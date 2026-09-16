@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Fraunces, Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { SimulationProvider } from "@/components/simulation-provider";
 import "./globals.css";
 
@@ -13,24 +13,17 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  weight: ["400", "500", "600", "700"],
-  style: ["normal", "italic"],
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "Backroute — The Autonomous AI Dispatcher",
+  title: "Backroute — Autonomous freight dispatch",
   description:
-    "Backroute finds, negotiates, books, tracks, documents, and chains the next load — so carriers never need a human dispatcher.",
+    "Backroute sources, negotiates, books, tracks, documents, and chains every load, end to end, so your trucks never run empty.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-white text-ink-950">
         <SimulationProvider>{children}</SimulationProvider>

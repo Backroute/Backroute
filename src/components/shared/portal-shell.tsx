@@ -19,6 +19,7 @@ export function PortalShell({
   navItems,
   switchTo,
   footer,
+  topBar,
   children,
 }: {
   variant: "light" | "dark";
@@ -26,6 +27,7 @@ export function PortalShell({
   navItems: NavItem[];
   switchTo?: { href: string; label: string };
   footer?: React.ReactNode;
+  topBar?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -103,7 +105,10 @@ export function PortalShell({
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 bg-ink-50/40">{children}</main>
+      <main className="min-w-0 flex-1 bg-ink-50/40">
+        {topBar && <div className="sticky top-0 z-20">{topBar}</div>}
+        {children}
+      </main>
     </div>
   );
 }

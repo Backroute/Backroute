@@ -25,8 +25,6 @@
   --accent-warn: #b3760b;
   --accent-danger: #b23a2f;
   --accent-info: #2b4c8c;
-
-  --font-serif: var(--font-fraunces);
 }
 
 @theme inline {
@@ -34,7 +32,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --font-display: var(--font-serif);
+  --font-display: var(--font-geist-sans);
 
   --color-ink-0: var(--ink-0);
   --color-ink-50: var(--ink-50);
@@ -76,7 +74,9 @@ body {
 }
 
 .font-display {
-  font-family: var(--font-serif), Georgia, serif;
+  font-family: var(--font-display), Arial, Helvetica, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .tabular {

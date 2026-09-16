@@ -2,8 +2,11 @@
 
 import { BarChart3, LayoutGrid, MessageSquareText, Settings, Truck } from "lucide-react";
 import { PortalShell, type NavItem } from "@/components/shared/portal-shell";
+import { TopBar } from "@/components/shared/top-bar";
+import { CommandPalette, type CommandGroup } from "@/components/shared/command-palette";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierEscalations, useCarrierLoads } from "@/lib/selectors";
 
 const NAV: NavItem[] = [
@@ -18,12 +21,27 @@ const NAV: NavItem[] = [
 export default function CarrierLayout({ children }: { children: React.ReactNode }) {
   const carrier = usePrimaryCarrier();
   const escalations = useCarrierEscalations().filter((e) => e.status === "open");
-  const pendingOffers = useCarrierLoads().filter((l) => l.stage === "offered").length;
+  const loads = useCarrierLoads();
+  const activity = useStore((s) => s.activity).filter((e) => e.carrierId === carrier.id);
+  const pendingOffers = loads.filter((l) => l.stage === "offered").length;
   const navWithBadge = NAV.map((n) => {
     if (n.href === "/carrier/negotiations") return { ...n, badge: escalations.length };
     if (n.href === "/carrier/loads") return { ...n, badge: pendingOffers };
     return n;
   });
+
+  const commandGroups: CommandGroup[] = [
+    { heading: "Go to", items: NAV.map((n) => ({ id: n.href, label: n.label, icon: n.icon, href: n.href })) },
+    {
+      heading: "Loads",
+      items: loads.slice(0, 30).map((l) => ({
+        id: l.id,
+        label: `${l.lane.origin} → ${l.lane.destination}`,
+        sublabel: l.referenceNumber,
+        href: `/carrier/loads/${l.id}`,
+      })),
+    },
+  ];
 
   return (
     <PortalShell
@@ -31,6 +49,15 @@ export default function CarrierLayout({ children }: { children: React.ReactNode 
       portalLabel="Carrier Dashboard"
       navItems={navWithBadge}
       switchTo={{ href: "/", label: "Back to home" }}
+      topBar={
+        <TopBar
+          notifications={activity}
+          accountName={carrier.name}
+          accountSubtitle={carrier.mc}
+          settingsHref="/carrier/settings"
+          exitHref="/"
+        />
+      }
       footer={
         <div className="flex items-center gap-2.5 rounded-xl border border-line px-3 py-2.5">
           <Avatar name={carrier.name} size="sm" />
@@ -42,6 +69,7 @@ export default function CarrierLayout({ children }: { children: React.ReactNode 
         </div>
       }
     >
+      <CommandPalette groups={commandGroups} />
       {children}
     </PortalShell>
   );

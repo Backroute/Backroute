@@ -1,15 +1,28 @@
 "use client";
 
-import { CheckCircle2, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle2, CreditCard, Download, FileText, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Avatar } from "@/components/ui/avatar";
 import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierTrucks } from "@/lib/selectors";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Aggressiveness } from "@/lib/store";
+
+const INVOICES = [
+  { id: "inv-1", date: "2026-09-01T00:00:00Z", amount: 3159, status: "Paid" as const },
+  { id: "inv-2", date: "2026-08-01T00:00:00Z", amount: 2884, status: "Paid" as const },
+  { id: "inv-3", date: "2026-07-01T00:00:00Z", amount: 2611, status: "Paid" as const },
+];
+
+const INITIAL_TEAM = [
+  { id: "tm-1", name: "Alicia Moreno", email: "alicia@titanfreight.com", role: "Owner" },
+  { id: "tm-2", name: "Chris Palmer", email: "chris@titanfreight.com", role: "Ops Manager" },
+];
 
 const AGGRESSIVENESS_OPTIONS: { key: Aggressiveness; label: string; desc: string }[] = [
   { key: "conservative", label: "Conservative", desc: "Holds close to listed rate, escalates often." },
@@ -22,6 +35,16 @@ export default function SettingsPage() {
   const trucks = useCarrierTrucks();
   const settings = useStore((s) => s.settings);
   const updateSettings = useStore((s) => s.actions.updateSettings);
+  const [team, setTeam] = useState(INITIAL_TEAM);
+  const [inviteEmail, setInviteEmail] = useState("");
+
+  function handleInvite() {
+    const email = inviteEmail.trim();
+    if (!email) return;
+    const name = email.split("@")[0].replace(/[._]/g, " ");
+    setTeam((t) => [...t, { id: `tm-${Date.now()}`, name: name.replace(/\b\w/g, (c) => c.toUpperCase()), email, role: "Dispatcher" }]);
+    setInviteEmail("");
+  }
 
   return (
     <div>
@@ -117,6 +140,99 @@ export default function SettingsPage() {
                   <RefreshCw className="h-3.5 w-3.5" /> Sync now
                 </Button>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Billing</CardTitle>
+            <CardDescription>{carrier.plan} plan &middot; $
+              {carrier.mrr}/mo + 2% of booked freight
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="!pt-3 flex flex-col gap-5">
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line p-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-ink-100 text-ink-600">
+                  <CreditCard className="h-4 w-4" />
+                </span>
+                <div>
+                  <p className="text-sm font-medium text-ink-900">Visa •••• 4242</p>
+                  <p className="text-xs text-ink-500">Expires 08/29 &middot; Next charge Oct 1</p>
+                </div>
+              </div>
+              <Button variant="outline" size="sm">Update payment method</Button>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">Invoice history</p>
+              <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
+                {INVOICES.map((inv) => (
+                  <div key={inv.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-100 text-ink-600">
+                        <FileText className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium text-ink-900">{formatDate(inv.date)}</p>
+                        <p className="text-xs text-ink-500">{formatCurrency(inv.amount)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge tone="success">{inv.status}</Badge>
+                      <button className="flex h-8 w-8 items-center justify-center rounded-full text-ink-500 hover:bg-ink-100">
+                        <Download className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Team</CardTitle>
+            <CardDescription>Who can see loads, negotiations, and approve escalations.</CardDescription>
+          </CardHeader>
+          <CardContent className="!pt-3 flex flex-col gap-4">
+            <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
+              {team.map((member) => (
+                <div key={member.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar name={member.name} size="sm" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-ink-900">{member.name}</p>
+                      <p className="truncate text-xs text-ink-500">{member.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge tone={member.role === "Owner" ? "dark" : "neutral"}>{member.role}</Badge>
+                    {member.role !== "Owner" && (
+                      <button
+                        onClick={() => setTeam((t) => t.filter((m) => m.id !== member.id))}
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 hover:text-[var(--accent-danger)]"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleInvite()}
+                placeholder="teammate@company.com"
+                className="flex-1 rounded-full border border-line bg-ink-50/60 px-4 py-2 text-sm outline-none focus:border-ink-400"
+              />
+              <Button size="sm" onClick={handleInvite}>
+                <Plus className="h-3.5 w-3.5" /> Invite
+              </Button>
             </div>
           </CardContent>
         </Card>
