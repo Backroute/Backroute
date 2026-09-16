@@ -37,7 +37,7 @@ export default function EarningsPage() {
 
   return (
     <div>
-      <PageHeader title="Earnings" description="Revenue, savings, and efficiency across your fleet." />
+      <PageHeader title="Earnings" />
 
       <div className="flex flex-col gap-6 px-8 py-6">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

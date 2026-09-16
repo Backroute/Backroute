@@ -20,7 +20,7 @@ export default function EscalationsPage() {
 
   return (
     <div>
-      <PageHeader title="Escalations" description="The rare edge cases the AI can't resolve on its own — by design." />
+      <PageHeader title="Escalations" description={`${open.length} awaiting review`} />
 
       <div className="flex flex-col gap-6 px-8 py-6">
         <div>

@@ -31,7 +31,7 @@ export default function OpsOverviewPage() {
 
   return (
     <div>
-      <PageHeader title="Overview" description="Real-time view of activity across every carrier on the platform." right={<LiveDot />} />
+      <PageHeader title="Overview" description={`${carriers.length} carriers · ${formatNumber(totalTrucks)} trucks tracked`} right={<LiveDot />} />
 
       <div className="flex flex-col gap-6 px-8 py-6">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

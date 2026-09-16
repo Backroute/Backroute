@@ -13,7 +13,7 @@ export default function BrokersPage() {
 
   return (
     <div>
-      <PageHeader title="Brokers" description="Every deal improves rate prediction and broker scoring across the network." />
+      <PageHeader title="Brokers" description={`${brokers.length} brokers ranked by reliability`} />
 
       <div className="px-8 py-6">
         <div className="overflow-hidden rounded-2xl border border-line bg-white">

@@ -48,7 +48,7 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <PageHeader title="Settings" description="AI handles sourcing, negotiating, booking, and tracking end to end. You only see it for rate-floor breaches, detention approvals, and true emergencies." />
+      <PageHeader title="Settings" />
 
       <div className="flex flex-col gap-6 px-8 py-6">
         <Card>

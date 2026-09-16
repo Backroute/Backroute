@@ -26,7 +26,7 @@ export default function NegotiationsPage() {
 
   return (
     <div>
-      <PageHeader title="Negotiations" description="Every AI conversation in flight, across email, SMS, and voice." right={<LiveDot />} />
+      <PageHeader title="Negotiations" description={`${active.length} active`} right={<LiveDot />} />
 
       <div className="px-8 py-6">
         <div className="grid grid-cols-3 gap-4">

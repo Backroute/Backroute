@@ -31,7 +31,7 @@ export default function RevenuePage() {
 
   return (
     <div>
-      <PageHeader title="Revenue" description="Flat subscription plus 2% take-rate on every load booked." />
+      <PageHeader title="Revenue" description="Subscription + 2% take-rate" />
 
       <div className="flex flex-col gap-6 px-8 py-6">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

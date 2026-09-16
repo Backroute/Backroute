@@ -21,7 +21,7 @@ export default function OpsLoadsPage() {
 
   return (
     <div>
-      <PageHeader title="Loads" description="Live pipeline across the network, shown for Titan Freight LLC." right={<LiveDot />} />
+      <PageHeader title="Loads" description={`${loads.length} loads · Titan Freight LLC`} right={<LiveDot />} />
 
       <div className="px-8 py-6">
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-5 lg:grid-cols-10">

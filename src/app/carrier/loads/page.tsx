@@ -53,7 +53,7 @@ export default function CarrierLoadsPage() {
 
   return (
     <div>
-      <PageHeader title="Loads" description="Every load the AI has sourced, negotiated, or booked for your fleet." right={<LiveDot />} />
+      <PageHeader title="Loads" description={`${loads.length} loads`} right={<LiveDot />} />
 
       <div className="px-8 py-6">
         <Tabs tabs={GROUPS.map((g) => ({ key: g.key, label: g.label, count: counts[g.key] }))} active={group} onChange={setGroup} />
