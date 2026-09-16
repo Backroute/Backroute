@@ -9,6 +9,7 @@ import {
   createSourcedLoad,
   incidentOpenedEvent,
   pushForBetterRate,
+  requestBetterOfferPrice,
   resolveLoadOffer,
   shouldChainNextLoad,
 } from "./engine";
@@ -88,6 +89,7 @@ interface StoreState {
     seedInitialOffers: () => void;
     updateHomeTimeTarget: (driverId: string, target: string) => void;
     requestBetterRate: (loadId: string, actor: "driver" | "carrier", amount?: number) => void;
+    requestBetterOfferPrice: (loadId: string, actor: "driver" | "carrier") => void;
   };
 }
 
@@ -183,11 +185,12 @@ export const useStore = create<StoreState>((set) => ({
           const offers = createLoadOfferBatch(state.brokers, PRIMARY_CARRIER_ID, truck.id, state.tickCount, false, state.settings.offersPerTruck, {
             excludeTiers,
             homeTimeTarget: driver?.homeTimeTarget,
+            equipmentType: truck.equipmentType,
           });
           loads = [...offers, ...loads];
           newEvents.push({
             id: uid("act"), timestamp: new Date().toISOString(), type: "load_offered",
-            message: `AI found ${offers.length} loads for ${truck.unitNumber}`, detail: `Scanned every connected board — awaiting ${driver ? driver.name.split(" ")[0] : "driver"}'s pick`,
+            message: `AI found ${offers.length} ${truck.equipmentType.toLowerCase()} loads for ${truck.unitNumber}`, detail: `Scanned every connected board — awaiting ${driver ? driver.name.split(" ")[0] : "driver"}'s pick`,
             loadId: offers[0]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info",
           });
         }
@@ -203,6 +206,7 @@ export const useStore = create<StoreState>((set) => ({
             const offers = createLoadOfferBatch(state.brokers, PRIMARY_CARRIER_ID, truck.id, state.tickCount + 1, true, state.settings.offersPerTruck, {
               excludeTiers,
               homeTimeTarget: driver?.homeTimeTarget,
+              equipmentType: truck.equipmentType,
             });
             loads = [...offers, ...loads];
             newEvents.push({
@@ -263,7 +267,7 @@ export const useStore = create<StoreState>((set) => ({
           }
 
           if (effectiveTruck && shouldChainNextLoad(result.load, effectiveTruck)) {
-            const chained = createSourcedLoad(state.brokers, PRIMARY_CARRIER_ID, state.tickCount + 1, effectiveTruck.id, true, excludeTiers);
+            const chained = createSourcedLoad(state.brokers, PRIMARY_CARRIER_ID, state.tickCount + 1, effectiveTruck.id, true, excludeTiers, effectiveTruck.equipmentType);
             loads = [chained, ...loads];
             trucks = trucks.map((t) => (t.id === effectiveTruck!.id ? { ...t, nextLoadId: chained.id } : t));
             newEvents.push({
@@ -427,6 +431,7 @@ export const useStore = create<StoreState>((set) => ({
         const driver = state.drivers.find((d) => d.id === truck.driverId);
         const offers = createLoadOfferBatch(state.brokers, PRIMARY_CARRIER_ID, truck.id, state.tickCount, true, state.settings.offersPerTruck, {
           homeTimeTarget: driver?.homeTimeTarget,
+          equipmentType: truck.equipmentType,
         });
         return {
           loads: [...offers, ...state.loads],
@@ -456,6 +461,27 @@ export const useStore = create<StoreState>((set) => ({
         return {
           loads: state.loads.map((l) => (l.id === updated.id ? updated : l)),
           activity: [...events, ...state.activity].slice(0, 80),
+        };
+      }),
+
+    requestBetterOfferPrice: (loadId, actor) =>
+      set((state) => {
+        const load = state.loads.find((l) => l.id === loadId);
+        if (!load) return {};
+        const broker = state.brokers.find((b) => b.id === load.brokerId);
+        const updated = requestBetterOfferPrice(load, broker);
+        if (updated === load) return {};
+        return {
+          loads: state.loads.map((l) => (l.id === updated.id ? updated : l)),
+          activity: [
+            {
+              id: uid("act"), timestamp: new Date().toISOString(), type: "negotiation_email" as const,
+              message: actor === "driver" ? "Driver asked AI for a better price before booking" : "Carrier asked AI for a better price before booking",
+              detail: `${broker?.company ?? load.source} · new ask $${updated.targetRate.toLocaleString()}`,
+              loadId: updated.id, carrierId: updated.carrierId, severity: "info" as const, channel: "email" as const,
+            },
+            ...state.activity,
+          ].slice(0, 80),
         };
       }),
   },

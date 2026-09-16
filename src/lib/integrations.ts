@@ -2,11 +2,12 @@ export interface IntegrationItem {
   id: string;
   name: string;
   connected: boolean;
+  /** What this specific provider does — distinct per item, not a repeated category description. */
+  detail: string;
 }
 
 export interface IntegrationCategory {
   name: string;
-  blurb: string;
   items: IntegrationItem[];
 }
 
@@ -14,44 +15,39 @@ export interface IntegrationCategory {
 export const INTEGRATION_CATEGORIES: IntegrationCategory[] = [
   {
     name: "Load boards",
-    blurb: "Where the AI sources and posts for freight",
     items: [
-      { id: "dat-one", name: "DAT One", connected: true },
-      { id: "truckstop", name: "Truckstop.com", connected: true },
-      { id: "123loadboard", name: "123Loadboard", connected: false },
+      { id: "dat-one", name: "DAT One", connected: true, detail: "Largest spot-market board — primary source" },
+      { id: "truckstop", name: "Truckstop.com", connected: true, detail: "Secondary board coverage + rate insight" },
+      { id: "123loadboard", name: "123Loadboard", connected: false, detail: "Additional regional board coverage" },
     ],
   },
   {
     name: "ELD & tracking",
-    blurb: "Live location, HOS, and check calls",
     items: [
-      { id: "samsara", name: "Samsara", connected: true },
-      { id: "motive", name: "Motive", connected: false },
-      { id: "geotab", name: "Geotab", connected: false },
+      { id: "samsara", name: "Samsara", connected: true, detail: "GPS, HOS, and dash cam data" },
+      { id: "motive", name: "Motive", connected: false, detail: "GPS and HOS data" },
+      { id: "geotab", name: "Geotab", connected: false, detail: "Fleet telematics and HOS data" },
     ],
   },
   {
     name: "Factoring & payments",
-    blurb: "Get paid on delivered loads faster than net-30",
     items: [
-      { id: "triumph", name: "Triumph Business Capital", connected: true },
-      { id: "rts-financial", name: "RTS Financial", connected: false },
+      { id: "triumph", name: "Triumph Business Capital", connected: true, detail: "Same-day invoice factoring" },
+      { id: "rts-financial", name: "RTS Financial", connected: false, detail: "Next-day invoice factoring" },
     ],
   },
   {
     name: "Rate intelligence",
-    blurb: "Live lane pricing the AI negotiates against",
     items: [
-      { id: "greenscreens", name: "Greenscreens.ai", connected: true },
-      { id: "dat-rateview", name: "DAT RateView", connected: false },
+      { id: "greenscreens", name: "Greenscreens.ai", connected: true, detail: "AI-powered lane rate benchmarking" },
+      { id: "dat-rateview", name: "DAT RateView", connected: false, detail: "Historical rate benchmarking" },
     ],
   },
   {
     name: "Compliance & verification",
-    blurb: "Broker and carrier vetting before every booking",
     items: [
-      { id: "fmcsa-safer", name: "FMCSA SAFER", connected: true },
-      { id: "highway", name: "Highway", connected: false },
+      { id: "fmcsa-safer", name: "FMCSA SAFER", connected: true, detail: "Federal carrier & broker safety records" },
+      { id: "highway", name: "Highway", connected: false, detail: "Automated broker fraud screening" },
     ],
   },
 ];

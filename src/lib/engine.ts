@@ -5,6 +5,7 @@ import type {
   ActivityType,
   Broker,
   CallTranscriptLine,
+  EquipmentType,
   Incident,
   IncidentType,
   Load,
@@ -37,6 +38,7 @@ export function createSourcedLoad(
   truckId: string | null,
   isChained: boolean,
   excludeTiers: Broker["tier"][] = [],
+  equipmentType?: EquipmentType,
 ): Load {
   const broker = pickBroker(brokers, excludeTiers);
   const lane = pick(LANES);
@@ -65,7 +67,7 @@ export function createSourcedLoad(
     source: pick(["DAT One", "Truckstop", "Numeo", "Direct Email", "Loadsmart"]),
     brokerId: broker.id,
     lane,
-    equipmentType: pick(EQUIPMENT),
+    equipmentType: equipmentType ?? pick(EQUIPMENT),
     weight: randInt(22000, 44500),
     pickupWindow: `${pick(["today", "tomorrow"])}, ${randInt(6, 14)}:00–${randInt(15, 19)}:00`,
     deliveryWindow: `${randInt(1, 3)} day transit`,
@@ -97,6 +99,7 @@ export function createSourcedLoad(
 export interface OfferOptions {
   excludeTiers?: Broker["tier"][];
   homeTimeTarget?: string;
+  equipmentType?: EquipmentType;
 }
 
 /** AI has scanned the boards and scored several candidates for one truck — driver/carrier picks one. */
@@ -113,7 +116,7 @@ export function createLoadOfferBatch(
   const homeFitIndex = wantsHomeTime ? randInt(0, count - 1) : -1;
 
   const candidates = Array.from({ length: count }, (_, i) => {
-    const base = createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers);
+    const base = createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType);
     const { netProfit, rpm } = computeEconomics(base.targetRate, base.lane.miles, base.deadheadMiles, base.fuelCost, base.tollCost);
     return {
       ...base,
@@ -429,6 +432,25 @@ export function pushForBetterRate(
     ),
   ];
   return { load: next, events };
+}
+
+/** Before committing to an offer, driver/carrier can ask the AI to go get a better number from the broker first — exactly
+ *  how a human would tell a dispatcher "see if they'll come up" before saying yes to a load. Recomputes score and
+ *  net profit live so the offer card reflects the new ask immediately. */
+export function requestBetterOfferPrice(load: Load, broker: Broker | undefined): Load {
+  if (load.stage !== "offered") return load;
+  const bumpedTarget = Math.min(Math.max(Math.round(load.targetRate * 1.06), load.targetRate + 40), Math.round(load.listedRate * 1.3));
+  const { netProfit, rpm } = computeEconomics(bumpedTarget, load.lane.miles, load.deadheadMiles, load.fuelCost, load.tollCost);
+  const score = computeLoadScore({
+    rate: bumpedTarget,
+    netProfit,
+    miles: load.lane.miles,
+    deadheadMiles: load.deadheadMiles,
+    rpm,
+    marketRpm: load.lane.marketRpm,
+    brokerReliability: broker?.reliability ?? 70,
+  });
+  return { ...load, targetRate: bumpedTarget, netProfit, rpm, score, updatedAt: new Date().toISOString() };
 }
 
 // ---------- Incidents: the AI handling breakdowns, accidents, delays and weather like a real dispatcher would ----------

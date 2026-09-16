@@ -20,6 +20,7 @@ export default function DriverHomePage() {
   const incidents = useStore((s) => s.incidents).filter((i) => i.driverId === driver.id && i.status === "active");
   const selectLoadOffer = useStore((s) => s.actions.selectLoadOffer);
   const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
+  const requestBetterOfferPrice = useStore((s) => s.actions.requestBetterOfferPrice);
 
   const truck = trucks.find((t) => t.id === driver.truckId);
   const currentLoad = loads.find((l) => l.id === truck?.currentLoadId);
@@ -83,6 +84,7 @@ export default function DriverHomePage() {
                 broker={brokers.get(offer.brokerId)}
                 compact
                 onSelect={() => offer.offerGroupId && selectLoadOffer(offer.offerGroupId, offer.id, "driver")}
+                onNegotiate={() => requestBetterOfferPrice(offer.id, "driver")}
               />
             ))}
           </div>

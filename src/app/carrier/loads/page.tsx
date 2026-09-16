@@ -29,6 +29,7 @@ export default function CarrierLoadsPage() {
   const brokers = useBrokerMap();
   const trucks = useTruckMap();
   const selectLoadOffer = useStore((s) => s.actions.selectLoadOffer);
+  const requestBetterOfferPrice = useStore((s) => s.actions.requestBetterOfferPrice);
   const [group, setGroup] = useState("active");
 
   const activeGroup = GROUPS.find((g) => g.key === group)!;
@@ -77,6 +78,7 @@ export default function CarrierLoadsPage() {
                         load={load}
                         broker={brokers.get(load.brokerId)}
                         onSelect={() => selectLoadOffer(groupId, load.id, "carrier")}
+                        onNegotiate={() => requestBetterOfferPrice(load.id, "carrier")}
                       />
                     ))}
                   </div>

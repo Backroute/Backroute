@@ -168,7 +168,7 @@ export default function SettingsPage() {
                           </span>
                           <div>
                             <p className="text-sm font-medium text-ink-900">{item.name}</p>
-                            <p className="text-xs text-ink-500">{cat.blurb}</p>
+                            <p className="text-xs text-ink-500">{item.detail}</p>
                           </div>
                         </div>
                         {connected ? (
