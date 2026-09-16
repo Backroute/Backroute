@@ -90,10 +90,10 @@ export function LoadOfferCard({
       </p>
 
       <div className="grid grid-cols-2 gap-2">
-        <Stat label="Est. net (after our 2%)" value={formatCurrency(load.netProfit ?? 0)} dark={load.recommended} pulse={asking} emphasize />
+        <Stat label="Total offer" value={formatCurrency(load.targetRate)} dark={load.recommended} pulse={asking} />
+        <Stat label="Est. net" value={formatCurrency(load.netProfit ?? 0)} dark={load.recommended} pulse={asking} emphasize />
         <Stat label="Rate / mi" value={`$${(load.rpm ?? 0).toFixed(2)}`} dark={load.recommended} pulse={asking} />
         <Stat label="Pickup" value={load.pickupWindow.split(",")[0]} dark={load.recommended} />
-        <Stat label="Our commission" value={formatCurrency(load.commission)} dark={load.recommended} />
       </div>
 
       <div className="flex gap-2">
