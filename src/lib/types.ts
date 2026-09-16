@@ -1,6 +1,7 @@
 export type LoadStage =
   | "sourced"
   | "scoring"
+  | "offered"
   | "negotiating"
   | "rate_confirmed"
   | "booked"
@@ -8,11 +9,13 @@ export type LoadStage =
   | "at_pickup"
   | "in_transit"
   | "at_delivery"
-  | "delivered";
+  | "delivered"
+  | "declined";
 
 export const LOAD_STAGE_ORDER: LoadStage[] = [
   "sourced",
   "scoring",
+  "offered",
   "negotiating",
   "rate_confirmed",
   "booked",
@@ -26,6 +29,7 @@ export const LOAD_STAGE_ORDER: LoadStage[] = [
 export const LOAD_STAGE_LABEL: Record<LoadStage, string> = {
   sourced: "Sourced",
   scoring: "Scoring",
+  offered: "Awaiting Choice",
   negotiating: "Negotiating",
   rate_confirmed: "Rate Confirmed",
   booked: "Booked",
@@ -34,6 +38,7 @@ export const LOAD_STAGE_LABEL: Record<LoadStage, string> = {
   in_transit: "In Transit",
   at_delivery: "At Delivery",
   delivered: "Delivered",
+  declined: "Declined",
 };
 
 export type Channel = "email" | "sms" | "voice";
@@ -77,6 +82,8 @@ export interface Driver {
   cdl: string;
   rating: number;
   hireDate: string;
+  homeBase: string;
+  homeTimeTarget: string;
 }
 
 export interface Truck {
@@ -175,6 +182,9 @@ export interface Load {
   aiConfidence: number;
   ticksInStage: number;
   progressPct: number;
+  offerGroupId?: string;
+  recommended?: boolean;
+  homeTimeFit?: boolean;
 }
 
 export type ActivityType =
@@ -192,7 +202,10 @@ export type ActivityType =
   | "document_captured"
   | "delivered"
   | "chained"
-  | "escalation";
+  | "escalation"
+  | "load_offered"
+  | "offer_selected"
+  | "incident";
 
 export interface ActivityEvent {
   id: string;
@@ -221,4 +234,25 @@ export interface DriverMessage {
   from: "driver" | "ai";
   content: string;
   timestamp: string;
+}
+
+export type IncidentType = "breakdown" | "accident" | "delay" | "weather";
+
+export interface IncidentStep {
+  label: string;
+  status: "pending" | "done";
+  timestamp?: string;
+}
+
+export interface Incident {
+  id: string;
+  driverId: string;
+  carrierId: string;
+  truckId: string;
+  loadId: string | null;
+  type: IncidentType;
+  note: string;
+  createdAt: string;
+  status: "active" | "resolved";
+  steps: IncidentStep[];
 }

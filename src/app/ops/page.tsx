@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { ArrowUpRight, Mail, MessageSquare, Phone, Radar } from "lucide-react";
+import { ArrowUpRight, LifeBuoy, Mail, MessageSquare, Phone, Radar } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
@@ -18,6 +18,9 @@ export default function OpsOverviewPage() {
   const metrics = useStore((s) => s.liveMetrics);
   const allEscalations = useStore((s) => s.escalations);
   const escalations = useMemo(() => allEscalations.filter((e) => e.status === "open"), [allEscalations]);
+  const allIncidents = useStore((s) => s.incidents);
+  const activeIncidents = useMemo(() => allIncidents.filter((i) => i.status === "active"), [allIncidents]);
+  const trucks = useStore((s) => s.trucks);
 
   const totalTrucks = carriers.reduce((s, c) => s + c.trucks, 0);
   const gmv = carriers.reduce((s, c) => s + c.gmvMonth, 0);
@@ -84,6 +87,33 @@ export default function OpsOverviewPage() {
                 <Link href="/ops/escalations" className="text-xs font-medium text-ink-950 hover:underline">
                   Review queue →
                 </Link>
+              </CardContent>
+            </Card>
+
+            <Card className={activeIncidents.length ? "border-[var(--accent-danger)]/40" : undefined}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <LifeBuoy className="h-4 w-4" /> Active incidents
+                </CardTitle>
+                <Badge tone={activeIncidents.length ? "danger" : "success"}>{activeIncidents.length} active</Badge>
+              </CardHeader>
+              <CardContent className="!pt-3">
+                {activeIncidents.length === 0 ? (
+                  <p className="text-xs text-ink-400">No breakdowns, accidents, or delays reported.</p>
+                ) : (
+                  <div className="flex flex-col gap-2.5">
+                    {activeIncidents.map((incident) => {
+                      const truck = trucks.find((t) => t.id === incident.truckId);
+                      const done = incident.steps.filter((s) => s.status === "done").length;
+                      return (
+                        <div key={incident.id} className="flex items-center justify-between text-xs">
+                          <span className="capitalize text-ink-700">{incident.type} · {truck?.unitNumber ?? "—"}</span>
+                          <span className="tabular text-ink-400">{done}/{incident.steps.length}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
 

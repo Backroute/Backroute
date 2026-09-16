@@ -4,6 +4,7 @@ import { LOAD_STAGE_LABEL, type LoadStage } from "@/lib/types";
 const STAGE_TONE: Record<LoadStage, string> = {
   sourced: "bg-ink-100 text-ink-600",
   scoring: "bg-ink-100 text-ink-600",
+  offered: "bg-amber-50 text-[var(--accent-warn)]",
   negotiating: "bg-amber-50 text-[var(--accent-warn)]",
   rate_confirmed: "bg-blue-50 text-[var(--accent-info)]",
   booked: "bg-blue-50 text-[var(--accent-info)]",
@@ -12,6 +13,7 @@ const STAGE_TONE: Record<LoadStage, string> = {
   in_transit: "bg-emerald-50 text-[var(--accent-live)]",
   at_delivery: "bg-emerald-50 text-[var(--accent-live)]",
   delivered: "bg-ink-950 text-white",
+  declined: "bg-ink-100 text-ink-400",
 };
 
 export function LoadStagePill({ stage, className }: { stage: LoadStage; className?: string }) {

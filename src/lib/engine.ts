@@ -4,6 +4,8 @@ import type {
   ActivityType,
   Broker,
   CallTranscriptLine,
+  Incident,
+  IncidentType,
   Load,
   LoadStage,
   NegotiationMessage,
@@ -22,8 +24,20 @@ function costsForLane(miles: number, deadheadMiles: number) {
   return { fuelCost, tollCost };
 }
 
-export function createSourcedLoad(brokers: Broker[], carrierId: string, refSeed: number, truckId: string | null, isChained: boolean): Load {
-  const broker = pick(brokers);
+function pickBroker(brokers: Broker[], excludeTiers: Broker["tier"][] = []): Broker {
+  const pool = excludeTiers.length ? brokers.filter((b) => !excludeTiers.includes(b.tier)) : brokers;
+  return pick(pool.length ? pool : brokers);
+}
+
+export function createSourcedLoad(
+  brokers: Broker[],
+  carrierId: string,
+  refSeed: number,
+  truckId: string | null,
+  isChained: boolean,
+  excludeTiers: Broker["tier"][] = [],
+): Load {
+  const broker = pickBroker(brokers, excludeTiers);
   const lane = pick(LANES);
   const marketRate = lane.miles * lane.marketRpm;
   const listedRate = Math.round(marketRate * (0.86 + Math.random() * 0.1));
@@ -63,6 +77,101 @@ export function createSourcedLoad(brokers: Broker[], carrierId: string, refSeed:
     ticksInStage: 0,
     progressPct: 4,
   };
+}
+
+export interface OfferOptions {
+  excludeTiers?: Broker["tier"][];
+  homeTimeTarget?: string;
+}
+
+/** AI has scanned the boards and scored several candidates for one truck — driver/carrier picks one. */
+export function createLoadOfferBatch(
+  brokers: Broker[],
+  carrierId: string,
+  truckId: string,
+  refSeed: number,
+  isChained: boolean,
+  count = 3,
+  opts: OfferOptions = {},
+): Load[] {
+  const wantsHomeTime = !!opts.homeTimeTarget && opts.homeTimeTarget !== "No preference set";
+  const homeFitIndex = wantsHomeTime ? randInt(0, count - 1) : -1;
+
+  const candidates = Array.from({ length: count }, (_, i) => {
+    const base = createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers);
+    const projectedRate = base.targetRate;
+    const netProfit = Math.round(projectedRate - base.fuelCost - base.tollCost - base.deadheadMiles * 0.68);
+    const rpm = Math.round((projectedRate / base.lane.miles) * 100) / 100;
+    return {
+      ...base,
+      stage: "offered" as const,
+      netProfit,
+      rpm,
+      progressPct: 16,
+      homeTimeFit: i === homeFitIndex,
+    };
+  });
+
+  const offerGroupId = uid("offer");
+  const best = candidates.reduce((a, b) => ((b.netProfit ?? 0) > (a.netProfit ?? 0) ? b : a));
+
+  return candidates.map((c) => ({ ...c, offerGroupId, recommended: c.id === best.id }));
+}
+
+interface OfferResolution {
+  loads: Load[];
+  events: ActivityEvent[];
+}
+
+/** Chosen load moves back into the normal pipeline; the rest of its offer group is declined. */
+export function resolveLoadOffer(loads: Load[], offerGroupId: string, chosenId: string, actor: "driver" | "carrier" | "ai"): OfferResolution {
+  const group = loads.filter((l) => l.offerGroupId === offerGroupId);
+  const chosen = group.find((l) => l.id === chosenId);
+  if (!chosen) return { loads, events: [] };
+
+  const now = new Date().toISOString();
+  const updated = loads.map((l) => {
+    if (l.offerGroupId !== offerGroupId) return l;
+    if (l.id === chosenId) {
+      return { ...l, stage: "scoring" as const, progressPct: 12, updatedAt: now, ticksInStage: 0 };
+    }
+    return { ...l, stage: "declined" as const, progressPct: 100, updatedAt: now };
+  });
+
+  const actorLabel = actor === "driver" ? "Driver selected the next load" : actor === "carrier" ? "Carrier selected the next load" : "AI auto-selected the top-scored load";
+  const events: ActivityEvent[] = [
+    mkEvent(
+      chosen.carrierId,
+      chosen.id,
+      "offer_selected",
+      actorLabel,
+      `${chosen.lane.origin} → ${chosen.lane.destination} · est. net $${(chosen.netProfit ?? 0).toLocaleString()} · ${group.length - 1} other option${group.length - 1 === 1 ? "" : "s"} declined`,
+      "success",
+    ),
+  ];
+
+  return { loads: updated, events };
+}
+
+/** Offers left unattended past the timeout get auto-resolved when autonomy is enabled. */
+export function autoResolveStaleOffers(loads: Load[], staleMs: number, autoBookEnabled: boolean): OfferResolution {
+  if (!autoBookEnabled) return { loads, events: [] };
+  const now = Date.now();
+  const groupIds = new Set(
+    loads.filter((l) => l.stage === "offered" && now - new Date(l.createdAt).getTime() > staleMs).map((l) => l.offerGroupId!),
+  );
+
+  let result = loads;
+  const events: ActivityEvent[] = [];
+  for (const groupId of groupIds) {
+    const group = result.filter((l) => l.offerGroupId === groupId && l.stage === "offered");
+    const best = group.find((l) => l.recommended) ?? group[0];
+    if (!best) continue;
+    const resolved = resolveLoadOffer(result, groupId, best.id, "ai");
+    result = resolved.loads;
+    events.push(...resolved.events);
+  }
+  return { loads: result, events };
 }
 
 const EMAIL_OPEN = (o: string, d: string, miles: number) =>
@@ -109,11 +218,11 @@ interface StepResult {
 }
 
 const STAGE_PROGRESS: Record<LoadStage, number> = {
-  sourced: 4, scoring: 12, negotiating: 30, rate_confirmed: 44, booked: 54,
-  dispatched: 64, at_pickup: 72, in_transit: 84, at_delivery: 94, delivered: 100,
+  sourced: 4, scoring: 12, offered: 16, negotiating: 30, rate_confirmed: 44, booked: 54,
+  dispatched: 64, at_pickup: 72, in_transit: 84, at_delivery: 94, delivered: 100, declined: 100,
 };
 
-function mkEvent(carrierId: string, loadId: string, type: ActivityType, message: string, detail: string, severity: ActivityEvent["severity"], channel?: ActivityEvent["channel"]): ActivityEvent {
+function mkEvent(carrierId: string, loadId: string | undefined, type: ActivityType, message: string, detail: string, severity: ActivityEvent["severity"], channel?: ActivityEvent["channel"]): ActivityEvent {
   return { id: uid("act"), timestamp: new Date().toISOString(), type, message, detail, loadId, carrierId, severity, channel };
 }
 
@@ -243,4 +352,85 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
 
 export function shouldChainNextLoad(load: Load, truck: Truck | undefined): boolean {
   return !!truck && load.stage === "in_transit" && !truck.nextLoadId && chance(0.5);
+}
+
+// ---------- Incidents: the AI handling breakdowns, accidents, delays and weather like a real dispatcher would ----------
+
+const INCIDENT_STEPS: Record<IncidentType, string[]> = {
+  breakdown: [
+    "Confirming driver safety and location",
+    "Dispatching mobile roadside repair",
+    "Notifying broker of the delay",
+    "Confirming updated delivery time with receiver",
+  ],
+  accident: [
+    "Confirming driver is safe",
+    "Notifying carrier safety and insurance",
+    "Arranging tow and inspection",
+    "Notifying broker and rebooking delivery window",
+  ],
+  delay: [
+    "Notifying broker of updated ETA",
+    "Confirming receiver can accept late arrival",
+    "Re-sequencing the next load if needed",
+  ],
+  weather: [
+    "Monitoring route conditions",
+    "Rerouting around severe weather",
+    "Notifying broker of possible delay",
+    "Confirming updated ETA with receiver",
+  ],
+};
+
+const INCIDENT_LABEL: Record<IncidentType, string> = {
+  breakdown: "Breakdown",
+  accident: "Accident",
+  delay: "Delay",
+  weather: "Weather",
+};
+
+export function createIncident(driverId: string, carrierId: string, truckId: string, loadId: string | null, type: IncidentType, note: string): Incident {
+  return {
+    id: uid("incident"),
+    driverId,
+    carrierId,
+    truckId,
+    loadId,
+    type,
+    note,
+    createdAt: new Date().toISOString(),
+    status: "active",
+    steps: INCIDENT_STEPS[type].map((label) => ({ label, status: "pending" as const })),
+  };
+}
+
+export function incidentOpenedEvent(incident: Incident, truck: Truck | undefined): ActivityEvent {
+  return mkEvent(
+    incident.carrierId,
+    incident.loadId ?? undefined,
+    "incident",
+    `${INCIDENT_LABEL[incident.type]} reported${truck ? ` — ${truck.unitNumber}` : ""}`,
+    incident.note || "AI dispatcher is handling it now.",
+    "warning",
+  );
+}
+
+/** Advance one incident by one step per tick, like a dispatcher working a checklist. */
+export function advanceIncident(incident: Incident): { incident: Incident; event?: ActivityEvent } {
+  const nextStepIndex = incident.steps.findIndex((s) => s.status === "pending");
+  if (nextStepIndex === -1) {
+    if (incident.status === "resolved") return { incident };
+    const resolved: Incident = { ...incident, status: "resolved" };
+    return {
+      incident: resolved,
+      event: mkEvent(incident.carrierId, incident.loadId ?? undefined, "incident", `${INCIDENT_LABEL[incident.type]} resolved`, "Driver and load back on plan.", "success"),
+    };
+  }
+
+  const steps = incident.steps.map((s, i) => (i === nextStepIndex ? { ...s, status: "done" as const, timestamp: new Date().toISOString() } : s));
+  const updated: Incident = { ...incident, steps };
+  return {
+    incident: updated,
+    event: mkEvent(incident.carrierId, incident.loadId ?? undefined, "incident", steps[nextStepIndex].label, `${INCIDENT_LABEL[incident.type]} · in progress`, "info"),
+  };
 }

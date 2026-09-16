@@ -1,11 +1,12 @@
 "use client";
 
-import { Phone, Star } from "lucide-react";
+import { Home, Phone, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { usePrimaryDriver, useCarrierTrucks, usePrimaryCarrier } from "@/lib/selectors";
-import { formatDate, formatNumber } from "@/lib/utils";
+import { useStore } from "@/lib/store";
+import { cn, formatDate, formatNumber } from "@/lib/utils";
 import type { HosStatus } from "@/lib/types";
 
 const HOS_TONE: Record<HosStatus, "success" | "neutral" | "info" | "warning"> = {
@@ -15,11 +16,14 @@ const HOS_TONE: Record<HosStatus, "success" | "neutral" | "info" | "warning"> = 
   sleeper: "warning",
 };
 
+const HOME_TIME_OPTIONS = ["No preference set", "Home by Friday", "Home by Saturday", "Home by Sunday"];
+
 export default function DriverProfilePage() {
   const driver = usePrimaryDriver();
   const carrier = usePrimaryCarrier();
   const trucks = useCarrierTrucks();
   const truck = trucks.find((t) => t.id === driver.truckId);
+  const updateHomeTimeTarget = useStore((s) => s.actions.updateHomeTimeTarget);
 
   return (
     <div className="flex flex-col gap-5 px-5">
@@ -39,6 +43,29 @@ export default function DriverProfilePage() {
         </div>
         <Progress value={(driver.hoursRemaining / 11) * 100} className="mt-2" />
         <p className="mt-1.5 text-xs text-ink-400">{driver.hoursRemaining.toFixed(1)} hours remaining today</p>
+      </div>
+
+      <div className="rounded-2xl border border-line p-4">
+        <div className="flex items-center gap-2">
+          <Home className="h-3.5 w-3.5 text-ink-400" />
+          <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">Home-time preference</p>
+        </div>
+        <p className="mt-1 text-xs text-ink-500">AI factors this in when scoring your next-load options.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {HOME_TIME_OPTIONS.map((opt) => (
+            <button
+              key={opt}
+              onClick={() => updateHomeTimeTarget(driver.id, opt)}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                driver.homeTimeTarget === opt ? "bg-ink-950 text-white" : "bg-ink-100 text-ink-600 hover:bg-ink-150",
+              )}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-ink-400">Home base: {driver.homeBase}</p>
       </div>
 
       {truck && (

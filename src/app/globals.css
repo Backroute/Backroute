@@ -26,7 +26,7 @@
   --accent-danger: #b23a2f;
   --accent-info: #2b4c8c;
 
-  --font-serif: var(--font-instrument-serif);
+  --font-serif: var(--font-fraunces);
 }
 
 @theme inline {

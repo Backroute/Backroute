@@ -1,6 +1,16 @@
 import { create } from "zustand";
 import { generateWorld, PRIMARY_CARRIER_ID } from "./mock-data";
-import { advanceLoad, createSourcedLoad, shouldChainNextLoad } from "./engine";
+import {
+  advanceIncident,
+  advanceLoad,
+  autoResolveStaleOffers,
+  createIncident,
+  createLoadOfferBatch,
+  createSourcedLoad,
+  incidentOpenedEvent,
+  resolveLoadOffer,
+  shouldChainNextLoad,
+} from "./engine";
 import { clamp } from "./utils";
 import type {
   ActivityEvent,
@@ -9,6 +19,8 @@ import type {
   Driver,
   DriverMessage,
   Escalation,
+  Incident,
+  IncidentType,
   Load,
   Truck,
 } from "./types";
@@ -31,6 +43,8 @@ export interface AgentSettings {
   notifyEmail: boolean;
   notifySms: boolean;
   rateFloorPct: number;
+  avoidWatchBrokers: boolean;
+  offersPerTruck: number;
 }
 
 export interface LiveMetrics {
@@ -58,6 +72,7 @@ interface StoreState {
   activity: ActivityEvent[];
   escalations: Escalation[];
   driverMessages: DriverMessage[];
+  incidents: Incident[];
   settings: AgentSettings;
   liveMetrics: LiveMetrics;
   tickCount: number;
@@ -67,6 +82,10 @@ interface StoreState {
     sendDriverMessage: (driverId: string, content: string) => void;
     updateSettings: (partial: Partial<AgentSettings>) => void;
     captureDocument: (loadId: string, type: "bol" | "pod") => void;
+    selectLoadOffer: (offerGroupId: string, loadId: string, actor: "driver" | "carrier") => void;
+    reportIncident: (driverId: string, truckId: string, type: IncidentType, note: string) => void;
+    seedInitialOffers: () => void;
+    updateHomeTimeTarget: (driverId: string, target: string) => void;
   };
 }
 
@@ -96,6 +115,8 @@ export const useStore = create<StoreState>((set) => ({
     notifyEmail: true,
     notifySms: false,
     rateFloorPct: 96,
+    avoidWatchBrokers: false,
+    offersPerTruck: 3,
   },
   liveMetrics: {
     activeCalls: 9,
@@ -112,14 +133,15 @@ export const useStore = create<StoreState>((set) => ({
         let loads = state.loads;
         let trucks = state.trucks;
         let escalations = state.escalations;
+        let incidents = state.incidents;
         const newEvents: ActivityEvent[] = [];
+        const excludeTiers: Broker["tier"][] = state.settings.avoidWatchBrokers ? ["watch"] : [];
 
-        const activeLoads = loads.filter((l) => l.stage !== "delivered" && l.carrierId === PRIMARY_CARRIER_ID);
-        const availableTrucks = trucks.filter((t) => t.status === "available" && !t.nextLoadId);
+        const activeLoads = loads.filter((l) => l.stage !== "delivered" && l.stage !== "declined" && l.carrierId === PRIMARY_CARRIER_ID);
 
-        if (activeLoads.length < 13 && Math.random() < 0.42) {
-          const preassign = availableTrucks.length && Math.random() < 0.25 ? pick(availableTrucks) : null;
-          const newLoad = createSourcedLoad(state.brokers, PRIMARY_CARRIER_ID, state.tickCount, preassign?.id ?? null, false);
+        // Background market activity: loads the AI is working speculatively, not yet tied to a truck.
+        if (activeLoads.length < 13 && Math.random() < 0.32) {
+          const newLoad = createSourcedLoad(state.brokers, PRIMARY_CARRIER_ID, state.tickCount, null, false, excludeTiers);
           loads = [newLoad, ...loads];
           newEvents.push({
             id: uid("act"), timestamp: new Date().toISOString(), type: "load_sourced",
@@ -128,7 +150,63 @@ export const useStore = create<StoreState>((set) => ({
           });
         }
 
-        const candidates = loads.filter((l) => l.stage !== "delivered" && l.carrierId === PRIMARY_CARRIER_ID);
+        // Trucks with nothing lined up: AI scans the boards and hands back a shortlist to choose from.
+        const freeTrucks = trucks.filter(
+          (t) => t.status === "available" && !t.currentLoadId && !t.nextLoadId && !loads.some((l) => l.truckId === t.id && l.stage === "offered"),
+        );
+        if (freeTrucks.length && Math.random() < 0.35) {
+          const truck = pick(freeTrucks);
+          const driver = state.drivers.find((d) => d.id === truck.driverId);
+          const offers = createLoadOfferBatch(state.brokers, PRIMARY_CARRIER_ID, truck.id, state.tickCount, false, state.settings.offersPerTruck, {
+            excludeTiers,
+            homeTimeTarget: driver?.homeTimeTarget,
+          });
+          loads = [...offers, ...loads];
+          newEvents.push({
+            id: uid("act"), timestamp: new Date().toISOString(), type: "load_offered",
+            message: `AI found ${offers.length} loads for ${truck.unitNumber}`, detail: `Scanned every connected board — awaiting ${driver ? driver.name.split(" ")[0] : "driver"}'s pick`,
+            loadId: offers[0]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info",
+          });
+        }
+
+        // Trucks running a load with nothing chained yet: offer a shortlist for the next leg before this one delivers.
+        const chainCandidates = trucks.filter(
+          (t) => t.status === "on_load" && !t.nextLoadId && !loads.some((l) => l.truckId === t.id && l.stage === "offered"),
+        );
+        for (const truck of chainCandidates) {
+          const currentLoad = loads.find((l) => l.id === truck.currentLoadId);
+          if (currentLoad?.stage === "in_transit" && Math.random() < 0.22) {
+            const driver = state.drivers.find((d) => d.id === truck.driverId);
+            const offers = createLoadOfferBatch(state.brokers, PRIMARY_CARRIER_ID, truck.id, state.tickCount + 1, true, state.settings.offersPerTruck, {
+              excludeTiers,
+              homeTimeTarget: driver?.homeTimeTarget,
+            });
+            loads = [...offers, ...loads];
+            newEvents.push({
+              id: uid("act"), timestamp: new Date().toISOString(), type: "load_offered",
+              message: `Next-load options ready for ${truck.unitNumber}`, detail: `Pre-negotiating before delivery — ${offers.length} options found`,
+              loadId: offers[0]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info",
+            });
+          }
+        }
+
+        // Auto-pick offers nobody has acted on, if autonomy is enabled.
+        const staleResolved = autoResolveStaleOffers(loads, 13000, state.settings.autoBookEnabled);
+        if (staleResolved.events.length) {
+          loads = staleResolved.loads;
+          newEvents.push(...staleResolved.events);
+          for (const ev of staleResolved.events) {
+            const chosen = loads.find((l) => l.id === ev.loadId);
+            if (chosen?.truckId) {
+              trucks = trucks.map((t) => {
+                if (t.id !== chosen.truckId) return t;
+                return t.currentLoadId ? { ...t, nextLoadId: chosen.id } : t;
+              });
+            }
+          }
+        }
+
+        const candidates = loads.filter((l) => l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "offered" && l.carrierId === PRIMARY_CARRIER_ID);
         if (candidates.length && Math.random() < 0.88) {
           const target = pick(candidates);
           const broker = state.brokers.find((b) => b.id === target.brokerId);
@@ -162,7 +240,7 @@ export const useStore = create<StoreState>((set) => ({
           }
 
           if (effectiveTruck && shouldChainNextLoad(result.load, effectiveTruck)) {
-            const chained = createSourcedLoad(state.brokers, PRIMARY_CARRIER_ID, state.tickCount + 1, effectiveTruck.id, true);
+            const chained = createSourcedLoad(state.brokers, PRIMARY_CARRIER_ID, state.tickCount + 1, effectiveTruck.id, true, excludeTiers);
             loads = [chained, ...loads];
             trucks = trucks.map((t) => (t.id === effectiveTruck!.id ? { ...t, nextLoadId: chained.id } : t));
             newEvents.push({
@@ -186,12 +264,21 @@ export const useStore = create<StoreState>((set) => ({
           });
         }
 
+        const activeIncidents = incidents.filter((i) => i.status === "active");
+        if (activeIncidents.length && Math.random() < 0.6) {
+          const target = pick(activeIncidents);
+          const result = advanceIncident(target);
+          incidents = incidents.map((i) => (i.id === result.incident.id ? result.incident : i));
+          if (result.event) newEvents.push(result.event);
+        }
+
         const step = (v: number, min: number, max: number, jitter = 2) => clamp(v + randInt(-jitter, jitter), min, max);
 
         return {
           loads,
           trucks,
           escalations,
+          incidents,
           activity: [...newEvents, ...state.activity].slice(0, 80),
           tickCount: state.tickCount + 1,
           liveMetrics: {
@@ -253,6 +340,59 @@ export const useStore = create<StoreState>((set) => ({
           ].slice(0, 80),
         };
       }),
+
+    selectLoadOffer: (offerGroupId, loadId, actor) =>
+      set((state) => {
+        const { loads, events } = resolveLoadOffer(state.loads, offerGroupId, loadId, actor);
+        const chosen = loads.find((l) => l.id === loadId);
+        let trucks = state.trucks;
+        if (chosen?.truckId) {
+          trucks = trucks.map((t) => (t.id === chosen.truckId && t.currentLoadId ? { ...t, nextLoadId: loadId } : t));
+        }
+        return {
+          loads,
+          trucks,
+          activity: [...events, ...state.activity].slice(0, 80),
+        };
+      }),
+
+    reportIncident: (driverId, truckId, type, note) =>
+      set((state) => {
+        const truck = state.trucks.find((t) => t.id === truckId);
+        const incident = createIncident(driverId, PRIMARY_CARRIER_ID, truckId, truck?.currentLoadId ?? null, type, note);
+        return {
+          incidents: [incident, ...state.incidents],
+          activity: [incidentOpenedEvent(incident, truck), ...state.activity].slice(0, 80),
+        };
+      }),
+
+    seedInitialOffers: () =>
+      set((state) => {
+        if (state.loads.some((l) => l.stage === "offered")) return {};
+        const truck = state.trucks.find((t) => t.id === "truck-marcus");
+        if (!truck || truck.nextLoadId || !truck.currentLoadId) return {};
+        const driver = state.drivers.find((d) => d.id === truck.driverId);
+        const offers = createLoadOfferBatch(state.brokers, PRIMARY_CARRIER_ID, truck.id, state.tickCount, true, state.settings.offersPerTruck, {
+          homeTimeTarget: driver?.homeTimeTarget,
+        });
+        return {
+          loads: [...offers, ...state.loads],
+          activity: [
+            {
+              id: uid("act"), timestamp: new Date().toISOString(), type: "load_offered" as const,
+              message: `Next-load options ready for ${truck.unitNumber}`,
+              detail: `Pre-negotiating before delivery — ${offers.length} options found`,
+              loadId: offers[0]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info" as const,
+            },
+            ...state.activity,
+          ].slice(0, 80),
+        };
+      }),
+
+    updateHomeTimeTarget: (driverId, target) =>
+      set((state) => ({
+        drivers: state.drivers.map((d) => (d.id === driverId ? { ...d, homeTimeTarget: target } : d)),
+      })),
   },
 }));
 

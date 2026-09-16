@@ -4,7 +4,7 @@ import { BarChart3, LayoutGrid, MessageSquareText, Settings, Truck } from "lucid
 import { PortalShell, type NavItem } from "@/components/shared/portal-shell";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { usePrimaryCarrier, useCarrierEscalations } from "@/lib/selectors";
+import { usePrimaryCarrier, useCarrierEscalations, useCarrierLoads } from "@/lib/selectors";
 
 const NAV: NavItem[] = [
   { href: "/carrier", label: "Overview", icon: LayoutGrid },
@@ -18,7 +18,12 @@ const NAV: NavItem[] = [
 export default function CarrierLayout({ children }: { children: React.ReactNode }) {
   const carrier = usePrimaryCarrier();
   const escalations = useCarrierEscalations().filter((e) => e.status === "open");
-  const navWithBadge = NAV.map((n) => (n.href === "/carrier/negotiations" ? { ...n, badge: escalations.length } : n));
+  const pendingOffers = useCarrierLoads().filter((l) => l.stage === "offered").length;
+  const navWithBadge = NAV.map((n) => {
+    if (n.href === "/carrier/negotiations") return { ...n, badge: escalations.length };
+    if (n.href === "/carrier/loads") return { ...n, badge: pendingOffers };
+    return n;
+  });
 
   return (
     <PortalShell

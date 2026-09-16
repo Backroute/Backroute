@@ -4,10 +4,13 @@ import {
   Database,
   FileText,
   Flag,
+  LifeBuoy,
   Link2,
+  ListChecks,
   Mail,
   MapPin,
   MessageSquare,
+  MousePointerClick,
   Phone,
   Radar,
   ScanLine,
@@ -33,6 +36,9 @@ const TYPE_ICON: Record<ActivityType, typeof Radar> = {
   delivered: Flag,
   chained: Link2,
   escalation: AlertTriangle,
+  load_offered: ListChecks,
+  offer_selected: MousePointerClick,
+  incident: LifeBuoy,
 };
 
 const SEVERITY_TONE: Record<ActivityEvent["severity"], string> = {

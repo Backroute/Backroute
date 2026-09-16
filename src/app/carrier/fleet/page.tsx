@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Link2, Phone } from "lucide-react";
+import { Link2, Phone, Sparkles } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,7 @@ export default function FleetPage() {
           const driver = drivers.get(truck.driverId ?? "");
           const currentLoad = loads.find((l) => l.id === truck.currentLoadId);
           const nextLoad = loads.find((l) => l.id === truck.nextLoadId);
+          const pendingOffers = loads.filter((l) => l.truckId === truck.id && l.stage === "offered");
           const hosPct = driver ? Math.min(100, (driver.hoursRemaining / 11) * 100) : 0;
 
           return (
@@ -89,6 +90,11 @@ export default function FleetPage() {
                     <div className="mt-1 flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs text-[var(--accent-info)]">
                       <Link2 className="h-3 w-3" /> Next: {nextLoad.lane.origin} → {nextLoad.lane.destination}
                     </div>
+                  )}
+                  {pendingOffers.length > 0 && (
+                    <Link href="/carrier/loads" className="mt-1 flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-[var(--accent-warn)]">
+                      <Sparkles className="h-3 w-3" /> {pendingOffers.length} load options awaiting a pick
+                    </Link>
                   )}
                 </div>
               </CardContent>

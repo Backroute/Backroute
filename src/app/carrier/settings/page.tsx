@@ -70,7 +70,13 @@ export default function SettingsPage() {
               <CardTitle>Autonomy</CardTitle>
             </CardHeader>
             <CardContent className="!pt-3 flex flex-col gap-4">
-              <ToggleRow label="Auto-book when net profit target is hit" desc={`Threshold: $${settings.autoBookThreshold} minimum net`} checked={settings.autoBookEnabled} onChange={(v) => updateSettings({ autoBookEnabled: v })} />
+              <ToggleRow
+                label="Auto-select when driver doesn't choose"
+                desc="If nobody picks a load option within ~15s, AI books its top-scored pick automatically"
+                checked={settings.autoBookEnabled}
+                onChange={(v) => updateSettings({ autoBookEnabled: v })}
+              />
+              <ToggleRow label="Avoid low-reliability brokers" desc="Never source or negotiate with 'watch' tier brokers" checked={settings.avoidWatchBrokers} onChange={(v) => updateSettings({ avoidWatchBrokers: v })} />
               <ToggleRow label="Voice agent" desc="Allow the AI to call brokers directly" checked={settings.voiceEnabled} onChange={(v) => updateSettings({ voiceEnabled: v })} />
               <ToggleRow label="SMS agent" desc="Allow rate checks and counters over SMS" checked={settings.smsEnabled} onChange={(v) => updateSettings({ smsEnabled: v })} />
               <ToggleRow label="Email agent" desc="Allow inbox monitoring and negotiation by email" checked={settings.emailEnabled} onChange={(v) => updateSettings({ emailEnabled: v })} />

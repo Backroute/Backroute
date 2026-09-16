@@ -7,6 +7,7 @@ import type {
   DriverMessage,
   EquipmentType,
   Escalation,
+  Incident,
   Lane,
   Load,
   LoadDocument,
@@ -62,13 +63,13 @@ export const LANES: Lane[] = [
 
 export const EQUIPMENT: EquipmentType[] = ["Dry Van", "Reefer", "Flatbed"];
 
-const DRIVER_ROSTER: { name: string; phone: string; cdl: string }[] = [
-  { name: "Marcus Bell", phone: "(214) 555-0148", cdl: "CDL-A TX 88213" },
-  { name: "Yolanda Reyes", phone: "(469) 555-0172", cdl: "CDL-A TX 77102" },
-  { name: "Corey Franklin", phone: "(214) 555-0195", cdl: "CDL-A TX 65401" },
-  { name: "Ava Whitmore", phone: "(972) 555-0163", cdl: "CDL-A TX 71234" },
-  { name: "Deshawn Price", phone: "(214) 555-0187", cdl: "CDL-A TX 69022" },
-  { name: "Nina Castillo", phone: "(469) 555-0129", cdl: "CDL-A TX 73310" },
+const DRIVER_ROSTER: { name: string; phone: string; cdl: string; homeBase: string; homeTimeTarget: string }[] = [
+  { name: "Marcus Bell", phone: "(214) 555-0148", cdl: "CDL-A TX 88213", homeBase: "Dallas, TX", homeTimeTarget: "Home by Friday" },
+  { name: "Yolanda Reyes", phone: "(469) 555-0172", cdl: "CDL-A TX 77102", homeBase: "Fort Worth, TX", homeTimeTarget: "Home by Saturday" },
+  { name: "Corey Franklin", phone: "(214) 555-0195", cdl: "CDL-A TX 65401", homeBase: "Dallas, TX", homeTimeTarget: "No preference set" },
+  { name: "Ava Whitmore", phone: "(972) 555-0163", cdl: "CDL-A TX 71234", homeBase: "Plano, TX", homeTimeTarget: "Home by Sunday" },
+  { name: "Deshawn Price", phone: "(214) 555-0187", cdl: "CDL-A TX 69022", homeBase: "Arlington, TX", homeTimeTarget: "No preference set" },
+  { name: "Nina Castillo", phone: "(469) 555-0129", cdl: "CDL-A TX 73310", homeBase: "Irving, TX", homeTimeTarget: "Home by Friday" },
 ];
 
 const CARRIER_PREFIXES = [
@@ -384,9 +385,9 @@ function buildLoad(
   const pickupLabel = pickupOffsetDays === 0 ? "today" : pickupOffsetDays === 1 ? "tomorrow" : "in 2 days";
   const ref = `BR-${10000 + refCounter}`;
 
-  const includeCall = rng.bool(0.45) && spec.stage !== "sourced" && spec.stage !== "scoring";
+  const includeCall = rng.bool(0.45) && spec.stage !== "sourced" && spec.stage !== "scoring" && spec.stage !== "offered";
   const { messages, calls } =
-    spec.stage === "sourced" || spec.stage === "scoring"
+    spec.stage === "sourced" || spec.stage === "scoring" || spec.stage === "offered"
       ? { messages: [], calls: [] }
       : buildNegotiationThread(rng, {
           broker,
@@ -404,8 +405,8 @@ function buildLoad(
   const { netProfit, rpm } = scoreLoad(finalRate, lane.miles, deadheadMiles, fuelCost, tollCost);
 
   const progressByStage: Record<LoadStage, number> = {
-    sourced: 5, scoring: 12, negotiating: 28, rate_confirmed: 42, booked: 52,
-    dispatched: 62, at_pickup: 70, in_transit: 82, at_delivery: 93, delivered: 100,
+    sourced: 5, scoring: 12, offered: 16, negotiating: 28, rate_confirmed: 42, booked: 52,
+    dispatched: 62, at_pickup: 70, in_transit: 82, at_delivery: 93, delivered: 100, declined: 100,
   };
 
   return {
@@ -452,6 +453,7 @@ export interface World {
   activity: ActivityEvent[];
   escalations: Escalation[];
   driverMessages: DriverMessage[];
+  incidents: Incident[];
 }
 
 export function generateWorld(seed = 20260916): World {
@@ -509,6 +511,8 @@ export function generateWorld(seed = 20260916): World {
     cdl: d.cdl,
     rating: pct(rng, 4.6, 5.0, 1),
     hireDate: iso(-rng.int(60, 900) * 1440),
+    homeBase: d.homeBase,
+    homeTimeTarget: d.homeTimeTarget,
   }));
 
   const specs: LoadSpec[] = [
@@ -588,5 +592,5 @@ export function generateWorld(seed = 20260916): World {
     { id: rng.id("dm"), driverId: PRIMARY_DRIVER_ID, from: "ai", content: "Heads up: receiver in Atlanta closes at 6 PM sharp, you're tracking to arrive with room to spare.", timestamp: iso(-60) },
   ];
 
-  return { carriers, brokers, trucks, drivers, loads, activity, escalations, driverMessages };
+  return { carriers, brokers, trucks, drivers, loads, activity, escalations, driverMessages, incidents: [] };
 }

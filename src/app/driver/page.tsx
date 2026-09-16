@@ -1,19 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, Link2, MapPin, MessageCircle } from "lucide-react";
+import { ArrowUpRight, LifeBuoy, Link2, MapPin, MessageCircle, Sparkles } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { LoadStagePill } from "@/components/shared/load-stage";
-import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads } from "@/lib/selectors";
+import { LoadOfferCard } from "@/components/shared/load-offer-card";
+import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap } from "@/lib/selectors";
+import { useStore } from "@/lib/store";
 import { formatNumber } from "@/lib/utils";
 
 export default function DriverHomePage() {
   const driver = usePrimaryDriver();
   const trucks = useCarrierTrucks();
   const loads = useCarrierLoads();
+  const brokers = useBrokerMap();
+  const incidents = useStore((s) => s.incidents).filter((i) => i.driverId === driver.id && i.status === "active");
+  const selectLoadOffer = useStore((s) => s.actions.selectLoadOffer);
+
   const truck = trucks.find((t) => t.id === driver.truckId);
   const currentLoad = loads.find((l) => l.id === truck?.currentLoadId);
   const nextLoad = loads.find((l) => l.id === truck?.nextLoadId);
+  const pendingOffers = loads.filter((l) => l.truckId === truck?.id && l.stage === "offered");
 
   const weekLoads = loads.filter((l) => l.truckId === truck?.id);
   const weekMiles = weekLoads.reduce((s, l) => s + l.lane.miles, 0);
@@ -24,6 +32,56 @@ export default function DriverHomePage() {
         <p className="text-sm text-ink-500">Welcome back,</p>
         <h1 className="font-display text-2xl text-ink-950">{driver.name.split(" ")[0]}</h1>
       </div>
+
+      {incidents.length > 0 && (
+        <div className="rounded-2xl border border-[var(--accent-warn)]/40 bg-amber-50/60 p-4">
+          {incidents.map((incident) => {
+            const doneCount = incident.steps.filter((s) => s.status === "done").length;
+            return (
+              <div key={incident.id}>
+                <div className="flex items-center gap-2">
+                  <LifeBuoy className="h-4 w-4 text-[var(--accent-warn)]" />
+                  <span className="text-xs font-semibold uppercase tracking-wide text-[var(--accent-warn)]">
+                    {incident.type} reported — AI is on it
+                  </span>
+                </div>
+                <div className="mt-2.5 flex flex-col gap-1.5">
+                  {incident.steps.map((step, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <span className={`h-1.5 w-1.5 rounded-full ${step.status === "done" ? "bg-[var(--accent-live)]" : "bg-ink-300"}`} />
+                      <span className={step.status === "done" ? "text-ink-700 line-through decoration-ink-300" : "text-ink-500"}>{step.label}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] text-ink-500">{doneCount}/{incident.steps.length} steps complete</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {pendingOffers.length > 0 && (
+        <div>
+          <div className="mb-2.5 flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-ink-950" />
+            <p className="text-sm font-semibold text-ink-950">Choose your next load</p>
+          </div>
+          <p className="mb-3 text-xs text-ink-500">
+            AI checked every connected board and scored {pendingOffers.length} options for you.
+          </p>
+          <div className="flex flex-col gap-3">
+            {pendingOffers.map((offer) => (
+              <LoadOfferCard
+                key={offer.id}
+                load={offer}
+                broker={brokers.get(offer.brokerId)}
+                compact
+                onSelect={() => offer.offerGroupId && selectLoadOffer(offer.offerGroupId, offer.id, "driver")}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {currentLoad ? (
         <div className="rounded-3xl bg-ink-950 p-5 text-white">
@@ -53,9 +111,14 @@ export default function DriverHomePage() {
             </div>
           </div>
 
-          <Link href="/driver/messages" className="mt-4 flex items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-medium text-ink-950">
-            <MessageCircle className="h-4 w-4" /> Message AI dispatcher
-          </Link>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Link href="/driver/messages" className="flex items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-medium text-ink-950">
+              <MessageCircle className="h-4 w-4" /> Message AI
+            </Link>
+            <Link href="/driver/incident" className="flex items-center justify-center gap-2 rounded-full border border-white/25 py-3 text-sm font-medium text-white">
+              <LifeBuoy className="h-4 w-4" /> Report issue
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="rounded-3xl border border-line p-6 text-center">
@@ -75,6 +138,13 @@ export default function DriverHomePage() {
             {nextLoad.lane.origin} <span className="text-ink-300">→</span> {nextLoad.lane.destination}
           </p>
           <p className="mt-0.5 text-xs text-ink-500">{nextLoad.stage === "negotiating" ? "AI is negotiating rate now" : "Rate locked — waiting on your current delivery"}</p>
+        </div>
+      )}
+
+      {driver.homeTimeTarget !== "No preference set" && (
+        <div className="flex items-center justify-between rounded-2xl border border-line px-4 py-3 text-sm">
+          <span className="text-ink-600">Home-time preference</span>
+          <Badge tone="info">{driver.homeTimeTarget}</Badge>
         </div>
       )}
 
