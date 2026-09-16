@@ -2,7 +2,7 @@
 
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads } from "@/lib/selectors";
-import { formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 
 export default function DriverLoadsPage() {
   const driver = usePrimaryDriver();
@@ -36,6 +36,10 @@ export default function DriverLoadsPage() {
                 <span>{load.lane.miles} mi</span>
                 <span>{load.equipmentType}</span>
                 <span>{load.weight.toLocaleString()} lbs</span>
+              </div>
+              <div className="mt-2.5 flex items-center gap-4 border-t border-line pt-2.5 text-xs">
+                <span className="text-ink-500">Total offer <span className="font-semibold tabular text-ink-950">{formatCurrency(load.bookedRate ?? load.targetRate)}</span></span>
+                <span className="text-ink-500">Est. net <span className="font-semibold tabular text-ink-950">{formatCurrency(load.netProfit ?? 0)}</span></span>
               </div>
             </div>
           ))}

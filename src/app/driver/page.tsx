@@ -10,7 +10,7 @@ import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
-import { formatNumber } from "@/lib/utils";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 
 export default function DriverHomePage() {
   const driver = usePrimaryDriver();
@@ -113,6 +113,14 @@ export default function DriverHomePage() {
 
           <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-2xl bg-white/10 p-3">
+              <p className="text-white/50">Total offer</p>
+              <p className="mt-0.5 font-display text-lg font-semibold tabular">{formatCurrency(currentLoad.bookedRate ?? currentLoad.targetRate)}</p>
+            </div>
+            <div className="rounded-2xl bg-white/10 p-3">
+              <p className="text-white/50">Est. net</p>
+              <p className="mt-0.5 font-display text-lg font-semibold tabular">{formatCurrency(currentLoad.netProfit ?? 0)}</p>
+            </div>
+            <div className="rounded-2xl bg-white/10 p-3">
               <p className="text-white/50">Pickup</p>
               <p className="mt-0.5 font-medium">{currentLoad.pickupWindow}</p>
             </div>
@@ -157,6 +165,10 @@ export default function DriverHomePage() {
             {nextLoad.lane.origin} <span className="text-ink-300">→</span> {nextLoad.lane.destination}
           </p>
           <p className="mt-0.5 text-xs text-ink-500">{nextLoad.stage === "negotiating" ? "AI is negotiating rate now" : "Rate locked — waiting on your current delivery"}</p>
+          <div className="mt-2.5 flex items-center gap-4 text-xs">
+            <span className="text-ink-500">Total offer <span className="font-semibold tabular text-ink-950">{formatCurrency(nextLoad.bookedRate ?? nextLoad.targetRate)}</span></span>
+            <span className="text-ink-500">Est. net <span className="font-semibold tabular text-ink-950">{formatCurrency(nextLoad.netProfit ?? 0)}</span></span>
+          </div>
           {nextLoad.stage === "negotiating" && (
             <div className="mt-3">
               <CounterOfferButton load={nextLoad} onSubmit={(amount) => requestBetterRate(nextLoad.id, "driver", amount)} variant="text" />
