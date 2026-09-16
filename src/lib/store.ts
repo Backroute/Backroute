@@ -3,7 +3,9 @@ import { generateWorld, PRIMARY_CARRIER_ID } from "./mock-data";
 import {
   advanceIncident,
   advanceLoad,
+  applyNegotiationInstruction,
   autoResolveStaleOffers,
+  classifyInstruction,
   createIncident,
   createLoadOfferBatch,
   createSourcedLoad,
@@ -12,6 +14,7 @@ import {
   requestBetterOfferPrice,
   resolveLoadOffer,
   shouldChainNextLoad,
+  type InstructionCategory,
 } from "./engine";
 import { clamp } from "./utils";
 import type {
@@ -90,6 +93,7 @@ interface StoreState {
     updateHomeTimeTarget: (driverId: string, target: string) => void;
     requestBetterRate: (loadId: string, actor: "driver" | "carrier", amount?: number) => void;
     requestBetterOfferPrice: (loadId: string, actor: "driver" | "carrier") => void;
+    sendNegotiationInstruction: (loadId: string, actor: "driver" | "carrier", text: string) => void;
   };
 }
 
@@ -105,19 +109,12 @@ function craftDriverReply(content: string): string {
   return "Got it, thanks for the update — I've logged it and will keep you posted.";
 }
 
-function extractAmount(content: string): number | undefined {
-  const match = content.match(/\$?\s?(\d{3,5}(?:\.\d+)?)/);
-  if (!match) return undefined;
-  const n = Number(match[1]);
-  return Number.isFinite(n) && n >= 200 && n <= 20000 ? Math.round(n) : undefined;
-}
-
-function isRateRequest(content: string): boolean {
-  const c = content.toLowerCase();
-  const wantsMore = /\b(more|higher|better|push|bump|raise|counter)\b/.test(c);
-  const aboutMoney = /\b(rate|money|pay|\$|price|dollar)/.test(c);
-  return (wantsMore && aboutMoney) || (aboutMoney && extractAmount(content) !== undefined);
-}
+const NEGOTIATION_REPLY: Record<Exclude<InstructionCategory, "general">, (brokerName: string, origin: string, dest: string) => string> = {
+  rate: (brokerName, origin, dest) => `On it — taking that back to ${brokerName} on the ${origin} to ${dest} load now.`,
+  detention: (brokerName) => `Got it — asking ${brokerName} about detention/lumper terms on that load now.`,
+  schedule: (brokerName) => `Understood — checking with ${brokerName} about the pickup window.`,
+  payment: (brokerName) => `On it — asking ${brokerName} about quick pay on this one.`,
+};
 
 function findNegotiatingLoadForDriver(state: StoreState, driverId: string): Load | undefined {
   const driver = state.drivers.find((d) => d.id === driverId);
@@ -339,25 +336,25 @@ export const useStore = create<StoreState>((set) => ({
 
       setTimeout(() => {
         set((state) => {
-          if (isRateRequest(content)) {
-            const target = findNegotiatingLoadForDriver(state, driverId);
-            if (target) {
-              const broker = state.brokers.find((b) => b.id === target.brokerId);
-              const amount = extractAmount(content);
-              const { load: updated, events } = pushForBetterRate(target, broker, "driver", amount);
-              const reply: DriverMessage = {
-                id: uid("dm"), driverId, from: "ai",
-                content: amount
-                  ? `On it — asking ${broker?.company ?? "the broker"} for $${amount.toLocaleString()} on the ${target.lane.origin} to ${target.lane.destination} load now.`
-                  : `On it — pushing ${broker?.company ?? "the broker"} for a better number on the ${target.lane.origin} to ${target.lane.destination} load now.`,
-                timestamp: new Date().toISOString(),
-              };
-              return {
-                loads: state.loads.map((l) => (l.id === updated.id ? updated : l)),
-                activity: [...events, ...state.activity].slice(0, 80),
-                driverMessages: [...state.driverMessages, reply],
-              };
-            }
+          const target = findNegotiatingLoadForDriver(state, driverId);
+          const category = classifyInstruction(content);
+
+          if (target && category !== "general") {
+            const broker = state.brokers.find((b) => b.id === target.brokerId);
+            const { load: updated, events } = applyNegotiationInstruction(target, broker, "driver", content);
+            const reply: DriverMessage = {
+              id: uid("dm"), driverId, from: "ai",
+              content: NEGOTIATION_REPLY[category](broker?.company ?? "the broker", target.lane.origin, target.lane.destination),
+              timestamp: new Date().toISOString(),
+            };
+            return {
+              loads: state.loads.map((l) => (l.id === updated.id ? updated : l)),
+              activity: [...events, ...state.activity].slice(0, 80),
+              driverMessages: [...state.driverMessages, reply],
+            };
+          }
+
+          if (!target && category === "rate") {
             const reply: DriverMessage = {
               id: uid("dm"), driverId, from: "ai",
               content: "Nothing open to negotiate on right now — I'll push for the best number the moment I'm working a rate for you.",
@@ -482,6 +479,19 @@ export const useStore = create<StoreState>((set) => ({
             },
             ...state.activity,
           ].slice(0, 80),
+        };
+      }),
+
+    sendNegotiationInstruction: (loadId, actor, text) =>
+      set((state) => {
+        const load = state.loads.find((l) => l.id === loadId);
+        if (!load) return {};
+        const broker = state.brokers.find((b) => b.id === load.brokerId);
+        const { load: updated, events } = applyNegotiationInstruction(load, broker, actor, text);
+        if (updated === load && !events.length) return {};
+        return {
+          loads: state.loads.map((l) => (l.id === updated.id ? updated : l)),
+          activity: [...events, ...state.activity].slice(0, 80),
         };
       }),
   },

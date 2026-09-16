@@ -434,6 +434,74 @@ export function pushForBetterRate(
   return { load: next, events };
 }
 
+export type InstructionCategory = "rate" | "detention" | "schedule" | "payment" | "general";
+
+/** Pull a plausible dollar figure out of free text like "can you get 2200" or "ask for $500 more". */
+export function extractDollarAmount(text: string): number | undefined {
+  const match = text.match(/\$?\s?(\d{3,5}(?:\.\d+)?)/);
+  if (!match) return undefined;
+  const n = Number(match[1]);
+  return Number.isFinite(n) && n >= 200 && n <= 20000 ? Math.round(n) : undefined;
+}
+
+/** Reads a free-text ask the way a dispatcher would triage it, so the AI can act on more than just a rate. */
+export function classifyInstruction(text: string): InstructionCategory {
+  const c = text.toLowerCase();
+  // An explicit "$500" is an unambiguous ask — treat it as the rate even if other keywords (e.g. "pickup") are also present.
+  if (/\$\s?\d{3,5}/.test(text)) return "rate";
+  if (/\b(detention|lumper|accessorial)\b/.test(c)) return "detention";
+  if (/\b(pickup|pick[\s-]?up|appointment|reschedule|earlier|later)\b/.test(c)) return "schedule";
+  if (/\b(quick\s?pay|net[\s-]?\d+|payment terms|pay faster|faster pay|payment cycle)\b/.test(c)) return "payment";
+  const wantsMore = /\b(more|higher|better|push|bump|raise|counter)\b/.test(c);
+  const aboutMoney = /\b(rate|money|pay|\$|price|dollar)\b/.test(c);
+  if ((wantsMore && aboutMoney) || extractDollarAmount(text) !== undefined) return "rate";
+  return "general";
+}
+
+function instructionMessage(category: InstructionCategory, text: string, b: Broker): NegotiationMessage {
+  const content =
+    category === "detention"
+      ? `Also flagging detention/lumper terms on this one — can you confirm what's covered if we run over on time?`
+      : category === "schedule"
+        ? `Any flexibility on the pickup window? We can move earlier or later if it helps lock this in.`
+        : category === "payment"
+          ? `Quick one on terms, ${b.contact.split(" ")[0]} — any chance of quick pay or a shorter cycle on this load?`
+          : `Also wanted to flag on this one: "${text}"`;
+  return { id: uid("msg"), channel: "email", direction: "outbound", from: "Backroute AI", timestamp: new Date().toISOString(), content };
+}
+
+/** The general version of "push for better rate" — driver/carrier can tell the AI ANY ask (money, detention terms,
+ *  pickup timing, payment terms, or anything else) once a load is actively negotiating, and the AI relays it to the
+ *  broker appropriately instead of only handling a fixed rate bump. */
+export function applyNegotiationInstruction(
+  load: Load,
+  broker: Broker | undefined,
+  actor: "driver" | "carrier",
+  text: string,
+): { load: Load; events: ActivityEvent[] } {
+  if (load.stage !== "negotiating") return { load, events: [] };
+  const category = classifyInstruction(text);
+  if (category === "rate") {
+    return pushForBetterRate(load, broker, actor, extractDollarAmount(text));
+  }
+
+  const b = broker ?? ({ contact: "Broker", company: load.source } as Broker);
+  const msg = instructionMessage(category, text, b);
+  const next: Load = { ...load, messages: [...load.messages, msg], updatedAt: new Date().toISOString() };
+  const events: ActivityEvent[] = [
+    mkEvent(
+      load.carrierId,
+      load.id,
+      "negotiation_email",
+      actor === "driver" ? "Driver asked AI to raise something with the broker" : "Carrier asked AI to raise something with the broker",
+      `${b.company} · ${text}`,
+      "info",
+      "email",
+    ),
+  ];
+  return { load: next, events };
+}
+
 /** Before committing to an offer, driver/carrier can ask the AI to go get a better number from the broker first — exactly
  *  how a human would tell a dispatcher "see if they'll come up" before saying yes to a load. Recomputes score and
  *  net profit live so the offer card reflects the new ask immediately. */

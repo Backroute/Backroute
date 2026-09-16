@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { LiveDot } from "@/components/shared/live-dot";
 import { ChannelBadge } from "@/components/shared/channel-badge";
 import { LoadScoreBadge } from "@/components/shared/load-score";
-import { CounterOfferButton } from "@/components/shared/counter-offer-button";
+import { NegotiationComposer } from "@/components/shared/negotiation-composer";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { useCarrierLoads, useBrokerMap } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
@@ -17,7 +17,7 @@ import { formatCurrency } from "@/lib/utils";
 export default function NegotiationsPage() {
   const loads = useCarrierLoads();
   const brokers = useBrokerMap();
-  const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
+  const sendNegotiationInstruction = useStore((s) => s.actions.sendNegotiationInstruction);
   const active = loads.filter((l) => l.stage === "negotiating" || l.stage === "rate_confirmed");
 
   const emailCount = active.reduce((s, l) => s + l.messages.filter((m) => m.channel === "email").length, 0);
@@ -81,13 +81,13 @@ export default function NegotiationsPage() {
                         <div className="h-full rounded-full bg-ink-950 transition-all" style={{ width: `${progress}%` }} />
                       </div>
                     </div>
-                    {load.stage === "negotiating" && (
-                      <CounterOfferButton load={load} onSubmit={(amount) => requestBetterRate(load.id, "carrier", amount)} variant="ghost" label="Push for more" />
-                    )}
                     <Link href={`/carrier/loads/${load.id}`} className="flex shrink-0 items-center gap-1 text-xs font-medium text-ink-950 hover:underline">
                       Open <ArrowUpRight className="h-3 w-3" />
                     </Link>
                   </div>
+                  {load.stage === "negotiating" && (
+                    <NegotiationComposer compact onSend={(text) => sendNegotiationInstruction(load.id, "carrier", text)} />
+                  )}
                   {lastMsg && (
                     <p className="text-[11px] text-ink-400">
                       Last activity <TimeAgo iso={lastMsg.timestamp} />

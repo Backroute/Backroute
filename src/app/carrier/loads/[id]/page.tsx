@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
+import { NegotiationComposer } from "@/components/shared/negotiation-composer";
 import { NegotiationThread } from "@/components/shared/negotiation-thread";
 import { CallTranscript } from "@/components/shared/call-transcript";
 import { Progress } from "@/components/ui/progress";
@@ -22,6 +23,7 @@ export default function LoadDetailPage() {
   const trucks = useTruckMap();
   const drivers = useDriverMap();
   const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
+  const sendNegotiationInstruction = useStore((s) => s.actions.sendNegotiationInstruction);
 
   if (!load) {
     return (
@@ -83,6 +85,11 @@ export default function LoadDetailPage() {
                   {load.calls.map((call) => (
                     <CallTranscript key={call.id} call={call} />
                   ))}
+                </div>
+              )}
+              {load.stage === "negotiating" && (
+                <div className="mt-4">
+                  <NegotiationComposer onSend={(text) => sendNegotiationInstruction(load.id, "carrier", text)} />
                 </div>
               )}
             </CardContent>

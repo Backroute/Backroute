@@ -50,7 +50,7 @@ export default function DriverMessagesPage() {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          placeholder="Message your dispatcher…"
+          placeholder='Ask for anything — "get $50 more", "ask about detention"…'
           className="flex-1 rounded-full border border-line bg-ink-50/60 px-4 py-2.5 text-sm outline-none focus:border-ink-400"
         />
         <button
