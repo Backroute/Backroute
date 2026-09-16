@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/shared/portal-shell";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useStore } from "@/lib/store";
+import { cn } from "@/lib/utils";
 
 const TIER_TONE = { preferred: "success", standard: "neutral", watch: "warning" } as const;
 
@@ -16,7 +17,33 @@ export default function BrokersPage() {
       <PageHeader title="Brokers" description={`${brokers.length} brokers ranked by reliability`} />
 
       <div className="px-4 py-6 sm:px-8">
-        <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+        <div className="flex flex-col gap-3 lg:hidden">
+          {sorted.map((b) => (
+            <div key={b.id} className="rounded-2xl border border-line bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium text-ink-950">{b.company}</p>
+                  <p className="text-xs text-ink-400">{b.contact}</p>
+                </div>
+                <Badge tone={TIER_TONE[b.tier]}>{b.tier}</Badge>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <Progress value={b.reliability} className="w-20" />
+                <span className="tabular text-xs text-ink-500">Reliability {b.reliability}</span>
+              </div>
+              <div className="mt-3 flex items-center gap-4 border-t border-line pt-3 text-xs">
+                <span className="text-ink-500">Avg response <span className="font-semibold tabular text-ink-950">{b.avgResponseMins}m</span></span>
+                <span className="text-ink-500">Booked <span className="font-semibold tabular text-ink-950">{b.loadsBooked}</span></span>
+                <span className="text-ink-500">On-time <span className="font-semibold tabular text-ink-950">{b.onTimePct}%</span></span>
+                <span className={cn("ml-auto font-semibold tabular", b.avgRateVariancePct >= 0 ? "text-[var(--accent-live)]" : "text-[var(--accent-danger)]")}>
+                  {b.avgRateVariancePct >= 0 ? "+" : ""}{b.avgRateVariancePct}% vs market
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden overflow-x-auto rounded-2xl border border-line bg-white lg:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line bg-ink-50/60 text-left text-[11px] uppercase tracking-wider text-ink-400">

@@ -33,7 +33,31 @@ export default function OpsLoadsPage() {
           ))}
         </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+        {/* Mobile: cards — a wide table forces horizontal scrolling past the numbers that matter most. */}
+        <div className="flex flex-col gap-3 lg:hidden">
+          {sorted.map((load) => (
+            <Link key={load.id} href={`/ops/loads/${load.id}`} className="block rounded-2xl border border-line bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-medium text-ink-950">{load.lane.origin} <span className="text-ink-300">→</span> {load.lane.destination}</p>
+                  <p className="text-xs text-ink-400">{load.referenceNumber} · {brokers.get(load.brokerId)?.company ?? "—"}</p>
+                </div>
+                <LoadScoreBadge score={load.score} size="sm" />
+              </div>
+              <div className="mt-2.5 flex items-center gap-2">
+                <LoadStagePill stage={load.stage} />
+                <span className="text-xs text-ink-400"><TimeAgo iso={load.updatedAt} /></span>
+              </div>
+              <div className="mt-3 flex items-center gap-4 border-t border-line pt-3 text-xs">
+                <span className="text-ink-500">Total offer <span className="font-semibold tabular text-ink-950">{formatCurrency(load.bookedRate ?? load.targetRate)}</span></span>
+                <span className="text-ink-500">Est. net <span className="font-semibold tabular text-ink-950">{load.netProfit !== null ? formatCurrency(load.netProfit) : "—"}</span></span>
+              </div>
+            </Link>
+          ))}
+        </div>
+
+        {/* Desktop: dense table */}
+        <div className="hidden overflow-x-auto rounded-2xl border border-line bg-white lg:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line bg-ink-50/60 text-left text-[11px] uppercase tracking-wider text-ink-400">

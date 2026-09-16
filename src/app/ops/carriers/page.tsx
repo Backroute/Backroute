@@ -30,7 +30,31 @@ export default function CarriersPage() {
           onChange={(k) => setPlan(k as (typeof PLAN_TABS)[number])}
         />
 
-        <div className="mt-5 overflow-x-auto rounded-2xl border border-line bg-white">
+        <div className="mt-5 flex flex-col gap-3 lg:hidden">
+          {filtered.map((c) => (
+            <div key={c.id} className="rounded-2xl border border-line bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium text-ink-950">{c.name}</p>
+                  <p className="text-xs text-ink-400">{c.mc} · {c.city}, {c.state}</p>
+                </div>
+                <Badge tone={c.plan === "Fleet" ? "dark" : "neutral"}>{c.plan}</Badge>
+              </div>
+              <div className="mt-3 flex items-center gap-4 text-xs">
+                <span className="text-ink-500">Trucks <span className="font-semibold tabular text-ink-950">{c.trucks}</span></span>
+                <span className="text-ink-500">MRR <span className="font-semibold tabular text-ink-950">{formatCurrency(c.mrr)}</span></span>
+                <span className="text-ink-500">Take-rate <span className="font-semibold tabular text-[var(--accent-live)]">{formatCurrency(c.takeRateRevenue)}</span></span>
+              </div>
+              <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">
+                <Progress value={c.healthScore} className="w-20" />
+                <span className="text-xs tabular text-ink-500">Health {c.healthScore}</span>
+                <span className="ml-auto text-xs text-ink-400">Joined {formatDate(c.joinedAt)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 hidden overflow-x-auto rounded-2xl border border-line bg-white lg:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line bg-ink-50/60 text-left text-[11px] uppercase tracking-wider text-ink-400">
