@@ -8,6 +8,7 @@ import {
   createLoadOfferBatch,
   createSourcedLoad,
   incidentOpenedEvent,
+  pushForBetterRate,
   resolveLoadOffer,
   shouldChainNextLoad,
 } from "./engine";
@@ -86,6 +87,7 @@ interface StoreState {
     reportIncident: (driverId: string, truckId: string, type: IncidentType, note: string) => void;
     seedInitialOffers: () => void;
     updateHomeTimeTarget: (driverId: string, target: string) => void;
+    requestBetterRate: (loadId: string, actor: "driver" | "carrier") => void;
   };
 }
 
@@ -99,6 +101,20 @@ function craftDriverReply(content: string): string {
   if (c.includes("load") || c.includes("next")) return "Already working your next load so you don't run empty — I'll confirm the rate as soon as it's locked.";
   if (c.includes("doc") || c.includes("pod") || c.includes("bol")) return "Got it — snap a photo in the Documents tab and I'll verify and file it automatically.";
   return "Got it, thanks for the update — I've logged it and will keep you posted.";
+}
+
+function isRateRequest(content: string): boolean {
+  const c = content.toLowerCase();
+  const wantsMore = /\b(more|higher|better|push|bump|raise)\b/.test(c);
+  const aboutMoney = /\b(rate|money|pay|\$|price|dollar)/.test(c);
+  return wantsMore && aboutMoney;
+}
+
+function findNegotiatingLoadForDriver(state: StoreState, driverId: string): Load | undefined {
+  const driver = state.drivers.find((d) => d.id === driverId);
+  const truck = driver ? state.trucks.find((t) => t.id === driver.truckId) : undefined;
+  if (!truck) return undefined;
+  return state.loads.find((l) => (l.id === truck.currentLoadId || l.id === truck.nextLoadId) && l.stage === "negotiating");
 }
 
 export const useStore = create<StoreState>((set) => ({
@@ -309,9 +325,36 @@ export const useStore = create<StoreState>((set) => ({
     sendDriverMessage: (driverId, content) => {
       const msg: DriverMessage = { id: uid("dm"), driverId, from: "driver", content, timestamp: new Date().toISOString() };
       set((state) => ({ driverMessages: [...state.driverMessages, msg] }));
+
       setTimeout(() => {
-        const reply: DriverMessage = { id: uid("dm"), driverId, from: "ai", content: craftDriverReply(content), timestamp: new Date().toISOString() };
-        set((state) => ({ driverMessages: [...state.driverMessages, reply] }));
+        set((state) => {
+          if (isRateRequest(content)) {
+            const target = findNegotiatingLoadForDriver(state, driverId);
+            if (target) {
+              const broker = state.brokers.find((b) => b.id === target.brokerId);
+              const { load: updated, events } = pushForBetterRate(target, broker, "driver");
+              const reply: DriverMessage = {
+                id: uid("dm"), driverId, from: "ai",
+                content: `On it — pushing ${broker?.company ?? "the broker"} for a better number on the ${target.lane.origin} to ${target.lane.destination} load now.`,
+                timestamp: new Date().toISOString(),
+              };
+              return {
+                loads: state.loads.map((l) => (l.id === updated.id ? updated : l)),
+                activity: [...events, ...state.activity].slice(0, 80),
+                driverMessages: [...state.driverMessages, reply],
+              };
+            }
+            const reply: DriverMessage = {
+              id: uid("dm"), driverId, from: "ai",
+              content: "Nothing open to negotiate on right now — I'll push for the best number the moment I'm working a rate for you.",
+              timestamp: new Date().toISOString(),
+            };
+            return { driverMessages: [...state.driverMessages, reply] };
+          }
+
+          const reply: DriverMessage = { id: uid("dm"), driverId, from: "ai", content: craftDriverReply(content), timestamp: new Date().toISOString() };
+          return { driverMessages: [...state.driverMessages, reply] };
+        });
       }, 1100 + Math.random() * 1000);
     },
 
@@ -393,6 +436,18 @@ export const useStore = create<StoreState>((set) => ({
       set((state) => ({
         drivers: state.drivers.map((d) => (d.id === driverId ? { ...d, homeTimeTarget: target } : d)),
       })),
+
+    requestBetterRate: (loadId, actor) =>
+      set((state) => {
+        const load = state.loads.find((l) => l.id === loadId);
+        if (!load) return {};
+        const broker = state.brokers.find((b) => b.id === load.brokerId);
+        const { load: updated, events } = pushForBetterRate(load, broker, actor);
+        return {
+          loads: state.loads.map((l) => (l.id === updated.id ? updated : l)),
+          activity: [...events, ...state.activity].slice(0, 80),
+        };
+      }),
   },
 }));
 

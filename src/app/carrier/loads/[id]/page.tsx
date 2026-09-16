@@ -2,14 +2,17 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, FileText, Fuel, Gauge, Route, TrendingUp } from "lucide-react";
+import { ArrowLeft, Fuel, Gauge, Handshake, Percent, Route, TrendingUp, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { LoadStagePill } from "@/components/shared/load-stage";
+import { LoadScoreBadge } from "@/components/shared/load-score";
 import { NegotiationThread } from "@/components/shared/negotiation-thread";
 import { CallTranscript } from "@/components/shared/call-transcript";
 import { Progress } from "@/components/ui/progress";
 import { useLoad, useBrokerMap, useTruckMap, useDriverMap } from "@/lib/selectors";
+import { useStore } from "@/lib/store";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 
 export default function LoadDetailPage() {
@@ -18,6 +21,7 @@ export default function LoadDetailPage() {
   const brokers = useBrokerMap();
   const trucks = useTruckMap();
   const drivers = useDriverMap();
+  const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
 
   if (!load) {
     return (
@@ -50,6 +54,7 @@ export default function LoadDetailPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <LoadScoreBadge score={load.score} size="lg" />
             <LoadStagePill stage={load.stage} className="!text-xs !px-3 !py-1.5" />
             <Badge tone="info">AI confidence {load.aiConfidence}%</Badge>
           </div>
@@ -63,8 +68,15 @@ export default function LoadDetailPage() {
         <div className="flex flex-col gap-6 lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle>Negotiation</CardTitle>
-              {broker && <p className="text-xs text-ink-500">{broker.company} · {broker.contact}</p>}
+              <div>
+                <CardTitle>Negotiation</CardTitle>
+                {broker && <p className="text-xs text-ink-500">{broker.company} · {broker.contact}</p>}
+              </div>
+              {load.stage === "negotiating" && (
+                <Button size="sm" variant="outline" onClick={() => requestBetterRate(load.id, "carrier")}>
+                  <Handshake className="h-3.5 w-3.5" /> Ask AI to push for more
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="!pt-4">
               <NegotiationThread messages={load.messages} />
@@ -118,7 +130,7 @@ export default function LoadDetailPage() {
                 <Row label="AI target rate" value={formatCurrency(load.targetRate)} />
                 <Row label="Booked rate" value={load.bookedRate ? formatCurrency(load.bookedRate) : "Pending"} strong />
                 <Row
-                  label="Net profit"
+                  label="Net profit (after our 2%)"
                   value={load.netProfit ? formatCurrency(load.netProfit) : "Projecting…"}
                   tone={load.netProfit ? (load.netProfit > 0 ? "success" : "danger") : undefined}
                   strong
@@ -130,14 +142,23 @@ export default function LoadDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Cost breakdown</CardTitle>
+              <CardTitle>Real-time expenses</CardTitle>
             </CardHeader>
             <CardContent className="!pt-3">
               <div className="flex flex-col gap-3.5">
                 <IconRow icon={Route} label="Distance" value={`${load.lane.miles} mi`} />
                 <IconRow icon={Gauge} label="Deadhead" value={`${load.deadheadMiles} mi`} />
                 <IconRow icon={Fuel} label="Fuel cost" value={formatCurrency(load.fuelCost)} />
+                <IconRow icon={TrendingUp} label="Deadhead cost" value={formatCurrency(load.deadheadCost)} />
                 <IconRow icon={TrendingUp} label="Tolls" value={formatCurrency(load.tollCost)} />
+                <IconRow icon={Percent} label="Backroute commission (2%)" value={formatCurrency(load.commission)} />
+                <div className="border-t border-line pt-3.5">
+                  <Row
+                    label="Total expenses"
+                    value={formatCurrency(load.fuelCost + load.tollCost + load.deadheadCost + load.commission)}
+                    strong
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>

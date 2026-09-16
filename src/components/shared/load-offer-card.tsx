@@ -3,6 +3,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 import type { Broker, Load } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { LoadScoreBadge } from "./load-score";
 
 export function LoadOfferCard({
   load,
@@ -34,6 +35,7 @@ export function LoadOfferCard({
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
+          <LoadScoreBadge score={load.score} invert={load.recommended} />
           {load.recommended && (
             <Badge tone="dark" className="!bg-white/15 !text-white gap-1">
               <Sparkles className="h-3 w-3" /> AI pick
@@ -47,10 +49,11 @@ export function LoadOfferCard({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <Stat label="Est. net" value={formatCurrency(load.netProfit ?? 0)} dark={load.recommended} />
+      <div className="grid grid-cols-2 gap-2">
+        <Stat label="Est. net (after our 2%)" value={formatCurrency(load.netProfit ?? 0)} dark={load.recommended} />
         <Stat label="Rate / mi" value={`$${(load.rpm ?? 0).toFixed(2)}`} dark={load.recommended} />
         <Stat label="Pickup" value={load.pickupWindow.split(",")[0]} dark={load.recommended} />
+        <Stat label="Our commission" value={formatCurrency(load.commission)} dark={load.recommended} />
       </div>
 
       <Button

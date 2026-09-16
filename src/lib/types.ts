@@ -169,8 +169,11 @@ export interface Load {
   deadheadMiles: number;
   fuelCost: number;
   tollCost: number;
+  deadheadCost: number;
+  commission: number;
   netProfit: number | null;
   rpm: number | null;
+  score: number;
   carrierId: string;
   truckId: string | null;
   messages: NegotiationMessage[];
@@ -255,4 +258,5 @@ export interface Incident {
   createdAt: string;
   status: "active" | "resolved";
   steps: IncidentStep[];
+  humanNotified: boolean;
 }

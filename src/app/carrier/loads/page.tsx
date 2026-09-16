@@ -8,6 +8,7 @@ import { LoadStagePill } from "@/components/shared/load-stage";
 import { LiveDot } from "@/components/shared/live-dot";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { LoadOfferCard } from "@/components/shared/load-offer-card";
+import { LoadScoreBadge } from "@/components/shared/load-score";
 import { useCarrierLoads, useBrokerMap, useTruckMap } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { formatCurrency } from "@/lib/utils";
@@ -90,6 +91,7 @@ export default function CarrierLoadsPage() {
                 <tr className="border-b border-line bg-ink-50/60 text-left text-[11px] uppercase tracking-wider text-ink-400">
                   <th className="px-5 py-3 font-medium">Lane</th>
                   <th className="px-5 py-3 font-medium">Broker</th>
+                  <th className="px-5 py-3 font-medium">Score</th>
                   <th className="px-5 py-3 font-medium">Stage</th>
                   <th className="px-5 py-3 font-medium">Truck</th>
                   <th className="px-5 py-3 font-medium text-right">Rate</th>
@@ -110,6 +112,7 @@ export default function CarrierLoadsPage() {
                         </Link>
                       </td>
                       <td className="px-5 py-3.5 text-ink-600">{broker?.company ?? "—"}</td>
+                      <td className="px-5 py-3.5"><LoadScoreBadge score={load.score} size="sm" /></td>
                       <td className="px-5 py-3.5"><LoadStagePill stage={load.stage} /></td>
                       <td className="px-5 py-3.5 text-ink-600">{truck?.unitNumber ?? "—"}</td>
                       <td className="px-5 py-3.5 text-right tabular text-ink-950">
@@ -124,7 +127,7 @@ export default function CarrierLoadsPage() {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-5 py-12 text-center text-sm text-ink-400">No loads in this view.</td>
+                    <td colSpan={8} className="px-5 py-12 text-center text-sm text-ink-400">No loads in this view.</td>
                   </tr>
                 )}
               </tbody>

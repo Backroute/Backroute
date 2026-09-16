@@ -1,4 +1,5 @@
 import { createRng } from "./utils";
+import { computeEconomics, computeLoadScore } from "./scoring";
 import type {
   ActivityEvent,
   Broker,
@@ -141,13 +142,6 @@ function buildLightweightCarriers(rng: ReturnType<typeof createRng>, count: numb
     });
   }
   return out;
-}
-
-function scoreLoad(rate: number, miles: number, deadheadMiles: number, fuelCost: number, tollCost: number) {
-  const deadheadCost = deadheadMiles * 0.68;
-  const netProfit = Math.round(rate - fuelCost - tollCost - deadheadCost);
-  const rpm = Math.round((rate / miles) * 100) / 100;
-  return { netProfit, rpm };
 }
 
 function costsForLane(rng: ReturnType<typeof createRng>, miles: number, deadheadMiles: number) {
@@ -402,7 +396,8 @@ function buildLoad(
         });
 
   const finalRate = bookedRate ?? targetRate;
-  const { netProfit, rpm } = scoreLoad(finalRate, lane.miles, deadheadMiles, fuelCost, tollCost);
+  const { deadheadCost, commission, netProfit, rpm } = computeEconomics(finalRate, lane.miles, deadheadMiles, fuelCost, tollCost);
+  const score = computeLoadScore({ rate: finalRate, netProfit, miles: lane.miles, deadheadMiles, rpm, marketRpm: lane.marketRpm, brokerReliability: broker.reliability });
 
   const progressByStage: Record<LoadStage, number> = {
     sourced: 5, scoring: 12, offered: 16, negotiating: 28, rate_confirmed: 42, booked: 52,
@@ -426,8 +421,11 @@ function buildLoad(
     deadheadMiles,
     fuelCost,
     tollCost,
+    deadheadCost,
+    commission,
     netProfit,
     rpm,
+    score,
     carrierId: PRIMARY_CARRIER_ID,
     truckId: spec.truckId,
     messages,

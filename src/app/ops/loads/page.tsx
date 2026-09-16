@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { LoadStagePill } from "@/components/shared/load-stage";
+import { LoadScoreBadge } from "@/components/shared/load-score";
 import { LiveDot } from "@/components/shared/live-dot";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { LOAD_STAGE_ORDER, LOAD_STAGE_LABEL } from "@/lib/types";
@@ -39,6 +40,7 @@ export default function OpsLoadsPage() {
                 <th className="px-5 py-3 font-medium">Lane</th>
                 <th className="px-5 py-3 font-medium">Carrier</th>
                 <th className="px-5 py-3 font-medium">Broker</th>
+                <th className="px-5 py-3 font-medium">Score</th>
                 <th className="px-5 py-3 font-medium">Stage</th>
                 <th className="px-5 py-3 font-medium text-right">Rate</th>
                 <th className="px-5 py-3 font-medium text-right">Updated</th>
@@ -55,6 +57,7 @@ export default function OpsLoadsPage() {
                   </td>
                   <td className="px-5 py-3.5 text-ink-600">{carrier.name}</td>
                   <td className="px-5 py-3.5 text-ink-600">{brokers.get(load.brokerId)?.company ?? "—"}</td>
+                  <td className="px-5 py-3.5"><LoadScoreBadge score={load.score} size="sm" /></td>
                   <td className="px-5 py-3.5"><LoadStagePill stage={load.stage} /></td>
                   <td className="px-5 py-3.5 text-right tabular">{load.bookedRate ? formatCurrency(load.bookedRate) : formatCurrency(load.targetRate)}</td>
                   <td className="px-5 py-3.5 text-right text-xs text-ink-400"><TimeAgo iso={load.updatedAt} /></td>

@@ -107,7 +107,10 @@ export default function OpsOverviewPage() {
                       const done = incident.steps.filter((s) => s.status === "done").length;
                       return (
                         <div key={incident.id} className="flex items-center justify-between text-xs">
-                          <span className="capitalize text-ink-700">{incident.type} · {truck?.unitNumber ?? "—"}</span>
+                          <span className="flex items-center gap-1.5 capitalize text-ink-700">
+                            {incident.type} · {truck?.unitNumber ?? "—"}
+                            {incident.humanNotified && <Badge tone="danger">Human notified</Badge>}
+                          </span>
                           <span className="tabular text-ink-400">{done}/{incident.steps.length}</span>
                         </div>
                       );

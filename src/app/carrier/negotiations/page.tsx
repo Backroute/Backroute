@@ -1,19 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, Mail, MessageSquare, Phone } from "lucide-react";
+import { ArrowUpRight, Handshake, Mail, MessageSquare, Phone } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { LiveDot } from "@/components/shared/live-dot";
 import { ChannelBadge } from "@/components/shared/channel-badge";
+import { LoadScoreBadge } from "@/components/shared/load-score";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { useCarrierLoads, useBrokerMap } from "@/lib/selectors";
+import { useStore } from "@/lib/store";
 import { formatCurrency } from "@/lib/utils";
 
 export default function NegotiationsPage() {
   const loads = useCarrierLoads();
   const brokers = useBrokerMap();
+  const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
   const active = loads.filter((l) => l.stage === "negotiating" || l.stage === "rate_confirmed");
 
   const emailCount = active.reduce((s, l) => s + l.messages.filter((m) => m.channel === "email").length, 0);
@@ -47,7 +51,10 @@ export default function NegotiationsPage() {
                 <CardContent className="flex flex-col gap-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="font-medium text-ink-950">{load.lane.origin} <span className="text-ink-300">→</span> {load.lane.destination}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-ink-950">{load.lane.origin} <span className="text-ink-300">→</span> {load.lane.destination}</p>
+                        <LoadScoreBadge score={load.score} size="sm" />
+                      </div>
                       <p className="text-xs text-ink-500">{broker?.company} · {broker?.contact}</p>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -74,6 +81,11 @@ export default function NegotiationsPage() {
                         <div className="h-full rounded-full bg-ink-950 transition-all" style={{ width: `${progress}%` }} />
                       </div>
                     </div>
+                    {load.stage === "negotiating" && (
+                      <Button size="sm" variant="ghost" onClick={() => requestBetterRate(load.id, "carrier")}>
+                        <Handshake className="h-3.5 w-3.5" /> Push for more
+                      </Button>
+                    )}
                     <Link href={`/carrier/loads/${load.id}`} className="flex shrink-0 items-center gap-1 text-xs font-medium text-ink-950 hover:underline">
                       Open <ArrowUpRight className="h-3 w-3" />
                     </Link>

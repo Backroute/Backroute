@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, LifeBuoy, Link2, MapPin, MessageCircle, Sparkles } from "lucide-react";
+import { ArrowUpRight, Handshake, LifeBuoy, Link2, MapPin, MessageCircle, Sparkles } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { LoadOfferCard } from "@/components/shared/load-offer-card";
+import { LoadScoreBadge } from "@/components/shared/load-score";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { formatNumber } from "@/lib/utils";
@@ -17,6 +18,7 @@ export default function DriverHomePage() {
   const brokers = useBrokerMap();
   const incidents = useStore((s) => s.incidents).filter((i) => i.driverId === driver.id && i.status === "active");
   const selectLoadOffer = useStore((s) => s.actions.selectLoadOffer);
+  const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
 
   const truck = trucks.find((t) => t.id === driver.truckId);
   const currentLoad = loads.find((l) => l.id === truck?.currentLoadId);
@@ -54,6 +56,9 @@ export default function DriverHomePage() {
                   ))}
                 </div>
                 <p className="mt-2 text-[11px] text-ink-500">{doneCount}/{incident.steps.length} steps complete</p>
+                {incident.humanNotified && (
+                  <Badge tone="danger" className="mt-2">Human safety specialist notified</Badge>
+                )}
               </div>
             );
           })}
@@ -87,7 +92,10 @@ export default function DriverHomePage() {
         <div className="rounded-3xl bg-ink-950 p-5 text-white">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-medium uppercase tracking-wider text-white/50">Current load</span>
-            <LoadStagePill stage={currentLoad.stage} className="!bg-white/15 !text-white" />
+            <div className="flex items-center gap-1.5">
+              <LoadScoreBadge score={currentLoad.score} size="sm" invert />
+              <LoadStagePill stage={currentLoad.stage} className="!bg-white/15 !text-white" />
+            </div>
           </div>
           <p className="mt-3 font-display text-2xl">
             {currentLoad.lane.origin}, {currentLoad.lane.originState}
@@ -111,13 +119,23 @@ export default function DriverHomePage() {
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <Link href="/driver/messages" className="flex items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-medium text-ink-950">
-              <MessageCircle className="h-4 w-4" /> Message AI
-            </Link>
-            <Link href="/driver/incident" className="flex items-center justify-center gap-2 rounded-full border border-white/25 py-3 text-sm font-medium text-white">
-              <LifeBuoy className="h-4 w-4" /> Report issue
-            </Link>
+          <div className="mt-4 flex flex-col gap-2">
+            {currentLoad.stage === "negotiating" && (
+              <button
+                onClick={() => requestBetterRate(currentLoad.id, "driver")}
+                className="flex w-full items-center justify-center gap-2 rounded-full bg-white/15 py-3 text-sm font-medium text-white"
+              >
+                <Handshake className="h-4 w-4" /> Ask AI to push for more
+              </button>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              <Link href="/driver/messages" className="flex items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-medium text-ink-950">
+                <MessageCircle className="h-4 w-4" /> Message AI
+              </Link>
+              <Link href="/driver/incident" className="flex items-center justify-center gap-2 rounded-full border border-white/25 py-3 text-sm font-medium text-white">
+                <LifeBuoy className="h-4 w-4" /> Report issue
+              </Link>
+            </div>
           </div>
         </div>
       ) : (
@@ -128,16 +146,27 @@ export default function DriverHomePage() {
 
       {nextLoad && (
         <div className="rounded-3xl border border-line p-5">
-          <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-[var(--accent-info)]">
-              <Link2 className="h-3.5 w-3.5" />
-            </span>
-            <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Next load — already chained</span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-[var(--accent-info)]">
+                <Link2 className="h-3.5 w-3.5" />
+              </span>
+              <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Next load — already chained</span>
+            </div>
+            <LoadScoreBadge score={nextLoad.score} size="sm" />
           </div>
           <p className="mt-2 font-medium text-ink-950">
             {nextLoad.lane.origin} <span className="text-ink-300">→</span> {nextLoad.lane.destination}
           </p>
           <p className="mt-0.5 text-xs text-ink-500">{nextLoad.stage === "negotiating" ? "AI is negotiating rate now" : "Rate locked — waiting on your current delivery"}</p>
+          {nextLoad.stage === "negotiating" && (
+            <button
+              onClick={() => requestBetterRate(nextLoad.id, "driver")}
+              className="mt-3 flex items-center gap-1.5 text-xs font-medium text-ink-950 hover:underline"
+            >
+              <Handshake className="h-3.5 w-3.5" /> Ask AI to push for more
+            </button>
+          )}
         </div>
       )}
 

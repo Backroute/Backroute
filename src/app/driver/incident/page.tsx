@@ -41,7 +41,11 @@ export default function ReportIncidentPage() {
           <AlertTriangle className="h-6 w-6" />
         </div>
         <p className="font-display text-xl text-ink-950">AI dispatcher is on it</p>
-        <p className="text-sm text-ink-500">Notifying the broker and working the checklist now — check Home for live status.</p>
+        <p className="text-sm text-ink-500">
+          {type === "accident"
+            ? "Notifying the broker, working the checklist, and looping in a live human safety specialist now — check Home for live status."
+            : "Notifying the broker and working the checklist now — check Home for live status."}
+        </p>
       </div>
     );
   }

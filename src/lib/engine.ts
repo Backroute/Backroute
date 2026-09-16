@@ -1,4 +1,5 @@
 import { EQUIPMENT, LANES } from "./mock-data";
+import { computeEconomics, computeLoadScore } from "./scoring";
 import type {
   ActivityEvent,
   ActivityType,
@@ -46,6 +47,17 @@ export function createSourcedLoad(
   const { fuelCost, tollCost } = costsForLane(lane.miles, deadheadMiles);
   const now = new Date().toISOString();
 
+  const projected = computeEconomics(targetRate, lane.miles, deadheadMiles, fuelCost, tollCost);
+  const score = computeLoadScore({
+    rate: targetRate,
+    netProfit: projected.netProfit,
+    miles: lane.miles,
+    deadheadMiles,
+    rpm: projected.rpm,
+    marketRpm: lane.marketRpm,
+    brokerReliability: broker.reliability,
+  });
+
   return {
     id: uid("load"),
     referenceNumber: `BR-${20000 + refSeed}`,
@@ -63,8 +75,11 @@ export function createSourcedLoad(
     deadheadMiles,
     fuelCost,
     tollCost,
+    deadheadCost: projected.deadheadCost,
+    commission: projected.commission,
     netProfit: null,
     rpm: null,
+    score,
     carrierId,
     truckId,
     messages: [],
@@ -99,9 +114,7 @@ export function createLoadOfferBatch(
 
   const candidates = Array.from({ length: count }, (_, i) => {
     const base = createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers);
-    const projectedRate = base.targetRate;
-    const netProfit = Math.round(projectedRate - base.fuelCost - base.tollCost - base.deadheadMiles * 0.68);
-    const rpm = Math.round((projectedRate / base.lane.miles) * 100) / 100;
+    const { netProfit, rpm } = computeEconomics(base.targetRate, base.lane.miles, base.deadheadMiles, base.fuelCost, base.tollCost);
     return {
       ...base,
       stage: "offered" as const,
@@ -113,7 +126,7 @@ export function createLoadOfferBatch(
   });
 
   const offerGroupId = uid("offer");
-  const best = candidates.reduce((a, b) => ((b.netProfit ?? 0) > (a.netProfit ?? 0) ? b : a));
+  const best = candidates.reduce((a, b) => (b.score > a.score ? b : a));
 
   return candidates.map((c) => ({ ...c, offerGroupId, recommended: c.id === best.id }));
 }
@@ -226,6 +239,17 @@ function mkEvent(carrierId: string, loadId: string | undefined, type: ActivityTy
   return { id: uid("act"), timestamp: new Date().toISOString(), type, message, detail, loadId, carrierId, severity, channel };
 }
 
+/** Recomputes the real expense breakdown — fuel, tolls, deadhead, and our 2% commission — once a rate is locked in. */
+function applyBookedEconomics(next: Load, original: Load, finalAmt: number, brokerReliability: number) {
+  const { fuelCost, tollCost, deadheadMiles, lane } = original;
+  const { deadheadCost, commission, netProfit, rpm } = computeEconomics(finalAmt, lane.miles, deadheadMiles, fuelCost, tollCost);
+  next.deadheadCost = deadheadCost;
+  next.commission = commission;
+  next.netProfit = netProfit;
+  next.rpm = rpm;
+  next.score = computeLoadScore({ rate: finalAmt, netProfit, miles: lane.miles, deadheadMiles, rpm, marketRpm: lane.marketRpm, brokerReliability });
+}
+
 export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck | undefined): StepResult {
   const events: ActivityEvent[] = [];
   const next: Load = { ...load, updatedAt: new Date().toISOString(), ticksInStage: load.ticksInStage + 1 };
@@ -265,9 +289,7 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
           next.calls = [...load.calls, call];
           next.bookedRate = finalAmt;
           next.stage = "rate_confirmed";
-          const { fuelCost, tollCost, deadheadMiles, lane } = load;
-          next.netProfit = Math.round(finalAmt - fuelCost - tollCost - deadheadMiles * 0.68);
-          next.rpm = Math.round((finalAmt / lane.miles) * 100) / 100;
+          applyBookedEconomics(next, load, finalAmt, b.reliability ?? 70);
           next.documents = [...load.documents, { id: uid("doc"), type: "rate_confirmation", name: `RateCon_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" }];
           events.push(mkEvent(load.carrierId, load.id, "call_completed", "Voice agent closed the deal by phone", `${b.company} · $${finalAmt.toLocaleString()} all-in`, "success", "voice"));
         } else {
@@ -276,9 +298,7 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
           next.messages = [...load.messages, msg];
           next.bookedRate = finalAmt;
           next.stage = "rate_confirmed";
-          const { fuelCost, tollCost, deadheadMiles, lane } = load;
-          next.netProfit = Math.round(finalAmt - fuelCost - tollCost - deadheadMiles * 0.68);
-          next.rpm = Math.round((finalAmt / lane.miles) * 100) / 100;
+          applyBookedEconomics(next, load, finalAmt, b.reliability ?? 70);
           next.documents = [...load.documents, { id: uid("doc"), type: "rate_confirmation", name: `RateCon_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" }];
           events.push(mkEvent(load.carrierId, load.id, "rate_confirmed", "Rate confirmed and validated", `${b.company} · $${finalAmt.toLocaleString()} all-in`, "success", "sms"));
         }
@@ -354,6 +374,45 @@ export function shouldChainNextLoad(load: Load, truck: Truck | undefined): boole
   return !!truck && load.stage === "in_transit" && !truck.nextLoadId && chance(0.5);
 }
 
+const PUSH_REQUEST_COPY: Record<"driver" | "carrier", (target: number) => string> = {
+  driver: (target) => `Driver asked us to push harder on this one — following up to see if we can get closer to $${target.toLocaleString()}.`,
+  carrier: (target) => `Following up per carrier request — any room to move toward $${target.toLocaleString()} on this one?`,
+};
+
+/** The one place a human (driver or carrier) can ask the AI to go back and negotiate harder — still no human dispatcher involved. */
+export function pushForBetterRate(load: Load, broker: Broker | undefined, actor: "driver" | "carrier"): { load: Load; events: ActivityEvent[] } {
+  if (load.stage !== "negotiating") return { load, events: [] };
+  const b = broker ?? ({ contact: "Broker", company: load.source } as Broker);
+
+  const bumpedTarget = Math.max(Math.round(load.targetRate * 1.05), load.targetRate + 40);
+  const ceiling = Math.round(load.listedRate * 1.3);
+  const newTarget = Math.min(bumpedTarget, ceiling);
+
+  const msg: NegotiationMessage = {
+    id: uid("msg"),
+    channel: "email",
+    direction: "outbound",
+    from: "Backroute AI",
+    timestamp: new Date().toISOString(),
+    content: PUSH_REQUEST_COPY[actor](newTarget),
+    offerAmount: newTarget,
+  };
+
+  const next: Load = { ...load, targetRate: newTarget, messages: [...load.messages, msg], updatedAt: new Date().toISOString() };
+  const events: ActivityEvent[] = [
+    mkEvent(
+      load.carrierId,
+      load.id,
+      "negotiation_email",
+      actor === "driver" ? "Driver asked AI to push for a better rate" : "Carrier asked AI to push for a better rate",
+      `${b.company} · new target $${newTarget.toLocaleString()}`,
+      "info",
+      "email",
+    ),
+  ];
+  return { load: next, events };
+}
+
 // ---------- Incidents: the AI handling breakdowns, accidents, delays and weather like a real dispatcher would ----------
 
 const INCIDENT_STEPS: Record<IncidentType, string[]> = {
@@ -401,16 +460,18 @@ export function createIncident(driverId: string, carrierId: string, truckId: str
     createdAt: new Date().toISOString(),
     status: "active",
     steps: INCIDENT_STEPS[type].map((label) => ({ label, status: "pending" as const })),
+    humanNotified: type === "accident",
   };
 }
 
 export function incidentOpenedEvent(incident: Incident, truck: Truck | undefined): ActivityEvent {
+  const base = incident.note || "AI dispatcher is handling it now.";
   return mkEvent(
     incident.carrierId,
     incident.loadId ?? undefined,
     "incident",
     `${INCIDENT_LABEL[incident.type]} reported${truck ? ` — ${truck.unitNumber}` : ""}`,
-    incident.note || "AI dispatcher is handling it now.",
+    incident.humanNotified ? `${base} A live safety specialist has also been notified.` : base,
     "warning",
   );
 }
