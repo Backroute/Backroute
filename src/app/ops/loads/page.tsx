@@ -42,7 +42,8 @@ export default function OpsLoadsPage() {
                 <th className="px-5 py-3 font-medium">Broker</th>
                 <th className="px-5 py-3 font-medium">Score</th>
                 <th className="px-5 py-3 font-medium">Stage</th>
-                <th className="px-5 py-3 font-medium text-right">Rate</th>
+                <th className="px-5 py-3 font-medium text-right">Total offer</th>
+                <th className="px-5 py-3 font-medium text-right">Est. net</th>
                 <th className="px-5 py-3 font-medium text-right">Updated</th>
               </tr>
             </thead>
@@ -59,7 +60,8 @@ export default function OpsLoadsPage() {
                   <td className="px-5 py-3.5 text-ink-600">{brokers.get(load.brokerId)?.company ?? "—"}</td>
                   <td className="px-5 py-3.5"><LoadScoreBadge score={load.score} size="sm" /></td>
                   <td className="px-5 py-3.5"><LoadStagePill stage={load.stage} /></td>
-                  <td className="px-5 py-3.5 text-right tabular">{load.bookedRate ? formatCurrency(load.bookedRate) : formatCurrency(load.targetRate)}</td>
+                  <td className="px-5 py-3.5 text-right tabular">{formatCurrency(load.bookedRate ?? load.targetRate)}</td>
+                  <td className="px-5 py-3.5 text-right tabular font-medium text-ink-950">{load.netProfit !== null ? formatCurrency(load.netProfit) : "—"}</td>
                   <td className="px-5 py-3.5 text-right text-xs text-ink-400"><TimeAgo iso={load.updatedAt} /></td>
                 </tr>
               ))}

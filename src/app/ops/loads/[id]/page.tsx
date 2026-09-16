@@ -80,6 +80,10 @@ export default function OpsLoadDetailPage() {
         <div className="mt-4">
           <Progress value={load.progressPct} />
         </div>
+        <div className="mt-4 flex items-center gap-6">
+          <span className="text-sm text-ink-500">Total offer <span className="font-display text-lg font-semibold tabular text-ink-950">{formatCurrency(load.bookedRate ?? load.targetRate)}</span></span>
+          <span className="text-sm text-ink-500">Est. net <span className="font-display text-lg font-semibold tabular text-ink-950">{load.netProfit !== null ? formatCurrency(load.netProfit) : "—"}</span></span>
+        </div>
       </div>
 
       <div className="grid gap-6 px-4 py-6 sm:px-8 lg:grid-cols-3">

@@ -5,10 +5,9 @@ import { ArrowUpRight, LifeBuoy, Link2, MapPin, MessageCircle, Sparkles } from "
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { LoadStagePill } from "@/components/shared/load-stage";
-import { LoadOfferCard } from "@/components/shared/load-offer-card";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
-import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap } from "@/lib/selectors";
+import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 
@@ -16,11 +15,8 @@ export default function DriverHomePage() {
   const driver = usePrimaryDriver();
   const trucks = useCarrierTrucks();
   const loads = useCarrierLoads();
-  const brokers = useBrokerMap();
   const incidents = useStore((s) => s.incidents).filter((i) => i.driverId === driver.id && i.status === "active");
-  const selectLoadOffer = useStore((s) => s.actions.selectLoadOffer);
   const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
-  const requestBetterOfferPrice = useStore((s) => s.actions.requestBetterOfferPrice);
 
   const truck = trucks.find((t) => t.id === driver.truckId);
   const currentLoad = loads.find((l) => l.id === truck?.currentLoadId);
@@ -68,27 +64,15 @@ export default function DriverHomePage() {
       )}
 
       {pendingOffers.length > 0 && (
-        <div>
-          <div className="mb-2.5 flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-ink-950" />
-            <p className="text-sm font-semibold text-ink-950">Choose your next load</p>
-          </div>
-          <p className="mb-3 text-xs text-ink-500">
-            AI checked every connected board and scored {pendingOffers.length} options for you.
-          </p>
-          <div className="flex flex-col gap-3">
-            {pendingOffers.map((offer) => (
-              <LoadOfferCard
-                key={offer.id}
-                load={offer}
-                broker={brokers.get(offer.brokerId)}
-                compact
-                onSelect={() => offer.offerGroupId && selectLoadOffer(offer.offerGroupId, offer.id, "driver")}
-                onNegotiate={() => requestBetterOfferPrice(offer.id, "driver")}
-              />
-            ))}
-          </div>
-        </div>
+        <Link
+          href="/driver/loads"
+          className="flex items-center justify-between gap-3 rounded-2xl bg-ink-950 px-4 py-3.5 text-white"
+        >
+          <span className="flex items-center gap-2 text-sm font-medium">
+            <Sparkles className="h-4 w-4" /> {pendingOffers.length} load option{pendingOffers.length === 1 ? "" : "s"} ready — choose your next load
+          </span>
+          <ArrowUpRight className="h-4 w-4 shrink-0" />
+        </Link>
       )}
 
       {currentLoad ? (
