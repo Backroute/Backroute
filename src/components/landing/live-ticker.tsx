@@ -12,7 +12,7 @@ export function LiveTicker() {
     <div className="rounded-3xl border border-white/10 bg-ink-900 p-6 sm:p-8">
       <div className="flex items-center justify-between">
         <div>
-          <p className="font-display text-xl text-white">The agent fleet, right now</p>
+          <p className="font-display text-xl text-white">Live activity, right now</p>
           <p className="mt-1 text-sm text-white/50">Simulated live feed from the Backroute dispatcher engine</p>
         </div>
         <LiveDot />

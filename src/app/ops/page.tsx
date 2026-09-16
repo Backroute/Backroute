@@ -31,7 +31,7 @@ export default function OpsOverviewPage() {
 
   return (
     <div>
-      <PageHeader title="Mission Control" description="Real-time view of the Backroute agent fleet across every carrier." right={<LiveDot />} />
+      <PageHeader title="Overview" description="Real-time view of activity across every carrier on the platform." right={<LiveDot />} />
 
       <div className="flex flex-col gap-6 px-8 py-6">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -45,12 +45,12 @@ export default function OpsOverviewPage() {
           <CardHeader>
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Radar className="h-4 w-4" /> Agent fleet, right now
+                <Radar className="h-4 w-4" /> Agents, right now
               </CardTitle>
               <p className="mt-1 text-xs text-ink-500">Concurrent negotiation activity across email, SMS, and voice</p>
             </div>
             <Link href="/ops/agents" className="flex items-center gap-1 text-xs font-medium text-ink-950 hover:underline">
-              Full monitor <ArrowUpRight className="h-3 w-3" />
+              View all <ArrowUpRight className="h-3 w-3" />
             </Link>
           </CardHeader>
           <CardContent className="!pt-4">

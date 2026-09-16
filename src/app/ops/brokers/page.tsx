@@ -13,7 +13,7 @@ export default function BrokersPage() {
 
   return (
     <div>
-      <PageHeader title="Broker Scorecards" description="Every deal improves rate prediction and broker scoring — the continuous learning flywheel." />
+      <PageHeader title="Brokers" description="Every deal improves rate prediction and broker scoring across the network." />
 
       <div className="px-8 py-6">
         <div className="overflow-hidden rounded-2xl border border-line bg-white">

@@ -123,7 +123,7 @@ export default function CarrierOverviewPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Live agent activity</CardTitle>
+                <CardTitle>Live activity</CardTitle>
                 <Button href="/carrier/negotiations" variant="ghost" size="sm">
                   All negotiations <ArrowUpRight className="h-3.5 w-3.5" />
                 </Button>

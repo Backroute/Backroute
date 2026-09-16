@@ -11,7 +11,7 @@ import { PRIMARY_CARRIER_ID } from "@/lib/mock-data";
 const NAV: NavItem[] = [
   { href: "/ops", label: "Overview", icon: LayoutGrid },
   { href: "/ops/carriers", label: "Carriers", icon: Building2 },
-  { href: "/ops/agents", label: "Agent Fleet", icon: Radio },
+  { href: "/ops/agents", label: "Agents", icon: Radio },
   { href: "/ops/loads", label: "Loads", icon: Truck },
   { href: "/ops/brokers", label: "Brokers", icon: Users },
   { href: "/ops/escalations", label: "Escalations", icon: ShieldAlert },
@@ -36,7 +36,7 @@ export default function OpsLayout({ children }: { children: React.ReactNode }) {
   return (
     <PortalShell
       variant="dark"
-      portalLabel="Mission Control"
+      portalLabel="Backroute Ops"
       navItems={navWithBadge}
       switchTo={{ href: "/", label: "Exit to public site" }}
       topBar={

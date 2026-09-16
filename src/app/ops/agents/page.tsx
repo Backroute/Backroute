@@ -30,7 +30,7 @@ export default function AgentsPage() {
 
   return (
     <div>
-      <PageHeader title="Agent Fleet" description="Live monitor for every email, SMS, and voice agent working the network." right={<LiveDot />} />
+      <PageHeader title="Agents" description="Live monitor for every email, SMS, and voice agent working the network." right={<LiveDot />} />
 
       <div className="flex flex-col gap-6 px-8 py-6">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
