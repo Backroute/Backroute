@@ -22,7 +22,7 @@ export default function EscalationsPage() {
     <div>
       <PageHeader title="Escalations" description={`${open.length} awaiting review`} />
 
-      <div className="flex flex-col gap-6 px-8 py-6">
+      <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
         <div>
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-400">Open ({open.length})</h2>
           {open.length === 0 ? (

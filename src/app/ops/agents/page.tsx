@@ -32,7 +32,7 @@ export default function AgentsPage() {
     <div>
       <PageHeader title="Agents" description={`${metrics.activeCalls + metrics.activeSmsThreads + metrics.activeEmailThreads} conversations active`} right={<LiveDot />} />
 
-      <div className="flex flex-col gap-6 px-8 py-6">
+      <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
           <Metric icon={Phone} value={metrics.activeCalls} label="Calls in progress" />
           <Metric icon={MessageSquare} value={metrics.activeSmsThreads} label="SMS threads" />

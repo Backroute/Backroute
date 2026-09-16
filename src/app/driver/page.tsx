@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, Handshake, LifeBuoy, Link2, MapPin, MessageCircle, Sparkles } from "lucide-react";
+import { ArrowUpRight, LifeBuoy, Link2, MapPin, MessageCircle, Sparkles } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { LoadOfferCard } from "@/components/shared/load-offer-card";
 import { LoadScoreBadge } from "@/components/shared/load-score";
+import { CounterOfferButton } from "@/components/shared/counter-offer-button";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { formatNumber } from "@/lib/utils";
@@ -121,12 +122,7 @@ export default function DriverHomePage() {
 
           <div className="mt-4 flex flex-col gap-2">
             {currentLoad.stage === "negotiating" && (
-              <button
-                onClick={() => requestBetterRate(currentLoad.id, "driver")}
-                className="flex w-full items-center justify-center gap-2 rounded-full bg-white/15 py-3 text-sm font-medium text-white"
-              >
-                <Handshake className="h-4 w-4" /> Ask AI to push for more
-              </button>
+              <CounterOfferButton load={currentLoad} onSubmit={(amount) => requestBetterRate(currentLoad.id, "driver", amount)} variant="dark" />
             )}
             <div className="grid grid-cols-2 gap-2">
               <Link href="/driver/messages" className="flex items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-medium text-ink-950">
@@ -160,12 +156,9 @@ export default function DriverHomePage() {
           </p>
           <p className="mt-0.5 text-xs text-ink-500">{nextLoad.stage === "negotiating" ? "AI is negotiating rate now" : "Rate locked — waiting on your current delivery"}</p>
           {nextLoad.stage === "negotiating" && (
-            <button
-              onClick={() => requestBetterRate(nextLoad.id, "driver")}
-              className="mt-3 flex items-center gap-1.5 text-xs font-medium text-ink-950 hover:underline"
-            >
-              <Handshake className="h-3.5 w-3.5" /> Ask AI to push for more
-            </button>
+            <div className="mt-3">
+              <CounterOfferButton load={nextLoad} onSubmit={(amount) => requestBetterRate(nextLoad.id, "driver", amount)} variant="text" />
+            </div>
           )}
         </div>
       )}

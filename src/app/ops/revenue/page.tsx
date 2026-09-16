@@ -33,7 +33,7 @@ export default function RevenuePage() {
     <div>
       <PageHeader title="Revenue" description="Subscription + 2% take-rate" />
 
-      <div className="flex flex-col gap-6 px-8 py-6">
+      <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Card><CardContent><StatTile label="Total revenue / mo" value={formatCurrency(mrr + takeRate)} /></CardContent></Card>
           <Card><CardContent><StatTile label="Subscription MRR" value={formatCurrency(mrr)} /></CardContent></Card>

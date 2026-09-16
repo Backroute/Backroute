@@ -379,14 +379,30 @@ const PUSH_REQUEST_COPY: Record<"driver" | "carrier", (target: number) => string
   carrier: (target) => `Following up per carrier request — any room to move toward $${target.toLocaleString()} on this one?`,
 };
 
-/** The one place a human (driver or carrier) can ask the AI to go back and negotiate harder — still no human dispatcher involved. */
-export function pushForBetterRate(load: Load, broker: Broker | undefined, actor: "driver" | "carrier"): { load: Load; events: ActivityEvent[] } {
+const COUNTER_REQUEST_COPY: Record<"driver" | "carrier", (target: number) => string> = {
+  driver: (target) => `Driver countered at $${target.toLocaleString()} — going back to the broker with that number now.`,
+  carrier: (target) => `Carrier countered at $${target.toLocaleString()} — going back to the broker with that number now.`,
+};
+
+export function suggestedCounter(load: Load): number {
+  return Math.min(Math.max(Math.round(load.targetRate * 1.06), load.targetRate + 50), Math.round(load.listedRate * 1.3));
+}
+
+/** The one place a human (driver or carrier) can ask the AI to go back and negotiate harder — still no human dispatcher involved.
+ *  Optionally pass a specific dollar amount the driver/carrier is asking for, like a real dispatcher relaying a target number. */
+export function pushForBetterRate(
+  load: Load,
+  broker: Broker | undefined,
+  actor: "driver" | "carrier",
+  requestedAmount?: number,
+): { load: Load; events: ActivityEvent[] } {
   if (load.stage !== "negotiating") return { load, events: [] };
   const b = broker ?? ({ contact: "Broker", company: load.source } as Broker);
 
-  const bumpedTarget = Math.max(Math.round(load.targetRate * 1.05), load.targetRate + 40);
   const ceiling = Math.round(load.listedRate * 1.3);
-  const newTarget = Math.min(bumpedTarget, ceiling);
+  const floor = load.targetRate;
+  const hasSpecificAsk = typeof requestedAmount === "number" && Number.isFinite(requestedAmount) && requestedAmount > floor;
+  const newTarget = hasSpecificAsk ? Math.min(Math.round(requestedAmount!), ceiling) : Math.min(Math.max(Math.round(load.targetRate * 1.05), load.targetRate + 40), ceiling);
 
   const msg: NegotiationMessage = {
     id: uid("msg"),
@@ -394,7 +410,7 @@ export function pushForBetterRate(load: Load, broker: Broker | undefined, actor:
     direction: "outbound",
     from: "Backroute AI",
     timestamp: new Date().toISOString(),
-    content: PUSH_REQUEST_COPY[actor](newTarget),
+    content: hasSpecificAsk ? COUNTER_REQUEST_COPY[actor](newTarget) : PUSH_REQUEST_COPY[actor](newTarget),
     offerAmount: newTarget,
   };
 
@@ -404,7 +420,9 @@ export function pushForBetterRate(load: Load, broker: Broker | undefined, actor:
       load.carrierId,
       load.id,
       "negotiation_email",
-      actor === "driver" ? "Driver asked AI to push for a better rate" : "Carrier asked AI to push for a better rate",
+      actor === "driver"
+        ? (hasSpecificAsk ? `Driver countered at $${newTarget.toLocaleString()}` : "Driver asked AI to push for a better rate")
+        : (hasSpecificAsk ? `Carrier countered at $${newTarget.toLocaleString()}` : "Carrier asked AI to push for a better rate"),
       `${b.company} · new target $${newTarget.toLocaleString()}`,
       "info",
       "email",

@@ -87,7 +87,7 @@ interface StoreState {
     reportIncident: (driverId: string, truckId: string, type: IncidentType, note: string) => void;
     seedInitialOffers: () => void;
     updateHomeTimeTarget: (driverId: string, target: string) => void;
-    requestBetterRate: (loadId: string, actor: "driver" | "carrier") => void;
+    requestBetterRate: (loadId: string, actor: "driver" | "carrier", amount?: number) => void;
   };
 }
 
@@ -103,11 +103,18 @@ function craftDriverReply(content: string): string {
   return "Got it, thanks for the update — I've logged it and will keep you posted.";
 }
 
+function extractAmount(content: string): number | undefined {
+  const match = content.match(/\$?\s?(\d{3,5}(?:\.\d+)?)/);
+  if (!match) return undefined;
+  const n = Number(match[1]);
+  return Number.isFinite(n) && n >= 200 && n <= 20000 ? Math.round(n) : undefined;
+}
+
 function isRateRequest(content: string): boolean {
   const c = content.toLowerCase();
-  const wantsMore = /\b(more|higher|better|push|bump|raise)\b/.test(c);
+  const wantsMore = /\b(more|higher|better|push|bump|raise|counter)\b/.test(c);
   const aboutMoney = /\b(rate|money|pay|\$|price|dollar)/.test(c);
-  return wantsMore && aboutMoney;
+  return (wantsMore && aboutMoney) || (aboutMoney && extractAmount(content) !== undefined);
 }
 
 function findNegotiatingLoadForDriver(state: StoreState, driverId: string): Load | undefined {
@@ -332,10 +339,13 @@ export const useStore = create<StoreState>((set) => ({
             const target = findNegotiatingLoadForDriver(state, driverId);
             if (target) {
               const broker = state.brokers.find((b) => b.id === target.brokerId);
-              const { load: updated, events } = pushForBetterRate(target, broker, "driver");
+              const amount = extractAmount(content);
+              const { load: updated, events } = pushForBetterRate(target, broker, "driver", amount);
               const reply: DriverMessage = {
                 id: uid("dm"), driverId, from: "ai",
-                content: `On it — pushing ${broker?.company ?? "the broker"} for a better number on the ${target.lane.origin} to ${target.lane.destination} load now.`,
+                content: amount
+                  ? `On it — asking ${broker?.company ?? "the broker"} for $${amount.toLocaleString()} on the ${target.lane.origin} to ${target.lane.destination} load now.`
+                  : `On it — pushing ${broker?.company ?? "the broker"} for a better number on the ${target.lane.origin} to ${target.lane.destination} load now.`,
                 timestamp: new Date().toISOString(),
               };
               return {
@@ -437,12 +447,12 @@ export const useStore = create<StoreState>((set) => ({
         drivers: state.drivers.map((d) => (d.id === driverId ? { ...d, homeTimeTarget: target } : d)),
       })),
 
-    requestBetterRate: (loadId, actor) =>
+    requestBetterRate: (loadId, actor, amount) =>
       set((state) => {
         const load = state.loads.find((l) => l.id === loadId);
         if (!load) return {};
         const broker = state.brokers.find((b) => b.id === load.brokerId);
-        const { load: updated, events } = pushForBetterRate(load, broker, actor);
+        const { load: updated, events } = pushForBetterRate(load, broker, actor, amount);
         return {
           loads: state.loads.map((l) => (l.id === updated.id ? updated : l)),
           activity: [...events, ...state.activity].slice(0, 80),

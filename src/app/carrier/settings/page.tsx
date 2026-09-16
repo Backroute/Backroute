@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CheckCircle2, CreditCard, Download, FileText, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { INTEGRATION_CATEGORIES } from "@/lib/integrations";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -37,6 +38,9 @@ export default function SettingsPage() {
   const updateSettings = useStore((s) => s.actions.updateSettings);
   const [team, setTeam] = useState(INITIAL_TEAM);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [connections, setConnections] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(INTEGRATION_CATEGORIES.flatMap((c) => c.items).map((i) => [i.id, i.connected])),
+  );
 
   function handleInvite() {
     const email = inviteEmail.trim();
@@ -50,7 +54,7 @@ export default function SettingsPage() {
     <div>
       <PageHeader title="Settings" />
 
-      <div className="flex flex-col gap-6 px-8 py-6">
+      <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
         <Card>
           <CardHeader>
             <CardTitle>Company profile</CardTitle>
@@ -119,28 +123,75 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>TMS integration</CardTitle>
+            <CardTitle>Integrations</CardTitle>
+            <CardDescription>The load boards, TMS, ELD, and back-office tools the AI reads and writes to.</CardDescription>
           </CardHeader>
-          <CardContent className="!pt-3">
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line p-4">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-ink-950 text-white text-xs font-bold">TMS</span>
-                <div>
-                  <p className="text-sm font-medium text-ink-900">{settings.tmsProvider}</p>
-                  <p className="text-xs text-ink-500">Booked loads sync automatically after rate confirmation.</p>
+          <CardContent className="!pt-3 flex flex-col gap-5">
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">TMS</p>
+              <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
+                <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-950 text-[10px] font-bold text-white">
+                      {initials(settings.tmsProvider)}
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium text-ink-900">{settings.tmsProvider}</p>
+                      <p className="text-xs text-ink-500">Booked loads sync automatically after rate confirmation.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {settings.tmsConnected ? (
+                      <Badge tone="success"><CheckCircle2 className="h-3 w-3" /> Connected</Badge>
+                    ) : (
+                      <Badge tone="warning">Disconnected</Badge>
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => updateSettings({ tmsConnected: true })}>
+                      <RefreshCw className="h-3.5 w-3.5" /> Sync now
+                    </Button>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {settings.tmsConnected ? (
-                  <Badge tone="success"><CheckCircle2 className="h-3 w-3" /> Connected</Badge>
-                ) : (
-                  <Badge tone="warning">Disconnected</Badge>
-                )}
-                <Button variant="outline" size="sm" onClick={() => updateSettings({ tmsConnected: true })}>
-                  <RefreshCw className="h-3.5 w-3.5" /> Sync now
-                </Button>
-              </div>
             </div>
+
+            {INTEGRATION_CATEGORIES.map((cat) => (
+              <div key={cat.name}>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">{cat.name}</p>
+                <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
+                  {cat.items.map((item) => {
+                    const connected = connections[item.id];
+                    return (
+                      <div key={item.id} className="flex flex-wrap items-center justify-between gap-4 px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-[10px] font-bold text-ink-700">
+                            {initials(item.name)}
+                          </span>
+                          <div>
+                            <p className="text-sm font-medium text-ink-900">{item.name}</p>
+                            <p className="text-xs text-ink-500">{cat.blurb}</p>
+                          </div>
+                        </div>
+                        {connected ? (
+                          <div className="flex items-center gap-2">
+                            <Badge tone="success"><CheckCircle2 className="h-3 w-3" /> Connected</Badge>
+                            <button
+                              onClick={() => setConnections((c) => ({ ...c, [item.id]: false }))}
+                              className="text-xs font-medium text-ink-400 hover:text-[var(--accent-danger)]"
+                            >
+                              Disconnect
+                            </button>
+                          </div>
+                        ) : (
+                          <Button variant="outline" size="sm" onClick={() => setConnections((c) => ({ ...c, [item.id]: true }))}>
+                            Connect
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
 
@@ -239,6 +290,11 @@ export default function SettingsPage() {
       </div>
     </div>
   );
+}
+
+function initials(name: string): string {
+  const words = name.replace(/\.(com|ai)$/i, "").split(/[\s.]+/).filter(Boolean);
+  return words.slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 }
 
 function Field({ label, value }: { label: string; value: string }) {

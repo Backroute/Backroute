@@ -23,7 +23,7 @@ export default function OpsLoadsPage() {
     <div>
       <PageHeader title="Loads" description={`${loads.length} loads · Titan Freight LLC`} right={<LiveDot />} />
 
-      <div className="px-8 py-6">
+      <div className="px-4 py-6 sm:px-8">
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-5 lg:grid-cols-10">
           {LOAD_STAGE_ORDER.map((stage) => (
             <div key={stage} className="rounded-xl border border-line bg-white p-3 text-center">
@@ -33,7 +33,7 @@ export default function OpsLoadsPage() {
           ))}
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-line bg-white">
+        <div className="overflow-x-auto rounded-2xl border border-line bg-white">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line bg-ink-50/60 text-left text-[11px] uppercase tracking-wider text-ink-400">

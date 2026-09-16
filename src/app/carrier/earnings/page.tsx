@@ -39,7 +39,7 @@ export default function EarningsPage() {
     <div>
       <PageHeader title="Earnings" />
 
-      <div className="flex flex-col gap-6 px-8 py-6">
+      <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Card><CardContent><StatTile label="Net profit" value={formatCurrency(netProfitTotal)} sublabel="This cycle" /></CardContent></Card>
           <Card><CardContent><StatTile label="Avg rate / mile" value={`$${avgRpm.toFixed(2)}`} /></CardContent></Card>

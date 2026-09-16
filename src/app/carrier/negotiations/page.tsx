@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, Handshake, Mail, MessageSquare, Phone } from "lucide-react";
+import { ArrowUpRight, Mail, MessageSquare, Phone } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { LiveDot } from "@/components/shared/live-dot";
 import { ChannelBadge } from "@/components/shared/channel-badge";
 import { LoadScoreBadge } from "@/components/shared/load-score";
+import { CounterOfferButton } from "@/components/shared/counter-offer-button";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { useCarrierLoads, useBrokerMap } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
@@ -28,7 +28,7 @@ export default function NegotiationsPage() {
     <div>
       <PageHeader title="Negotiations" description={`${active.length} active`} right={<LiveDot />} />
 
-      <div className="px-8 py-6">
+      <div className="px-4 py-6 sm:px-8">
         <div className="grid grid-cols-3 gap-4">
           <Card><CardContent className="flex items-center gap-3"><Mail className="h-4 w-4 text-ink-400" /><div><p className="font-display text-2xl tabular text-ink-950">{emailCount}</p><p className="text-xs text-ink-500">Email exchanges</p></div></CardContent></Card>
           <Card><CardContent className="flex items-center gap-3"><MessageSquare className="h-4 w-4 text-ink-400" /><div><p className="font-display text-2xl tabular text-ink-950">{smsCount}</p><p className="text-xs text-ink-500">SMS exchanges</p></div></CardContent></Card>
@@ -82,9 +82,7 @@ export default function NegotiationsPage() {
                       </div>
                     </div>
                     {load.stage === "negotiating" && (
-                      <Button size="sm" variant="ghost" onClick={() => requestBetterRate(load.id, "carrier")}>
-                        <Handshake className="h-3.5 w-3.5" /> Push for more
-                      </Button>
+                      <CounterOfferButton load={load} onSubmit={(amount) => requestBetterRate(load.id, "carrier", amount)} variant="ghost" label="Push for more" />
                     )}
                     <Link href={`/carrier/loads/${load.id}`} className="flex shrink-0 items-center gap-1 text-xs font-medium text-ink-950 hover:underline">
                       Open <ArrowUpRight className="h-3 w-3" />

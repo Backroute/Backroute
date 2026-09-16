@@ -15,8 +15,8 @@ export default function BrokersPage() {
     <div>
       <PageHeader title="Brokers" description={`${brokers.length} brokers ranked by reliability`} />
 
-      <div className="px-8 py-6">
-        <div className="overflow-hidden rounded-2xl border border-line bg-white">
+      <div className="px-4 py-6 sm:px-8">
+        <div className="overflow-x-auto rounded-2xl border border-line bg-white">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line bg-ink-50/60 text-left text-[11px] uppercase tracking-wider text-ink-400">

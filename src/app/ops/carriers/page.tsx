@@ -23,14 +23,14 @@ export default function CarriersPage() {
     <div>
       <PageHeader title="Carriers" description={`${carriers.length} carrier accounts · ${formatNumber(carriers.reduce((s, c) => s + c.trucks, 0))} trucks tracked`} />
 
-      <div className="px-8 py-6">
+      <div className="px-4 py-6 sm:px-8">
         <Tabs
           tabs={PLAN_TABS.map((p) => ({ key: p, label: p === "all" ? "All plans" : p, count: p === "all" ? carriers.length : carriers.filter((c) => c.plan === p).length }))}
           active={plan}
           onChange={(k) => setPlan(k as (typeof PLAN_TABS)[number])}
         />
 
-        <div className="mt-5 overflow-hidden rounded-2xl border border-line bg-white">
+        <div className="mt-5 overflow-x-auto rounded-2xl border border-line bg-white">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line bg-ink-50/60 text-left text-[11px] uppercase tracking-wider text-ink-400">

@@ -28,7 +28,7 @@ export default function FleetPage() {
     <div>
       <PageHeader title="Fleet" description={`${trucks.length} trucks · ${drivers.size ?? 0} drivers on roster`} />
 
-      <div className="grid gap-5 px-8 py-6 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-5 px-4 py-6 sm:px-8 sm:grid-cols-2 xl:grid-cols-3">
         {trucks.map((truck) => {
           const driver = drivers.get(truck.driverId ?? "");
           const currentLoad = loads.find((l) => l.id === truck.currentLoadId);

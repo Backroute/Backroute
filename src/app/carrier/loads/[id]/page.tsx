@@ -2,12 +2,12 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Fuel, Gauge, Handshake, Percent, Route, TrendingUp, FileText } from "lucide-react";
+import { ArrowLeft, Fuel, Gauge, Percent, Route, TrendingUp, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { LoadScoreBadge } from "@/components/shared/load-score";
+import { CounterOfferButton } from "@/components/shared/counter-offer-button";
 import { NegotiationThread } from "@/components/shared/negotiation-thread";
 import { CallTranscript } from "@/components/shared/call-transcript";
 import { Progress } from "@/components/ui/progress";
@@ -25,7 +25,7 @@ export default function LoadDetailPage() {
 
   if (!load) {
     return (
-      <div className="px-8 py-16 text-center">
+      <div className="px-4 py-16 sm:px-8 text-center">
         <p className="text-sm text-ink-500">This load isn&apos;t in the current simulation window.</p>
         <Link href="/carrier/loads" className="mt-3 inline-block text-sm font-medium text-ink-950 underline">
           Back to loads
@@ -40,7 +40,7 @@ export default function LoadDetailPage() {
 
   return (
     <div>
-      <div className="border-b border-line bg-white/70 px-8 py-6 backdrop-blur-sm">
+      <div className="border-b border-line bg-white/70 px-4 py-6 sm:px-8 backdrop-blur-sm">
         <Link href="/carrier/loads" className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-500 hover:text-ink-950">
           <ArrowLeft className="h-3.5 w-3.5" /> Back to loads
         </Link>
@@ -64,7 +64,7 @@ export default function LoadDetailPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 px-8 py-6 lg:grid-cols-3">
+      <div className="grid gap-6 px-4 py-6 sm:px-8 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
           <Card>
             <CardHeader>
@@ -73,9 +73,7 @@ export default function LoadDetailPage() {
                 {broker && <p className="text-xs text-ink-500">{broker.company} · {broker.contact}</p>}
               </div>
               {load.stage === "negotiating" && (
-                <Button size="sm" variant="outline" onClick={() => requestBetterRate(load.id, "carrier")}>
-                  <Handshake className="h-3.5 w-3.5" /> Ask AI to push for more
-                </Button>
+                <CounterOfferButton load={load} onSubmit={(amount) => requestBetterRate(load.id, "carrier", amount)} variant="outline" />
               )}
             </CardHeader>
             <CardContent className="!pt-4">

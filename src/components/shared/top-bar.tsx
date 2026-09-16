@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, LogOut, Search, Settings } from "lucide-react";
+import { Bell, LogOut, Menu, Search, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNow } from "@/lib/hooks";
 import { openCommandPalette } from "./command-palette";
@@ -27,6 +27,7 @@ export function TopBar({
   accountSubtitle,
   settingsHref,
   exitHref,
+  onMenuClick,
 }: {
   dark?: boolean;
   notifications: ActivityEvent[];
@@ -34,6 +35,7 @@ export function TopBar({
   accountSubtitle: string;
   settingsHref?: string;
   exitHref: string;
+  onMenuClick?: () => void;
 }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -48,23 +50,36 @@ export function TopBar({
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-4 border-b px-8 py-3",
+        "flex items-center justify-between gap-2 border-b px-4 py-3 sm:gap-4 sm:px-8",
         dark ? "border-white/10 bg-ink-950" : "border-line bg-white",
       )}
     >
-      <button
-        onClick={openCommandPalette}
-        className={cn(
-          "flex w-full max-w-xs items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm transition-colors",
-          dark ? "border-white/15 text-white/40 hover:border-white/30" : "border-line text-ink-400 hover:border-ink-300",
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        {onMenuClick && (
+          <button
+            onClick={onMenuClick}
+            className={cn(
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-full lg:hidden",
+              dark ? "text-white/60 hover:bg-white/10" : "text-ink-500 hover:bg-ink-100",
+            )}
+          >
+            <Menu className="h-4 w-4" />
+          </button>
         )}
-      >
-        <Search className="h-3.5 w-3.5" />
-        <span className="flex-1 text-left">Search or jump to...</span>
-        <kbd className={cn("rounded border px-1.5 py-0.5 text-[10px]", dark ? "border-white/15 text-white/40" : "border-line text-ink-400")}>
-          &#8984;K
-        </kbd>
-      </button>
+        <button
+          onClick={openCommandPalette}
+          className={cn(
+            "flex w-full max-w-xs items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm transition-colors",
+            dark ? "border-white/15 text-white/40 hover:border-white/30" : "border-line text-ink-400 hover:border-ink-300",
+          )}
+        >
+          <Search className="h-3.5 w-3.5 shrink-0" />
+          <span className="hidden flex-1 text-left sm:inline">Search or jump to...</span>
+          <kbd className={cn("hidden rounded border px-1.5 py-0.5 text-[10px] sm:inline", dark ? "border-white/15 text-white/40" : "border-line text-ink-400")}>
+            &#8984;K
+          </kbd>
+        </button>
+      </div>
 
       <div className="flex items-center gap-2">
         <div className="relative" ref={notifRef}>
