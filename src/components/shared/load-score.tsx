@@ -7,6 +7,12 @@ const TONE_CLASSES = {
   danger: "bg-red-50 text-[var(--accent-danger)]",
 };
 
+const RING_COLOR = {
+  success: "var(--accent-live)",
+  warning: "var(--accent-warn)",
+  danger: "var(--accent-danger)",
+};
+
 export function LoadScoreBadge({
   score,
   size = "md",
@@ -14,11 +20,35 @@ export function LoadScoreBadge({
   className,
 }: {
   score: number;
-  size?: "sm" | "md" | "lg";
+  /** "xl" is the decision-prominent ring gauge — use it wherever a carrier/driver is choosing between loads. */
+  size?: "sm" | "md" | "lg" | "xl";
   invert?: boolean;
   className?: string;
 }) {
   const tone = scoreTone(score);
+
+  if (size === "xl") {
+    const deg = Math.max(8, Math.round((score / 100) * 360));
+    const ringColor = invert ? "#fff" : RING_COLOR[tone];
+    const trackColor = invert ? "rgba(255,255,255,0.15)" : "rgba(10,10,10,0.08)";
+    return (
+      <div
+        className={cn("relative flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full", className)}
+        style={{ background: `conic-gradient(${ringColor} ${deg}deg, ${trackColor} ${deg}deg)` }}
+      >
+        <div
+          className={cn(
+            "flex h-[60px] w-[60px] flex-col items-center justify-center rounded-full",
+            invert ? "bg-ink-950" : "border border-line bg-white",
+          )}
+        >
+          <span className={cn("font-display text-[26px] font-bold leading-none tabular", invert ? "text-white" : "text-ink-950")}>{score}</span>
+          <span className={cn("mt-0.5 text-[9px] font-semibold uppercase tracking-wide", invert ? "text-white/50" : "text-ink-400")}>score</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <span
       className={cn(

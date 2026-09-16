@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Link2, Phone, Sparkles } from "lucide-react";
+import { Link2, MapPin, Phone, Sparkles } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,8 +9,16 @@ import { Avatar } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { useCarrierTrucks, useDriverMap, useCarrierLoads } from "@/lib/selectors";
+import { useNow } from "@/lib/hooks";
 import { formatNumber } from "@/lib/utils";
 import type { HosStatus } from "@/lib/types";
+
+/** A believable "GPS just pinged" freshness readout — deterministic per truck, ticks with the shared clock. */
+function pingSecondsAgo(id: string, now: number): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return (hash + Math.floor(now / 1000)) % 40;
+}
 
 const HOS_TONE: Record<HosStatus, "success" | "neutral" | "info" | "warning"> = {
   driving: "success",
@@ -23,6 +31,7 @@ export default function FleetPage() {
   const trucks = useCarrierTrucks();
   const drivers = useDriverMap();
   const loads = useCarrierLoads();
+  const now = useNow();
 
   return (
     <div>
@@ -43,6 +52,11 @@ export default function FleetPage() {
                   <div>
                     <p className="font-display text-xl text-ink-950">{truck.unitNumber}</p>
                     <p className="text-xs text-ink-500">{truck.equipmentType} · {formatNumber(truck.odometer)} mi · {truck.mpg.toFixed(1)} mpg</p>
+                    <p className="mt-1 flex items-center gap-1 text-[11px] text-ink-400">
+                      <MapPin className="h-3 w-3" /> {truck.currentCity}, {truck.currentState}
+                      <span className="text-ink-300">·</span>
+                      GPS via Samsara, {now === null ? "just now" : `${pingSecondsAgo(truck.id, now)}s ago`}
+                    </p>
                   </div>
                   <Badge tone={truck.status === "available" ? "success" : truck.status === "on_load" ? "info" : "warning"}>
                     {truck.status.replace("_", " ")}

@@ -53,3 +53,22 @@ export function scoreTone(score: number): "success" | "warning" | "danger" {
   if (score >= 55) return "warning";
   return "danger";
 }
+
+/** The one-line reason a dispatcher would give for liking a load — surfaces the dominant factor behind the score. */
+export function loadHighlight(opts: {
+  rpm: number;
+  marketRpm: number;
+  deadheadMiles: number;
+  miles: number;
+  brokerReliability: number;
+  brokerTier: "preferred" | "standard" | "watch";
+}): string {
+  const { rpm, marketRpm, deadheadMiles, miles, brokerReliability, brokerTier } = opts;
+  const deadheadRatio = deadheadMiles / Math.max(miles + deadheadMiles, 1);
+  if (brokerTier === "preferred" && brokerReliability >= 90) return "Preferred broker — pays reliably";
+  if (deadheadRatio < 0.03) return "Almost zero deadhead miles";
+  if (rpm >= marketRpm * 1.05) return "Paying above market rate";
+  if (brokerReliability >= 85) return "High-reliability broker";
+  if (deadheadRatio < 0.1) return "Low deadhead — efficient lane";
+  return "Solid overall fit for this truck";
+}

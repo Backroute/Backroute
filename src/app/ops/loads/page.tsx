@@ -50,7 +50,7 @@ export default function OpsLoadsPage() {
               {sorted.map((load) => (
                 <tr key={load.id} className="border-b border-line last:border-0 hover:bg-ink-50/60">
                   <td className="px-5 py-3.5">
-                    <Link href={`/carrier/loads/${load.id}`} className="block">
+                    <Link href={`/ops/loads/${load.id}`} className="block">
                       <p className="font-medium text-ink-950">{load.lane.origin} <span className="text-ink-300">→</span> {load.lane.destination}</p>
                       <p className="text-xs text-ink-400">{load.referenceNumber}</p>
                     </Link>

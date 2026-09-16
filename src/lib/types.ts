@@ -188,6 +188,10 @@ export interface Load {
   offerGroupId?: string;
   recommended?: boolean;
   homeTimeFit?: boolean;
+  /** Backroute Ops paused the AI on this load — the simulation skips advancing it until resumed. */
+  aiPaused?: boolean;
+  /** Set once Ops has manually stepped in (rate override, force-book, etc.) so the carrier can see support was involved. */
+  opsOverridden?: boolean;
 }
 
 export type ActivityType =

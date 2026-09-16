@@ -16,6 +16,7 @@ import {
   shouldChainNextLoad,
   type InstructionCategory,
 } from "./engine";
+import { computeEconomics, computeLoadScore } from "./scoring";
 import { clamp } from "./utils";
 import type {
   ActivityEvent,
@@ -94,6 +95,8 @@ interface StoreState {
     requestBetterRate: (loadId: string, actor: "driver" | "carrier", amount?: number) => void;
     requestBetterOfferPrice: (loadId: string, actor: "driver" | "carrier") => void;
     sendNegotiationInstruction: (loadId: string, actor: "driver" | "carrier", text: string) => void;
+    setAiPaused: (loadId: string, paused: boolean) => void;
+    opsOverrideRate: (loadId: string, amount: number) => void;
   };
 }
 
@@ -230,7 +233,7 @@ export const useStore = create<StoreState>((set) => ({
           }
         }
 
-        const candidates = loads.filter((l) => l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "offered" && l.carrierId === PRIMARY_CARRIER_ID);
+        const candidates = loads.filter((l) => l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "offered" && !l.aiPaused && l.carrierId === PRIMARY_CARRIER_ID);
         if (candidates.length && Math.random() < 0.88) {
           const target = pick(candidates);
           const broker = state.brokers.find((b) => b.id === target.brokerId);
@@ -492,6 +495,55 @@ export const useStore = create<StoreState>((set) => ({
         return {
           loads: state.loads.map((l) => (l.id === updated.id ? updated : l)),
           activity: [...events, ...state.activity].slice(0, 80),
+        };
+      }),
+
+    setAiPaused: (loadId, paused) =>
+      set((state) => {
+        const load = state.loads.find((l) => l.id === loadId);
+        if (!load) return {};
+        return {
+          loads: state.loads.map((l) => (l.id === loadId ? { ...l, aiPaused: paused, opsOverridden: true, updatedAt: new Date().toISOString() } : l)),
+          activity: [
+            {
+              id: uid("act"), timestamp: new Date().toISOString(), type: "escalation" as const,
+              message: paused ? "Ops paused the AI on this load" : "Ops resumed the AI on this load",
+              detail: `${load.lane.origin} → ${load.lane.destination} · ${load.referenceNumber}`,
+              loadId, carrierId: load.carrierId, severity: (paused ? "warning" : "info") as ActivityEvent["severity"],
+            },
+            ...state.activity,
+          ].slice(0, 80),
+        };
+      }),
+
+    opsOverrideRate: (loadId, amount) =>
+      set((state) => {
+        const load = state.loads.find((l) => l.id === loadId);
+        if (!load || !Number.isFinite(amount) || amount <= 0) return {};
+        const broker = state.brokers.find((b) => b.id === load.brokerId);
+        const { deadheadCost, commission, netProfit, rpm } = computeEconomics(amount, load.lane.miles, load.deadheadMiles, load.fuelCost, load.tollCost);
+        const score = computeLoadScore({
+          rate: amount, netProfit, miles: load.lane.miles, deadheadMiles: load.deadheadMiles, rpm,
+          marketRpm: load.lane.marketRpm, brokerReliability: broker?.reliability ?? 70,
+        });
+        const updated: Load = {
+          ...load,
+          targetRate: amount,
+          bookedRate: load.bookedRate !== null ? amount : load.bookedRate,
+          deadheadCost, commission, netProfit, rpm, score,
+          opsOverridden: true,
+          updatedAt: new Date().toISOString(),
+        };
+        return {
+          loads: state.loads.map((l) => (l.id === loadId ? updated : l)),
+          activity: [
+            {
+              id: uid("act"), timestamp: new Date().toISOString(), type: "negotiation_email" as const,
+              message: "Ops manually overrode the rate", detail: `${broker?.company ?? load.source} · set to $${amount.toLocaleString()}`,
+              loadId, carrierId: load.carrierId, severity: "warning" as const,
+            },
+            ...state.activity,
+          ].slice(0, 80),
         };
       }),
   },

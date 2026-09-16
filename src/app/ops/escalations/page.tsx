@@ -40,7 +40,7 @@ export default function EscalationsPage() {
                         <p className="text-sm text-ink-900">{e.reason}</p>
                         <p className="mt-1 text-xs text-ink-400">
                           {carrier.name} · <TimeAgo iso={e.createdAt} /> ·{" "}
-                          <Link href={`/carrier/loads/${e.loadId}`} className="inline-flex items-center gap-0.5 text-ink-500 hover:text-ink-950 hover:underline">
+                          <Link href={`/ops/loads/${e.loadId}`} className="inline-flex items-center gap-0.5 text-ink-500 hover:text-ink-950 hover:underline">
                             View load <ArrowUpRight className="h-3 w-3" />
                           </Link>
                         </p>
