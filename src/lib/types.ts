@@ -1,0 +1,224 @@
+export type LoadStage =
+  | "sourced"
+  | "scoring"
+  | "negotiating"
+  | "rate_confirmed"
+  | "booked"
+  | "dispatched"
+  | "at_pickup"
+  | "in_transit"
+  | "at_delivery"
+  | "delivered";
+
+export const LOAD_STAGE_ORDER: LoadStage[] = [
+  "sourced",
+  "scoring",
+  "negotiating",
+  "rate_confirmed",
+  "booked",
+  "dispatched",
+  "at_pickup",
+  "in_transit",
+  "at_delivery",
+  "delivered",
+];
+
+export const LOAD_STAGE_LABEL: Record<LoadStage, string> = {
+  sourced: "Sourced",
+  scoring: "Scoring",
+  negotiating: "Negotiating",
+  rate_confirmed: "Rate Confirmed",
+  booked: "Booked",
+  dispatched: "Dispatched",
+  at_pickup: "At Pickup",
+  in_transit: "In Transit",
+  at_delivery: "At Delivery",
+  delivered: "Delivered",
+};
+
+export type Channel = "email" | "sms" | "voice";
+
+export type EquipmentType = "Dry Van" | "Reefer" | "Flatbed";
+
+export interface Broker {
+  id: string;
+  company: string;
+  contact: string;
+  phone: string;
+  email: string;
+  reliability: number;
+  avgResponseMins: number;
+  loadsBooked: number;
+  onTimePct: number;
+  avgRateVariancePct: number;
+  tier: "preferred" | "standard" | "watch";
+}
+
+export interface Lane {
+  origin: string;
+  originState: string;
+  destination: string;
+  destState: string;
+  miles: number;
+  marketRpm: number;
+}
+
+export type HosStatus = "driving" | "on_duty" | "off_duty" | "sleeper";
+
+export interface Driver {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  truckId: string;
+  carrierId: string;
+  hosStatus: HosStatus;
+  hoursRemaining: number;
+  cdl: string;
+  rating: number;
+  hireDate: string;
+}
+
+export interface Truck {
+  id: string;
+  unitNumber: string;
+  driverId: string | null;
+  carrierId: string;
+  equipmentType: EquipmentType;
+  status: "available" | "on_load" | "maintenance";
+  currentCity: string;
+  currentState: string;
+  homeBase: string;
+  currentLoadId: string | null;
+  nextLoadId: string | null;
+  mpg: number;
+  odometer: number;
+}
+
+export interface Carrier {
+  id: string;
+  name: string;
+  mc: string;
+  dot: string;
+  plan: "Starter" | "Growth" | "Fleet";
+  mrr: number;
+  trucks: number;
+  healthScore: number;
+  joinedAt: string;
+  city: string;
+  state: string;
+  takeRateRevenue: number;
+  gmvMonth: number;
+  avgSavingsPerTruck: number;
+  detailed?: boolean;
+}
+
+export interface NegotiationMessage {
+  id: string;
+  channel: Channel;
+  direction: "outbound" | "inbound";
+  from: string;
+  timestamp: string;
+  content: string;
+  offerAmount?: number;
+}
+
+export interface CallTranscriptLine {
+  speaker: "ai" | "broker";
+  text: string;
+}
+
+export interface VoiceCall {
+  id: string;
+  status: "ringing" | "in_progress" | "completed" | "voicemail" | "no_answer";
+  startedAt: string;
+  durationSec: number;
+  transcript: CallTranscriptLine[];
+  outcome?: string;
+}
+
+export interface LoadDocument {
+  id: string;
+  type: "rate_confirmation" | "bol" | "pod" | "invoice";
+  name: string;
+  generatedAt: string;
+  status: "pending" | "verified";
+}
+
+export interface Load {
+  id: string;
+  referenceNumber: string;
+  stage: LoadStage;
+  source: string;
+  brokerId: string;
+  lane: Lane;
+  equipmentType: EquipmentType;
+  weight: number;
+  pickupWindow: string;
+  deliveryWindow: string;
+  listedRate: number;
+  targetRate: number;
+  bookedRate: number | null;
+  deadheadMiles: number;
+  fuelCost: number;
+  tollCost: number;
+  netProfit: number | null;
+  rpm: number | null;
+  carrierId: string;
+  truckId: string | null;
+  messages: NegotiationMessage[];
+  calls: VoiceCall[];
+  documents: LoadDocument[];
+  createdAt: string;
+  updatedAt: string;
+  isChained: boolean;
+  aiConfidence: number;
+  ticksInStage: number;
+  progressPct: number;
+}
+
+export type ActivityType =
+  | "load_sourced"
+  | "scoring_done"
+  | "negotiation_email"
+  | "negotiation_sms"
+  | "call_started"
+  | "call_completed"
+  | "rate_confirmed"
+  | "booked"
+  | "tms_synced"
+  | "dispatched"
+  | "check_call"
+  | "document_captured"
+  | "delivered"
+  | "chained"
+  | "escalation";
+
+export interface ActivityEvent {
+  id: string;
+  timestamp: string;
+  type: ActivityType;
+  channel?: Channel;
+  message: string;
+  detail?: string;
+  loadId?: string;
+  carrierId?: string;
+  severity: "info" | "success" | "warning" | "danger";
+}
+
+export interface Escalation {
+  id: string;
+  loadId: string;
+  carrierId: string;
+  reason: string;
+  createdAt: string;
+  status: "open" | "resolved";
+}
+
+export interface DriverMessage {
+  id: string;
+  driverId: string;
+  from: "driver" | "ai";
+  content: string;
+  timestamp: string;
+}
