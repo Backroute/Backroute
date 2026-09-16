@@ -30,7 +30,7 @@ export default function CarrierLayout({ children }: { children: React.ReactNode 
       variant="light"
       portalLabel="Carrier Dashboard"
       navItems={navWithBadge}
-      switchTo={{ href: "/", label: "Switch portal" }}
+      switchTo={{ href: "/", label: "Back to home" }}
       footer={
         <div className="flex items-center gap-2.5 rounded-xl border border-line px-3 py-2.5">
           <Avatar name={carrier.name} size="sm" />

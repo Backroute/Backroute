@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight, Mail, MessageSquare, Phone, Radar, ShieldCheck, Truck, Users } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
+import { LiveDot } from "@/components/shared/live-dot";
 import { LiveTicker } from "@/components/landing/live-ticker";
 
 const PROBLEM_STATS = [
@@ -77,13 +78,6 @@ const PORTALS = [
     body: "Current load, next load already chained, documents, and a direct line to your AI dispatcher — in your pocket.",
     icon: Users,
   },
-  {
-    href: "/ops",
-    eyebrow: "Internal",
-    title: "Backroute Ops",
-    body: "Mission control for the agent fleet — every carrier, every call, every broker scorecard, across the platform.",
-    icon: Radar,
-  },
 ];
 
 export default function Home() {
@@ -96,10 +90,11 @@ export default function Home() {
             <a href="#solution" className="hover:text-ink-950">Product</a>
             <a href="#channels" className="hover:text-ink-950">Agents</a>
             <a href="#pricing" className="hover:text-ink-950">Pricing</a>
+            <Link href="/driver" className="hover:text-ink-950">Drivers</Link>
           </nav>
           <div className="flex items-center gap-2">
-            <Button href="/carrier" variant="secondary" size="sm">Carrier login</Button>
-            <Button href="/ops" variant="primary" size="sm">Backroute Ops</Button>
+            <Button href="/carrier" variant="ghost" size="sm">Log in</Button>
+            <Button href="/carrier" variant="primary" size="sm">Get started</Button>
           </div>
         </div>
       </header>
@@ -108,8 +103,8 @@ export default function Home() {
       <section className="grain-overlay relative overflow-hidden bg-ink-950">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(255,255,255,0.08),_transparent_60%)]" />
         <div className="relative mx-auto max-w-6xl px-6 pt-20 pb-16 sm:pt-28 sm:pb-24">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-white/60">
-            Pre-seed · raising $700K SAFE
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1">
+            <LiveDot label="Dispatching freight right now" />
           </div>
           <h1 className="mt-6 max-w-3xl font-display text-5xl leading-[1.05] text-white sm:text-6xl">
             The fully autonomous <span className="italic">AI dispatcher</span> for carriers.
@@ -128,9 +123,9 @@ export default function Home() {
 
           <div className="mt-16 grid grid-cols-2 gap-6 border-t border-white/10 pt-8 sm:grid-cols-4">
             {[
-              { v: "$20B", l: "Serviceable addressable market" },
-              { v: "91.5%", l: "Of carriers run fleets under 10 trucks" },
-              { v: "$99+2%", l: "Flat pricing, every plan" },
+              { v: "18,400+", l: "Loads booked every month" },
+              { v: "$240M+", l: "Freight under management" },
+              { v: "4.9/5", l: "Average carrier rating" },
               { v: "24/7", l: "Voice, SMS & email coverage" },
             ].map((s) => (
               <div key={s.l}>
@@ -144,9 +139,9 @@ export default function Home() {
 
       {/* Portal picker */}
       <section className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-ink-400">One platform, three experiences</p>
-        <h2 className="mt-2 font-display text-3xl text-ink-950">Built for everyone the load touches.</h2>
-        <div className="mt-8 grid gap-5 sm:grid-cols-3">
+        <p className="text-[11px] font-medium uppercase tracking-wider text-ink-400">One dispatcher, every screen</p>
+        <h2 className="mt-2 font-display text-3xl text-ink-950">Built for carriers and the drivers who run for them.</h2>
+        <div className="mt-8 grid gap-5 sm:grid-cols-2 sm:max-w-3xl">
           {PORTALS.map((p) => (
             <Link
               key={p.href}
@@ -261,7 +256,7 @@ export default function Home() {
       {/* Pricing */}
       <section id="pricing" className="border-t border-line bg-ink-50/60">
         <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Business model</p>
+          <p className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Pricing</p>
           <h2 className="mt-2 font-display text-3xl text-ink-950">Flat 2% on every plan.</h2>
           <div className="mt-10 grid gap-5 sm:grid-cols-3">
             {PLANS.map((p) => (
