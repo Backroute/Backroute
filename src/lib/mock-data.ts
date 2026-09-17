@@ -205,6 +205,21 @@ const CALL_BROKER_CONFIRMS = [
   "Deal — I'll send the rate confirmation over in a few minutes.",
   "You got it, locking the truck on my end. Paperwork's on its way.",
 ];
+const CALL_BROKER_CHECKS_PENDING = [
+  "Let me check with the shipper and call you right back.",
+  "I'm not authorized to close at that — give me a few minutes to confirm.",
+  "Have to run it by my manager on this one, hang tight.",
+];
+const CALL_AI_FOLLOWUP = [
+  (amt: number) => `Understood — let's hold $${amt.toLocaleString()} for you. Call me back the second you're clear to close.`,
+  (amt: number) => `We'll keep $${amt.toLocaleString()} open on our end. Get the sign-off and we'll send the packet right away.`,
+  (amt: number) => `$${amt.toLocaleString()} still works for us. Confirm with your shipper and we can lock the truck.`,
+];
+const CALL_BROKER_PENDING = [
+  "Okay, I'll call you back once I hear from the shipper.",
+  "Give me a bit — I'll follow up as soon as I know.",
+  "Noted, I'll get back to you shortly on that.",
+];
 
 const SMS_NUDGES = [
   "Just checking in — still have the truck available if we can get to a number that works.",
@@ -291,9 +306,17 @@ function buildNegotiationThread(
       { speaker: "ai", text: rng.pick(CALL_OPENERS)(broker.contact.split(" ")[0], lane.origin, lane.destination) },
       { speaker: "broker", text: rng.pick(CALL_BROKER_STALLS) },
       { speaker: "ai", text: rng.pick(CALL_AI_HOLDS)(Math.round(finalAmt * 0.98)) },
-      { speaker: "broker", text: rng.pick(CALL_BROKER_CHECKS) },
-      { speaker: "ai", text: rng.pick(CALL_AI_CLOSES)(finalAmt) },
-      { speaker: "broker", text: rng.pick(CALL_BROKER_CONFIRMS) },
+      ...(resolvedRate
+        ? [
+            { speaker: "broker" as const, text: rng.pick(CALL_BROKER_CHECKS) },
+            { speaker: "ai" as const, text: rng.pick(CALL_AI_CLOSES)(finalAmt) },
+            { speaker: "broker" as const, text: rng.pick(CALL_BROKER_CONFIRMS) },
+          ]
+        : [
+            { speaker: "broker" as const, text: rng.pick(CALL_BROKER_CHECKS_PENDING) },
+            { speaker: "ai" as const, text: rng.pick(CALL_AI_FOLLOWUP)(finalAmt) },
+            { speaker: "broker" as const, text: rng.pick(CALL_BROKER_PENDING) },
+          ]),
     ];
     calls.push({
       id: rng.id("call"),
