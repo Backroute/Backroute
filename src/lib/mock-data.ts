@@ -165,6 +165,11 @@ const EMAIL_COUNTERS = [
   (amt: number) => `$${amt.toLocaleString()} works on our end and we can hold that rate — need confirmation in the next hour to lock the truck.`,
   (amt: number) => `Closest we can get is $${amt.toLocaleString()}. Truck is clean, on-time history is 98%+, empty and ready to roll.`,
 ];
+const EMAIL_CONCEDE = [
+  (amt: number) => `We can come down to $${amt.toLocaleString()} to get this locked in today.`,
+  (amt: number) => `Alright, we can do $${amt.toLocaleString()} if that gets us confirmed now.`,
+  (amt: number) => `We'll meet you closer — $${amt.toLocaleString()} works if we can lock the truck now.`,
+];
 const BROKER_REPLIES_LOW = [
   (amt: number) => `Best I can do right now is $${amt.toLocaleString()}. Shipper is firm on the budget.`,
   (amt: number) => `I hear you, but I'm capped at $${amt.toLocaleString()} on this one.`,
@@ -271,24 +276,28 @@ function buildNegotiationThread(
   });
   t += rng.int(3, 14);
 
+  // The AI opens at its best, data-driven ask (target) and gives a little ground on each of its own turns —
+  // never below a floor that protects margin — while the broker concedes up from their low opener toward
+  // wherever the AI currently stands. Two sides closing the gap, not one side standing still the whole time.
+  const aiFloor = Math.round(targetRate * 0.94);
+  let aiLast = targetRate;
+  let brokerLast = brokerOpen;
   for (round = 0; round < maxRounds; round++) {
-    const progress = (round + 1) / (maxRounds + 1);
-    // The AI already opened with its best data-driven ask, so it holds at finalAmt every round —
-    // only the broker's number should visibly move, conceding up from their low opener.
-    const aiAsk = finalAmt;
+    const aiAsk = round === 0 ? targetRate : Math.max(aiFloor, Math.round(aiLast - (aiLast - brokerLast) * 0.15));
     messages.push({
       id: rng.id("msg"),
       channel: round === 0 ? "email" : "sms",
       direction: "outbound",
       from: "Backroute AI",
       timestamp: iso(t),
-      content: rng.pick(EMAIL_COUNTERS)(aiAsk),
+      content: rng.pick(round === 0 ? EMAIL_COUNTERS : EMAIL_CONCEDE)(aiAsk),
       offerAmount: aiAsk,
     });
+    aiLast = aiAsk;
     t += rng.int(2, 11);
 
     if (round < maxRounds - 1) {
-      const brokerCounter = Math.round(brokerOpen + (finalAmt - brokerOpen) * progress);
+      const brokerCounter = Math.round(brokerLast + (aiAsk - brokerLast) * 0.35);
       messages.push({
         id: rng.id("msg"),
         channel: "sms",
@@ -298,6 +307,7 @@ function buildNegotiationThread(
         content: rng.pick(BROKER_REPLIES_LOW)(brokerCounter),
         offerAmount: brokerCounter,
       });
+      brokerLast = brokerCounter;
       t += rng.int(3, 12);
     }
   }
@@ -307,7 +317,7 @@ function buildNegotiationThread(
     const transcript: CallTranscriptSeed = [
       { speaker: "ai", text: rng.pick(CALL_OPENERS)(broker.contact.split(" ")[0], lane.origin, lane.destination) },
       { speaker: "broker", text: rng.pick(CALL_BROKER_STALLS) },
-      { speaker: "ai", text: rng.pick(CALL_AI_HOLDS)(Math.round(finalAmt * 0.98)) },
+      { speaker: "ai", text: rng.pick(CALL_AI_HOLDS)(finalAmt) },
       ...(resolvedRate
         ? [
             { speaker: "broker" as const, text: rng.pick(CALL_BROKER_CHECKS) },
