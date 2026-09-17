@@ -22,6 +22,9 @@ const STATUS_LABEL: Record<ServiceStatus, string> = {
   overdue: "Overdue",
 };
 
+const STATUS_RANK: Record<ServiceStatus, number> = { ok: 0, "due-soon": 1, overdue: 2 };
+const worseStatus = (a: ServiceStatus, b: ServiceStatus): ServiceStatus => (STATUS_RANK[a] >= STATUS_RANK[b] ? a : b);
+
 export default function MaintenancePage() {
   const trucks = useCarrierTrucks();
   const drivers = useDriverMap();
@@ -40,6 +43,7 @@ export default function MaintenancePage() {
               const svcStatus = serviceStatus(truck);
               const pct = Math.max(0, Math.min(100, (remaining / truck.serviceIntervalMiles) * 100));
               const inspStatus = now === null ? "ok" : inspectionStatus(truck, now);
+              const overallStatus = worseStatus(svcStatus, inspStatus);
               const driver = drivers.get(truck.driverId ?? "");
 
               return (
@@ -50,7 +54,7 @@ export default function MaintenancePage() {
                         <p className="font-display text-xl text-ink-950">{truck.unitNumber}</p>
                         <p className="text-xs text-ink-500">{driver?.name ?? "Unassigned"} · {formatNumber(truck.odometer)} mi</p>
                       </div>
-                      <Badge tone={STATUS_TONE[svcStatus]}>{STATUS_LABEL[svcStatus]}</Badge>
+                      <Badge tone={STATUS_TONE[overallStatus]}>{STATUS_LABEL[overallStatus]}</Badge>
                     </div>
 
                     <div>
@@ -75,6 +79,16 @@ export default function MaintenancePage() {
                           {svcStatus === "overdue"
                             ? "Past service interval — AI will avoid booking a long-haul load on this truck until serviced."
                             : "Approaching service interval — schedule before the next multi-day load."}
+                        </span>
+                      </div>
+                    )}
+                    {inspStatus !== "ok" && (
+                      <div className={`flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs ${inspStatus === "overdue" ? "bg-red-50 text-[var(--accent-danger)]" : "bg-amber-50 text-[var(--accent-warn)]"}`}>
+                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          {inspStatus === "overdue"
+                            ? "DOT inspection is past due — AI will avoid booking this truck until it's current."
+                            : "DOT inspection due soon — schedule it before it lapses."}
                         </span>
                       </div>
                     )}
