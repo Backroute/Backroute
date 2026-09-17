@@ -11,12 +11,14 @@ import {
   createIncident,
   createLoadOfferBatch,
   createSourcedLoad,
+  draftOfferAsk,
   incidentOpenedEvent,
   pushForBetterRate,
-  respondToOfferAsk,
   resolveLoadOffer,
+  resolveOfferAsk,
   shouldChainNextLoad,
   type InstructionCategory,
+  type OfferAskDraft,
 } from "./engine";
 import { computeEconomics, computeLoadScore } from "./scoring";
 import { clamp } from "./utils";
@@ -97,8 +99,10 @@ interface StoreState {
     seedInitialOffers: () => void;
     updateHomeTimeTarget: (driverId: string, target: string) => void;
     requestBetterRate: (loadId: string, actor: "driver" | "carrier", amount?: number) => void;
-    /** Ask the AI anything about a pending offer before committing — a rate ask updates the card live, anything else returns a short reply. */
-    requestOfferDetail: (loadId: string, text: string) => string;
+    /** Ask the AI a question about a pending offer before committing — detention, schedule, payment terms, anything but rate (the AI already set that from data; pushing further belongs to post-selection negotiation). Phase one logs the ask and returns what to show; `resolved` true means there's nothing to wait on. */
+    requestOfferDetail: (loadId: string, text: string) => { draft: OfferAskDraft; pendingReply: string; resolved: boolean };
+    /** Phase two: the broker's actual answer to a non-rate ask. */
+    resolveOfferDetail: (loadId: string, draft: OfferAskDraft) => string;
     sendNegotiationInstruction: (loadId: string, actor: "driver" | "carrier", text: string) => void;
     setAiPaused: (loadId: string, paused: boolean) => void;
     opsOverrideRate: (loadId: string, amount: number) => void;
@@ -506,17 +510,40 @@ export const useStore = create<StoreState>((set, get) => ({
     requestOfferDetail: (loadId, text) => {
       const state = get();
       const load = state.loads.find((l) => l.id === loadId);
+      if (!load) return { draft: { category: "general" as const }, pendingReply: "", resolved: true };
+      const broker = state.brokers.find((b) => b.id === load.brokerId);
+      const { load: updated, draft, pendingReply, resolved } = draftOfferAsk(load, broker, text);
+      if (!pendingReply) return { draft, pendingReply: "", resolved: true };
+      if (!resolved) {
+        set((s) => ({
+          loads: s.loads.map((l) => (l.id === updated.id ? updated : l)),
+          activity: [
+            {
+              id: uid("act"), timestamp: new Date().toISOString(), type: "negotiation_email" as const,
+              message: "Asked AI about this offer before committing",
+              detail: `${broker?.company ?? load.source} · "${text}"`,
+              loadId: updated.id, carrierId: updated.carrierId, severity: "info" as const, channel: "email" as const,
+            },
+            ...s.activity,
+          ].slice(0, 80),
+        }));
+      }
+      return { draft, pendingReply, resolved };
+    },
+
+    resolveOfferDetail: (loadId, draft) => {
+      const state = get();
+      const load = state.loads.find((l) => l.id === loadId);
       if (!load) return "";
       const broker = state.brokers.find((b) => b.id === load.brokerId);
-      const { load: updated, reply } = respondToOfferAsk(load, broker, text);
-      if (!reply) return "";
+      const { load: updated, reply } = resolveOfferAsk(load, broker, draft);
       set((s) => ({
         loads: s.loads.map((l) => (l.id === updated.id ? updated : l)),
         activity: [
           {
             id: uid("act"), timestamp: new Date().toISOString(), type: "negotiation_email" as const,
-            message: "Asked AI about this offer before committing",
-            detail: `${broker?.company ?? load.source} · "${text}"`,
+            message: updated !== load ? "Broker responded to our ask — offer updated" : "Broker responded to our ask",
+            detail: `${broker?.company ?? load.source} · ${reply}`,
             loadId: updated.id, carrierId: updated.carrierId, severity: "info" as const, channel: "email" as const,
           },
           ...s.activity,

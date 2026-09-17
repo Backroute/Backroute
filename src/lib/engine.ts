@@ -543,46 +543,61 @@ export function applyNegotiationInstruction(
   return { load: next, events };
 }
 
-const OFFER_REPLY: Record<Exclude<InstructionCategory, "rate">, (company: string) => string> = {
-  detention: (company) => `Asked ${company} about detention/lumper terms — will have an answer before you need to decide.`,
-  schedule: (company) => `Asked ${company} about pickup flexibility — will have an answer before you need to decide.`,
-  payment: (company) => `Asked ${company} about quick pay and terms — will have an answer before you need to decide.`,
-  general: (company) => `Passed that along to ${company} — will let you know what they say before you need to decide.`,
+export interface OfferAskDraft {
+  category: InstructionCategory;
+}
+
+const OFFER_PENDING_REPLY: Record<Exclude<InstructionCategory, "rate">, (company: string) => string> = {
+  detention: (company) => `Reached out to ${company} about detention terms — waiting on their response.`,
+  schedule: (company) => `Reached out to ${company} about the pickup window — waiting on their response.`,
+  payment: (company) => `Reached out to ${company} about payment terms — waiting on their response.`,
+  general: (company) => `Reached out to ${company} — waiting on their response.`,
 };
 
 /**
- * The offer-card equivalent of applyNegotiationInstruction — before committing, driver/carrier can tell the AI
- * anything (more money, a specific dollar figure, detention/schedule/payment terms, or just a question), exactly
- * like relaying an ask to a dispatcher. A rate ask updates the card's numbers live; anything else logs the ask
- * to the load's message thread and hands back a short reply to show on the card.
+ * The AI already set this offer's rate from lane, broker, and market data — that's its strongest data-driven
+ * ask, not a starting bid to sweeten on request. Pushing further is what the post-selection negotiation flow is
+ * for (already gated on an actual broker response there), so a rate ask here doesn't touch the broker or the
+ * card at all — it just points to where that capability actually lives.
  */
-export function respondToOfferAsk(load: Load, broker: Broker | undefined, text: string): { load: Load; reply: string } {
-  if (load.stage !== "offered") return { load, reply: "" };
-  const b = broker ?? ({ contact: "Broker", company: load.source } as Broker);
+const RATE_REDIRECT_REPLY =
+  "This offer already reflects our strongest data-driven ask for this lane and broker. Select the load and the AI can keep pushing the broker directly during negotiation.";
+
+/**
+ * The offer-card equivalent of applyNegotiationInstruction, scoped to what makes sense before a load is booked:
+ * a question about detention, schedule, payment terms, or anything else — not rate, which the AI already set
+ * optimally and which only makes sense to keep pushing once the load is selected and actually negotiating.
+ * Phase one logs the outbound question and hands back what to show while waiting on the broker.
+ */
+export function draftOfferAsk(load: Load, broker: Broker | undefined, text: string): { load: Load; draft: OfferAskDraft; pendingReply: string; resolved: boolean } {
+  if (load.stage !== "offered") return { load, draft: { category: "general" }, pendingReply: "", resolved: true };
   const category = classifyInstruction(text);
 
   if (category === "rate") {
-    const requested = extractDollarAmount(text);
-    const ceiling = Math.round(load.listedRate * 1.3);
-    const bumpedTarget = requested
-      ? Math.min(Math.max(requested, load.targetRate + 1), ceiling)
-      : Math.min(Math.max(Math.round(load.targetRate * 1.06), load.targetRate + 40), ceiling);
-    const { netProfit, rpm } = computeEconomics(bumpedTarget, load.lane.miles, load.deadheadMiles, load.fuelCost, load.tollCost);
-    const score = computeLoadScore({
-      rate: bumpedTarget, netProfit, miles: load.lane.miles, deadheadMiles: load.deadheadMiles, rpm,
-      marketRpm: load.lane.marketRpm, brokerReliability: b.reliability ?? 70,
-    });
-    return {
-      load: { ...load, targetRate: bumpedTarget, netProfit, rpm, score, updatedAt: new Date().toISOString() },
-      reply: `Asked ${b.company} for $${bumpedTarget.toLocaleString()} — numbers above are updated.`,
-    };
+    return { load, draft: { category }, pendingReply: RATE_REDIRECT_REPLY, resolved: true };
   }
 
+  const b = broker ?? ({ contact: "Broker", company: load.source } as Broker);
   const msg = instructionMessage(category, text, b);
   return {
     load: { ...load, messages: [...load.messages, msg], updatedAt: new Date().toISOString() },
-    reply: OFFER_REPLY[category](b.company),
+    draft: { category },
+    pendingReply: OFFER_PENDING_REPLY[category](b.company),
+    resolved: false,
   };
+}
+
+/** Phase two — the broker's actual answer to a detention/schedule/payment question or general ask. */
+export function resolveOfferAsk(load: Load, broker: Broker | undefined, draft: OfferAskDraft): { load: Load; reply: string } {
+  if (draft.category === "rate") return { load, reply: RATE_REDIRECT_REPLY };
+  const b = broker ?? ({ contact: "Broker", company: load.source } as Broker);
+  const REPLY: Record<Exclude<InstructionCategory, "rate">, string> = {
+    detention: `${b.company} confirmed detention pay kicks in after 2 free hours.`,
+    schedule: `${b.company} can flex the pickup window if it helps lock this in.`,
+    payment: `${b.company} can offer quick pay on this load for a small fee.`,
+    general: `${b.company} responded — nothing here changes what's shown on this card.`,
+  };
+  return { load, reply: REPLY[draft.category] };
 }
 
 // ---------- Incidents: the AI handling breakdowns, accidents, delays and weather like a real dispatcher would ----------

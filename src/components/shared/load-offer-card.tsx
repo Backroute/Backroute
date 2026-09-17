@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Home, MessageCircle, Send, Sparkles, Truck as TruckIcon, X, Zap } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { loadHighlight } from "@/lib/scoring";
+import type { OfferAskDraft } from "@/lib/engine";
 import type { Broker, Driver, Load, Truck } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { TimeAgo } from "./time-ago";
 
 const TIER_TONE = { preferred: "success", standard: "neutral", watch: "warning" } as const;
 
-type AskState = "idle" | "composing" | "sending" | "replied";
+type AskState = "idle" | "composing" | "pending" | "replied";
 
 export function LoadOfferCard({
   load,
@@ -21,7 +22,8 @@ export function LoadOfferCard({
   truck,
   driver,
   onSelect,
-  onNegotiate,
+  onAsk,
+  onAskResolve,
   compact,
 }: {
   load: Load;
@@ -30,8 +32,10 @@ export function LoadOfferCard({
   truck?: Truck;
   driver?: Driver;
   onSelect: () => void;
-  /** Ask the AI anything about this offer before committing — more money, detention terms, a question — and get a reply back, right on the card. */
-  onNegotiate?: (text: string) => string;
+  /** Ask the AI a question about this offer before committing — detention, schedule, payment terms, anything but rate (already set from data; push further after selecting). Phase one: logs the ask and returns what to show while waiting on the broker. */
+  onAsk?: (text: string) => { draft: OfferAskDraft; pendingReply: string; resolved: boolean };
+  /** Phase two: the broker's actual answer, applied a moment later. */
+  onAskResolve?: (draft: OfferAskDraft) => string;
   compact?: boolean;
 }) {
   const [askState, setAskState] = useState<AskState>("idle");
@@ -40,14 +44,21 @@ export function LoadOfferCard({
 
   function handleSend() {
     const trimmed = text.trim();
-    if (!onNegotiate || !trimmed || askState === "sending") return;
-    setAskState("sending");
-    setTimeout(() => {
-      const result = onNegotiate(trimmed);
-      setReply(result);
-      setText("");
+    if (!onAsk || !onAskResolve || !trimmed || askState === "pending") return;
+    const { draft, pendingReply, resolved } = onAsk(trimmed);
+    if (!pendingReply) return;
+    setReply(pendingReply);
+    setText("");
+    if (resolved) {
       setAskState("replied");
-    }, 900);
+      return;
+    }
+    setAskState("pending");
+    setTimeout(() => {
+      const finalReply = onAskResolve(draft);
+      setReply(finalReply);
+      setAskState("replied");
+    }, 2400);
   }
 
   function reset() {
@@ -119,36 +130,22 @@ export function LoadOfferCard({
       </p>
 
       <div className="grid grid-cols-2 gap-2">
-        <Stat label="Total offer" value={formatCurrency(load.targetRate)} dark={dark} pulse={askState === "sending"} />
-        <Stat label="Est. net" value={formatCurrency(load.netProfit ?? 0)} dark={dark} pulse={askState === "sending"} emphasize />
-        <Stat label="Rate / mi" value={`$${(load.rpm ?? 0).toFixed(2)}`} dark={dark} pulse={askState === "sending"} />
+        <Stat label="Total offer" value={formatCurrency(load.targetRate)} dark={dark} pulse={askState === "pending"} />
+        <Stat label="Est. net" value={formatCurrency(load.netProfit ?? 0)} dark={dark} pulse={askState === "pending"} emphasize />
+        <Stat label="Rate / mi" value={`$${(load.rpm ?? 0).toFixed(2)}`} dark={dark} pulse={askState === "pending"} />
         <Stat label="Pickup" value={load.pickupWindow.split(",")[0]} dark={dark} />
       </div>
 
-      {onNegotiate && askState !== "idle" ? (
+      {onAsk && onAskResolve && askState !== "idle" ? (
         <div className={cn("rounded-xl p-2.5", dark ? "bg-white/10" : "bg-ink-50")}>
-          {askState === "replied" ? (
-            <div className="flex items-start gap-2">
-              <MessageCircle className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", dark ? "text-white/60" : "text-ink-400")} />
-              <div className="min-w-0 flex-1">
-                <p className={cn("text-xs leading-relaxed", dark ? "text-white/90" : "text-ink-700")}>{reply}</p>
-                <button
-                  onClick={reset}
-                  className={cn("mt-1.5 text-[11px] font-medium underline", dark ? "text-white/60 hover:text-white" : "text-ink-400 hover:text-ink-700")}
-                >
-                  Ask something else
-                </button>
-              </div>
-            </div>
-          ) : (
+          {askState === "composing" ? (
             <div className="flex items-center gap-1.5">
               <input
                 autoFocus
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                disabled={askState === "sending"}
-                placeholder="More money, detention terms, a question…"
+                placeholder="Ask about detention, scheduling, or anything else…"
                 className={cn(
                   "min-w-0 flex-1 rounded-lg border bg-transparent px-2.5 py-1.5 text-xs outline-none",
                   dark ? "border-white/20 text-white placeholder:text-white/40 focus:border-white/40" : "border-line placeholder:text-ink-300 focus:border-ink-400",
@@ -156,7 +153,7 @@ export function LoadOfferCard({
               />
               <button
                 onClick={handleSend}
-                disabled={askState === "sending" || !text.trim()}
+                disabled={!text.trim()}
                 className={cn(
                   "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg disabled:opacity-40",
                   dark ? "bg-white text-ink-950" : "bg-ink-950 text-white",
@@ -166,25 +163,39 @@ export function LoadOfferCard({
               </button>
               <button
                 onClick={reset}
-                disabled={askState === "sending"}
                 className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", dark ? "text-white/50 hover:bg-white/10" : "text-ink-400 hover:bg-ink-100")}
               >
                 <X className="h-3.5 w-3.5" />
               </button>
+            </div>
+          ) : (
+            <div className="flex items-start gap-2">
+              <MessageCircle className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", askState === "pending" && "animate-pulse", dark ? "text-white/60" : "text-ink-400")} />
+              <div className="min-w-0 flex-1">
+                <p className={cn("text-xs leading-relaxed", askState === "pending" && "animate-pulse", dark ? "text-white/90" : "text-ink-700")}>{reply}</p>
+                {askState === "replied" && (
+                  <button
+                    onClick={reset}
+                    className={cn("mt-1.5 text-[11px] font-medium underline", dark ? "text-white/60 hover:text-white" : "text-ink-400 hover:text-ink-700")}
+                  >
+                    Ask something else
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
       ) : null}
 
       <div className="flex gap-2">
-        {onNegotiate && askState === "idle" && (
+        {onAsk && onAskResolve && askState === "idle" && (
           <Button
             size={compact ? "sm" : "md"}
             variant={dark ? "secondary" : "outline"}
             className={dark ? "!bg-white/15 !text-white hover:!bg-white/25" : ""}
             onClick={() => setAskState("composing")}
           >
-            <MessageCircle className="h-3.5 w-3.5" /> Ask AI about this load
+            <MessageCircle className="h-3.5 w-3.5" /> Ask a question
           </Button>
         )}
         <Button

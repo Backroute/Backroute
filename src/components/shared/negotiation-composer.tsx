@@ -27,7 +27,7 @@ export function NegotiationComposer({
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && submit()}
-        placeholder='Tell the AI what you want — "get $50 more", "ask about detention"…'
+        placeholder="Ask about rate, detention terms, or scheduling…"
         className={cn(
           "flex-1 rounded-full border border-line bg-ink-50/60 outline-none focus:border-ink-400",
           compact ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm",

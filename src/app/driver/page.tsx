@@ -28,6 +28,7 @@ export default function DriverHomePage() {
   const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
   const selectLoadOffer = useStore((s) => s.actions.selectLoadOffer);
   const requestOfferDetail = useStore((s) => s.actions.requestOfferDetail);
+  const resolveOfferDetail = useStore((s) => s.actions.resolveOfferDetail);
   const driverConfirmStage = useStore((s) => s.actions.driverConfirmStage);
 
   const truck = trucks.find((t) => t.id === driver.truckId);
@@ -88,7 +89,8 @@ export default function DriverHomePage() {
           offerGroups={offerGroups}
           brokers={brokers}
           onSelect={(groupId, loadId) => selectLoadOffer(groupId, loadId, "driver")}
-          onNegotiate={(loadId, text) => requestOfferDetail(loadId, text)}
+          onAsk={(loadId, text) => requestOfferDetail(loadId, text)}
+          onAskResolve={(loadId, draft) => resolveOfferDetail(loadId, draft)}
         />
       )}
 

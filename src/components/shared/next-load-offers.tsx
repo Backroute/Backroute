@@ -3,6 +3,7 @@
 import { Sparkles } from "lucide-react";
 import { LoadOfferCard } from "./load-offer-card";
 import { TruckDriverChip } from "./truck-driver-chip";
+import type { OfferAskDraft } from "@/lib/engine";
 import type { Broker, Driver, Load, Truck } from "@/lib/types";
 
 /** Shared "choose your next load" picker — used at the top of both the carrier Overview and driver Home, so it looks identical in both apps. */
@@ -12,7 +13,8 @@ export function NextLoadOffers({
   trucks,
   drivers,
   onSelect,
-  onNegotiate,
+  onAsk,
+  onAskResolve,
 }: {
   offerGroups: [string, Load[]][];
   brokers: Map<string, Broker>;
@@ -20,7 +22,8 @@ export function NextLoadOffers({
   trucks?: Map<string, Truck>;
   drivers?: Map<string, Driver>;
   onSelect: (groupId: string, loadId: string) => void;
-  onNegotiate: (loadId: string, text: string) => string;
+  onAsk: (loadId: string, text: string) => { draft: OfferAskDraft; pendingReply: string; resolved: boolean };
+  onAskResolve: (loadId: string, draft: OfferAskDraft) => string;
 }) {
   if (offerGroups.length === 0) return null;
   const totalCount = offerGroups.reduce((sum, [, loads]) => sum + loads.length, 0);
@@ -58,7 +61,8 @@ export function NextLoadOffers({
                     truck={truck}
                     driver={driver}
                     onSelect={() => onSelect(groupId, load.id)}
-                    onNegotiate={(text) => onNegotiate(load.id, text)}
+                    onAsk={(text) => onAsk(load.id, text)}
+                    onAskResolve={(draft) => onAskResolve(load.id, draft)}
                   />
                 ))}
               </div>
