@@ -13,7 +13,7 @@ import {
   createSourcedLoad,
   incidentOpenedEvent,
   pushForBetterRate,
-  requestBetterOfferPrice,
+  respondToOfferAsk,
   resolveLoadOffer,
   shouldChainNextLoad,
   type InstructionCategory,
@@ -97,7 +97,8 @@ interface StoreState {
     seedInitialOffers: () => void;
     updateHomeTimeTarget: (driverId: string, target: string) => void;
     requestBetterRate: (loadId: string, actor: "driver" | "carrier", amount?: number) => void;
-    requestBetterOfferPrice: (loadId: string, actor: "driver" | "carrier") => void;
+    /** Ask the AI anything about a pending offer before committing — a rate ask updates the card live, anything else returns a short reply. */
+    requestOfferDetail: (loadId: string, text: string) => string;
     sendNegotiationInstruction: (loadId: string, actor: "driver" | "carrier", text: string) => void;
     setAiPaused: (loadId: string, paused: boolean) => void;
     opsOverrideRate: (loadId: string, amount: number) => void;
@@ -131,7 +132,7 @@ function findNegotiatingLoadForDriver(state: StoreState, driverId: string): Load
   return state.loads.find((l) => (l.id === truck.currentLoadId || l.id === truck.nextLoadId) && l.stage === "negotiating");
 }
 
-export const useStore = create<StoreState>((set) => ({
+export const useStore = create<StoreState>((set, get) => ({
   ...world,
   settings: {
     aggressiveness: "balanced",
@@ -502,26 +503,27 @@ export const useStore = create<StoreState>((set) => ({
         };
       }),
 
-    requestBetterOfferPrice: (loadId, actor) =>
-      set((state) => {
-        const load = state.loads.find((l) => l.id === loadId);
-        if (!load) return {};
-        const broker = state.brokers.find((b) => b.id === load.brokerId);
-        const updated = requestBetterOfferPrice(load, broker);
-        if (updated === load) return {};
-        return {
-          loads: state.loads.map((l) => (l.id === updated.id ? updated : l)),
-          activity: [
-            {
-              id: uid("act"), timestamp: new Date().toISOString(), type: "negotiation_email" as const,
-              message: actor === "driver" ? "Driver asked AI for a better price before booking" : "Carrier asked AI for a better price before booking",
-              detail: `${broker?.company ?? load.source} · new ask $${updated.targetRate.toLocaleString()}`,
-              loadId: updated.id, carrierId: updated.carrierId, severity: "info" as const, channel: "email" as const,
-            },
-            ...state.activity,
-          ].slice(0, 80),
-        };
-      }),
+    requestOfferDetail: (loadId, text) => {
+      const state = get();
+      const load = state.loads.find((l) => l.id === loadId);
+      if (!load) return "";
+      const broker = state.brokers.find((b) => b.id === load.brokerId);
+      const { load: updated, reply } = respondToOfferAsk(load, broker, text);
+      if (!reply) return "";
+      set((s) => ({
+        loads: s.loads.map((l) => (l.id === updated.id ? updated : l)),
+        activity: [
+          {
+            id: uid("act"), timestamp: new Date().toISOString(), type: "negotiation_email" as const,
+            message: "Asked AI about this offer before committing",
+            detail: `${broker?.company ?? load.source} · "${text}"`,
+            loadId: updated.id, carrierId: updated.carrierId, severity: "info" as const, channel: "email" as const,
+          },
+          ...s.activity,
+        ].slice(0, 80),
+      }));
+      return reply;
+    },
 
     sendNegotiationInstruction: (loadId, actor, text) =>
       set((state) => {

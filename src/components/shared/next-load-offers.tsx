@@ -20,7 +20,7 @@ export function NextLoadOffers({
   trucks?: Map<string, Truck>;
   drivers?: Map<string, Driver>;
   onSelect: (groupId: string, loadId: string) => void;
-  onNegotiate: (loadId: string) => void;
+  onNegotiate: (loadId: string, text: string) => string;
 }) {
   if (offerGroups.length === 0) return null;
   const totalCount = offerGroups.reduce((sum, [, loads]) => sum + loads.length, 0);
@@ -58,7 +58,7 @@ export function NextLoadOffers({
                     truck={truck}
                     driver={driver}
                     onSelect={() => onSelect(groupId, load.id)}
-                    onNegotiate={() => onNegotiate(load.id)}
+                    onNegotiate={(text) => onNegotiate(load.id, text)}
                   />
                 ))}
               </div>

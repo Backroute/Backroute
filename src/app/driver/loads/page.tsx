@@ -13,7 +13,7 @@ export default function DriverLoadsPage() {
   const loads = useCarrierLoads();
   const brokers = useBrokerMap();
   const selectLoadOffer = useStore((s) => s.actions.selectLoadOffer);
-  const requestBetterOfferPrice = useStore((s) => s.actions.requestBetterOfferPrice);
+  const requestOfferDetail = useStore((s) => s.actions.requestOfferDetail);
 
   const truck = trucks.find((t) => t.id === driver.truckId);
   const pendingOffers = loads.filter((l) => l.truckId === truck?.id && l.stage === "offered").sort((a, b) => b.score - a.score);
@@ -40,7 +40,7 @@ export default function DriverLoadsPage() {
                 broker={brokers.get(offer.brokerId)}
                 compact
                 onSelect={() => offer.offerGroupId && selectLoadOffer(offer.offerGroupId, offer.id, "driver")}
-                onNegotiate={() => requestBetterOfferPrice(offer.id, "driver")}
+                onNegotiate={(text) => requestOfferDetail(offer.id, text)}
               />
             ))}
           </div>

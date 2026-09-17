@@ -27,7 +27,7 @@ export default function CarrierOverviewPage() {
   const escalations = useCarrierEscalations().filter((e) => e.status === "open");
   const activity = useStore((s) => s.activity).filter((e) => e.carrierId === carrier.id);
   const selectLoadOffer = useStore((s) => s.actions.selectLoadOffer);
-  const requestBetterOfferPrice = useStore((s) => s.actions.requestBetterOfferPrice);
+  const requestOfferDetail = useStore((s) => s.actions.requestOfferDetail);
 
   const activeLoads = loads.filter((l) => l.stage !== "delivered");
   const netProfitMonth = loads.reduce((sum, l) => sum + (l.netProfit ?? 0), 0);
@@ -65,7 +65,7 @@ export default function CarrierOverviewPage() {
             trucks={truckMap}
             drivers={driverMap}
             onSelect={(groupId, loadId) => selectLoadOffer(groupId, loadId, "carrier")}
-            onNegotiate={(loadId) => requestBetterOfferPrice(loadId, "carrier")}
+            onNegotiate={(loadId, text) => requestOfferDetail(loadId, text)}
           />
         )}
 

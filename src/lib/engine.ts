@@ -308,9 +308,11 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
       } else {
         const isAiTurn = rounds % 2 === 0;
         const lastOffer = [...load.messages].reverse().find((m) => m.offerAmount)?.offerAmount ?? load.listedRate;
+        // AI pushes up toward its target; the broker concedes down from the AI's ask back toward their own listed rate —
+        // two anchors closing the gap from opposite ends, not both drifting toward the same number.
         const amt = isAiTurn
           ? Math.round(lastOffer + (load.targetRate - lastOffer) * 0.5)
-          : Math.round(lastOffer + (load.targetRate - lastOffer) * 0.3);
+          : Math.round(lastOffer - (lastOffer - load.listedRate) * 0.3);
         const msg: NegotiationMessage = {
           id: uid("msg"), channel: pick(["email", "sms"]), direction: isAiTurn ? "outbound" : "inbound",
           from: isAiTurn ? "Backroute AI" : b.contact, timestamp: new Date().toISOString(),
@@ -541,23 +543,46 @@ export function applyNegotiationInstruction(
   return { load: next, events };
 }
 
-/** Before committing to an offer, driver/carrier can ask the AI to go get a better number from the broker first — exactly
- *  how a human would tell a dispatcher "see if they'll come up" before saying yes to a load. Recomputes score and
- *  net profit live so the offer card reflects the new ask immediately. */
-export function requestBetterOfferPrice(load: Load, broker: Broker | undefined): Load {
-  if (load.stage !== "offered") return load;
-  const bumpedTarget = Math.min(Math.max(Math.round(load.targetRate * 1.06), load.targetRate + 40), Math.round(load.listedRate * 1.3));
-  const { netProfit, rpm } = computeEconomics(bumpedTarget, load.lane.miles, load.deadheadMiles, load.fuelCost, load.tollCost);
-  const score = computeLoadScore({
-    rate: bumpedTarget,
-    netProfit,
-    miles: load.lane.miles,
-    deadheadMiles: load.deadheadMiles,
-    rpm,
-    marketRpm: load.lane.marketRpm,
-    brokerReliability: broker?.reliability ?? 70,
-  });
-  return { ...load, targetRate: bumpedTarget, netProfit, rpm, score, updatedAt: new Date().toISOString() };
+const OFFER_REPLY: Record<Exclude<InstructionCategory, "rate">, (company: string) => string> = {
+  detention: (company) => `Asked ${company} about detention/lumper terms — will have an answer before you need to decide.`,
+  schedule: (company) => `Asked ${company} about pickup flexibility — will have an answer before you need to decide.`,
+  payment: (company) => `Asked ${company} about quick pay and terms — will have an answer before you need to decide.`,
+  general: (company) => `Passed that along to ${company} — will let you know what they say before you need to decide.`,
+};
+
+/**
+ * The offer-card equivalent of applyNegotiationInstruction — before committing, driver/carrier can tell the AI
+ * anything (more money, a specific dollar figure, detention/schedule/payment terms, or just a question), exactly
+ * like relaying an ask to a dispatcher. A rate ask updates the card's numbers live; anything else logs the ask
+ * to the load's message thread and hands back a short reply to show on the card.
+ */
+export function respondToOfferAsk(load: Load, broker: Broker | undefined, text: string): { load: Load; reply: string } {
+  if (load.stage !== "offered") return { load, reply: "" };
+  const b = broker ?? ({ contact: "Broker", company: load.source } as Broker);
+  const category = classifyInstruction(text);
+
+  if (category === "rate") {
+    const requested = extractDollarAmount(text);
+    const ceiling = Math.round(load.listedRate * 1.3);
+    const bumpedTarget = requested
+      ? Math.min(Math.max(requested, load.targetRate + 1), ceiling)
+      : Math.min(Math.max(Math.round(load.targetRate * 1.06), load.targetRate + 40), ceiling);
+    const { netProfit, rpm } = computeEconomics(bumpedTarget, load.lane.miles, load.deadheadMiles, load.fuelCost, load.tollCost);
+    const score = computeLoadScore({
+      rate: bumpedTarget, netProfit, miles: load.lane.miles, deadheadMiles: load.deadheadMiles, rpm,
+      marketRpm: load.lane.marketRpm, brokerReliability: b.reliability ?? 70,
+    });
+    return {
+      load: { ...load, targetRate: bumpedTarget, netProfit, rpm, score, updatedAt: new Date().toISOString() },
+      reply: `Asked ${b.company} for $${bumpedTarget.toLocaleString()} — numbers above are updated.`,
+    };
+  }
+
+  const msg = instructionMessage(category, text, b);
+  return {
+    load: { ...load, messages: [...load.messages, msg], updatedAt: new Date().toISOString() },
+    reply: OFFER_REPLY[category](b.company),
+  };
 }
 
 // ---------- Incidents: the AI handling breakdowns, accidents, delays and weather like a real dispatcher would ----------

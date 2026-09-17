@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Handshake, Home, Sparkles, Truck as TruckIcon, Zap } from "lucide-react";
+import { Home, MessageCircle, Send, Sparkles, Truck as TruckIcon, X, Zap } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { loadHighlight } from "@/lib/scoring";
 import type { Broker, Driver, Load, Truck } from "@/lib/types";
@@ -12,6 +12,8 @@ import { BrokerTrustBadge } from "./broker-trust-badge";
 import { TimeAgo } from "./time-ago";
 
 const TIER_TONE = { preferred: "success", standard: "neutral", watch: "warning" } as const;
+
+type AskState = "idle" | "composing" | "sending" | "replied";
 
 export function LoadOfferCard({
   load,
@@ -28,19 +30,30 @@ export function LoadOfferCard({
   truck?: Truck;
   driver?: Driver;
   onSelect: () => void;
-  /** Ask the AI to go back to the broker for a better number before committing — updates the card's numbers live. */
-  onNegotiate?: () => void;
+  /** Ask the AI anything about this offer before committing — more money, detention terms, a question — and get a reply back, right on the card. */
+  onNegotiate?: (text: string) => string;
   compact?: boolean;
 }) {
-  const [asking, setAsking] = useState(false);
+  const [askState, setAskState] = useState<AskState>("idle");
+  const [text, setText] = useState("");
+  const [reply, setReply] = useState("");
 
-  function handleNegotiate() {
-    if (!onNegotiate || asking) return;
-    setAsking(true);
+  function handleSend() {
+    const trimmed = text.trim();
+    if (!onNegotiate || !trimmed || askState === "sending") return;
+    setAskState("sending");
     setTimeout(() => {
-      onNegotiate();
-      setAsking(false);
+      const result = onNegotiate(trimmed);
+      setReply(result);
+      setText("");
+      setAskState("replied");
     }, 900);
+  }
+
+  function reset() {
+    setAskState("idle");
+    setText("");
+    setReply("");
   }
 
   const highlight = loadHighlight({
@@ -52,25 +65,27 @@ export function LoadOfferCard({
     brokerTier: broker?.tier ?? "standard",
   });
 
+  const dark = load.recommended;
+
   return (
     <div
       className={cn(
         "flex flex-col gap-3.5 rounded-2xl border p-4",
-        load.recommended ? "border-ink-950 bg-ink-950 text-white" : "border-line bg-white",
+        dark ? "border-ink-950 bg-ink-950 text-white" : "border-line bg-white",
       )}
     >
       <div className="flex items-start gap-3">
-        <LoadScoreBadge score={load.score} size="xl" invert={load.recommended} />
+        <LoadScoreBadge score={load.score} size="xl" invert={dark} />
         <div className="min-w-0 flex-1">
-          <p className={cn("text-sm font-semibold", load.recommended ? "text-white" : "text-ink-950")}>
+          <p className={cn("text-sm font-semibold", dark ? "text-white" : "text-ink-950")}>
             {load.lane.origin}, {load.lane.originState}
-            <span className={load.recommended ? "text-white/40" : "text-ink-300"}> → </span>
+            <span className={dark ? "text-white/40" : "text-ink-300"}> → </span>
             {load.lane.destination}, {load.lane.destState}
           </p>
-          <p className={cn("mt-0.5 flex flex-wrap items-center gap-1 text-xs", load.recommended ? "text-white/60" : "text-ink-500")}>
+          <p className={cn("mt-0.5 flex flex-wrap items-center gap-1 text-xs", dark ? "text-white/60" : "text-ink-500")}>
             {broker?.company ?? "Broker"}
             {broker && (
-              <Badge tone={load.recommended ? "dark" : TIER_TONE[broker.tier]} className={cn("!text-[10px] !px-1.5 !py-0", load.recommended && "!bg-white/15 !text-white")}>
+              <Badge tone={dark ? "dark" : TIER_TONE[broker.tier]} className={cn("!text-[10px] !px-1.5 !py-0", dark && "!bg-white/15 !text-white")}>
                 {broker.tier}
               </Badge>
             )}
@@ -78,20 +93,20 @@ export function LoadOfferCard({
           </p>
           {broker && <BrokerTrustBadge broker={broker} className="mt-1" />}
           {(truck || driver) && (
-            <p className={cn("mt-1 flex items-center gap-1 text-[11px] font-medium", load.recommended ? "text-white/60" : "text-ink-500")}>
+            <p className={cn("mt-1 flex items-center gap-1 text-[11px] font-medium", dark ? "text-white/60" : "text-ink-500")}>
               <TruckIcon className="h-3 w-3 shrink-0" />
               {truck?.unitNumber ?? "Unassigned"}
               {driver && ` · ${driver.name}`}
             </p>
           )}
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            {load.recommended && (
+            {dark && (
               <Badge tone="dark" className="!bg-white/15 !text-white gap-1">
                 <Sparkles className="h-3 w-3" /> AI pick
               </Badge>
             )}
             {load.homeTimeFit && (
-              <Badge tone={load.recommended ? "dark" : "info"} className={load.recommended ? "!bg-white/15 !text-white gap-1" : "gap-1"}>
+              <Badge tone={dark ? "dark" : "info"} className={dark ? "!bg-white/15 !text-white gap-1" : "gap-1"}>
                 <Home className="h-3 w-3" /> Home-time fit
               </Badge>
             )}
@@ -99,40 +114,90 @@ export function LoadOfferCard({
         </div>
       </div>
 
-      <p className={cn("flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium", load.recommended ? "bg-white/10 text-white/80" : "bg-ink-50 text-ink-600")}>
+      <p className={cn("flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium", dark ? "bg-white/10 text-white/80" : "bg-ink-50 text-ink-600")}>
         <Zap className="h-3 w-3 shrink-0" /> {highlight}
       </p>
 
       <div className="grid grid-cols-2 gap-2">
-        <Stat label="Total offer" value={formatCurrency(load.targetRate)} dark={load.recommended} pulse={asking} />
-        <Stat label="Est. net" value={formatCurrency(load.netProfit ?? 0)} dark={load.recommended} pulse={asking} emphasize />
-        <Stat label="Rate / mi" value={`$${(load.rpm ?? 0).toFixed(2)}`} dark={load.recommended} pulse={asking} />
-        <Stat label="Pickup" value={load.pickupWindow.split(",")[0]} dark={load.recommended} />
+        <Stat label="Total offer" value={formatCurrency(load.targetRate)} dark={dark} pulse={askState === "sending"} />
+        <Stat label="Est. net" value={formatCurrency(load.netProfit ?? 0)} dark={dark} pulse={askState === "sending"} emphasize />
+        <Stat label="Rate / mi" value={`$${(load.rpm ?? 0).toFixed(2)}`} dark={dark} pulse={askState === "sending"} />
+        <Stat label="Pickup" value={load.pickupWindow.split(",")[0]} dark={dark} />
       </div>
 
+      {onNegotiate && askState !== "idle" ? (
+        <div className={cn("rounded-xl p-2.5", dark ? "bg-white/10" : "bg-ink-50")}>
+          {askState === "replied" ? (
+            <div className="flex items-start gap-2">
+              <MessageCircle className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", dark ? "text-white/60" : "text-ink-400")} />
+              <div className="min-w-0 flex-1">
+                <p className={cn("text-xs leading-relaxed", dark ? "text-white/90" : "text-ink-700")}>{reply}</p>
+                <button
+                  onClick={reset}
+                  className={cn("mt-1.5 text-[11px] font-medium underline", dark ? "text-white/60 hover:text-white" : "text-ink-400 hover:text-ink-700")}
+                >
+                  Ask something else
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <input
+                autoFocus
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                disabled={askState === "sending"}
+                placeholder="More money, detention terms, a question…"
+                className={cn(
+                  "min-w-0 flex-1 rounded-lg border bg-transparent px-2.5 py-1.5 text-xs outline-none",
+                  dark ? "border-white/20 text-white placeholder:text-white/40 focus:border-white/40" : "border-line placeholder:text-ink-300 focus:border-ink-400",
+                )}
+              />
+              <button
+                onClick={handleSend}
+                disabled={askState === "sending" || !text.trim()}
+                className={cn(
+                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg disabled:opacity-40",
+                  dark ? "bg-white text-ink-950" : "bg-ink-950 text-white",
+                )}
+              >
+                <Send className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={reset}
+                disabled={askState === "sending"}
+                className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", dark ? "text-white/50 hover:bg-white/10" : "text-ink-400 hover:bg-ink-100")}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+      ) : null}
+
       <div className="flex gap-2">
-        {onNegotiate && (
+        {onNegotiate && askState === "idle" && (
           <Button
             size={compact ? "sm" : "md"}
-            variant={load.recommended ? "secondary" : "outline"}
-            className={load.recommended ? "!bg-white/15 !text-white hover:!bg-white/25" : ""}
-            onClick={handleNegotiate}
-            disabled={asking}
+            variant={dark ? "secondary" : "outline"}
+            className={dark ? "!bg-white/15 !text-white hover:!bg-white/25" : ""}
+            onClick={() => setAskState("composing")}
           >
-            <Handshake className="h-3.5 w-3.5" /> {asking ? "Asking broker…" : "Ask for better price"}
+            <MessageCircle className="h-3.5 w-3.5" /> Ask AI about this load
           </Button>
         )}
         <Button
           size={compact ? "md" : "lg"}
-          variant={load.recommended ? "secondary" : "primary"}
-          className={cn(load.recommended ? "!bg-white !text-ink-950 hover:!bg-white/90" : "", "flex-1 !font-semibold")}
+          variant={dark ? "secondary" : "primary"}
+          className={cn(dark ? "!bg-white !text-ink-950 hover:!bg-white/90" : "", "flex-1 !font-semibold")}
           onClick={onSelect}
         >
           Select this load
         </Button>
       </div>
 
-      <p className={cn("text-center text-[10px]", load.recommended ? "text-white/35" : "text-ink-300")}>
+      <p className={cn("text-center text-[10px]", dark ? "text-white/35" : "text-ink-300")}>
         Sourced from {load.source} · <TimeAgo iso={load.createdAt} />
       </p>
     </div>
