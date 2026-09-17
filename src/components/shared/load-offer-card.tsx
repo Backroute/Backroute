@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Handshake, Home, Sparkles, Zap } from "lucide-react";
+import { Handshake, Home, Sparkles, Truck as TruckIcon, Zap } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { loadHighlight } from "@/lib/scoring";
-import type { Broker, Load } from "@/lib/types";
+import type { Broker, Driver, Load, Truck } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LoadScoreBadge } from "./load-score";
@@ -16,12 +16,17 @@ const TIER_TONE = { preferred: "success", standard: "neutral", watch: "warning" 
 export function LoadOfferCard({
   load,
   broker,
+  truck,
+  driver,
   onSelect,
   onNegotiate,
   compact,
 }: {
   load: Load;
   broker: Broker | undefined;
+  /** Shown as a small identity line on the card when this offer is for a specific truck/driver (carrier context managing several). */
+  truck?: Truck;
+  driver?: Driver;
   onSelect: () => void;
   /** Ask the AI to go back to the broker for a better number before committing — updates the card's numbers live. */
   onNegotiate?: () => void;
@@ -72,6 +77,13 @@ export function LoadOfferCard({
             <span>· {load.equipmentType} · {load.lane.miles} mi</span>
           </p>
           {broker && <BrokerTrustBadge broker={broker} className="mt-1" />}
+          {(truck || driver) && (
+            <p className={cn("mt-1 flex items-center gap-1 text-[11px] font-medium", load.recommended ? "text-white/60" : "text-ink-500")}>
+              <TruckIcon className="h-3 w-3 shrink-0" />
+              {truck?.unitNumber ?? "Unassigned"}
+              {driver && ` · ${driver.name}`}
+            </p>
+          )}
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {load.recommended && (
               <Badge tone="dark" className="!bg-white/15 !text-white gap-1">

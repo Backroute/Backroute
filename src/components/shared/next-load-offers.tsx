@@ -54,6 +54,8 @@ export function NextLoadOffers({
                     key={load.id}
                     load={load}
                     broker={brokers.get(load.brokerId)}
+                    truck={truck}
+                    driver={driver}
                     onSelect={() => onSelect(groupId, load.id)}
                     onNegotiate={() => onNegotiate(load.id)}
                   />
