@@ -10,14 +10,17 @@ import { ChannelBadge } from "@/components/shared/channel-badge";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { BrokerTrustBadge } from "@/components/shared/broker-trust-badge";
 import { NegotiationComposer } from "@/components/shared/negotiation-composer";
+import { TruckDriverChip } from "@/components/shared/truck-driver-chip";
 import { TimeAgo } from "@/components/shared/time-ago";
-import { useCarrierLoads, useBrokerMap } from "@/lib/selectors";
+import { useCarrierLoads, useBrokerMap, useTruckMap, useDriverMap } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { formatCurrency } from "@/lib/utils";
 
 export default function NegotiationsPage() {
   const loads = useCarrierLoads();
   const brokers = useBrokerMap();
+  const trucks = useTruckMap();
+  const drivers = useDriverMap();
   const sendNegotiationInstruction = useStore((s) => s.actions.sendNegotiationInstruction);
   const active = loads.filter((l) => l.stage === "negotiating" || l.stage === "rate_confirmed");
 
@@ -42,6 +45,8 @@ export default function NegotiationsPage() {
           )}
           {active.map((load) => {
             const broker = brokers.get(load.brokerId);
+            const truck = load.truckId ? trucks.get(load.truckId) : undefined;
+            const driver = truck?.driverId ? drivers.get(truck.driverId) : undefined;
             const lastMsg = load.messages[load.messages.length - 1];
             const lastOffer = [...load.messages].reverse().find((m) => m.offerAmount)?.offerAmount;
             const progress = lastOffer ? Math.min(100, (lastOffer / load.targetRate) * 100) : 0;
@@ -66,6 +71,8 @@ export default function NegotiationsPage() {
                       {load.stage === "rate_confirmed" && <Badge tone="success">Confirmed</Badge>}
                     </div>
                   </div>
+
+                  {(truck || driver) && <TruckDriverChip truck={truck} driver={driver} />}
 
                   {lastMsg && (
                     <div className="rounded-xl bg-ink-50/70 px-3.5 py-2.5 text-xs text-ink-600">

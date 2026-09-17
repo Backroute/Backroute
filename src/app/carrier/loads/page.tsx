@@ -7,9 +7,9 @@ import { Tabs } from "@/components/ui/tabs";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { LiveDot } from "@/components/shared/live-dot";
 import { TimeAgo } from "@/components/shared/time-ago";
-import { LoadOfferCard } from "@/components/shared/load-offer-card";
 import { LoadScoreBadge } from "@/components/shared/load-score";
-import { useCarrierLoads, useBrokerMap, useTruckMap } from "@/lib/selectors";
+import { NextLoadOffers } from "@/components/shared/next-load-offers";
+import { useCarrierLoads, useBrokerMap, useTruckMap, useDriverMap } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { formatCurrency } from "@/lib/utils";
 import type { LoadStage } from "@/lib/types";
@@ -28,6 +28,7 @@ export default function CarrierLoadsPage() {
   const loads = useCarrierLoads();
   const brokers = useBrokerMap();
   const trucks = useTruckMap();
+  const drivers = useDriverMap();
   const selectLoadOffer = useStore((s) => s.actions.selectLoadOffer);
   const requestBetterOfferPrice = useStore((s) => s.actions.requestBetterOfferPrice);
   const [group, setGroup] = useState("active");
@@ -60,31 +61,19 @@ export default function CarrierLoadsPage() {
         <Tabs tabs={GROUPS.map((g) => ({ key: g.key, label: g.label, count: counts[g.key] }))} active={group} onChange={setGroup} />
 
         {group === "offers" ? (
-          <div className="mt-5 flex flex-col gap-6">
-            {offerGroups.length === 0 && (
+          <div className="mt-5">
+            {offerGroups.length === 0 ? (
               <p className="py-12 text-center text-sm text-ink-400">No pending load choices right now — the AI will surface options as trucks free up.</p>
+            ) : (
+              <NextLoadOffers
+                offerGroups={offerGroups}
+                brokers={brokers}
+                trucks={trucks}
+                drivers={drivers}
+                onSelect={(groupId, loadId) => selectLoadOffer(groupId, loadId, "carrier")}
+                onNegotiate={(loadId) => requestBetterOfferPrice(loadId, "carrier")}
+              />
             )}
-            {offerGroups.map(([groupId, groupLoads]) => {
-              const truck = groupLoads[0].truckId ? trucks.get(groupLoads[0].truckId) : undefined;
-              return (
-                <div key={groupId}>
-                  <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-ink-400">
-                    {truck ? `${truck.unitNumber} — awaiting choice` : "Awaiting choice"}
-                  </p>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {groupLoads.map((load) => (
-                      <LoadOfferCard
-                        key={load.id}
-                        load={load}
-                        broker={brokers.get(load.brokerId)}
-                        onSelect={() => selectLoadOffer(groupId, load.id, "carrier")}
-                        onNegotiate={() => requestBetterOfferPrice(load.id, "carrier")}
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
           </div>
         ) : (
           <div className="mt-5 overflow-x-auto rounded-2xl border border-line bg-white">

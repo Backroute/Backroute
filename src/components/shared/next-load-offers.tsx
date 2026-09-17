@@ -2,13 +2,15 @@
 
 import { Sparkles } from "lucide-react";
 import { LoadOfferCard } from "./load-offer-card";
-import type { Broker, Load, Truck } from "@/lib/types";
+import { TruckDriverChip } from "./truck-driver-chip";
+import type { Broker, Driver, Load, Truck } from "@/lib/types";
 
 /** Shared "choose your next load" picker — used at the top of both the carrier Overview and driver Home, so it looks identical in both apps. */
 export function NextLoadOffers({
   offerGroups,
   brokers,
   trucks,
+  drivers,
   onSelect,
   onNegotiate,
 }: {
@@ -16,6 +18,7 @@ export function NextLoadOffers({
   brokers: Map<string, Broker>;
   /** Pass when a single view can span multiple trucks (carrier) to label each group — omit for a single-truck context (driver). */
   trucks?: Map<string, Truck>;
+  drivers?: Map<string, Driver>;
   onSelect: (groupId: string, loadId: string) => void;
   onNegotiate: (loadId: string) => void;
 }) {
@@ -34,12 +37,16 @@ export function NextLoadOffers({
       <div className="flex flex-col gap-6">
         {offerGroups.map(([groupId, loads]) => {
           const truck = trucks && loads[0].truckId ? trucks.get(loads[0].truckId) : undefined;
+          const driver = drivers && truck?.driverId ? drivers.get(truck.driverId) : undefined;
           return (
             <div key={groupId}>
               {trucks && (
-                <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-ink-400">
-                  {truck ? `${truck.unitNumber} — awaiting choice` : "Awaiting choice"}
-                </p>
+                <TruckDriverChip
+                  truck={truck}
+                  driver={driver}
+                  trailing={<span className="ml-auto shrink-0 text-[11px] text-ink-400">{loads.length} option{loads.length === 1 ? "" : "s"}</span>}
+                  className="mb-2.5"
+                />
               )}
               <div className="grid gap-3 sm:grid-cols-3">
                 {loads.map((load) => (

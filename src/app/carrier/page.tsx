@@ -11,6 +11,7 @@ import { LiveDot } from "@/components/shared/live-dot";
 import { ActivityFeed } from "@/components/shared/activity-feed";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
+import { TruckDriverChip } from "@/components/shared/truck-driver-chip";
 import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks, useCarrierDrivers, useCarrierEscalations, useDriverMap, useBrokerMap, useTruckMap } from "@/lib/selectors";
 import { formatCurrency, formatNumber } from "@/lib/utils";
@@ -62,6 +63,7 @@ export default function CarrierOverviewPage() {
             offerGroups={offerGroups}
             brokers={brokers}
             trucks={truckMap}
+            drivers={driverMap}
             onSelect={(groupId, loadId) => selectLoadOffer(groupId, loadId, "carrier")}
             onNegotiate={(loadId) => requestBetterOfferPrice(loadId, "carrier")}
           />
@@ -170,14 +172,20 @@ export default function CarrierOverviewPage() {
                   <p className="text-sm text-ink-400">Nothing needs your attention — the AI is handling everything.</p>
                 ) : (
                   <div className="flex flex-col gap-3">
-                    {escalations.map((e) => (
-                      <div key={e.id} className="rounded-xl bg-amber-50/70 p-3">
-                        <p className="text-xs leading-relaxed text-ink-800">{e.reason}</p>
-                        <Link href={`/carrier/loads/${e.loadId}`} className="mt-2 inline-flex text-xs font-medium text-[var(--accent-warn)] hover:underline">
-                          Review load →
-                        </Link>
-                      </div>
-                    ))}
+                    {escalations.map((e) => {
+                      const load = loads.find((l) => l.id === e.loadId);
+                      const truck = load?.truckId ? truckMap.get(load.truckId) : undefined;
+                      const driver = truck?.driverId ? driverMap.get(truck.driverId) : undefined;
+                      return (
+                        <div key={e.id} className="rounded-xl bg-amber-50/70 p-3">
+                          {(truck || driver) && <TruckDriverChip truck={truck} driver={driver} className="mb-2 !bg-white/60" />}
+                          <p className="text-xs leading-relaxed text-ink-800">{e.reason}</p>
+                          <Link href={`/carrier/loads/${e.loadId}`} className="mt-2 inline-flex text-xs font-medium text-[var(--accent-warn)] hover:underline">
+                            Review load →
+                          </Link>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
