@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, LifeBuoy, Link2, MapPin, MessageCircle } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, LifeBuoy, Link2, MapPin, MessageCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { LoadStagePill } from "@/components/shared/load-stage";
@@ -12,6 +12,13 @@ import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap, truc
 import { useStore } from "@/lib/store";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 
+const STAGE_CONFIRM_LABEL: Partial<Record<string, string>> = {
+  dispatched: "Confirm arrived at pickup",
+  at_pickup: "Confirm loaded — departing",
+  in_transit: "Confirm arrived at delivery",
+  at_delivery: "Confirm delivered",
+};
+
 export default function DriverHomePage() {
   const driver = usePrimaryDriver();
   const trucks = useCarrierTrucks();
@@ -21,6 +28,7 @@ export default function DriverHomePage() {
   const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
   const selectLoadOffer = useStore((s) => s.actions.selectLoadOffer);
   const requestBetterOfferPrice = useStore((s) => s.actions.requestBetterOfferPrice);
+  const driverConfirmStage = useStore((s) => s.actions.driverConfirmStage);
 
   const truck = trucks.find((t) => t.id === driver.truckId);
   const { current: currentLoad, next: nextLoad } = truckActiveLoads(loads, truck);
@@ -127,8 +135,16 @@ export default function DriverHomePage() {
             {currentLoad.stage === "negotiating" && (
               <CounterOfferButton load={currentLoad} onSubmit={(amount) => requestBetterRate(currentLoad.id, "driver", amount)} variant="dark" />
             )}
+            {STAGE_CONFIRM_LABEL[currentLoad.stage] && (
+              <button
+                onClick={() => driverConfirmStage(currentLoad.id)}
+                className="flex items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-semibold text-ink-950"
+              >
+                <CheckCircle2 className="h-4 w-4" /> {STAGE_CONFIRM_LABEL[currentLoad.stage]}
+              </button>
+            )}
             <div className="grid grid-cols-2 gap-2">
-              <Link href="/driver/messages" className="flex items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-medium text-ink-950">
+              <Link href="/driver/messages" className="flex items-center justify-center gap-2 rounded-full border border-white/25 py-3 text-sm font-medium text-white">
                 <MessageCircle className="h-4 w-4" /> Message AI
               </Link>
               <Link href="/driver/incident" className="flex items-center justify-center gap-2 rounded-full border border-white/25 py-3 text-sm font-medium text-white">

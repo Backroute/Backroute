@@ -373,6 +373,45 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
   return { load: next, events };
 }
 
+const MANUAL_STAGE_ADVANCE: Partial<Record<LoadStage, LoadStage>> = {
+  dispatched: "at_pickup",
+  at_pickup: "in_transit",
+  in_transit: "at_delivery",
+  at_delivery: "delivered",
+};
+
+/**
+ * Lets the driver confirm a physical milestone (arrived, loaded, delivered) instantly instead of
+ * waiting on the automatic tick loop — same side effects as advanceLoad's equivalent transitions
+ * (BOL/POD/invoice generation, freeing the truck on delivery), just decisive rather than randomized.
+ */
+export function confirmLoadStage(load: Load, truck: Truck | undefined): StepResult {
+  const nextStage = MANUAL_STAGE_ADVANCE[load.stage];
+  if (!nextStage) return { load, events: [] };
+
+  const next: Load = { ...load, stage: nextStage, updatedAt: new Date().toISOString(), ticksInStage: 0, progressPct: STAGE_PROGRESS[nextStage] };
+  const events: ActivityEvent[] = [];
+
+  if (nextStage === "at_pickup") {
+    events.push(mkEvent(load.carrierId, load.id, "check_call", "Driver confirmed arrival at pickup", `${load.lane.origin}, ${load.lane.originState}`, "info"));
+  } else if (nextStage === "in_transit") {
+    next.documents = [...load.documents, { id: uid("doc"), type: "bol", name: `BOL_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" }];
+    events.push(mkEvent(load.carrierId, load.id, "document_captured", "Driver confirmed loaded — BOL captured", `Loaded ${load.weight.toLocaleString()} lbs · departing ${load.lane.origin}`, "success"));
+  } else if (nextStage === "at_delivery") {
+    events.push(mkEvent(load.carrierId, load.id, "check_call", "Driver confirmed arrival at delivery", `${load.lane.destination}, ${load.lane.destState}`, "info"));
+  } else if (nextStage === "delivered") {
+    next.documents = [
+      ...load.documents,
+      { id: uid("doc"), type: "pod", name: `POD_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" },
+      { id: uid("doc"), type: "invoice", name: `Invoice_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" },
+    ];
+    events.push(mkEvent(load.carrierId, load.id, "delivered", "Driver confirmed delivery — POD captured, invoice generated", `${load.referenceNumber} · net $${(load.netProfit ?? 0).toLocaleString()}`, "success"));
+  }
+
+  const truckUpdates = nextStage === "delivered" && truck ? { id: truck.id, status: "available" as const, currentLoadId: null } : undefined;
+  return { load: next, events, truckUpdates };
+}
+
 export function shouldChainNextLoad(load: Load, truck: Truck | undefined): boolean {
   return !!truck && load.stage === "in_transit" && !truck.nextLoadId && chance(0.5);
 }

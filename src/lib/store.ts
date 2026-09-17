@@ -7,6 +7,7 @@ import {
   applyNegotiationInstruction,
   autoResolveStaleOffers,
   classifyInstruction,
+  confirmLoadStage,
   createIncident,
   createLoadOfferBatch,
   createSourcedLoad,
@@ -90,6 +91,7 @@ interface StoreState {
     sendDriverMessage: (driverId: string, content: string) => void;
     updateSettings: (partial: Partial<AgentSettings>) => void;
     captureDocument: (loadId: string, type: "bol" | "pod") => void;
+    driverConfirmStage: (loadId: string) => void;
     selectLoadOffer: (offerGroupId: string, loadId: string, actor: "driver" | "carrier") => void;
     reportIncident: (driverId: string, truckId: string, type: IncidentType, note: string) => void;
     seedInitialOffers: () => void;
@@ -412,6 +414,25 @@ export const useStore = create<StoreState>((set) => ({
             },
             ...state.activity,
           ].slice(0, 80),
+        };
+      }),
+
+    driverConfirmStage: (loadId) =>
+      set((state) => {
+        const load = state.loads.find((l) => l.id === loadId);
+        if (!load) return {};
+        const truck = state.trucks.find((t) => t.id === load.truckId);
+        const result = confirmLoadStage(load, truck);
+        if (result.load === load) return {};
+        let trucks = state.trucks;
+        if (result.truckUpdates) {
+          const tu = result.truckUpdates;
+          trucks = trucks.map((t) => (t.id === tu.id ? { ...t, ...tu } : t));
+        }
+        return {
+          loads: state.loads.map((l) => (l.id === result.load.id ? result.load : l)),
+          trucks,
+          activity: [...result.events, ...state.activity].slice(0, 80),
         };
       }),
 
