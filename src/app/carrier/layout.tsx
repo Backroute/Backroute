@@ -7,7 +7,7 @@ import { CommandPalette, type CommandGroup } from "@/components/shared/command-p
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
-import { usePrimaryCarrier, useCarrierEscalations, useCarrierLoads } from "@/lib/selectors";
+import { usePrimaryCarrier, useCarrierLoads } from "@/lib/selectors";
 
 const NAV: NavItem[] = [
   { href: "/carrier", label: "Overview", icon: LayoutGrid },
@@ -23,12 +23,13 @@ const NAV: NavItem[] = [
 
 export default function CarrierLayout({ children }: { children: React.ReactNode }) {
   const carrier = usePrimaryCarrier();
-  const escalations = useCarrierEscalations().filter((e) => e.status === "open");
   const loads = useCarrierLoads();
   const activity = useStore((s) => s.activity).filter((e) => e.carrierId === carrier.id);
   const pendingOffers = loads.filter((l) => l.stage === "offered").length;
+  // Matches exactly what the Negotiations page itself lists, so the badge never disagrees with the page it labels.
+  const activeNegotiations = loads.filter((l) => l.stage === "negotiating" || l.stage === "rate_confirmed").length;
   const navWithBadge = NAV.map((n) => {
-    if (n.href === "/carrier/negotiations") return { ...n, badge: escalations.length };
+    if (n.href === "/carrier/negotiations") return { ...n, badge: activeNegotiations };
     if (n.href === "/carrier/loads") return { ...n, badge: pendingOffers };
     return n;
   });

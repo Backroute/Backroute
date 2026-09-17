@@ -447,8 +447,18 @@ const COUNTER_REQUEST_COPY: Record<"driver" | "carrier", (target: number) => str
   carrier: (target) => `Carrier countered at $${target.toLocaleString()} — going back to the broker with that number now.`,
 };
 
+/** Wherever the AI's ask actually stands in the live thread right now — it may have conceded below
+ *  load.targetRate over the course of the back-and-forth, so anything that "asks for more" needs to build
+ *  from here, not from the (possibly stale, possibly already-conceded-past) target field. */
+function currentAiAsk(load: Load): number {
+  const aiOffers = load.messages.filter((m) => m.direction === "outbound" && m.offerAmount);
+  const threadAiLast = aiOffers.length ? aiOffers[aiOffers.length - 1].offerAmount! : load.targetRate;
+  return Math.max(load.targetRate, threadAiLast);
+}
+
 export function suggestedCounter(load: Load): number {
-  return Math.min(Math.max(Math.round(load.targetRate * 1.06), load.targetRate + 50), Math.round(load.listedRate * 1.3));
+  const base = currentAiAsk(load);
+  return Math.min(Math.max(Math.round(base * 1.06), base + 50), Math.round(load.listedRate * 1.3));
 }
 
 /** The one place a human (driver or carrier) can ask the AI to go back and negotiate harder — still no human dispatcher involved.
@@ -462,10 +472,11 @@ export function pushForBetterRate(
   if (load.stage !== "negotiating") return { load, events: [] };
   const b = broker ?? ({ contact: "Broker", company: load.source } as Broker);
 
+  const base = currentAiAsk(load);
   const ceiling = Math.round(load.listedRate * 1.3);
-  const floor = load.targetRate;
+  const floor = base;
   const hasSpecificAsk = typeof requestedAmount === "number" && Number.isFinite(requestedAmount) && requestedAmount > floor;
-  const newTarget = hasSpecificAsk ? Math.min(Math.round(requestedAmount!), ceiling) : Math.min(Math.max(Math.round(load.targetRate * 1.05), load.targetRate + 40), ceiling);
+  const newTarget = hasSpecificAsk ? Math.min(Math.round(requestedAmount!), ceiling) : Math.min(Math.max(Math.round(base * 1.05), base + 40), ceiling);
 
   const msg: NegotiationMessage = {
     id: uid("msg"),
