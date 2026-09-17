@@ -9,8 +9,8 @@ import { Avatar } from "@/components/ui/avatar";
 import { usePrimaryDriver } from "@/lib/selectors";
 
 const TABS = [
-  { href: "/driver", label: "Loads", icon: Truck },
-  { href: "/driver/home", label: "Home", icon: Home },
+  { href: "/driver", label: "Home", icon: Home },
+  { href: "/driver/loads", label: "Loads", icon: Truck },
   { href: "/driver/messages", label: "Messages", icon: MessageCircle },
   { href: "/driver/documents", label: "Docs", icon: FileText },
   { href: "/driver/profile", label: "Profile", icon: User },

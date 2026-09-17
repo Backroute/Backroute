@@ -10,8 +10,8 @@ import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierEscalations, useCarrierLoads } from "@/lib/selectors";
 
 const NAV: NavItem[] = [
-  { href: "/carrier", label: "Loads", icon: Truck },
-  { href: "/carrier/overview", label: "Overview", icon: LayoutGrid },
+  { href: "/carrier", label: "Overview", icon: LayoutGrid },
+  { href: "/carrier/loads", label: "Loads", icon: Truck },
   { href: "/carrier/negotiations", label: "Negotiations", icon: MessageSquareText },
   { href: "/carrier/fleet", label: "Fleet", icon: Truck },
   { href: "/carrier/earnings", label: "Earnings", icon: BarChart3 },
@@ -29,7 +29,7 @@ export default function CarrierLayout({ children }: { children: React.ReactNode 
   const pendingOffers = loads.filter((l) => l.stage === "offered").length;
   const navWithBadge = NAV.map((n) => {
     if (n.href === "/carrier/negotiations") return { ...n, badge: escalations.length };
-    if (n.href === "/carrier") return { ...n, badge: pendingOffers };
+    if (n.href === "/carrier/loads") return { ...n, badge: pendingOffers };
     return n;
   });
 

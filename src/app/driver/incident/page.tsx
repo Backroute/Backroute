@@ -31,7 +31,7 @@ export default function ReportIncidentPage() {
     if (!type || !truck) return;
     reportIncident(driver.id, truck.id, type, note.trim());
     setSent(true);
-    setTimeout(() => router.push("/driver/home"), 1400);
+    setTimeout(() => router.push("/driver"), 1400);
   }
 
   if (sent) {
