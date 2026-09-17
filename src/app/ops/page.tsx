@@ -17,7 +17,7 @@ export default function OpsOverviewPage() {
   const activity = useStore((s) => s.activity);
   const metrics = useStore((s) => s.liveMetrics);
   const allEscalations = useStore((s) => s.escalations);
-  const escalations = useMemo(() => allEscalations.filter((e) => e.status === "open"), [allEscalations]);
+  const escalations = useMemo(() => allEscalations.filter((e) => e.status !== "resolved"), [allEscalations]);
   const allIncidents = useStore((s) => s.incidents);
   const activeIncidents = useMemo(() => allIncidents.filter((i) => i.status === "active"), [allIncidents]);
   const trucks = useStore((s) => s.trucks);

@@ -242,7 +242,14 @@ export interface Escalation {
   carrierId: string;
   reason: string;
   createdAt: string;
-  status: "open" | "resolved";
+  /** "with_support" = routed to a human specialist and being actively handled. */
+  status: "open" | "with_support" | "resolved";
+  /** "routine" cases carry a clear AI recommendation for a one-tap default action; "critical" ones route to human support instead. */
+  complexity: "routine" | "critical";
+  recommendedAction?: "approve" | "reject";
+  /** Human-readable label for the default-action button, e.g. "Approve — send detention invoice". */
+  recommendedLabel?: string;
+  resolvedBy?: "carrier" | "support";
 }
 
 export interface DriverMessage {

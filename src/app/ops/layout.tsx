@@ -22,7 +22,7 @@ export default function OpsLayout({ children }: { children: React.ReactNode }) {
   const escalations = useStore((s) => s.escalations);
   const activity = useStore((s) => s.activity);
   const carriers = useStore((s) => s.carriers);
-  const openCount = escalations.filter((e) => e.status === "open" && e.carrierId === PRIMARY_CARRIER_ID).length;
+  const openCount = escalations.filter((e) => e.status !== "resolved" && e.carrierId === PRIMARY_CARRIER_ID).length;
   const navWithBadge = NAV.map((n) => (n.href === "/ops/escalations" ? { ...n, badge: openCount } : n));
 
   const commandGroups: CommandGroup[] = [

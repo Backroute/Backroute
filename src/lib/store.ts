@@ -66,12 +66,55 @@ export interface LiveMetrics {
   boardsConnected: number;
 }
 
-const ESCALATION_REASONS = [
-  "Broker requesting rate 8% below carrier floor — needs human approval to accept or walk.",
-  "Receiver requesting appointment change outside driver's HOS window.",
-  "Detention exceeding 2 hours — approve detention invoice to shipper.",
-  "Broker unresponsive after 45 minutes — recommend re-sourcing the lane.",
-  "Weight discrepancy at scale — confirm accessorial with broker.",
+interface EscalationTemplate {
+  reason: string;
+  complexity: "routine" | "critical";
+  recommendedAction?: "approve" | "reject";
+  recommendedLabel?: string;
+}
+
+/** Routine cases: the AI already knows the right call — carrier gets a one-tap default action. Critical cases: no safe default, routed to human support instead. */
+const ESCALATION_TEMPLATES: EscalationTemplate[] = [
+  {
+    reason: "Detention exceeding 2 hours at the receiver — invoice ready to send.",
+    complexity: "routine",
+    recommendedAction: "approve",
+    recommendedLabel: "Approve — send detention invoice",
+  },
+  {
+    reason: "Broker unresponsive after 45 minutes — AI recommends re-sourcing this lane.",
+    complexity: "routine",
+    recommendedAction: "approve",
+    recommendedLabel: "Approve — re-source the lane",
+  },
+  {
+    reason: "Receiver requesting appointment change outside driver's HOS window.",
+    complexity: "routine",
+    recommendedAction: "reject",
+    recommendedLabel: "Decline — propose next available window",
+  },
+  {
+    reason: "Minor weight discrepancy at scale — within normal tolerance.",
+    complexity: "routine",
+    recommendedAction: "approve",
+    recommendedLabel: "Approve — confirm accessorial with broker",
+  },
+  {
+    reason: "Broker requesting rate 8% below carrier floor — needs a judgment call on accept or walk.",
+    complexity: "critical",
+  },
+  {
+    reason: "Broker disputing the signed rate confirmation — refusing to pay the agreed amount.",
+    complexity: "critical",
+  },
+  {
+    reason: "Cargo claim filed for alleged in-transit damage — carrier liability at stake.",
+    complexity: "critical",
+  },
+  {
+    reason: "Driver reports an unsafe delivery location after hours — needs a real-time call.",
+    complexity: "critical",
+  },
 ];
 
 interface StoreState {
@@ -90,6 +133,7 @@ interface StoreState {
   actions: {
     tick: () => void;
     resolveEscalation: (id: string, approve: boolean) => void;
+    routeEscalationToSupport: (id: string) => void;
     sendDriverMessage: (driverId: string, content: string) => void;
     updateSettings: (partial: Partial<AgentSettings>) => void;
     captureDocument: (loadId: string, type: "bol" | "pod") => void;
@@ -291,15 +335,30 @@ export const useStore = create<StoreState>((set, get) => ({
 
         if (Math.random() < 0.025 && candidates.length) {
           const target = pick(candidates);
+          const template = pick(ESCALATION_TEMPLATES);
           const esc: Escalation = {
             id: uid("esc"), loadId: target.id, carrierId: PRIMARY_CARRIER_ID,
-            reason: pick(ESCALATION_REASONS), createdAt: new Date().toISOString(), status: "open",
+            reason: template.reason, createdAt: new Date().toISOString(), status: "open",
+            complexity: template.complexity, recommendedAction: template.recommendedAction, recommendedLabel: template.recommendedLabel,
           };
           escalations = [esc, ...escalations];
           newEvents.push({
             id: uid("act"), timestamp: new Date().toISOString(), type: "escalation",
-            message: "Escalated for human approval", detail: esc.reason, loadId: target.id, carrierId: PRIMARY_CARRIER_ID, severity: "warning",
+            message: template.complexity === "critical" ? "Escalated — needs a human judgment call" : "Escalated for a quick approval",
+            detail: esc.reason, loadId: target.id, carrierId: PRIMARY_CARRIER_ID, severity: "warning",
           });
+        }
+
+        for (const esc of escalations) {
+          if (esc.status === "with_support" && Math.random() < 0.3) {
+            escalations = escalations.map((e) =>
+              e.id === esc.id ? { ...e, status: "resolved" as const, resolvedBy: "support" as const } : e,
+            );
+            newEvents.push({
+              id: uid("act"), timestamp: new Date().toISOString(), type: "escalation",
+              message: "Backroute Support resolved this personally", detail: esc.reason, loadId: esc.loadId, carrierId: esc.carrierId, severity: "success",
+            });
+          }
         }
 
         const activeIncidents = incidents.filter((i) => i.status === "active");
@@ -331,7 +390,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
     resolveEscalation: (id, approve) =>
       set((state) => ({
-        escalations: state.escalations.map((e) => (e.id === id ? { ...e, status: "resolved" as const } : e)),
+        escalations: state.escalations.map((e) => (e.id === id ? { ...e, status: "resolved" as const, resolvedBy: "carrier" as const } : e)),
         activity: [
           {
             id: uid("act"), timestamp: new Date().toISOString(), type: "escalation" as const,
@@ -339,6 +398,21 @@ export const useStore = create<StoreState>((set, get) => ({
             detail: state.escalations.find((e) => e.id === id)?.reason ?? "",
             loadId: state.escalations.find((e) => e.id === id)?.loadId,
             carrierId: PRIMARY_CARRIER_ID, severity: (approve ? "success" : "info") as ActivityEvent["severity"],
+          },
+          ...state.activity,
+        ].slice(0, 80),
+      })),
+
+    routeEscalationToSupport: (id) =>
+      set((state) => ({
+        escalations: state.escalations.map((e) => (e.id === id ? { ...e, status: "with_support" as const } : e)),
+        activity: [
+          {
+            id: uid("act"), timestamp: new Date().toISOString(), type: "escalation" as const,
+            message: "Routed to Backroute Support — a specialist is reviewing this now",
+            detail: state.escalations.find((e) => e.id === id)?.reason ?? "",
+            loadId: state.escalations.find((e) => e.id === id)?.loadId,
+            carrierId: PRIMARY_CARRIER_ID, severity: "info" as ActivityEvent["severity"],
           },
           ...state.activity,
         ].slice(0, 80),

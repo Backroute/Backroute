@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, Check, X } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Check, LifeBuoy, X } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,11 +16,12 @@ export default function EscalationsPage() {
   const carrier = usePrimaryCarrier();
 
   const open = escalations.filter((e) => e.status === "open");
+  const withSupport = escalations.filter((e) => e.status === "with_support");
   const resolved = escalations.filter((e) => e.status === "resolved");
 
   return (
     <div>
-      <PageHeader title="Escalations" description={`${open.length} awaiting review`} />
+      <PageHeader title="Escalations" description={`${open.length + withSupport.length} awaiting review`} />
 
       <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
         <div>
@@ -37,7 +38,15 @@ export default function EscalationsPage() {
                         <AlertTriangle className="h-4 w-4" />
                       </span>
                       <div>
-                        <p className="text-sm text-ink-900">{e.reason}</p>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge tone={e.complexity === "critical" ? "danger" : "neutral"}>
+                            {e.complexity === "critical" ? "Needs judgment call" : "AI has a recommendation"}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-sm text-ink-900">{e.reason}</p>
+                        {e.complexity === "routine" && e.recommendedLabel && (
+                          <p className="mt-0.5 text-xs text-ink-500">AI recommends: {e.recommendedLabel}</p>
+                        )}
                         <p className="mt-1 text-xs text-ink-400">
                           {carrier.name} · <TimeAgo iso={e.createdAt} /> ·{" "}
                           <Link href={`/ops/loads/${e.loadId}`} className="inline-flex items-center gap-0.5 text-ink-500 hover:text-ink-950 hover:underline">
@@ -61,6 +70,42 @@ export default function EscalationsPage() {
           )}
         </div>
 
+        {withSupport.length > 0 && (
+          <div>
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-400">With support ({withSupport.length})</h2>
+            <div className="flex flex-col gap-3">
+              {withSupport.map((e) => (
+                <Card key={e.id}>
+                  <CardContent className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink-100 text-ink-500">
+                        <LifeBuoy className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <p className="text-sm text-ink-900">{e.reason}</p>
+                        <p className="mt-1 text-xs text-ink-400">
+                          {carrier.name} routed this to support · <TimeAgo iso={e.createdAt} /> ·{" "}
+                          <Link href={`/ops/loads/${e.loadId}`} className="inline-flex items-center gap-0.5 text-ink-500 hover:text-ink-950 hover:underline">
+                            View load <ArrowUpRight className="h-3 w-3" />
+                          </Link>
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="danger" onClick={() => resolve(e.id, false)}>
+                        <X className="h-3.5 w-3.5" /> Reject
+                      </Button>
+                      <Button size="sm" variant="primary" onClick={() => resolve(e.id, true)}>
+                        <Check className="h-3.5 w-3.5" /> Approve
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
         {resolved.length > 0 && (
           <div>
             <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-400">Resolved ({resolved.length})</h2>
@@ -68,7 +113,7 @@ export default function EscalationsPage() {
               {resolved.map((e) => (
                 <div key={e.id} className="flex items-center justify-between gap-4 rounded-xl border border-line bg-white px-4 py-3">
                   <p className="text-sm text-ink-500 line-through decoration-ink-300">{e.reason}</p>
-                  <Badge tone="success">Resolved</Badge>
+                  <Badge tone="success">{e.resolvedBy === "support" ? "Resolved by support" : "Resolved"}</Badge>
                 </div>
               ))}
             </div>

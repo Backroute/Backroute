@@ -571,17 +571,21 @@ export function generateWorld(seed = 20260916): World {
       id: rng.id("esc"),
       loadId: loads.find((l) => l.stage === "negotiating")?.id ?? loads[3].id,
       carrierId: PRIMARY_CARRIER_ID,
-      reason: "Broker requesting rate 9% below carrier floor — needs human approval to accept or walk.",
+      reason: "Broker requesting rate 9% below carrier floor — needs a judgment call on accept or walk.",
       createdAt: iso(-18),
       status: "open",
+      complexity: "critical",
     },
     {
       id: rng.id("esc"),
       loadId: loads.find((l) => l.stage === "in_transit")?.id ?? loads[10].id,
       carrierId: PRIMARY_CARRIER_ID,
-      reason: "Detention at receiver exceeding 2 hours — approve detention invoice to shipper.",
+      reason: "Detention at receiver exceeding 2 hours — invoice ready to send.",
       createdAt: iso(-46),
       status: "open",
+      complexity: "routine",
+      recommendedAction: "approve",
+      recommendedLabel: "Approve — send detention invoice",
     },
   ];
 

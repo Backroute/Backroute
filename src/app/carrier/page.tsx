@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, Link2 } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Check, LifeBuoy, Link2 } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
@@ -24,11 +24,13 @@ export default function CarrierOverviewPage() {
   const driverMap = useDriverMap();
   const brokers = useBrokerMap();
   const truckMap = useTruckMap();
-  const escalations = useCarrierEscalations().filter((e) => e.status === "open");
+  const escalations = useCarrierEscalations().filter((e) => e.status !== "resolved");
   const activity = useStore((s) => s.activity).filter((e) => e.carrierId === carrier.id);
   const selectLoadOffer = useStore((s) => s.actions.selectLoadOffer);
   const requestOfferDetail = useStore((s) => s.actions.requestOfferDetail);
   const resolveOfferDetail = useStore((s) => s.actions.resolveOfferDetail);
+  const resolveEscalation = useStore((s) => s.actions.resolveEscalation);
+  const routeEscalationToSupport = useStore((s) => s.actions.routeEscalationToSupport);
 
   const activeLoads = loads.filter((l) => l.stage !== "delivered");
   const netProfitMonth = loads.reduce((sum, l) => sum + (l.netProfit ?? 0), 0);
@@ -180,10 +182,33 @@ export default function CarrierOverviewPage() {
                       return (
                         <div key={e.id} className="rounded-xl bg-amber-50/70 p-3">
                           {(truck || driver) && <TruckDriverChip truck={truck} driver={driver} className="mb-2 !bg-white/60" />}
+                          {e.complexity === "critical" && (
+                            <Badge tone="danger" className="mb-1.5">Needs a human judgment call</Badge>
+                          )}
                           <p className="text-xs leading-relaxed text-ink-800">{e.reason}</p>
-                          <Link href={`/carrier/loads/${e.loadId}`} className="mt-2 inline-flex text-xs font-medium text-[var(--accent-warn)] hover:underline">
-                            Review load →
-                          </Link>
+                          {e.status === "with_support" ? (
+                            <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-ink-500">
+                              <LifeBuoy className="h-3.5 w-3.5 animate-pulse" /> Backroute Support is reviewing this — you&apos;ll be notified
+                            </p>
+                          ) : e.complexity === "routine" && e.recommendedAction && e.recommendedLabel ? (
+                            <div className="mt-2 flex flex-wrap items-center gap-3">
+                              <Button size="sm" variant="primary" onClick={() => resolveEscalation(e.id, e.recommendedAction === "approve")}>
+                                <Check className="h-3.5 w-3.5" /> {e.recommendedLabel}
+                              </Button>
+                              <Link href={`/carrier/loads/${e.loadId}`} className="text-xs font-medium text-ink-500 hover:underline">
+                                Review manually
+                              </Link>
+                            </div>
+                          ) : (
+                            <div className="mt-2 flex flex-wrap items-center gap-3">
+                              <Button size="sm" variant="outline" onClick={() => routeEscalationToSupport(e.id)}>
+                                <LifeBuoy className="h-3.5 w-3.5" /> Get human support
+                              </Button>
+                              <Link href={`/carrier/loads/${e.loadId}`} className="text-xs font-medium text-ink-500 hover:underline">
+                                Review load →
+                              </Link>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
