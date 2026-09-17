@@ -264,7 +264,9 @@ function buildNegotiationThread(
   });
   t += rng.int(2, 9);
 
-  const brokerOpen = Math.round(listedRate * rng.float(0.88, 0.97));
+  // "Listed rate" is what the broker posted the load at — they don't lowball below their own posting.
+  // Their opening reply holds close to that number, having given a little ground toward the AI's ask.
+  const brokerOpen = Math.round(listedRate + (targetRate - listedRate) * rng.float(0.15, 0.35, 3));
   messages.push({
     id: rng.id("msg"),
     channel: "email",
