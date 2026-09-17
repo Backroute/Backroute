@@ -5,19 +5,18 @@ import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
 import { useStore } from "@/lib/store";
-import { ADDONS } from "@/lib/addons";
+import { computeFactoringCommission, INSURANCE_REFERRAL_FEE, IFTA_FILING_FEE } from "@/lib/commissions";
 import { formatCompact, formatCurrency } from "@/lib/utils";
 
-/** Platform-wide add-on adoption is estimated per agent — only the primary carrier's own toggles are real store state. */
-const ADDON_ADOPTION_PCT: Record<string, number> = {
-  "broker-shield": 0.62,
-  "factoring-ai": 0.54,
-  "driver-settlement-ai": 0.48,
-  "maintenance-ai": 0.41,
-  "insights-ai": 0.35,
-  "compliance-ai": 0.22,
-  "insurance-ai": 0.18,
-};
+/**
+ * Platform-wide adoption/usage is estimated — only the primary carrier's own toggles and loads are real store state.
+ * The AI add-ons themselves are free; this is what Backroute earns from partner referrals and flat filing fees instead.
+ */
+const FACTORING_ADOPTION_PCT = 0.54;
+const INSURANCE_ADOPTION_PCT = 0.18;
+const FILING_ADOPTION_PCT = 0.22;
+/** Assumed share of an average carrier's monthly freight that gets factored through the partner. */
+const AVG_FACTORED_GMV_SHARE = 0.35;
 
 const TRAJECTORY = [
   { year: "Year 1", revenue: 0.6, detail: "80 carriers · ~100 trucks" },
@@ -36,11 +35,22 @@ export default function RevenuePage() {
   const mrr = carriers.reduce((s, c) => s + c.mrr, 0);
   const gmv = carriers.reduce((s, c) => s + c.gmvMonth, 0);
 
-  const addonAdoption = ADDONS.map((a) => {
-    const adopters = Math.round(carriers.length * (ADDON_ADOPTION_PCT[a.id] ?? 0.3));
-    return { ...a, adopters, revenue: adopters * a.price };
-  });
-  const addonRevenue = addonAdoption.reduce((s, a) => s + a.revenue, 0);
+  const avgGmvPerCarrier = carriers.length ? gmv / carriers.length : 0;
+  const factoringAdopters = Math.round(carriers.length * FACTORING_ADOPTION_PCT);
+  const factoringCommissionRevenue = factoringAdopters * computeFactoringCommission(avgGmvPerCarrier * AVG_FACTORED_GMV_SHARE);
+
+  const insuranceAdopters = Math.round(carriers.length * INSURANCE_ADOPTION_PCT);
+  const insuranceCommissionRevenue = Math.round((insuranceAdopters * INSURANCE_REFERRAL_FEE) / 12);
+
+  const filingAdopters = Math.round(carriers.length * FILING_ADOPTION_PCT);
+  const iftaFilingRevenue = Math.round((filingAdopters * IFTA_FILING_FEE) / 3);
+
+  const commissionBreakdown = [
+    { id: "factoring-ai", name: "Factoring AI", detail: `${factoringAdopters} carriers · referral commission`, revenue: factoringCommissionRevenue },
+    { id: "insurance-ai", name: "Insurance AI", detail: `${insuranceAdopters} carriers · referral fee, amortized`, revenue: insuranceCommissionRevenue },
+    { id: "compliance-ai", name: "IFTA filing", detail: `${filingAdopters} carriers · $${IFTA_FILING_FEE}/quarter`, revenue: iftaFilingRevenue },
+  ];
+  const commissionRevenue = commissionBreakdown.reduce((s, a) => s + a.revenue, 0);
 
   const planMix = ["Starter", "Growth", "Fleet"].map((plan) => ({
     name: plan,
@@ -53,10 +63,10 @@ export default function RevenuePage() {
 
       <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-          <Card><CardContent><StatTile label="Total revenue / mo" value={formatCurrency(mrr + takeRate + addonRevenue)} /></CardContent></Card>
+          <Card><CardContent><StatTile label="Total revenue / mo" value={formatCurrency(mrr + takeRate + commissionRevenue)} /></CardContent></Card>
           <Card><CardContent><StatTile label="Subscription MRR" value={formatCurrency(mrr)} /></CardContent></Card>
           <Card><CardContent><StatTile label="Take-rate (2%)" value={formatCurrency(takeRate)} /></CardContent></Card>
-          <Card><CardContent><StatTile label="Add-on revenue" value={formatCurrency(addonRevenue)} /></CardContent></Card>
+          <Card><CardContent><StatTile label="Commission & filing revenue" value={formatCurrency(commissionRevenue)} /></CardContent></Card>
           <Card><CardContent><StatTile label="GMV / mo" value={`$${formatCompact(gmv)}`} /></CardContent></Card>
         </div>
 
@@ -120,19 +130,19 @@ export default function RevenuePage() {
         <Card>
           <CardHeader>
             <div>
-              <CardTitle>AI Add-on adoption</CardTitle>
-              <CardDescription>Estimated platform-wide — revenue beyond dispatch, per agent.</CardDescription>
+              <CardTitle>Partner commission & filing revenue</CardTitle>
+              <CardDescription>Estimated platform-wide — AI add-ons are free to carriers; this is what Backroute earns instead.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="!pt-3">
             <div className="flex flex-col divide-y divide-line">
-              {addonAdoption
+              {commissionBreakdown
                 .sort((a, b) => b.revenue - a.revenue)
                 .map((a) => (
                   <div key={a.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
                     <div className="min-w-0">
                       <p className="truncate text-sm text-ink-900">{a.name}</p>
-                      <p className="text-xs text-ink-400">{a.adopters} carriers · ${a.price}/mo</p>
+                      <p className="text-xs text-ink-400">{a.detail}</p>
                     </div>
                     <span className="shrink-0 text-sm font-semibold tabular text-ink-950">{formatCurrency(a.revenue)}</span>
                   </div>

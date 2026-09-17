@@ -2,14 +2,10 @@
 
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useStore } from "@/lib/store";
 import type { Broker } from "@/lib/types";
 
-/** Broker Shield AI: screens every broker for FMCSA authority + fraud risk before the AI will negotiate with them. */
+/** Broker Shield AI: screens every broker for FMCSA authority + fraud risk before the AI will negotiate with them. Included free with every plan. */
 export function BrokerTrustBadge({ broker, className }: { broker: Broker; className?: string }) {
-  const enabled = useStore((s) => s.settings.enabledAddons.includes("broker-shield"));
-  if (!enabled) return null;
-
   if (!broker.authorityVerified) {
     return (
       <span className={cn("inline-flex items-center gap-1 text-[10px] font-medium text-[var(--accent-danger)]", className)}>

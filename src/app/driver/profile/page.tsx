@@ -4,7 +4,6 @@ import { DollarSign, Home, Phone, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { AddonGate } from "@/components/shared/addon-gate";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, usePrimaryCarrier } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { computeDriverPay } from "@/lib/settlements";
@@ -93,28 +92,26 @@ export default function DriverProfilePage() {
           <DollarSign className="h-3.5 w-3.5 text-ink-400" />
           <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">Pay statements</p>
         </div>
-        <AddonGate addonId="driver-settlement-ai">
-          {paidLoads.length === 0 ? (
-            <p className="mt-2 text-xs text-ink-400">No delivered loads yet.</p>
-          ) : (
-            <>
-              <p className="mt-1 text-xs text-ink-500">
-                {driver.payType === "percentage" ? `${Math.round(driver.payRate * 100)}% of rate` : `$${driver.payRate.toFixed(2)}/mi`} · {formatCurrency(totalPay)} total
-              </p>
-              <div className="mt-3 flex flex-col divide-y divide-line">
-                {paidLoads.slice(0, 6).map((l) => (
-                  <div key={l.id} className="flex items-center justify-between gap-2 py-2.5 first:pt-0 last:pb-0">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm text-ink-800">{l.lane.origin} → {l.lane.destination}</p>
-                      <p className="text-[11px] text-ink-400">{formatDate(l.updatedAt)}</p>
-                    </div>
-                    <p className="shrink-0 text-sm font-semibold tabular text-ink-950">{formatCurrency(computeDriverPay(l, driver))}</p>
+        {paidLoads.length === 0 ? (
+          <p className="mt-2 text-xs text-ink-400">No delivered loads yet.</p>
+        ) : (
+          <>
+            <p className="mt-1 text-xs text-ink-500">
+              {driver.payType === "percentage" ? `${Math.round(driver.payRate * 100)}% of rate` : `$${driver.payRate.toFixed(2)}/mi`} · {formatCurrency(totalPay)} total
+            </p>
+            <div className="mt-3 flex flex-col divide-y divide-line">
+              {paidLoads.slice(0, 6).map((l) => (
+                <div key={l.id} className="flex items-center justify-between gap-2 py-2.5 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-ink-800">{l.lane.origin} → {l.lane.destination}</p>
+                    <p className="text-[11px] text-ink-400">{formatDate(l.updatedAt)}</p>
                   </div>
-                ))}
-              </div>
-            </>
-          )}
-        </AddonGate>
+                  <p className="shrink-0 text-sm font-semibold tabular text-ink-950">{formatCurrency(computeDriverPay(l, driver))}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       <div className="rounded-2xl border border-line p-4">

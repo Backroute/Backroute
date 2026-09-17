@@ -12,6 +12,7 @@ import { AddonGate } from "@/components/shared/addon-gate";
 import { useCarrierLoads, useDriverMap, useTruckMap } from "@/lib/selectors";
 import { useNow } from "@/lib/hooks";
 import { deriveFactoringSettlement, computeDriverPay, FACTORING_FEE_PCT } from "@/lib/settlements";
+import { computeFactoringCommission } from "@/lib/commissions";
 import { formatCurrency } from "@/lib/utils";
 import type { Driver, Load, Truck } from "@/lib/types";
 
@@ -44,9 +45,7 @@ export default function SettlementsPage() {
               <FactoringList loads={delivered} now={now} />
             </AddonGate>
           ) : (
-            <AddonGate addonId="driver-settlement-ai">
-              <DriverPayList loads={delivered} drivers={drivers} trucks={trucks} />
-            </AddonGate>
+            <DriverPayList loads={delivered} drivers={drivers} trucks={trucks} />
           )}
         </div>
       </div>
@@ -65,6 +64,7 @@ function FactoringList({ loads, now }: { loads: Load[]; now: number | null }) {
   const settlements = loads.map((l) => deriveFactoringSettlement(l, now));
   const funded = settlements.filter((s) => s.status === "funded");
   const pending = settlements.filter((s) => s.status === "submitted");
+  const backrouteCommission = settlements.reduce((s, x) => s + computeFactoringCommission(x.invoiceAmount), 0);
 
   return (
     <div className="flex flex-col gap-5">
@@ -73,6 +73,10 @@ function FactoringList({ loads, now }: { loads: Load[]; now: number | null }) {
         <Card><CardContent><StatTile label="Pending funding" value={formatCurrency(pending.reduce((s, x) => s + x.netPayout, 0))} sublabel={`${pending.length} invoices`} /></CardContent></Card>
         <Card><CardContent><StatTile label={`Factoring fee (${FACTORING_FEE_PCT * 100}%)`} value={formatCurrency(settlements.reduce((s, x) => s + x.factoringFee, 0))} sublabel="vs. 30-45 day broker terms" /></CardContent></Card>
       </div>
+
+      <p className="text-xs text-ink-400">
+        Free to you — Backroute earns {formatCurrency(backrouteCommission)} in referral commission from our factoring partner on these invoices, not charged to you.
+      </p>
 
       <div className="flex flex-col gap-2">
         {settlements.map((s) => (

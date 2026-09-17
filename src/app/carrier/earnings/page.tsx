@@ -5,7 +5,6 @@ import { Lightbulb } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
-import { AddonGate } from "@/components/shared/addon-gate";
 import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks, useBrokerMap } from "@/lib/selectors";
 import { formatCurrency } from "@/lib/utils";
 
@@ -164,24 +163,22 @@ export default function EarningsPage() {
             </div>
           </CardHeader>
           <CardContent className="!pt-3">
-            <AddonGate addonId="insights-ai">
-              {priced.length === 0 ? (
-                <p className="text-sm text-ink-400">Not enough delivered loads yet to generate insights.</p>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {bestLane && (
-                    <InsightRow label="Best lane" detail={bestLane.key} value={`${formatCurrency(bestLane.avg)} avg net`} tone="success" />
-                  )}
-                  {worstBrokerEntry && worstBrokerName && (
-                    <InsightRow label="Lowest-margin broker" detail={worstBrokerName} value={`${formatCurrency(worstBrokerEntry.avg)} avg net`} tone="danger" />
-                  )}
-                  {bestEquip && (
-                    <InsightRow label="Most profitable equipment" detail={bestEquip.key} value={`${formatCurrency(bestEquip.avg)} avg net`} tone="success" />
-                  )}
-                  <InsightRow label="Rate floor" detail={rateFloorNote} tone="info" />
-                </div>
-              )}
-            </AddonGate>
+            {priced.length === 0 ? (
+              <p className="text-sm text-ink-400">Not enough delivered loads yet to generate insights.</p>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {bestLane && (
+                  <InsightRow label="Best lane" detail={bestLane.key} value={`${formatCurrency(bestLane.avg)} avg net`} tone="success" />
+                )}
+                {worstBrokerEntry && worstBrokerName && (
+                  <InsightRow label="Lowest-margin broker" detail={worstBrokerName} value={`${formatCurrency(worstBrokerEntry.avg)} avg net`} tone="danger" />
+                )}
+                {bestEquip && (
+                  <InsightRow label="Most profitable equipment" detail={bestEquip.key} value={`${formatCurrency(bestEquip.avg)} avg net`} tone="success" />
+                )}
+                <InsightRow label="Rate floor" detail={rateFloorNote} tone="info" />
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

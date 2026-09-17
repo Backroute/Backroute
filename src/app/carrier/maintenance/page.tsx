@@ -5,7 +5,6 @@ import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { AddonGate } from "@/components/shared/addon-gate";
 import { useCarrierTrucks, useDriverMap } from "@/lib/selectors";
 import { useNow } from "@/lib/hooks";
 import { milesUntilService, serviceStatus, inspectionStatus, type ServiceStatus } from "@/lib/maintenance";
@@ -35,9 +34,8 @@ export default function MaintenancePage() {
       <PageHeader title="Maintenance" description={`${flagged.length} trucks need attention`} />
 
       <div className="px-4 py-6 sm:px-8">
-        <AddonGate addonId="maintenance-ai">
-          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {trucks.map((truck) => {
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          {trucks.map((truck) => {
               const remaining = milesUntilService(truck);
               const svcStatus = serviceStatus(truck);
               const pct = Math.max(0, Math.min(100, (remaining / truck.serviceIntervalMiles) * 100));
@@ -88,9 +86,8 @@ export default function MaintenancePage() {
                   </CardContent>
                 </Card>
               );
-            })}
-          </div>
-        </AddonGate>
+          })}
+        </div>
       </div>
     </div>
   );
