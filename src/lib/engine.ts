@@ -285,14 +285,20 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
     }
     case "negotiating": {
       const rounds = load.messages.filter((m) => m.channel !== "voice").length;
+      // Wherever the conversation actually left off — every branch below closes from here, not from a
+      // fresh random number, so the deal never lands on a figure that contradicts what was just said.
+      const priorAiOffers = load.messages.filter((m) => m.direction === "outbound" && m.offerAmount);
+      const priorBrokerOffers = load.messages.filter((m) => m.direction === "inbound" && m.offerAmount);
+      const threadAiLast = priorAiOffers.length ? priorAiOffers[priorAiOffers.length - 1].offerAmount! : load.targetRate;
+      const threadBrokerLast = priorBrokerOffers.length ? priorBrokerOffers[priorBrokerOffers.length - 1].offerAmount! : load.listedRate;
       if (rounds >= 5 || chance(0.32)) {
         const goVoice = chance(0.4) && !load.calls.length;
         if (goVoice) {
-          const finalAmt = Math.round(load.targetRate * (0.97 + Math.random() * 0.05));
+          const finalAmt = Math.round(threadBrokerLast + (threadAiLast - threadBrokerLast) * (0.75 + Math.random() * 0.2));
           const transcript: CallTranscriptLine[] = [
             { speaker: "ai", text: pick(CALL_OPENERS)(b.contact.split(" ")[0], load.lane.origin, load.lane.destination) },
             { speaker: "broker", text: pick(CALL_BROKER_STALLS) },
-            { speaker: "ai", text: pick(CALL_AI_HOLDS)(finalAmt) },
+            { speaker: "ai", text: pick(CALL_AI_HOLDS)(threadAiLast) },
             { speaker: "broker", text: pick(CALL_BROKER_CHECKS) },
             { speaker: "ai", text: pick(CALL_AI_CLOSES)(finalAmt) },
             { speaker: "broker", text: pick(CALL_BROKER_CONFIRMS) },
@@ -305,7 +311,7 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
           next.documents = [...load.documents, { id: uid("doc"), type: "rate_confirmation", name: `RateCon_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" }];
           events.push(mkEvent(load.carrierId, load.id, "call_completed", "Voice agent closed the deal by phone", `${b.company} · $${finalAmt.toLocaleString()} all-in`, "success", "voice"));
         } else {
-          const finalAmt = Math.round(load.targetRate * (0.96 + Math.random() * 0.06));
+          const finalAmt = Math.round(threadBrokerLast + (threadAiLast - threadBrokerLast) * (0.75 + Math.random() * 0.2));
           const msg: NegotiationMessage = { id: uid("msg"), channel: "sms", direction: "inbound", from: b.contact, timestamp: new Date().toISOString(), content: BROKER_ACCEPT(finalAmt), offerAmount: finalAmt };
           next.messages = [...load.messages, msg];
           next.bookedRate = finalAmt;
@@ -319,17 +325,13 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
         // The AI opens at its best, data-driven ask (target). From there it gives a little ground each of its
         // own turns — never below a floor that protects margin — while the broker concedes up from their low
         // opener toward wherever the AI currently stands. Two sides closing the gap, not one side standing still.
-        const aiOffers = load.messages.filter((m) => m.direction === "outbound" && m.offerAmount);
-        const brokerOffers = load.messages.filter((m) => m.direction === "inbound" && m.offerAmount);
-        const aiLast = aiOffers.length ? aiOffers[aiOffers.length - 1].offerAmount! : load.targetRate;
-        const brokerLast = brokerOffers.length ? brokerOffers[brokerOffers.length - 1].offerAmount! : load.listedRate;
         const aiFloor = Math.round(load.targetRate * 0.94);
         const amt = isAiTurn
-          ? aiOffers.length === 0
+          ? priorAiOffers.length === 0
             ? load.targetRate
-            : Math.max(aiFloor, Math.round(aiLast - (aiLast - brokerLast) * 0.15))
-          : Math.round(brokerLast + (aiLast - brokerLast) * 0.3);
-        const isFirstAiAsk = isAiTurn && aiOffers.length === 0;
+            : Math.max(aiFloor, Math.round(threadAiLast - (threadAiLast - threadBrokerLast) * 0.15))
+          : Math.round(threadBrokerLast + (threadAiLast - threadBrokerLast) * 0.3);
+        const isFirstAiAsk = isAiTurn && priorAiOffers.length === 0;
         const msg: NegotiationMessage = {
           id: uid("msg"), channel: pick(["email", "sms"]), direction: isAiTurn ? "outbound" : "inbound",
           from: isAiTurn ? "Backroute AI" : b.contact, timestamp: new Date().toISOString(),

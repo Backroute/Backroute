@@ -314,10 +314,13 @@ function buildNegotiationThread(
 
   if (includeCall) {
     const callStart = t;
+    // The call picks up right where the email/SMS thread left off (aiLast) — it never opens on a number
+    // that contradicts whatever the AI just said a message ago. Only a resolved call moves past that,
+    // closing at the true booked number, which is the natural "let's just lock it in" moment.
     const transcript: CallTranscriptSeed = [
       { speaker: "ai", text: rng.pick(CALL_OPENERS)(broker.contact.split(" ")[0], lane.origin, lane.destination) },
       { speaker: "broker", text: rng.pick(CALL_BROKER_STALLS) },
-      { speaker: "ai", text: rng.pick(CALL_AI_HOLDS)(finalAmt) },
+      { speaker: "ai", text: rng.pick(CALL_AI_HOLDS)(aiLast) },
       ...(resolvedRate
         ? [
             { speaker: "broker" as const, text: rng.pick(CALL_BROKER_CHECKS) },
@@ -326,7 +329,7 @@ function buildNegotiationThread(
           ]
         : [
             { speaker: "broker" as const, text: rng.pick(CALL_BROKER_CHECKS_PENDING) },
-            { speaker: "ai" as const, text: rng.pick(CALL_AI_FOLLOWUP)(finalAmt) },
+            { speaker: "ai" as const, text: rng.pick(CALL_AI_FOLLOWUP)(aiLast) },
             { speaker: "broker" as const, text: rng.pick(CALL_BROKER_PENDING) },
           ]),
     ];
@@ -341,17 +344,19 @@ function buildNegotiationThread(
     t += 4;
   }
 
-  if (resolvedRate) {
+  if (resolvedRate && !includeCall) {
+    // When there's a call, the call itself closes the deal (its transcript already ends in acceptance) —
+    // adding a second, separate "you got it" message here would have the broker agree twice.
     messages.push({
       id: rng.id("msg"),
-      channel: includeCall ? "sms" : "email",
+      channel: "email",
       direction: "inbound",
       from: broker.contact,
       timestamp: iso(t),
       content: rng.pick(BROKER_ACCEPTS)(resolvedRate),
       offerAmount: resolvedRate,
     });
-  } else if (!includeCall) {
+  } else if (!resolvedRate && !includeCall) {
     messages.push({
       id: rng.id("msg"),
       channel: "sms",
