@@ -273,7 +273,9 @@ function buildNegotiationThread(
 
   for (round = 0; round < maxRounds; round++) {
     const progress = (round + 1) / (maxRounds + 1);
-    const aiAsk = Math.round(brokerOpen + (finalAmt - brokerOpen) * Math.min(1, progress + 0.25));
+    // The AI already opened with its best data-driven ask, so it holds at finalAmt every round —
+    // only the broker's number should visibly move, conceding up from their low opener.
+    const aiAsk = finalAmt;
     messages.push({
       id: rng.id("msg"),
       channel: round === 0 ? "email" : "sms",

@@ -192,7 +192,11 @@ export function autoResolveStaleOffers(loads: Load[], staleMs: number, autoBookE
 
 const EMAIL_OPEN = (o: string, d: string, miles: number) =>
   `Hi — saw your ${o} to ${d} (${miles} mi) posted. We have a truck available. What's the best you can do on rate?`;
-const AI_COUNTER = (amt: number) => `We can commit at $${amt.toLocaleString()} all-in — truck is clean and ready to move within the appointment window.`;
+const AI_HOLD = [
+  (amt: number) => `We can commit at $${amt.toLocaleString()} all-in — truck is clean and ready to move within the appointment window.`,
+  (amt: number) => `$${amt.toLocaleString()} is where we're at based on the lane and truck's availability — that's the number that works for us.`,
+  (amt: number) => `Still holding at $${amt.toLocaleString()}. Truck's ready to roll as soon as we can lock it in.`,
+];
 const BROKER_LOW = (amt: number) => `Best I can do right now is $${amt.toLocaleString()}. Shipper's tight on budget this week.`;
 const BROKER_ACCEPT = (amt: number) => `Alright, you've got it — $${amt.toLocaleString()} all-in. Sending the rate con over now.`;
 
@@ -307,16 +311,16 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
         }
       } else {
         const isAiTurn = rounds % 2 === 0;
-        const lastOffer = [...load.messages].reverse().find((m) => m.offerAmount)?.offerAmount ?? load.listedRate;
-        // AI pushes up toward its target; the broker concedes down from the AI's ask back toward their own listed rate —
-        // two anchors closing the gap from opposite ends, not both drifting toward the same number.
-        const amt = isAiTurn
-          ? Math.round(lastOffer + (load.targetRate - lastOffer) * 0.5)
-          : Math.round(lastOffer - (lastOffer - load.listedRate) * 0.3);
+        // The AI already opened with its best data-driven ask, so it holds at target every turn instead of
+        // re-anchoring off whatever the broker just said — only the broker's number should visibly move,
+        // conceding up from their low opener toward the AI's (unchanged) target each time they reply.
+        const brokerOffers = load.messages.filter((m) => m.direction === "inbound" && m.offerAmount);
+        const brokerLast = brokerOffers.length ? brokerOffers[brokerOffers.length - 1].offerAmount! : load.listedRate;
+        const amt = isAiTurn ? load.targetRate : Math.round(brokerLast + (load.targetRate - brokerLast) * 0.3);
         const msg: NegotiationMessage = {
           id: uid("msg"), channel: pick(["email", "sms"]), direction: isAiTurn ? "outbound" : "inbound",
           from: isAiTurn ? "Backroute AI" : b.contact, timestamp: new Date().toISOString(),
-          content: isAiTurn ? AI_COUNTER(amt) : BROKER_LOW(amt), offerAmount: amt,
+          content: isAiTurn ? pick(AI_HOLD)(amt) : BROKER_LOW(amt), offerAmount: amt,
         };
         next.messages = [...load.messages, msg];
         events.push(mkEvent(load.carrierId, load.id, isAiTurn ? "negotiation_email" : "negotiation_sms", isAiTurn ? "AI sent a counter-offer" : "Broker replied with a counter", `${b.company} · $${amt.toLocaleString()}`, "info", msg.channel));
