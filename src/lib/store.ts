@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { DEFAULT_ENABLED_ADDONS } from "./addons";
 import { generateWorld, PRIMARY_CARRIER_ID } from "./mock-data";
 import {
   advanceIncident,
@@ -51,6 +52,7 @@ export interface AgentSettings {
   rateFloorPct: number;
   avoidWatchBrokers: boolean;
   offersPerTruck: number;
+  enabledAddons: string[];
 }
 
 export interface LiveMetrics {
@@ -97,6 +99,7 @@ interface StoreState {
     sendNegotiationInstruction: (loadId: string, actor: "driver" | "carrier", text: string) => void;
     setAiPaused: (loadId: string, paused: boolean) => void;
     opsOverrideRate: (loadId: string, amount: number) => void;
+    toggleAddon: (addonId: string) => void;
   };
 }
 
@@ -142,6 +145,7 @@ export const useStore = create<StoreState>((set) => ({
     rateFloorPct: 96,
     avoidWatchBrokers: false,
     offersPerTruck: 3,
+    enabledAddons: DEFAULT_ENABLED_ADDONS,
   },
   liveMetrics: {
     activeCalls: 9,
@@ -373,6 +377,19 @@ export const useStore = create<StoreState>((set) => ({
     },
 
     updateSettings: (partial) => set((state) => ({ settings: { ...state.settings, ...partial } })),
+
+    toggleAddon: (addonId) =>
+      set((state) => {
+        const enabled = state.settings.enabledAddons.includes(addonId);
+        return {
+          settings: {
+            ...state.settings,
+            enabledAddons: enabled
+              ? state.settings.enabledAddons.filter((id) => id !== addonId)
+              : [...state.settings.enabledAddons, addonId],
+          },
+        };
+      }),
 
     captureDocument: (loadId, type) =>
       set((state) => {

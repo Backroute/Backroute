@@ -1,10 +1,12 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Lightbulb } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
-import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks } from "@/lib/selectors";
+import { AddonGate } from "@/components/shared/addon-gate";
+import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks, useBrokerMap } from "@/lib/selectors";
 import { formatCurrency } from "@/lib/utils";
 
 const MONTHS = ["Apr", "May", "Jun", "Jul", "Aug", "Sep"];
@@ -13,6 +15,7 @@ export default function EarningsPage() {
   const carrier = usePrimaryCarrier();
   const loads = useCarrierLoads();
   const trucks = useCarrierTrucks();
+  const brokers = useBrokerMap();
 
   const delivered = loads.filter((l) => l.stage === "delivered");
   const netProfitTotal = loads.reduce((s, l) => s + (l.netProfit ?? 0), 0);
@@ -34,6 +37,64 @@ export default function EarningsPage() {
     { name: "Industry avg", value: 1500 },
     { name: "Backroute", value: 539 },
   ];
+
+  const priced = loads.filter((l) => l.netProfit !== null);
+  const byLane = new Map<string, { total: number; count: number }>();
+  const byBroker = new Map<string, { total: number; count: number }>();
+  const byEquip = new Map<string, { total: number; count: number }>();
+  let rpmSum = 0, marketRpmSum = 0, rpmCount = 0;
+
+  for (const l of priced) {
+    const laneKey = `${l.lane.origin} → ${l.lane.destination}`;
+    const laneEntry = byLane.get(laneKey) ?? { total: 0, count: 0 };
+    laneEntry.total += l.netProfit ?? 0;
+    laneEntry.count += 1;
+    byLane.set(laneKey, laneEntry);
+
+    const brokerEntry = byBroker.get(l.brokerId) ?? { total: 0, count: 0 };
+    brokerEntry.total += l.netProfit ?? 0;
+    brokerEntry.count += 1;
+    byBroker.set(l.brokerId, brokerEntry);
+
+    const equipEntry = byEquip.get(l.equipmentType) ?? { total: 0, count: 0 };
+    equipEntry.total += l.netProfit ?? 0;
+    equipEntry.count += 1;
+    byEquip.set(l.equipmentType, equipEntry);
+
+    if (l.rpm) {
+      rpmSum += l.rpm;
+      marketRpmSum += l.lane.marketRpm;
+      rpmCount += 1;
+    }
+  }
+
+  function bestOf(map: Map<string, { total: number; count: number }>) {
+    let best: { key: string; avg: number } | null = null;
+    for (const [key, v] of map) {
+      const avg = v.total / v.count;
+      if (!best || avg > best.avg) best = { key, avg };
+    }
+    return best;
+  }
+  function worstOf(map: Map<string, { total: number; count: number }>) {
+    let worst: { key: string; avg: number } | null = null;
+    for (const [key, v] of map) {
+      const avg = v.total / v.count;
+      if (!worst || avg < worst.avg) worst = { key, avg };
+    }
+    return worst;
+  }
+
+  const bestLane = bestOf(byLane);
+  const worstBrokerEntry = worstOf(byBroker);
+  const worstBrokerName = worstBrokerEntry ? brokers.get(worstBrokerEntry.key)?.company ?? "that broker" : null;
+  const bestEquip = bestOf(byEquip);
+  const avgRpmAll = rpmCount ? rpmSum / rpmCount : 0;
+  const avgMarketRpm = rpmCount ? marketRpmSum / rpmCount : 0;
+  const rateFloorNote =
+    avgRpmAll >= avgMarketRpm * 1.02
+      ? "You're consistently beating market rate — worth testing a higher rate floor."
+      : "You're tracking close to market rate — hold your current floor for now.";
 
   return (
     <div>
@@ -94,7 +155,47 @@ export default function EarningsPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle className="flex items-center gap-2"><Lightbulb className="h-4 w-4" /> Weekly insights</CardTitle>
+              <CardDescription>Where your fleet is making the most — and least — money.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="!pt-3">
+            <AddonGate addonId="insights-ai">
+              {priced.length === 0 ? (
+                <p className="text-sm text-ink-400">Not enough delivered loads yet to generate insights.</p>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {bestLane && (
+                    <InsightRow label="Best lane" detail={bestLane.key} value={`${formatCurrency(bestLane.avg)} avg net`} tone="success" />
+                  )}
+                  {worstBrokerEntry && worstBrokerName && (
+                    <InsightRow label="Lowest-margin broker" detail={worstBrokerName} value={`${formatCurrency(worstBrokerEntry.avg)} avg net`} tone="danger" />
+                  )}
+                  {bestEquip && (
+                    <InsightRow label="Most profitable equipment" detail={bestEquip.key} value={`${formatCurrency(bestEquip.avg)} avg net`} tone="success" />
+                  )}
+                  <InsightRow label="Rate floor" detail={rateFloorNote} tone="info" />
+                </div>
+              )}
+            </AddonGate>
+          </CardContent>
+        </Card>
       </div>
+    </div>
+  );
+}
+
+function InsightRow({ label, detail, value, tone }: { label: string; detail: string; value?: string; tone: "success" | "danger" | "info" }) {
+  const toneClass = tone === "success" ? "text-[var(--accent-live)]" : tone === "danger" ? "text-[var(--accent-danger)]" : "text-ink-500";
+  return (
+    <div className="rounded-2xl border border-line p-4">
+      <p className="text-[11px] font-medium uppercase tracking-wider text-ink-400">{label}</p>
+      <p className="mt-1 text-sm font-medium text-ink-950">{detail}</p>
+      {value && <p className={`mt-0.5 text-xs font-medium tabular ${toneClass}`}>{value}</p>}
     </div>
   );
 }

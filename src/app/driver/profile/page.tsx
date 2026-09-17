@@ -1,12 +1,14 @@
 "use client";
 
-import { Home, Phone, Star } from "lucide-react";
+import { DollarSign, Home, Phone, Star } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { usePrimaryDriver, useCarrierTrucks, usePrimaryCarrier } from "@/lib/selectors";
+import { AddonGate } from "@/components/shared/addon-gate";
+import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, usePrimaryCarrier } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
-import { cn, formatDate, formatNumber } from "@/lib/utils";
+import { computeDriverPay } from "@/lib/settlements";
+import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { HosStatus } from "@/lib/types";
 
 const HOS_TONE: Record<HosStatus, "success" | "neutral" | "info" | "warning"> = {
@@ -22,8 +24,14 @@ export default function DriverProfilePage() {
   const driver = usePrimaryDriver();
   const carrier = usePrimaryCarrier();
   const trucks = useCarrierTrucks();
+  const loads = useCarrierLoads();
   const truck = trucks.find((t) => t.id === driver.truckId);
   const updateHomeTimeTarget = useStore((s) => s.actions.updateHomeTimeTarget);
+
+  const paidLoads = loads
+    .filter((l) => l.stage === "delivered" && l.truckId === truck?.id)
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  const totalPay = paidLoads.reduce((s, l) => s + computeDriverPay(l, driver), 0);
 
   return (
     <div className="flex flex-col gap-5 px-5">
@@ -79,6 +87,35 @@ export default function DriverProfilePage() {
           </div>
         </div>
       )}
+
+      <div className="rounded-2xl border border-line p-4">
+        <div className="flex items-center gap-2">
+          <DollarSign className="h-3.5 w-3.5 text-ink-400" />
+          <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">Pay statements</p>
+        </div>
+        <AddonGate addonId="driver-settlement-ai">
+          {paidLoads.length === 0 ? (
+            <p className="mt-2 text-xs text-ink-400">No delivered loads yet.</p>
+          ) : (
+            <>
+              <p className="mt-1 text-xs text-ink-500">
+                {driver.payType === "percentage" ? `${Math.round(driver.payRate * 100)}% of rate` : `$${driver.payRate.toFixed(2)}/mi`} · {formatCurrency(totalPay)} total
+              </p>
+              <div className="mt-3 flex flex-col divide-y divide-line">
+                {paidLoads.slice(0, 6).map((l) => (
+                  <div key={l.id} className="flex items-center justify-between gap-2 py-2.5 first:pt-0 last:pb-0">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm text-ink-800">{l.lane.origin} → {l.lane.destination}</p>
+                      <p className="text-[11px] text-ink-400">{formatDate(l.updatedAt)}</p>
+                    </div>
+                    <p className="shrink-0 text-sm font-semibold tabular text-ink-950">{formatCurrency(computeDriverPay(l, driver))}</p>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </AddonGate>
+      </div>
 
       <div className="rounded-2xl border border-line p-4">
         <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">Details</p>

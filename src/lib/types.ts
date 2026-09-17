@@ -57,6 +57,9 @@ export interface Broker {
   onTimePct: number;
   avgRateVariancePct: number;
   tier: "preferred" | "standard" | "watch";
+  /** Broker Shield AI: FMCSA authority check before the AI will negotiate with them. */
+  authorityVerified: boolean;
+  fraudRisk: "low" | "medium" | "high";
 }
 
 export interface Lane {
@@ -84,6 +87,9 @@ export interface Driver {
   hireDate: string;
   homeBase: string;
   homeTimeTarget: string;
+  /** Driver Settlement AI: how weekly pay is computed. */
+  payType: "percentage" | "per_mile";
+  payRate: number;
 }
 
 export interface Truck {
@@ -100,6 +106,10 @@ export interface Truck {
   nextLoadId: string | null;
   mpg: number;
   odometer: number;
+  /** Maintenance AI tracking. */
+  lastServiceMiles: number;
+  serviceIntervalMiles: number;
+  nextInspectionDue: string;
 }
 
 export interface Carrier {

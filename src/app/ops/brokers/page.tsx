@@ -3,6 +3,7 @@
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { BrokerTrustBadge } from "@/components/shared/broker-trust-badge";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ export default function BrokersPage() {
                 <div>
                   <p className="font-medium text-ink-950">{b.company}</p>
                   <p className="text-xs text-ink-400">{b.contact}</p>
+                  <BrokerTrustBadge broker={b} className="mt-1" />
                 </div>
                 <Badge tone={TIER_TONE[b.tier]}>{b.tier}</Badge>
               </div>
@@ -62,6 +64,7 @@ export default function BrokersPage() {
                   <td className="px-5 py-3.5">
                     <p className="font-medium text-ink-950">{b.company}</p>
                     <p className="text-xs text-ink-400">{b.contact}</p>
+                    <BrokerTrustBadge broker={b} className="mt-1" />
                   </td>
                   <td className="px-5 py-3.5"><Badge tone={TIER_TONE[b.tier]}>{b.tier}</Badge></td>
                   <td className="px-5 py-3.5">

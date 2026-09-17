@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { LiveDot } from "@/components/shared/live-dot";
 import { ChannelBadge } from "@/components/shared/channel-badge";
 import { LoadScoreBadge } from "@/components/shared/load-score";
+import { BrokerTrustBadge } from "@/components/shared/broker-trust-badge";
 import { NegotiationComposer } from "@/components/shared/negotiation-composer";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { useCarrierLoads, useBrokerMap } from "@/lib/selectors";
@@ -56,6 +57,7 @@ export default function NegotiationsPage() {
                         <LoadScoreBadge score={load.score} size="sm" />
                       </div>
                       <p className="text-xs text-ink-500">{broker?.company} · {broker?.contact}</p>
+                      {broker && <BrokerTrustBadge broker={broker} className="mt-1" />}
                     </div>
                     <div className="flex items-center gap-1.5">
                       {channelsUsed.map((c) => (

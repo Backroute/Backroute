@@ -8,6 +8,7 @@ import type { Broker, Load } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LoadScoreBadge } from "./load-score";
+import { BrokerTrustBadge } from "./broker-trust-badge";
 import { TimeAgo } from "./time-ago";
 
 const TIER_TONE = { preferred: "success", standard: "neutral", watch: "warning" } as const;
@@ -70,6 +71,7 @@ export function LoadOfferCard({
             )}
             <span>· {load.equipmentType} · {load.lane.miles} mi</span>
           </p>
+          {broker && <BrokerTrustBadge broker={broker} className="mt-1" />}
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {load.recommended && (
               <Badge tone="dark" className="!bg-white/15 !text-white gap-1">

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, CreditCard, Download, FileText, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { CheckCircle2, CreditCard, Download, FileText, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { INTEGRATION_CATEGORIES } from "@/lib/integrations";
+import { ADDONS } from "@/lib/addons";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -36,6 +37,8 @@ export default function SettingsPage() {
   const trucks = useCarrierTrucks();
   const settings = useStore((s) => s.settings);
   const updateSettings = useStore((s) => s.actions.updateSettings);
+  const toggleAddon = useStore((s) => s.actions.toggleAddon);
+  const addonMonthlyTotal = ADDONS.filter((a) => settings.enabledAddons.includes(a.id)).reduce((s, a) => s + a.price, 0);
   const [team, setTeam] = useState(INITIAL_TEAM);
   const [inviteEmail, setInviteEmail] = useState("");
   const [connections, setConnections] = useState<Record<string, boolean>>(() =>
@@ -197,9 +200,43 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
+            <div>
+              <CardTitle className="flex items-center gap-2"><Sparkles className="h-4 w-4" /> AI Add-ons</CardTitle>
+              <CardDescription>Extra AI agents beyond dispatch — enable what your fleet needs.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="!pt-3">
+            <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
+              {ADDONS.map((addon) => {
+                const enabled = settings.enabledAddons.includes(addon.id);
+                return (
+                  <div key={addon.id} className="flex flex-wrap items-center justify-between gap-4 px-4 py-3.5">
+                    <div className="max-w-md">
+                      <p className="text-sm font-medium text-ink-900">{addon.name}</p>
+                      <p className="text-xs text-ink-500">{addon.tagline}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-medium tabular text-ink-500">${addon.price}/mo</span>
+                      <Switch checked={enabled} onChange={() => toggleAddon(addon.id)} label={addon.name} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {addonMonthlyTotal > 0 && (
+              <p className="mt-3 text-xs text-ink-500">
+                {settings.enabledAddons.length} add-on{settings.enabledAddons.length === 1 ? "" : "s"} enabled · <span className="font-medium text-ink-900">{formatCurrency(addonMonthlyTotal)}/mo</span>
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>Billing</CardTitle>
-            <CardDescription>{carrier.plan} plan &middot; $
-              {carrier.mrr}/mo + 2% of booked freight
+            <CardDescription>
+              {carrier.plan} plan &middot; {formatCurrency(carrier.mrr)}/mo + 2% of booked freight
+              {addonMonthlyTotal > 0 && <> &middot; {formatCurrency(addonMonthlyTotal)}/mo in add-ons</>}
             </CardDescription>
           </CardHeader>
           <CardContent className="!pt-3 flex flex-col gap-5">

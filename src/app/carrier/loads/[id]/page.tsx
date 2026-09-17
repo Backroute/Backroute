@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { LoadScoreBadge } from "@/components/shared/load-score";
+import { BrokerTrustBadge } from "@/components/shared/broker-trust-badge";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
 import { NegotiationComposer } from "@/components/shared/negotiation-composer";
 import { NegotiationThread } from "@/components/shared/negotiation-thread";
@@ -79,7 +80,12 @@ export default function LoadDetailPage() {
             <CardHeader>
               <div>
                 <CardTitle>Negotiation</CardTitle>
-                {broker && <p className="text-xs text-ink-500">{broker.company} · {broker.contact}</p>}
+                {broker && (
+                  <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                    <p className="text-xs text-ink-500">{broker.company} · {broker.contact}</p>
+                    <BrokerTrustBadge broker={broker} />
+                  </div>
+                )}
               </div>
               {load.stage === "negotiating" && (
                 <CounterOfferButton load={load} onSubmit={(amount) => requestBetterRate(load.id, "carrier", amount)} variant="outline" />

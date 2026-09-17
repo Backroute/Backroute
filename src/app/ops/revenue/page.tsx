@@ -2,10 +2,22 @@
 
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader } from "@/components/shared/portal-shell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
 import { useStore } from "@/lib/store";
+import { ADDONS } from "@/lib/addons";
 import { formatCompact, formatCurrency } from "@/lib/utils";
+
+/** Platform-wide add-on adoption is estimated per agent — only the primary carrier's own toggles are real store state. */
+const ADDON_ADOPTION_PCT: Record<string, number> = {
+  "broker-shield": 0.62,
+  "factoring-ai": 0.54,
+  "driver-settlement-ai": 0.48,
+  "maintenance-ai": 0.41,
+  "insights-ai": 0.35,
+  "compliance-ai": 0.22,
+  "insurance-ai": 0.18,
+};
 
 const TRAJECTORY = [
   { year: "Year 1", revenue: 0.6, detail: "80 carriers · ~100 trucks" },
@@ -24,6 +36,12 @@ export default function RevenuePage() {
   const mrr = carriers.reduce((s, c) => s + c.mrr, 0);
   const gmv = carriers.reduce((s, c) => s + c.gmvMonth, 0);
 
+  const addonAdoption = ADDONS.map((a) => {
+    const adopters = Math.round(carriers.length * (ADDON_ADOPTION_PCT[a.id] ?? 0.3));
+    return { ...a, adopters, revenue: adopters * a.price };
+  });
+  const addonRevenue = addonAdoption.reduce((s, a) => s + a.revenue, 0);
+
   const planMix = ["Starter", "Growth", "Fleet"].map((plan) => ({
     name: plan,
     value: carriers.filter((c) => c.plan === plan).length,
@@ -34,10 +52,11 @@ export default function RevenuePage() {
       <PageHeader title="Revenue" description="Subscription + 2% take-rate" />
 
       <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Card><CardContent><StatTile label="Total revenue / mo" value={formatCurrency(mrr + takeRate)} /></CardContent></Card>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+          <Card><CardContent><StatTile label="Total revenue / mo" value={formatCurrency(mrr + takeRate + addonRevenue)} /></CardContent></Card>
           <Card><CardContent><StatTile label="Subscription MRR" value={formatCurrency(mrr)} /></CardContent></Card>
           <Card><CardContent><StatTile label="Take-rate (2%)" value={formatCurrency(takeRate)} /></CardContent></Card>
+          <Card><CardContent><StatTile label="Add-on revenue" value={formatCurrency(addonRevenue)} /></CardContent></Card>
           <Card><CardContent><StatTile label="GMV / mo" value={`$${formatCompact(gmv)}`} /></CardContent></Card>
         </div>
 
@@ -97,6 +116,30 @@ export default function RevenuePage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>AI Add-on adoption</CardTitle>
+              <CardDescription>Estimated platform-wide — revenue beyond dispatch, per agent.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="!pt-3">
+            <div className="flex flex-col divide-y divide-line">
+              {addonAdoption
+                .sort((a, b) => b.revenue - a.revenue)
+                .map((a) => (
+                  <div key={a.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm text-ink-900">{a.name}</p>
+                      <p className="text-xs text-ink-400">{a.adopters} carriers · ${a.price}/mo</p>
+                    </div>
+                    <span className="shrink-0 text-sm font-semibold tabular text-ink-950">{formatCurrency(a.revenue)}</span>
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

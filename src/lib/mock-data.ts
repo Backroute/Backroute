@@ -106,6 +106,8 @@ function buildBrokers(rng: ReturnType<typeof createRng>): Broker[] {
     onTimePct: rng.int(82, 99),
     avgRateVariancePct: pct(rng, -6, 9),
     tier: b.tier,
+    authorityVerified: b.tier === "watch" ? rng.bool(0.7) : true,
+    fraudRisk: b.tier === "preferred" ? "low" : b.tier === "standard" ? (rng.bool(0.85) ? "low" : "medium") : rng.pick(["medium", "high"] as const),
   }));
 }
 
@@ -479,39 +481,51 @@ export function generateWorld(seed = 20260916): World {
   const otherCarriers = buildLightweightCarriers(rng, 27);
   const carriers = [primaryCarrier, ...otherCarriers];
 
-  const trucks: Truck[] = DRIVER_ROSTER.map((d, i) => ({
-    id: `truck-${i + 1}`,
-    unitNumber: `T-${104 + i}`,
-    driverId: `driver-${i + 1}`,
-    carrierId: PRIMARY_CARRIER_ID,
-    equipmentType: rng.pick(EQUIPMENT),
-    status: "available",
-    currentCity: rng.pick(US_CITY_PAIRS)[0],
-    currentState: "TX",
-    homeBase: "Dallas, TX",
-    currentLoadId: null,
-    nextLoadId: null,
-    mpg: pct(rng, 6.1, 7.2),
-    odometer: rng.int(80000, 340000),
-  }));
+  const trucks: Truck[] = DRIVER_ROSTER.map((d, i) => {
+    const odometer = rng.int(80000, 340000);
+    const serviceIntervalMiles = 25000;
+    return {
+      id: `truck-${i + 1}`,
+      unitNumber: `T-${104 + i}`,
+      driverId: `driver-${i + 1}`,
+      carrierId: PRIMARY_CARRIER_ID,
+      equipmentType: rng.pick(EQUIPMENT),
+      status: "available",
+      currentCity: rng.pick(US_CITY_PAIRS)[0],
+      currentState: "TX",
+      homeBase: "Dallas, TX",
+      currentLoadId: null,
+      nextLoadId: null,
+      mpg: pct(rng, 6.1, 7.2),
+      odometer,
+      lastServiceMiles: odometer - rng.int(1500, serviceIntervalMiles + 2000),
+      serviceIntervalMiles,
+      nextInspectionDue: iso(rng.int(-10, 75) * 1440),
+    };
+  });
   trucks[0].id = "truck-marcus";
   trucks[0].driverId = PRIMARY_DRIVER_ID;
 
-  const drivers: Driver[] = DRIVER_ROSTER.map((d, i) => ({
-    id: i === 0 ? PRIMARY_DRIVER_ID : `driver-${i + 1}`,
-    name: d.name,
-    phone: d.phone,
-    email: `${d.name.toLowerCase().replace(/\s+/g, ".")}@titanfreight.com`,
-    truckId: trucks[i].id,
-    carrierId: PRIMARY_CARRIER_ID,
-    hosStatus: rng.pick(["driving", "driving", "on_duty", "off_duty", "sleeper"]),
-    hoursRemaining: pct(rng, 2.5, 10.5),
-    cdl: d.cdl,
-    rating: pct(rng, 4.6, 5.0, 1),
-    hireDate: iso(-rng.int(60, 900) * 1440),
-    homeBase: d.homeBase,
-    homeTimeTarget: d.homeTimeTarget,
-  }));
+  const drivers: Driver[] = DRIVER_ROSTER.map((d, i) => {
+    const payType: Driver["payType"] = rng.bool(0.6) ? "percentage" : "per_mile";
+    return {
+      id: i === 0 ? PRIMARY_DRIVER_ID : `driver-${i + 1}`,
+      name: d.name,
+      phone: d.phone,
+      email: `${d.name.toLowerCase().replace(/\s+/g, ".")}@titanfreight.com`,
+      truckId: trucks[i].id,
+      carrierId: PRIMARY_CARRIER_ID,
+      hosStatus: rng.pick(["driving", "driving", "on_duty", "off_duty", "sleeper"]),
+      hoursRemaining: pct(rng, 2.5, 10.5),
+      cdl: d.cdl,
+      rating: pct(rng, 4.6, 5.0, 1),
+      hireDate: iso(-rng.int(60, 900) * 1440),
+      homeBase: d.homeBase,
+      homeTimeTarget: d.homeTimeTarget,
+      payType,
+      payRate: payType === "percentage" ? pct(rng, 0.25, 0.32, 2) : pct(rng, 0.58, 0.68, 2),
+    };
+  });
 
   const specs: LoadSpec[] = [
     { stage: "sourced", truckId: null, createdOffset: -8 },
