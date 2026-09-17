@@ -294,7 +294,9 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
       if (rounds >= 5 || chance(0.32)) {
         const goVoice = chance(0.4) && !load.calls.length;
         if (goVoice) {
-          const finalAmt = Math.round(threadBrokerLast + (threadAiLast - threadBrokerLast) * (0.75 + Math.random() * 0.2));
+          // Closes at exactly what the AI was last asking — the broker giving in, not a further discount
+          // tacked on after they've already agreed to look into that number.
+          const finalAmt = threadAiLast;
           const transcript: CallTranscriptLine[] = [
             { speaker: "ai", text: pick(CALL_OPENERS)(b.contact.split(" ")[0], load.lane.origin, load.lane.destination) },
             { speaker: "broker", text: pick(CALL_BROKER_STALLS) },
@@ -311,7 +313,8 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
           next.documents = [...load.documents, { id: uid("doc"), type: "rate_confirmation", name: `RateCon_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" }];
           events.push(mkEvent(load.carrierId, load.id, "call_completed", "Voice agent closed the deal by phone", `${b.company} · $${finalAmt.toLocaleString()} all-in`, "success", "voice"));
         } else {
-          const finalAmt = Math.round(threadBrokerLast + (threadAiLast - threadBrokerLast) * (0.75 + Math.random() * 0.2));
+          // Same principle without a call: the broker accepts the AI's current ask outright.
+          const finalAmt = threadAiLast;
           const msg: NegotiationMessage = { id: uid("msg"), channel: "sms", direction: "inbound", from: b.contact, timestamp: new Date().toISOString(), content: BROKER_ACCEPT(finalAmt), offerAmount: finalAmt };
           next.messages = [...load.messages, msg];
           next.bookedRate = finalAmt;

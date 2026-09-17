@@ -313,10 +313,10 @@ function buildNegotiationThread(
     }
   }
 
-  // The true booked number, when this load resolves, is derived from the thread itself — a point between
-  // the broker's last offer and the AI's last ask, weighted toward the AI — so it can never land above (or
-  // otherwise contradict) whatever was actually just said, the way an independently-rolled figure could.
-  const finalAmt = isResolved ? Math.round(brokerLast + (aiLast - brokerLast) * rng.float(0.75, 0.95, 3)) : null;
+  // The true booked number, when this load resolves, is exactly wherever the AI's ask last stood — the
+  // broker giving in, not some further discount tacked on after they've already agreed to look into that
+  // number. Landing below aiLast would contradict the broker's own "okay, I can make that work" a line earlier.
+  const finalAmt = isResolved ? aiLast : null;
 
   if (includeCall) {
     const callStart = t;
