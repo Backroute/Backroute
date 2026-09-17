@@ -81,7 +81,7 @@ export default function CarrierOverviewPage() {
           </Card>
           <Card>
             <CardContent>
-              <StatTile label="Net profit" value={formatCurrency(netProfitMonth)} sublabel="Across booked & delivered loads" />
+              <StatTile label="Net profit" value={formatCurrency(netProfitMonth)} sublabel="This cycle · includes projected loads" />
             </CardContent>
           </Card>
           <Card>

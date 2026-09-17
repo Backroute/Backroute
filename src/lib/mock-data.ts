@@ -408,14 +408,17 @@ function buildLoad(
   const lane = rng.pick(LANES);
   const equipmentType = rng.pick(EQUIPMENT);
   const marketRate = lane.miles * lane.marketRpm;
-  const listedRate = Math.round(marketRate * pct(rng, 0.86, 0.96));
-  const targetRate = Math.round(marketRate * pct(rng, 0.98, 1.05));
+  // These multiplier ranges are only ~0.1 wide — pct()'s default of 1 decimal place would collapse almost
+  // the entire range to a single value (e.g. 0.98–1.05 always rounds to 1.0), regularly making listed/target/
+  // booked rate land on the exact same number. Finer decimals keep the intended spread.
+  const listedRate = Math.round(marketRate * pct(rng, 0.86, 0.96, 3));
+  const targetRate = Math.round(marketRate * pct(rng, 0.98, 1.05, 3));
   const deadheadMiles = rng.int(0, 85);
   const { fuelCost, tollCost } = costsForLane(rng, lane.miles, deadheadMiles);
 
   const resolvedStages: LoadStage[] = ["rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery", "delivered"];
   const isResolved = resolvedStages.includes(spec.stage);
-  const bookedRate = isResolved ? Math.round(targetRate * pct(rng, 0.97, 1.06)) : null;
+  const bookedRate = isResolved ? Math.round(targetRate * pct(rng, 0.97, 1.06, 3)) : null;
 
   const pickupOffsetDays = rng.int(0, 2);
   const pickupLabel = pickupOffsetDays === 0 ? "today" : pickupOffsetDays === 1 ? "tomorrow" : "in 2 days";
