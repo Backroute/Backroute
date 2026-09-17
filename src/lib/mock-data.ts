@@ -239,20 +239,19 @@ function buildNegotiationThread(
     lane: Lane;
     listedRate: number;
     targetRate: number;
-    resolvedRate: number | null;
+    isResolved: boolean;
     stage: LoadStage;
     createdAtOffset: number;
     pickupLabel: string;
     includeCall: boolean;
   },
-): { messages: NegotiationMessage[]; calls: VoiceCall[] } {
-  const { broker, lane, listedRate, targetRate, resolvedRate, createdAtOffset, pickupLabel, includeCall } = opts;
+): { messages: NegotiationMessage[]; calls: VoiceCall[]; resolvedRate: number | null } {
+  const { broker, lane, listedRate, targetRate, isResolved, createdAtOffset, pickupLabel, includeCall } = opts;
   const messages: NegotiationMessage[] = [];
   const calls: VoiceCall[] = [];
   let t = createdAtOffset;
   let round = 0;
-  const maxRounds = resolvedRate ? rng.int(2, 3) : rng.int(1, 2);
-  const finalAmt = resolvedRate ?? targetRate;
+  const maxRounds = isResolved ? rng.int(2, 3) : rng.int(1, 2);
 
   messages.push({
     id: rng.id("msg"),
@@ -314,6 +313,11 @@ function buildNegotiationThread(
     }
   }
 
+  // The true booked number, when this load resolves, is derived from the thread itself — a point between
+  // the broker's last offer and the AI's last ask, weighted toward the AI — so it can never land above (or
+  // otherwise contradict) whatever was actually just said, the way an independently-rolled figure could.
+  const finalAmt = isResolved ? Math.round(brokerLast + (aiLast - brokerLast) * rng.float(0.75, 0.95, 3)) : null;
+
   if (includeCall) {
     const callStart = t;
     // The call picks up right where the email/SMS thread left off (aiLast) — it never opens on a number
@@ -323,7 +327,7 @@ function buildNegotiationThread(
       { speaker: "ai", text: rng.pick(CALL_OPENERS)(broker.contact.split(" ")[0], lane.origin, lane.destination) },
       { speaker: "broker", text: rng.pick(CALL_BROKER_STALLS) },
       { speaker: "ai", text: rng.pick(CALL_AI_HOLDS)(aiLast) },
-      ...(resolvedRate
+      ...(finalAmt
         ? [
             { speaker: "broker" as const, text: rng.pick(CALL_BROKER_CHECKS) },
             { speaker: "ai" as const, text: rng.pick(CALL_AI_CLOSES)(finalAmt) },
@@ -341,12 +345,12 @@ function buildNegotiationThread(
       startedAt: iso(callStart),
       durationSec: rng.int(95, 260),
       transcript,
-      outcome: resolvedRate ? `Booked at $${finalAmt.toLocaleString()}` : "Holding for confirmation",
+      outcome: finalAmt ? `Booked at $${finalAmt.toLocaleString()}` : "Holding for confirmation",
     });
     t += 4;
   }
 
-  if (resolvedRate && !includeCall) {
+  if (finalAmt && !includeCall) {
     // When there's a call, the call itself closes the deal (its transcript already ends in acceptance) —
     // adding a second, separate "you got it" message here would have the broker agree twice.
     messages.push({
@@ -355,10 +359,10 @@ function buildNegotiationThread(
       direction: "inbound",
       from: broker.contact,
       timestamp: iso(t),
-      content: rng.pick(BROKER_ACCEPTS)(resolvedRate),
-      offerAmount: resolvedRate,
+      content: rng.pick(BROKER_ACCEPTS)(finalAmt),
+      offerAmount: finalAmt,
     });
-  } else if (!resolvedRate && !includeCall) {
+  } else if (!finalAmt && !includeCall) {
     messages.push({
       id: rng.id("msg"),
       channel: "sms",
@@ -369,7 +373,7 @@ function buildNegotiationThread(
     });
   }
 
-  return { messages, calls };
+  return { messages, calls, resolvedRate: finalAmt };
 }
 
 type CallTranscriptSeed = { speaker: "ai" | "broker"; text: string }[];
@@ -420,22 +424,23 @@ function buildLoad(
 
   const resolvedStages: LoadStage[] = ["rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery", "delivered"];
   const isResolved = resolvedStages.includes(spec.stage);
-  const bookedRate = isResolved ? Math.round(targetRate * pct(rng, 0.97, 1.06, 3)) : null;
 
   const pickupOffsetDays = rng.int(0, 2);
   const pickupLabel = pickupOffsetDays === 0 ? "today" : pickupOffsetDays === 1 ? "tomorrow" : "in 2 days";
   const ref = `BR-${10000 + refCounter}`;
 
   const includeCall = rng.bool(0.45) && spec.stage !== "sourced" && spec.stage !== "scoring" && spec.stage !== "offered";
-  const { messages, calls } =
+  // bookedRate is never rolled independently — it comes straight out of the thread below, so the number
+  // that actually gets booked always matches (or is bounded by) what the AI and broker last said.
+  const { messages, calls, resolvedRate: bookedRate } =
     spec.stage === "sourced" || spec.stage === "scoring" || spec.stage === "offered"
-      ? { messages: [], calls: [] }
+      ? { messages: [], calls: [], resolvedRate: null }
       : buildNegotiationThread(rng, {
           broker,
           lane,
           listedRate,
           targetRate,
-          resolvedRate: isResolved ? bookedRate : null,
+          isResolved,
           stage: spec.stage,
           createdAtOffset: spec.createdOffset,
           pickupLabel,
