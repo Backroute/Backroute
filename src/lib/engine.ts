@@ -461,6 +461,19 @@ export function suggestedCounter(load: Load): number {
   return Math.min(Math.max(Math.round(base * 1.06), base + 50), Math.round(load.listedRate * 1.3));
 }
 
+/** True when the AI just sent the broker a number and hasn't heard back yet. Pushing for more in that window
+ *  would mean asking the broker for a higher number before they've even had a chance to respond to the last
+ *  one we sent — the kind of flip-flop that makes a carrier look unsure of its own ask. A completed call
+ *  always ends with the broker speaking last, so it clears this regardless of the written thread's order. */
+export function isAwaitingBrokerReply(load: Load): boolean {
+  const lastMsg = load.messages[load.messages.length - 1];
+  const lastCall = load.calls[load.calls.length - 1];
+  const lastMsgTime = lastMsg ? new Date(lastMsg.timestamp).getTime() : -Infinity;
+  const lastCallTime = lastCall ? new Date(lastCall.startedAt).getTime() : -Infinity;
+  if (lastCallTime > lastMsgTime) return false;
+  return lastMsg ? lastMsg.direction === "outbound" : false;
+}
+
 /** The one place a human (driver or carrier) can ask the AI to go back and negotiate harder — still no human dispatcher involved.
  *  Optionally pass a specific dollar amount the driver/carrier is asking for, like a real dispatcher relaying a target number. */
 export function pushForBetterRate(
@@ -470,6 +483,7 @@ export function pushForBetterRate(
   requestedAmount?: number,
 ): { load: Load; events: ActivityEvent[] } {
   if (load.stage !== "negotiating") return { load, events: [] };
+  if (isAwaitingBrokerReply(load)) return { load, events: [] };
   const b = broker ?? ({ contact: "Broker", company: load.source } as Broker);
 
   const base = currentAiAsk(load);
