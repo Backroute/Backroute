@@ -14,6 +14,17 @@ export interface NavItem {
   badge?: number;
 }
 
+/** Picks the most specific nav item matching the current path, so a portal root (e.g. /carrier) doesn't light up on every sub-route. */
+function bestMatchHref(pathname: string | null, navItems: NavItem[]): string | undefined {
+  if (!pathname) return undefined;
+  let best: NavItem | undefined;
+  for (const item of navItems) {
+    const matches = pathname === item.href || pathname.startsWith(item.href.endsWith("/") ? item.href : `${item.href}/`);
+    if (matches && (!best || item.href.length > best.href.length)) best = item;
+  }
+  return best?.href;
+}
+
 function SidebarContent({
   dark,
   portalLabel,
@@ -53,7 +64,7 @@ function SidebarContent({
 
         <nav className="mt-8 flex flex-col gap-0.5">
           {navItems.map((item) => {
-            const active = pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href));
+            const active = item.href === bestMatchHref(pathname, navItems);
             const Icon = item.icon;
             return (
               <Link

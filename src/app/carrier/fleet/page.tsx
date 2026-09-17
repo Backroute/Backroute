@@ -106,7 +106,7 @@ export default function FleetPage() {
                     </div>
                   )}
                   {pendingOffers.length > 0 && (
-                    <Link href="/carrier/loads" className="mt-1 flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-[var(--accent-warn)]">
+                    <Link href="/carrier" className="mt-1 flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-[var(--accent-warn)]">
                       <Sparkles className="h-3 w-3" /> {pendingOffers.length} load options awaiting a pick
                     </Link>
                   )}
