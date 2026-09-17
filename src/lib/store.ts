@@ -133,7 +133,7 @@ export const useStore = create<StoreState>((set) => ({
   ...world,
   settings: {
     aggressiveness: "balanced",
-    autoBookEnabled: true,
+    autoBookEnabled: false,
     autoBookThreshold: 350,
     voiceEnabled: true,
     smsEnabled: true,
