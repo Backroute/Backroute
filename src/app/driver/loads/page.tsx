@@ -16,7 +16,7 @@ export default function DriverLoadsPage() {
   const requestBetterOfferPrice = useStore((s) => s.actions.requestBetterOfferPrice);
 
   const truck = trucks.find((t) => t.id === driver.truckId);
-  const pendingOffers = loads.filter((l) => l.truckId === truck?.id && l.stage === "offered");
+  const pendingOffers = loads.filter((l) => l.truckId === truck?.id && l.stage === "offered").sort((a, b) => b.score - a.score);
   const myLoads = [...loads.filter((l) => l.truckId === truck?.id && l.stage !== "offered")].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
   );

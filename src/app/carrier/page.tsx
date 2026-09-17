@@ -13,7 +13,7 @@ import { LoadStagePill } from "@/components/shared/load-stage";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { TruckDriverChip } from "@/components/shared/truck-driver-chip";
 import { useStore } from "@/lib/store";
-import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks, useCarrierDrivers, useCarrierEscalations, useDriverMap, useBrokerMap, useTruckMap } from "@/lib/selectors";
+import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks, useCarrierDrivers, useCarrierEscalations, useDriverMap, useBrokerMap, useTruckMap, truckActiveLoads } from "@/lib/selectors";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 
 export default function CarrierOverviewPage() {
@@ -113,8 +113,7 @@ export default function CarrierOverviewPage() {
                 <div className="flex flex-col divide-y divide-line">
                   {trucks.map((truck) => {
                     const driver = driverMap.get(truck.driverId ?? "");
-                    const currentLoad = loads.find((l) => l.id === truck.currentLoadId);
-                    const nextLoad = loads.find((l) => l.id === truck.nextLoadId);
+                    const { current: currentLoad, next: nextLoad } = truckActiveLoads(loads, truck);
                     return (
                       <div key={truck.id} className="flex flex-wrap items-center justify-between gap-3 py-3.5 first:pt-0 last:pb-0">
                         <div className="flex items-center gap-3">

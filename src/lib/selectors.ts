@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useStore } from "./store";
 import { PRIMARY_CARRIER_ID, PRIMARY_DRIVER_ID } from "./mock-data";
+import type { Load, Truck } from "./types";
 
 export { PRIMARY_CARRIER_ID, PRIMARY_DRIVER_ID };
 
@@ -49,4 +50,19 @@ export function useDriverMap() {
 
 export function usePrimaryDriver() {
   return useStore((s) => s.drivers.find((d) => d.id === PRIMARY_DRIVER_ID)!);
+}
+
+/**
+ * truck.currentLoadId only gets set once a load actually reaches "dispatched" (see advanceLoad in engine.ts) —
+ * so a load a driver just selected sits invisible for several ticks while it negotiates/books. This falls back
+ * to any of the truck's own loads past "offered" so the pick shows up immediately, not just once dispatched.
+ */
+export function truckActiveLoads(loads: Load[], truck: Truck | undefined): { current: Load | undefined; next: Load | undefined } {
+  if (!truck) return { current: undefined, next: undefined };
+  const dispatched = loads.find((l) => l.id === truck.currentLoadId);
+  if (dispatched) return { current: dispatched, next: loads.find((l) => l.id === truck.nextLoadId) };
+  const inProgress = loads.find(
+    (l) => l.truckId === truck.id && l.stage !== "offered" && l.stage !== "delivered" && l.stage !== "declined",
+  );
+  return { current: inProgress, next: undefined };
 }

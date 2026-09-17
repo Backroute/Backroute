@@ -35,7 +35,8 @@ export function NextLoadOffers({
         AI checked every connected board and scored {totalCount} option{totalCount === 1 ? "" : "s"} for you.
       </p>
       <div className="flex flex-col gap-6">
-        {offerGroups.map(([groupId, loads]) => {
+        {offerGroups.map(([groupId, groupLoads]) => {
+          const loads = [...groupLoads].sort((a, b) => b.score - a.score);
           const truck = trucks && loads[0].truckId ? trucks.get(loads[0].truckId) : undefined;
           const driver = drivers && truck?.driverId ? drivers.get(truck.driverId) : undefined;
           return (

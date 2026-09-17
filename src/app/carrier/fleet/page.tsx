@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { LoadStagePill } from "@/components/shared/load-stage";
-import { useCarrierTrucks, useDriverMap, useCarrierLoads } from "@/lib/selectors";
+import { useCarrierTrucks, useDriverMap, useCarrierLoads, truckActiveLoads } from "@/lib/selectors";
 import { useNow } from "@/lib/hooks";
 import { formatNumber } from "@/lib/utils";
 import type { HosStatus } from "@/lib/types";
@@ -40,8 +40,7 @@ export default function FleetPage() {
       <div className="grid gap-5 px-4 py-6 sm:px-8 sm:grid-cols-2 xl:grid-cols-3">
         {trucks.map((truck) => {
           const driver = drivers.get(truck.driverId ?? "");
-          const currentLoad = loads.find((l) => l.id === truck.currentLoadId);
-          const nextLoad = loads.find((l) => l.id === truck.nextLoadId);
+          const { current: currentLoad, next: nextLoad } = truckActiveLoads(loads, truck);
           const pendingOffers = loads.filter((l) => l.truckId === truck.id && l.stage === "offered");
           const hosPct = driver ? Math.min(100, (driver.hoursRemaining / 11) * 100) : 0;
 

@@ -8,7 +8,7 @@ import { LoadStagePill } from "@/components/shared/load-stage";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
-import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap } from "@/lib/selectors";
+import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap, truckActiveLoads } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 
@@ -23,8 +23,7 @@ export default function DriverHomePage() {
   const requestBetterOfferPrice = useStore((s) => s.actions.requestBetterOfferPrice);
 
   const truck = trucks.find((t) => t.id === driver.truckId);
-  const currentLoad = loads.find((l) => l.id === truck?.currentLoadId);
-  const nextLoad = loads.find((l) => l.id === truck?.nextLoadId);
+  const { current: currentLoad, next: nextLoad } = truckActiveLoads(loads, truck);
   const pendingOffers = loads.filter((l) => l.truckId === truck?.id && l.stage === "offered");
 
   const offerGroups = (() => {
