@@ -19,14 +19,14 @@ const FEATURES = [
 ];
 
 const REACH_YOU = [
-  { icon: Phone, label: "You call it" },
-  { icon: MessageCircle, label: "You message it" },
+  { icon: Phone, label: "Phone call" },
+  { icon: MessageCircle, label: "In-app message" },
 ];
 
 const REACH_BROKERS = [
-  { icon: Phone, label: "It calls brokers" },
-  { icon: MessageSquare, label: "It texts brokers" },
-  { icon: Mail, label: "It emails brokers" },
+  { icon: Phone, label: "Phone call" },
+  { icon: MessageSquare, label: "Text (SMS)" },
+  { icon: Mail, label: "Email" },
 ];
 
 const PLANS = [
@@ -62,7 +62,9 @@ export default function Home() {
             <h1 className="mt-8 max-w-4xl font-display text-6xl leading-[0.95] tracking-tighter text-white sm:text-7xl lg:text-8xl">
               <span className="font-normal text-white/45">Freight dispatch,</span><br />fully automated.
             </h1>
-            <p className="mt-8 text-lg text-white/55">No dispatcher. No load board. No hold music.</p>
+            <p className="mt-8 max-w-xl text-lg text-white/55">
+              Sources loads, negotiates rate, and books the next one automatically — the work of a full-time dispatcher, without the headcount.
+            </p>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
               <Button href="/carrier" size="lg" variant="secondary" className="!bg-white !text-ink-950 hover:!bg-white/90">
                 Get started <ArrowUpRight className="h-4 w-4" />
@@ -115,9 +117,9 @@ export default function Home() {
       {/* Reach */}
       <section className="border-b border-line">
         <div className="mx-auto max-w-3xl px-6 py-24 text-center sm:py-32">
-          <h2 className="font-display text-4xl tracking-tighter text-ink-950 sm:text-5xl">Reach it like a real dispatcher.</h2>
+          <h2 className="font-display text-4xl tracking-tighter text-ink-950 sm:text-5xl">Every channel. One dispatcher.</h2>
           <p className="mx-auto mt-5 max-w-xl text-lg text-ink-500">
-            Call it or message it, any hour — it never misses a ring. It calls, texts, and emails brokers all day so you don&apos;t have to.
+            Call or send a message any hour and nothing goes to voicemail. The same AI dispatcher is already on the phone, texting, and emailing brokers, all day, every day.
           </p>
           <div className="mx-auto mt-12 flex max-w-md flex-col gap-5">
             <div>
