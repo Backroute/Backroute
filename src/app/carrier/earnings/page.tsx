@@ -104,7 +104,7 @@ export default function EarningsPage() {
           <Card><CardContent><StatTile label="Net profit" value={formatCurrency(netProfitTotal)} sublabel="This cycle" /></CardContent></Card>
           <Card><CardContent><StatTile label="Avg rate / mile" value={`$${avgRpm.toFixed(2)}`} /></CardContent></Card>
           <Card><CardContent><StatTile label="Loads delivered" value={delivered.length} /></CardContent></Card>
-          <Card><CardContent><StatTile label="Empty-mile rate" value={`${emptyRate.toFixed(1)}%`} sublabel="Industry avg is ~20%" trend={{ direction: "down", value: "chained loads cut this", good: true }} /></CardContent></Card>
+          <Card><CardContent><StatTile label="Empty-mile rate" value={`${emptyRate.toFixed(1)}%`} sublabel="Industry avg is ~20%" trend={{ direction: "down", value: "cut by load chaining", good: true }} /></CardContent></Card>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">

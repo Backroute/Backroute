@@ -120,7 +120,11 @@ function buildLightweightCarriers(rng: ReturnType<typeof createRng>, count: numb
       name = `${rng.pick(CARRIER_PREFIXES)} ${rng.pick(CARRIER_SUFFIXES)}`;
     } while (used.has(name));
     used.add(name);
-    const trucks = rng.pick([1, 1, 2, 2, 3, 4, 5, 6, 8, 10, 14]);
+    // Small fleets weighted heavily (realistic — most carriers on a freight platform are small
+    // owner-operators) with a long, sparse tail of large ones above the old hard cap of 14. Fewer
+    // carriers land in that tail at all, so "Top carriers by fleet size" mostly shows a real ranking
+    // instead of several carriers stacked at the same ceiling value.
+    const trucks = rng.pick([1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5, 6, 7, 8, 10, 12, 14, 16, 19, 23, 28, 34, 42]);
     const plan: Carrier["plan"] = trucks <= 1 ? "Starter" : trucks <= 5 ? "Growth" : "Fleet";
     const planFee = plan === "Starter" ? 99 : plan === "Growth" ? 499 : 999;
     const [city, state] = rng.pick(US_CITY_PAIRS);
@@ -428,7 +432,10 @@ function buildLoad(
   const resolvedStages: LoadStage[] = ["rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery", "delivered"];
   const isResolved = resolvedStages.includes(spec.stage);
 
-  const pickupOffsetDays = rng.int(0, 2);
+  // Once a load has actually reached the pickup (or gone past it), the pickup window can't still read
+  // as an upcoming "tomorrow"/"in 2 days" — that only makes sense before the truck has arrived.
+  const pastPickupStages: LoadStage[] = ["at_pickup", "in_transit", "at_delivery", "delivered"];
+  const pickupOffsetDays = pastPickupStages.includes(spec.stage) ? 0 : rng.int(0, 2);
   const pickupLabel = pickupOffsetDays === 0 ? "today" : pickupOffsetDays === 1 ? "tomorrow" : "in 2 days";
   const ref = `BR-${10000 + refCounter}`;
 

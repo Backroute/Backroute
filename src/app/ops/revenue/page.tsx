@@ -1,6 +1,6 @@
 "use client";
 
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
@@ -56,6 +56,18 @@ export default function RevenuePage() {
     name: plan,
     value: carriers.filter((c) => c.plan === plan).length,
   }));
+  // recharts' <Pie> stopped sweeping a full 360° in this project (v3.10.1 renders roughly half a
+  // ring, cause unconfirmed upstream) — a plain conic-gradient donut is simpler and can't have that
+  // bug, so it replaces the chart for this one widget.
+  const planMixTotal = planMix.reduce((s, p) => s + p.value, 0) || 1;
+  let planMixCursor = 0;
+  const planMixGradient = planMix
+    .map((p) => {
+      const start = planMixCursor;
+      planMixCursor += (p.value / planMixTotal) * 100;
+      return `${PLAN_COLORS[p.name]} ${start}% ${planMixCursor}%`;
+    })
+    .join(", ");
 
   return (
     <div>
@@ -100,17 +112,10 @@ export default function RevenuePage() {
               <CardTitle>Plan mix</CardTitle>
             </CardHeader>
             <CardContent className="!pt-4">
-              <div className="h-56 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={planMix} dataKey="value" nameKey="name" innerRadius={55} outerRadius={80} paddingAngle={3}>
-                      {planMix.map((entry) => (
-                        <Cell key={entry.name} fill={PLAN_COLORS[entry.name]} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e4e4e0", fontSize: 12 }} />
-                  </PieChart>
-                </ResponsiveContainer>
+              <div className="flex h-56 w-full items-center justify-center">
+                <div className="relative h-40 w-40 rounded-full" style={{ background: `conic-gradient(${planMixGradient})` }}>
+                  <div className="absolute inset-[25px] rounded-full bg-white" />
+                </div>
               </div>
               <div className="mt-2 flex flex-col gap-2">
                 {planMix.map((p) => (
