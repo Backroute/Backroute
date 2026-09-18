@@ -41,3 +41,13 @@ export function nextStop(load: Load): { label: string; window: string } {
   }
   return { label: "Pickup", window: load.pickupWindow };
 }
+
+/** What the AI dispatcher is doing on this load right now — the load detail page surfaces this as a
+ *  small live badge so it reads as an actively-managed AI dispatch, not just a static record. */
+export function aiDispatcherNote(stage: LoadStage): string {
+  if (stage === "negotiating") return "AI Dispatcher · Negotiating rate";
+  if (stage === "rate_confirmed" || stage === "booked") return "AI Dispatcher · Dispatching";
+  if (stage === "delivered") return "AI Dispatcher · Trip complete";
+  if (isTransitStage(stage)) return "AI Dispatcher · Monitoring trip";
+  return "AI Dispatcher";
+}

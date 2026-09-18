@@ -113,9 +113,10 @@ export default function DriverHomePage() {
               <span>Est. net <span className="font-medium text-white">{formatCurrency(currentLoad.netProfit ?? 0)}</span></span>
             </div>
 
-            <span className="mt-3 flex items-center justify-center gap-1 text-[11px] font-medium text-white/50">
-              View details & documents <ChevronRight className="h-3 w-3" />
-            </span>
+            <div className="mt-3.5 flex items-center justify-between rounded-2xl bg-white/5 px-3.5 py-2.5 text-xs font-medium text-white/70 transition-colors hover:bg-white/10">
+              <span>View details & documents</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </div>
           </Link>
 
           <div className="mt-3 flex flex-col gap-2">
