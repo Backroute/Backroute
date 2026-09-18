@@ -149,7 +149,7 @@ export default function DriverLoadDetailPage() {
       <SectionCard title="Rate & earnings" icon={DollarSign}>
         <div className="flex flex-col gap-2.5">
           <Row label="Total offer" value={formatCurrency(load.bookedRate ?? load.targetRate)} strong />
-          <Row label={load.bookedRate ? "Net profit (after our 2%)" : "Est. net profit"} value={formatCurrency(load.netProfit ?? 0)} />
+          <Row label={load.bookedRate ? "Net profit" : "Est. net profit"} value={formatCurrency(load.netProfit ?? 0)} />
           <Row label="Rate / mile" value={load.rpm ? `$${load.rpm.toFixed(2)}` : "—"} />
         </div>
       </SectionCard>

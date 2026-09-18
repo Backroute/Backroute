@@ -28,22 +28,37 @@ export function LoadScoreBadge({
   const tone = scoreTone(score);
 
   if (size === "xl") {
-    const deg = Math.max(8, Math.round((score / 100) * 360));
+    // A round-capped SVG ring (Apple Watch activity-ring construction) reads as far more premium than a
+    // conic-gradient at this size, and it's the score decisions actually get made on — carriers and drivers
+    // pick between load offers by scanning these, so it's sized to be unmissable rather than merely legible.
+    const dim = 96;
+    const strokeWidth = 7;
+    const radius = (dim - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const progress = Math.max(0.03, Math.min(1, score / 100));
+    const dashOffset = circumference * (1 - progress);
     const ringColor = invert ? "#fff" : RING_COLOR[tone];
     const trackColor = invert ? "rgba(255,255,255,0.15)" : "rgba(10,10,10,0.08)";
     return (
-      <div
-        className={cn("relative flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full", className)}
-        style={{ background: `conic-gradient(${ringColor} ${deg}deg, ${trackColor} ${deg}deg)` }}
-      >
-        <div
-          className={cn(
-            "flex h-[60px] w-[60px] flex-col items-center justify-center rounded-full",
-            invert ? "bg-ink-950" : "border border-line bg-white",
-          )}
-        >
-          <span className={cn("font-display text-[26px] font-bold leading-none tabular", invert ? "text-white" : "text-ink-950")}>{score}</span>
-          <span className={cn("mt-0.5 text-[9px] font-semibold uppercase tracking-wide", invert ? "text-white/50" : "text-ink-400")}>score</span>
+      <div className={cn("relative shrink-0", className)} style={{ width: dim, height: dim }}>
+        <svg width={dim} height={dim} viewBox={`0 0 ${dim} ${dim}`} className="-rotate-90">
+          <circle cx={dim / 2} cy={dim / 2} r={radius} fill="none" stroke={trackColor} strokeWidth={strokeWidth} />
+          <circle
+            cx={dim / 2}
+            cy={dim / 2}
+            r={radius}
+            fill="none"
+            stroke={ringColor}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+            style={{ transition: "stroke-dashoffset 700ms cubic-bezier(0.4, 0, 0.2, 1)" }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className={cn("font-display text-[34px] font-bold leading-none tabular", invert ? "text-white" : "text-ink-950")}>{score}</span>
+          <span className={cn("mt-1 text-[9px] font-semibold uppercase tracking-wider", invert ? "text-white/50" : "text-ink-400")}>Match score</span>
         </div>
       </div>
     );

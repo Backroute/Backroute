@@ -180,7 +180,7 @@ export default function LoadDetailPage() {
                 <Row label="AI target rate" value={formatCurrency(load.targetRate)} />
                 <Row label="Booked rate" value={load.bookedRate ? formatCurrency(load.bookedRate) : "Pending"} strong />
                 <Row
-                  label={load.bookedRate ? "Net profit (after our 2%)" : "Est. net profit"}
+                  label={load.bookedRate ? "Net profit" : "Est. net profit"}
                   value={load.netProfit ? formatCurrency(load.netProfit) : "Projecting…"}
                   tone={load.netProfit ? (load.netProfit > 0 ? "success" : "danger") : undefined}
                   strong
