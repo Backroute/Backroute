@@ -150,7 +150,7 @@ interface StoreState {
   tickCount: number;
   actions: {
     tick: () => void;
-    resolveEscalation: (id: string, approve: boolean) => void;
+    resolveEscalation: (id: string, approve: boolean, actor?: "carrier" | "ops") => void;
     routeEscalationToSupport: (id: string) => void;
     sendDriverMessage: (driverId: string, content: string) => void;
     updateSettings: (partial: Partial<AgentSettings>) => void;
@@ -409,13 +409,13 @@ export const useStore = create<StoreState>((set, get) => ({
         };
       }),
 
-    resolveEscalation: (id, approve) =>
+    resolveEscalation: (id, approve, actor = "carrier") =>
       set((state) => ({
-        escalations: state.escalations.map((e) => (e.id === id ? { ...e, status: "resolved" as const, resolvedBy: "carrier" as const } : e)),
+        escalations: state.escalations.map((e) => (e.id === id ? { ...e, status: "resolved" as const, resolvedBy: actor } : e)),
         activity: [
           {
             id: uid("act"), timestamp: new Date().toISOString(), type: "escalation" as const,
-            message: approve ? "Escalation approved by carrier" : "Escalation rejected — AI re-sourcing",
+            message: approve ? `Escalation approved by ${actor}` : `Escalation rejected by ${actor} — AI re-sourcing`,
             detail: state.escalations.find((e) => e.id === id)?.reason ?? "",
             loadId: state.escalations.find((e) => e.id === id)?.loadId,
             carrierId: PRIMARY_CARRIER_ID, severity: (approve ? "success" : "info") as ActivityEvent["severity"],

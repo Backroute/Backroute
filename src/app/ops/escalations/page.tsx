@@ -56,10 +56,10 @@ export default function EscalationsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button size="sm" variant="danger" onClick={() => resolve(e.id, false)}>
+                      <Button size="sm" variant="danger" onClick={() => resolve(e.id, false, "ops")}>
                         <X className="h-3.5 w-3.5" /> Reject
                       </Button>
-                      <Button size="sm" variant="primary" onClick={() => resolve(e.id, true)}>
+                      <Button size="sm" variant="primary" onClick={() => resolve(e.id, true, "ops")}>
                         <Check className="h-3.5 w-3.5" /> Approve
                       </Button>
                     </div>
@@ -92,10 +92,10 @@ export default function EscalationsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button size="sm" variant="danger" onClick={() => resolve(e.id, false)}>
+                      <Button size="sm" variant="danger" onClick={() => resolve(e.id, false, "ops")}>
                         <X className="h-3.5 w-3.5" /> Reject
                       </Button>
-                      <Button size="sm" variant="primary" onClick={() => resolve(e.id, true)}>
+                      <Button size="sm" variant="primary" onClick={() => resolve(e.id, true, "ops")}>
                         <Check className="h-3.5 w-3.5" /> Approve
                       </Button>
                     </div>
@@ -113,7 +113,9 @@ export default function EscalationsPage() {
               {resolved.map((e) => (
                 <div key={e.id} className="flex items-center justify-between gap-4 rounded-xl border border-line bg-white px-4 py-3">
                   <p className="text-sm text-ink-500 line-through decoration-ink-300">{e.reason}</p>
-                  <Badge tone="success">{e.resolvedBy === "support" ? "Resolved by support" : "Resolved"}</Badge>
+                  <Badge tone="success">
+                    {e.resolvedBy === "support" ? "Resolved by support" : e.resolvedBy === "ops" ? "Resolved by Ops" : "Resolved by carrier"}
+                  </Badge>
                 </div>
               ))}
             </div>

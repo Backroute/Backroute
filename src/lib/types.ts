@@ -249,7 +249,7 @@ export interface Escalation {
   recommendedAction?: "approve" | "reject";
   /** Human-readable label for the default-action button, e.g. "Approve — send detention invoice". */
   recommendedLabel?: string;
-  resolvedBy?: "carrier" | "support";
+  resolvedBy?: "carrier" | "support" | "ops";
 }
 
 export interface DriverMessage {
