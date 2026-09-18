@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, MessageSquare, Radar, Truck } from "lucide-react";
+import { ArrowUpRight, Mail, MessageCircle, MessageSquare, Phone, Radar, Truck } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import { LiveDot } from "@/components/shared/live-dot";
@@ -16,6 +16,17 @@ const FEATURES = [
   { title: "Finds every load", body: "Scans every board and inbox, scored on true profit after fuel, tolls, and deadhead.", icon: Radar },
   { title: "Negotiates everywhere", body: "Email, SMS, and voice — holding your rate floor, all day, every channel at once.", icon: MessageSquare },
   { title: "Books the next one", body: "Confirms, tracks, and documents automatically, then rebooks before this load lands.", icon: Truck },
+];
+
+const REACH_YOU = [
+  { icon: Phone, label: "You call it" },
+  { icon: MessageCircle, label: "You message it" },
+];
+
+const REACH_BROKERS = [
+  { icon: Phone, label: "It calls brokers" },
+  { icon: MessageSquare, label: "It texts brokers" },
+  { icon: Mail, label: "It emails brokers" },
 ];
 
 const PLANS = [
@@ -51,7 +62,7 @@ export default function Home() {
             <h1 className="mt-8 max-w-4xl font-display text-6xl leading-[0.95] tracking-tighter text-white sm:text-7xl lg:text-8xl">
               <span className="font-normal text-white/45">Freight dispatch,</span><br />fully automated.
             </h1>
-            <p className="mt-8 text-lg text-white/55">No dispatcher. No load board. No phone calls.</p>
+            <p className="mt-8 text-lg text-white/55">No dispatcher. No load board. No hold music.</p>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
               <Button href="/carrier" size="lg" variant="secondary" className="!bg-white !text-ink-950 hover:!bg-white/90">
                 Get started <ArrowUpRight className="h-4 w-4" />
@@ -97,6 +108,34 @@ export default function Home() {
 
           <div className="mt-20">
             <LiveTicker />
+          </div>
+        </div>
+      </section>
+
+      {/* Reach */}
+      <section className="border-b border-line">
+        <div className="mx-auto max-w-3xl px-6 py-24 text-center sm:py-32">
+          <h2 className="font-display text-4xl tracking-tighter text-ink-950 sm:text-5xl">Reach it like a real dispatcher.</h2>
+          <p className="mx-auto mt-5 max-w-xl text-lg text-ink-500">
+            Call it or message it, any hour — it never misses a ring. It calls, texts, and emails brokers all day so you don&apos;t have to.
+          </p>
+          <div className="mx-auto mt-12 flex max-w-md flex-col gap-5">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-wider text-ink-300">You &harr; AI dispatcher</p>
+              <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2.5">
+                {REACH_YOU.map((r) => (
+                  <ChannelPill key={r.label} icon={r.icon} label={r.label} />
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-wider text-ink-300">AI dispatcher &harr; brokers</p>
+              <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2.5">
+                {REACH_BROKERS.map((r) => (
+                  <ChannelPill key={r.label} icon={r.icon} label={r.label} />
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -181,6 +220,14 @@ export default function Home() {
         </div>
       </footer>
     </div>
+  );
+}
+
+function ChannelPill({ icon: Icon, label }: { icon: typeof Phone; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-3.5 py-2 text-xs font-medium text-ink-700">
+      <Icon className="h-3.5 w-3.5 text-ink-400" /> {label}
+    </span>
   );
 }
 
