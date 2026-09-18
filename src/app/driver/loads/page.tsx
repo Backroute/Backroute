@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { LoadOfferCard } from "@/components/shared/load-offer-card";
@@ -59,7 +60,7 @@ export default function DriverLoadsPage() {
         ) : (
           <div className="mt-4 flex flex-col gap-3">
             {myLoads.map((load) => (
-              <div key={load.id} className="rounded-2xl border border-line p-4">
+              <Link key={load.id} href={`/driver/loads/${load.id}`} className="block rounded-2xl border border-line p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-sm font-medium text-ink-950">
@@ -74,11 +75,16 @@ export default function DriverLoadsPage() {
                   <span>{load.equipmentType}</span>
                   <span>{load.weight.toLocaleString()} lbs</span>
                 </div>
-                <div className="mt-2.5 flex items-center gap-4 border-t border-line pt-2.5 text-xs">
-                  <span className="text-ink-500">Total offer <span className="font-semibold tabular text-ink-950">{formatCurrency(load.bookedRate ?? load.targetRate)}</span></span>
-                  <span className="text-ink-500">Est. net <span className="font-semibold tabular text-ink-950">{formatCurrency(load.netProfit ?? 0)}</span></span>
+                <div className="mt-2.5 flex items-center justify-between gap-4 border-t border-line pt-2.5 text-xs">
+                  <div className="flex items-center gap-4">
+                    <span className="text-ink-500">Total offer <span className="font-semibold tabular text-ink-950">{formatCurrency(load.bookedRate ?? load.targetRate)}</span></span>
+                    <span className="text-ink-500">Est. net <span className="font-semibold tabular text-ink-950">{formatCurrency(load.netProfit ?? 0)}</span></span>
+                  </div>
+                  {load.documents.length > 0 && (
+                    <span className="text-ink-400">{load.documents.length} doc{load.documents.length === 1 ? "" : "s"}</span>
+                  )}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

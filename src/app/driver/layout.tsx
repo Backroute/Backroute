@@ -2,17 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, Home, MessageCircle, Truck, User } from "lucide-react";
+import { Home, MessageCircle, Truck, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/shared/logo";
 import { Avatar } from "@/components/ui/avatar";
 import { usePrimaryDriver } from "@/lib/selectors";
 
+/** No standalone Docs tab — documents live on each load's own detail page (current or past), opened from
+ *  the Loads tab, so there's one place per load instead of a second list that has to agree with it. */
 const TABS = [
   { href: "/driver", label: "Home", icon: Home },
   { href: "/driver/loads", label: "Loads", icon: Truck },
   { href: "/driver/messages", label: "Messages", icon: MessageCircle },
-  { href: "/driver/documents", label: "Docs", icon: FileText },
   { href: "/driver/profile", label: "Profile", icon: User },
 ];
 
