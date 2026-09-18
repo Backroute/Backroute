@@ -4,13 +4,15 @@ import Link from "next/link";
 import { ArrowUpRight, ChevronRight, FileText, LifeBuoy, Link2, MapPin, MessageCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { LoadStagePill } from "@/components/shared/load-stage";
+import { TripProgress } from "@/components/shared/trip-progress";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap, truckActiveLoads } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { STAGE_CONFIRM } from "@/lib/stage-confirm";
+import { LOAD_STATUS_HEADLINE, isTransitStage, nextStop } from "@/lib/load-status";
+import { LOAD_STAGE_LABEL } from "@/lib/types";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 
 export default function DriverHomePage() {
@@ -83,39 +85,32 @@ export default function DriverHomePage() {
           <Link href={`/driver/loads/${currentLoad.id}`} className="block">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-medium uppercase tracking-wider text-white/50">Current load</span>
-              <div className="flex items-center gap-1.5">
-                <LoadScoreBadge score={currentLoad.score} size="sm" invert />
-                <LoadStagePill stage={currentLoad.stage} className="!bg-white/15 !text-white" />
-              </div>
+              <LoadScoreBadge score={currentLoad.score} size="sm" invert />
             </div>
-            <p className="mt-3 font-display text-2xl">
+            <p className="mt-1.5 text-lg font-semibold">{LOAD_STATUS_HEADLINE[currentLoad.stage] ?? LOAD_STAGE_LABEL[currentLoad.stage]}</p>
+            <p className="mt-0.5 text-sm text-white/70">
               {currentLoad.lane.origin}, {currentLoad.lane.originState}
-              <span className="mx-1.5 text-white/40">→</span>
+              <span className="mx-1 text-white/40">→</span>
               {currentLoad.lane.destination}, {currentLoad.lane.destState}
             </p>
-            <p className="mt-1 text-xs text-white/50">{currentLoad.referenceNumber} · {currentLoad.equipmentType} · {currentLoad.lane.miles} mi</p>
+            <p className="mt-0.5 text-[11px] text-white/40">
+              {currentLoad.referenceNumber} · {currentLoad.equipmentType} · {currentLoad.lane.miles} mi
+            </p>
 
             <div className="mt-4">
-              <Progress value={currentLoad.progressPct} barClassName="!bg-white" className="!bg-white/15" />
+              {isTransitStage(currentLoad.stage) ? (
+                <TripProgress stage={currentLoad.stage} invert />
+              ) : (
+                <Progress value={currentLoad.progressPct} barClassName="!bg-white" className="!bg-white/15" />
+              )}
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
-              <div className="rounded-2xl bg-white/10 p-3">
-                <p className="text-white/50">Total offer</p>
-                <p className="mt-0.5 font-display text-lg font-semibold tabular">{formatCurrency(currentLoad.bookedRate ?? currentLoad.targetRate)}</p>
-              </div>
-              <div className="rounded-2xl bg-white/10 p-3">
-                <p className="text-white/50">Est. net</p>
-                <p className="mt-0.5 font-display text-lg font-semibold tabular">{formatCurrency(currentLoad.netProfit ?? 0)}</p>
-              </div>
-              <div className="rounded-2xl bg-white/10 p-3">
-                <p className="text-white/50">Pickup</p>
-                <p className="mt-0.5 font-medium">{currentLoad.pickupWindow}</p>
-              </div>
-              <div className="rounded-2xl bg-white/10 p-3">
-                <p className="text-white/50">Delivery</p>
-                <p className="mt-0.5 font-medium">{currentLoad.deliveryWindow}</p>
-              </div>
+            <div className="mt-3.5 flex items-center justify-between text-xs text-white/50">
+              <span>{nextStop(currentLoad).label} <span className="font-medium text-white">{nextStop(currentLoad).window}</span></span>
+            </div>
+            <div className="mt-1.5 flex items-center justify-between text-xs text-white/50">
+              <span>Total offer <span className="font-medium text-white">{formatCurrency(currentLoad.bookedRate ?? currentLoad.targetRate)}</span></span>
+              <span>Est. net <span className="font-medium text-white">{formatCurrency(currentLoad.netProfit ?? 0)}</span></span>
             </div>
 
             <span className="mt-3 flex items-center justify-center gap-1 text-[11px] font-medium text-white/50">
