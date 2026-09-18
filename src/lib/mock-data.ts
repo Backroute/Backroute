@@ -378,6 +378,11 @@ function buildNegotiationThread(
 
 type CallTranscriptSeed = { speaker: "ai" | "broker"; text: string }[];
 
+/** Mirrors confirmLoadStage's actual document-creation rule (src/lib/engine.ts) exactly, so a seeded
+ *  load never starts with paperwork the live simulation wouldn't have generated yet: BOL only exists
+ *  once a load has reached in_transit (created on the at_pickup -> in_transit confirm), and POD/invoice
+ *  only exist once delivered (created together on the at_delivery -> delivered confirm) — there's no
+ *  "pending POD" state in the live engine, so the seed shouldn't invent one either. */
 function buildDocuments(rng: ReturnType<typeof createRng>, stage: LoadStage, ref: string, createdOffset: number): LoadDocument[] {
   const docs: LoadDocument[] = [];
   const order: LoadStage[] = ["rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery", "delivered"];
@@ -385,13 +390,11 @@ function buildDocuments(rng: ReturnType<typeof createRng>, stage: LoadStage, ref
   if (idx >= 0) {
     docs.push({ id: rng.id("doc"), type: "rate_confirmation", name: `RateCon_${ref}.pdf`, generatedAt: iso(createdOffset + 4), status: "verified" });
   }
-  if (idx >= 2) {
+  if (idx >= order.indexOf("in_transit")) {
     docs.push({ id: rng.id("doc"), type: "bol", name: `BOL_${ref}.pdf`, generatedAt: iso(createdOffset + 40), status: "verified" });
   }
-  if (idx >= 5) {
-    docs.push({ id: rng.id("doc"), type: "pod", name: `POD_${ref}.pdf`, generatedAt: iso(createdOffset + 300), status: stage === "delivered" ? "verified" : "pending" });
-  }
   if (stage === "delivered") {
+    docs.push({ id: rng.id("doc"), type: "pod", name: `POD_${ref}.pdf`, generatedAt: iso(createdOffset + 300), status: "verified" });
     docs.push({ id: rng.id("doc"), type: "invoice", name: `Invoice_${ref}.pdf`, generatedAt: iso(createdOffset + 320), status: "verified" });
   }
   return docs;

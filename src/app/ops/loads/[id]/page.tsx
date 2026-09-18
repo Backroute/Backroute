@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ArrowUpRight, Fuel, Gauge, Pause, Percent, Play, Route, ShieldAlert, TrendingUp, FileText } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Camera, Fuel, Gauge, Pause, Percent, Play, Route, ShieldAlert, TrendingUp, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,20 @@ import { LoadStagePill } from "@/components/shared/load-stage";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { NegotiationThread } from "@/components/shared/negotiation-thread";
 import { CallTranscript } from "@/components/shared/call-transcript";
+import { LiveDot } from "@/components/shared/live-dot";
+import { TripStepper } from "@/components/shared/trip-stepper";
 import { Progress } from "@/components/ui/progress";
 import { useLoad, useBrokerMap, useTruckMap, useDriverMap, usePrimaryCarrier } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
+import { STAGE_CONFIRM } from "@/lib/stage-confirm";
+import { aiDispatcherNote, isTransitStage } from "@/lib/load-status";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
+
+/** Which document a stage is still waiting on — same source of truth the driver's confirm button
+ *  reads from, so this card's pending rows can never disagree with what actually triggers capture. */
+function pendingDocLabel(type: "bol" | "pod"): string {
+  return type === "bol" ? "Bill of Lading (BOL)" : "Proof of Delivery (POD)";
+}
 
 export default function OpsLoadDetailPage() {
   const params = useParams<{ id: string }>();
@@ -56,9 +66,12 @@ export default function OpsLoadDetailPage() {
           <Link href="/ops/loads" className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-500 hover:text-ink-950">
             <ArrowLeft className="h-3.5 w-3.5" /> Back to loads
           </Link>
-          <Link href={`/carrier/loads/${load.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-ink-500 hover:text-ink-950">
-            View as carrier sees it <ArrowUpRight className="h-3 w-3" />
-          </Link>
+          <div className="flex items-center gap-4">
+            <LiveDot label={aiDispatcherNote(load.stage)} />
+            <Link href={`/carrier/loads/${load.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-ink-500 hover:text-ink-950">
+              View as carrier sees it <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </div>
         </div>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -78,7 +91,7 @@ export default function OpsLoadDetailPage() {
           </div>
         </div>
         <div className="mt-4">
-          <Progress value={load.progressPct} />
+          {isTransitStage(load.stage) ? <TripStepper stage={load.stage} /> : <Progress value={load.progressPct} />}
         </div>
         <div className="mt-4 flex items-center gap-6">
           <span className="text-sm text-ink-500">Total offer <span className="font-display text-lg font-semibold tabular text-ink-950">{formatCurrency(load.bookedRate ?? load.targetRate)}</span></span>
@@ -99,7 +112,13 @@ export default function OpsLoadDetailPage() {
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line p-3.5">
                 <div>
                   <p className="text-sm font-medium text-ink-900">AI negotiation</p>
-                  <p className="text-xs text-ink-500">{load.aiPaused ? "Paused — the AI will not advance this load" : "Running normally"}</p>
+                  <p className="text-xs text-ink-500">
+                    {load.aiPaused
+                      ? isTransitStage(load.stage)
+                        ? "Paused — has no effect now; the driver, not the AI, owns pickup/delivery from here."
+                        : "Paused — the AI will not advance this load"
+                      : "Running normally"}
+                  </p>
                 </div>
                 <Button
                   variant={load.aiPaused ? "primary" : "danger"}
@@ -170,26 +189,45 @@ export default function OpsLoadDetailPage() {
               <CardTitle>Documents</CardTitle>
             </CardHeader>
             <CardContent className="!pt-3">
-              {load.documents.length === 0 ? (
-                <p className="text-sm text-ink-400">No documents generated yet.</p>
-              ) : (
-                <div className="flex flex-col divide-y divide-line">
-                  {load.documents.map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-100 text-ink-600">
-                          <FileText className="h-4 w-4" />
-                        </span>
-                        <div>
-                          <p className="text-sm font-medium text-ink-900">{doc.name}</p>
-                          <p className="text-xs text-ink-400">{formatDateTime(doc.generatedAt)}</p>
+              {(() => {
+                const step = STAGE_CONFIRM[load.stage];
+                const pendingType = step?.doc && !load.documents.some((d) => d.type === step.doc) ? step.doc : null;
+                if (load.documents.length === 0 && !pendingType) {
+                  return <p className="text-sm text-ink-400">No documents generated yet.</p>;
+                }
+                return (
+                  <div className="flex flex-col divide-y divide-line">
+                    {load.documents.map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-100 text-ink-600">
+                            <FileText className="h-4 w-4" />
+                          </span>
+                          <div>
+                            <p className="text-sm font-medium text-ink-900">{doc.name}</p>
+                            <p className="text-xs text-ink-400">{formatDateTime(doc.generatedAt)}</p>
+                          </div>
                         </div>
+                        <Badge tone={doc.status === "verified" ? "success" : "warning"}>{doc.status}</Badge>
                       </div>
-                      <Badge tone={doc.status === "verified" ? "success" : "warning"}>{doc.status}</Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                    {pendingType && (
+                      <div className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-50 text-ink-400">
+                            <Camera className="h-4 w-4" />
+                          </span>
+                          <div>
+                            <p className="text-sm font-medium text-ink-700">{pendingDocLabel(pendingType)}</p>
+                            <p className="text-xs text-ink-400">Captured once the driver confirms {pendingType === "bol" ? "loaded" : "delivered"}.</p>
+                          </div>
+                        </div>
+                        <Badge tone="neutral">pending</Badge>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </div>

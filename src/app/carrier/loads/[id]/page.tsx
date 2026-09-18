@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Fuel, Gauge, Percent, Route, ShieldAlert, TrendingUp, FileText } from "lucide-react";
+import { ArrowLeft, Camera, Fuel, Gauge, Percent, Route, ShieldAlert, TrendingUp, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LoadStagePill } from "@/components/shared/load-stage";
@@ -12,10 +12,20 @@ import { CounterOfferButton } from "@/components/shared/counter-offer-button";
 import { NegotiationComposer } from "@/components/shared/negotiation-composer";
 import { NegotiationThread } from "@/components/shared/negotiation-thread";
 import { CallTranscript } from "@/components/shared/call-transcript";
+import { LiveDot } from "@/components/shared/live-dot";
+import { TripStepper } from "@/components/shared/trip-stepper";
 import { Progress } from "@/components/ui/progress";
 import { useLoad, useBrokerMap, useTruckMap, useDriverMap } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
+import { STAGE_CONFIRM } from "@/lib/stage-confirm";
+import { aiDispatcherNote, isTransitStage } from "@/lib/load-status";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
+
+/** Which document a stage is still waiting on — same source of truth the driver's confirm button
+ *  reads from, so this card's pending rows can never disagree with what actually triggers capture. */
+function pendingDocLabel(type: "bol" | "pod"): string {
+  return type === "bol" ? "Bill of Lading (BOL)" : "Proof of Delivery (POD)";
+}
 
 export default function LoadDetailPage() {
   const params = useParams<{ id: string }>();
@@ -44,9 +54,12 @@ export default function LoadDetailPage() {
   return (
     <div>
       <div className="border-b border-line bg-white/70 px-4 py-6 sm:px-8 backdrop-blur-sm">
-        <Link href="/carrier/loads" className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-500 hover:text-ink-950">
-          <ArrowLeft className="h-3.5 w-3.5" /> Back to loads
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link href="/carrier/loads" className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-500 hover:text-ink-950">
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to loads
+          </Link>
+          <LiveDot label={aiDispatcherNote(load.stage)} />
+        </div>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="font-display text-2xl text-ink-950">
@@ -65,7 +78,7 @@ export default function LoadDetailPage() {
           </div>
         </div>
         <div className="mt-4">
-          <Progress value={load.progressPct} />
+          {isTransitStage(load.stage) ? <TripStepper stage={load.stage} /> : <Progress value={load.progressPct} />}
         </div>
         {load.aiPaused && (
           <p className="mt-4 flex items-center gap-1.5 rounded-xl bg-amber-50 px-3.5 py-2.5 text-xs font-medium text-[var(--accent-warn)]">
@@ -113,26 +126,45 @@ export default function LoadDetailPage() {
               <CardTitle>Documents</CardTitle>
             </CardHeader>
             <CardContent className="!pt-3">
-              {load.documents.length === 0 ? (
-                <p className="text-sm text-ink-400">No documents generated yet.</p>
-              ) : (
-                <div className="flex flex-col divide-y divide-line">
-                  {load.documents.map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-100 text-ink-600">
-                          <FileText className="h-4 w-4" />
-                        </span>
-                        <div>
-                          <p className="text-sm font-medium text-ink-900">{doc.name}</p>
-                          <p className="text-xs text-ink-400">{formatDateTime(doc.generatedAt)}</p>
+              {(() => {
+                const step = STAGE_CONFIRM[load.stage];
+                const pendingType = step?.doc && !load.documents.some((d) => d.type === step.doc) ? step.doc : null;
+                if (load.documents.length === 0 && !pendingType) {
+                  return <p className="text-sm text-ink-400">No documents generated yet.</p>;
+                }
+                return (
+                  <div className="flex flex-col divide-y divide-line">
+                    {load.documents.map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-100 text-ink-600">
+                            <FileText className="h-4 w-4" />
+                          </span>
+                          <div>
+                            <p className="text-sm font-medium text-ink-900">{doc.name}</p>
+                            <p className="text-xs text-ink-400">{formatDateTime(doc.generatedAt)}</p>
+                          </div>
                         </div>
+                        <Badge tone={doc.status === "verified" ? "success" : "warning"}>{doc.status}</Badge>
                       </div>
-                      <Badge tone={doc.status === "verified" ? "success" : "warning"}>{doc.status}</Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                    {pendingType && (
+                      <div className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-50 text-ink-400">
+                            <Camera className="h-4 w-4" />
+                          </span>
+                          <div>
+                            <p className="text-sm font-medium text-ink-700">{pendingDocLabel(pendingType)}</p>
+                            <p className="text-xs text-ink-400">Captured once the driver confirms {pendingType === "bol" ? "loaded" : "delivered"}.</p>
+                          </div>
+                        </div>
+                        <Badge tone="neutral">pending</Badge>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </div>
