@@ -30,22 +30,24 @@ function stepStatus(stage: LoadStage): { completed: number; active: number } {
  *  checking "more info" wants to see exactly which checkpoints are done, not just an overall percentage. */
 export function TripStepper({ stage, invert }: { stage: LoadStage; invert?: boolean }) {
   const { completed, active } = stepStatus(stage);
+  const filledClass = invert ? "bg-white" : "bg-ink-950";
+  const unfilledClass = invert ? "bg-white/15" : "bg-ink-100";
   return (
     <div className="flex items-start">
       {STEPS.map((step, i) => {
         const done = i <= completed;
         const isActive = i === active && !done;
+        // Each segment between step i-1 and step i is one continuous line, drawn as two halves that
+        // meet at the column boundary — the circle sits centered between them (flex-1 on both sides),
+        // instead of flush against one side, which left a visible gap right after the first node.
+        const leftHalfFilled = i > 0 && i - 1 <= completed;
+        const rightHalfFilled = i < STEPS.length - 1 && i <= completed;
         return (
           <div key={step.key} className="flex flex-1 flex-col items-center">
             <div className="flex w-full items-center">
-              {i > 0 && (
-                <div
-                  className={cn(
-                    "h-0.5 flex-1 transition-colors duration-500",
-                    i <= completed + 1 ? (invert ? "bg-white" : "bg-ink-950") : invert ? "bg-white/15" : "bg-ink-100",
-                  )}
-                />
-              )}
+              <div
+                className={cn("h-0.5 flex-1 transition-colors duration-500", i === 0 ? "opacity-0" : leftHalfFilled ? filledClass : unfilledClass)}
+              />
               <div
                 className={cn(
                   "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
@@ -58,6 +60,12 @@ export function TripStepper({ stage, invert }: { stage: LoadStage; invert?: bool
               >
                 {done && <Check className={cn("h-3 w-3", invert ? "text-ink-950" : "text-white")} strokeWidth={3} />}
               </div>
+              <div
+                className={cn(
+                  "h-0.5 flex-1 transition-colors duration-500",
+                  i === STEPS.length - 1 ? "opacity-0" : rightHalfFilled ? filledClass : unfilledClass,
+                )}
+              />
             </div>
             <span
               className={cn(
