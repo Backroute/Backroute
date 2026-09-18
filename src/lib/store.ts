@@ -137,6 +137,7 @@ interface StoreState {
     sendDriverMessage: (driverId: string, content: string) => void;
     updateSettings: (partial: Partial<AgentSettings>) => void;
     driverConfirmStage: (loadId: string) => void;
+    recaptureDocument: (loadId: string, type: "bol" | "pod") => void;
     selectLoadOffer: (offerGroupId: string, loadId: string, actor: "driver" | "carrier") => void;
     reportIncident: (driverId: string, truckId: string, type: IncidentType, note: string) => void;
     seedInitialOffers: () => void;
@@ -487,6 +488,30 @@ export const useStore = create<StoreState>((set, get) => ({
           loads: state.loads.map((l) => (l.id === result.load.id ? result.load : l)),
           trucks,
           activity: [...result.events, ...state.activity].slice(0, 80),
+        };
+      }),
+
+    recaptureDocument: (loadId, type) =>
+      set((state) => {
+        const load = state.loads.find((l) => l.id === loadId);
+        if (!load) return {};
+        const doc = load.documents.find((d) => d.type === type);
+        if (!doc) return {};
+        const now = new Date().toISOString();
+        return {
+          loads: state.loads.map((l) =>
+            l.id === loadId
+              ? { ...l, documents: l.documents.map((d) => (d.id === doc.id ? { ...d, generatedAt: now, status: "verified" as const } : d)) }
+              : l,
+          ),
+          activity: [
+            {
+              id: uid("act"), timestamp: now, type: "document_captured" as const,
+              message: `${type.toUpperCase()} photo retaken by driver`, detail: `${load.referenceNumber} · re-verified automatically`,
+              loadId, carrierId: load.carrierId, severity: "success" as const,
+            },
+            ...state.activity,
+          ].slice(0, 80),
         };
       }),
 

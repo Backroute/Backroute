@@ -14,17 +14,17 @@ function pendingDocNote(load: Load, type: "bol" | "pod"): string | null {
   if (load.documents.some((d) => d.type === type)) return null;
   if (type === "bol") {
     if (load.stage === "dispatched") return "Captured once you confirm you're loaded at pickup.";
-    if (load.stage === "at_pickup") return "Confirm you're loaded on Home to capture this now.";
+    if (load.stage === "at_pickup") return "Confirm you're loaded to capture this now.";
     return null;
   }
   if (load.stage === "dispatched" || load.stage === "at_pickup" || load.stage === "in_transit") {
     return "Captured once you confirm delivery.";
   }
-  if (load.stage === "at_delivery") return "Confirm delivery on Home to capture this now.";
+  if (load.stage === "at_delivery") return "Confirm delivery to capture this now.";
   return null;
 }
 
-function PendingDocRow({ label, note }: { label: string; note: string }) {
+function PendingDocRow({ label, note, loadId }: { label: string; note: string; loadId: string }) {
   const actionable = note.startsWith("Confirm");
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-ink-300 px-3.5 py-3">
@@ -38,8 +38,8 @@ function PendingDocRow({ label, note }: { label: string; note: string }) {
         </div>
       </div>
       {actionable && (
-        <Link href="/driver" className="flex shrink-0 items-center gap-1 text-xs font-medium text-ink-950 hover:underline">
-          Go to Home <ArrowUpRight className="h-3 w-3" />
+        <Link href={`/driver/loads/${loadId}`} className="flex shrink-0 items-center gap-1 text-xs font-medium text-ink-950 hover:underline">
+          Open load <ArrowUpRight className="h-3 w-3" />
         </Link>
       )}
     </div>
@@ -71,7 +71,12 @@ export default function DriverDocumentsPage() {
 
       {currentLoad ? (
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">{currentLoad.referenceNumber}</p>
+          <Link
+            href={`/driver/loads/${currentLoad.id}`}
+            className="mb-2 inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-ink-400 hover:text-ink-950"
+          >
+            {currentLoad.referenceNumber} <ArrowUpRight className="h-3 w-3" />
+          </Link>
           <div className="flex flex-col gap-2">
             {currentLoad.documents.length === 0 && !bolNote && !podNote ? (
               <p className="py-6 text-center text-sm text-ink-400">No documents yet for this load.</p>
@@ -94,8 +99,8 @@ export default function DriverDocumentsPage() {
                     </Badge>
                   </div>
                 ))}
-                {bolNote && <PendingDocRow label="Bill of Lading (BOL)" note={bolNote} />}
-                {podNote && <PendingDocRow label="Proof of Delivery (POD)" note={podNote} />}
+                {bolNote && <PendingDocRow label="Bill of Lading (BOL)" note={bolNote} loadId={currentLoad.id} />}
+                {podNote && <PendingDocRow label="Proof of Delivery (POD)" note={podNote} loadId={currentLoad.id} />}
               </>
             )}
           </div>

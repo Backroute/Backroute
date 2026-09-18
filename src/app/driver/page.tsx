@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, Camera, CheckCircle2, FileText, LifeBuoy, Link2, MapPin, MessageCircle } from "lucide-react";
+import { ArrowUpRight, ChevronRight, FileText, LifeBuoy, Link2, MapPin, MessageCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { LoadStagePill } from "@/components/shared/load-stage";
@@ -10,16 +10,8 @@ import { CounterOfferButton } from "@/components/shared/counter-offer-button";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap, truckActiveLoads } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
+import { STAGE_CONFIRM } from "@/lib/stage-confirm";
 import { formatCurrency, formatNumber } from "@/lib/utils";
-
-/** Stages where confirming is also the moment a document gets captured — the button says so, instead of a
- *  plain "confirm" silently filing paperwork the driver never saw happen. */
-const STAGE_CONFIRM: Partial<Record<string, { label: string; icon: typeof CheckCircle2; doc?: "bol" | "pod" }>> = {
-  dispatched: { label: "Confirm arrived at pickup", icon: MapPin },
-  at_pickup: { label: "Capture BOL & confirm loaded", icon: Camera, doc: "bol" },
-  in_transit: { label: "Confirm arrived at delivery", icon: MapPin },
-  at_delivery: { label: "Capture POD & confirm delivered", icon: Camera, doc: "pod" },
-};
 
 export default function DriverHomePage() {
   const driver = usePrimaryDriver();
@@ -88,44 +80,50 @@ export default function DriverHomePage() {
 
       {currentLoad ? (
         <div className="rounded-3xl bg-ink-950 p-5 text-white">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-white/50">Current load</span>
-            <div className="flex items-center gap-1.5">
-              <LoadScoreBadge score={currentLoad.score} size="sm" invert />
-              <LoadStagePill stage={currentLoad.stage} className="!bg-white/15 !text-white" />
+          <Link href={`/driver/loads/${currentLoad.id}`} className="block">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-white/50">Current load</span>
+              <div className="flex items-center gap-1.5">
+                <LoadScoreBadge score={currentLoad.score} size="sm" invert />
+                <LoadStagePill stage={currentLoad.stage} className="!bg-white/15 !text-white" />
+              </div>
             </div>
-          </div>
-          <p className="mt-3 font-display text-2xl">
-            {currentLoad.lane.origin}, {currentLoad.lane.originState}
-            <span className="mx-1.5 text-white/40">→</span>
-            {currentLoad.lane.destination}, {currentLoad.lane.destState}
-          </p>
-          <p className="mt-1 text-xs text-white/50">{currentLoad.referenceNumber} · {currentLoad.equipmentType} · {currentLoad.lane.miles} mi</p>
+            <p className="mt-3 font-display text-2xl">
+              {currentLoad.lane.origin}, {currentLoad.lane.originState}
+              <span className="mx-1.5 text-white/40">→</span>
+              {currentLoad.lane.destination}, {currentLoad.lane.destState}
+            </p>
+            <p className="mt-1 text-xs text-white/50">{currentLoad.referenceNumber} · {currentLoad.equipmentType} · {currentLoad.lane.miles} mi</p>
 
-          <div className="mt-4">
-            <Progress value={currentLoad.progressPct} barClassName="!bg-white" className="!bg-white/15" />
-          </div>
+            <div className="mt-4">
+              <Progress value={currentLoad.progressPct} barClassName="!bg-white" className="!bg-white/15" />
+            </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
-            <div className="rounded-2xl bg-white/10 p-3">
-              <p className="text-white/50">Total offer</p>
-              <p className="mt-0.5 font-display text-lg font-semibold tabular">{formatCurrency(currentLoad.bookedRate ?? currentLoad.targetRate)}</p>
+            <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+              <div className="rounded-2xl bg-white/10 p-3">
+                <p className="text-white/50">Total offer</p>
+                <p className="mt-0.5 font-display text-lg font-semibold tabular">{formatCurrency(currentLoad.bookedRate ?? currentLoad.targetRate)}</p>
+              </div>
+              <div className="rounded-2xl bg-white/10 p-3">
+                <p className="text-white/50">Est. net</p>
+                <p className="mt-0.5 font-display text-lg font-semibold tabular">{formatCurrency(currentLoad.netProfit ?? 0)}</p>
+              </div>
+              <div className="rounded-2xl bg-white/10 p-3">
+                <p className="text-white/50">Pickup</p>
+                <p className="mt-0.5 font-medium">{currentLoad.pickupWindow}</p>
+              </div>
+              <div className="rounded-2xl bg-white/10 p-3">
+                <p className="text-white/50">Delivery</p>
+                <p className="mt-0.5 font-medium">{currentLoad.deliveryWindow}</p>
+              </div>
             </div>
-            <div className="rounded-2xl bg-white/10 p-3">
-              <p className="text-white/50">Est. net</p>
-              <p className="mt-0.5 font-display text-lg font-semibold tabular">{formatCurrency(currentLoad.netProfit ?? 0)}</p>
-            </div>
-            <div className="rounded-2xl bg-white/10 p-3">
-              <p className="text-white/50">Pickup</p>
-              <p className="mt-0.5 font-medium">{currentLoad.pickupWindow}</p>
-            </div>
-            <div className="rounded-2xl bg-white/10 p-3">
-              <p className="text-white/50">Delivery</p>
-              <p className="mt-0.5 font-medium">{currentLoad.deliveryWindow}</p>
-            </div>
-          </div>
 
-          <div className="mt-4 flex flex-col gap-2">
+            <span className="mt-3 flex items-center justify-center gap-1 text-[11px] font-medium text-white/50">
+              View details & documents <ChevronRight className="h-3 w-3" />
+            </span>
+          </Link>
+
+          <div className="mt-3 flex flex-col gap-2">
             {currentLoad.stage === "negotiating" && (
               <CounterOfferButton load={currentLoad} onSubmit={(amount) => requestBetterRate(currentLoad.id, "driver", amount)} variant="dark" />
             )}
@@ -150,7 +148,7 @@ export default function DriverHomePage() {
               </Link>
             </div>
             {currentLoad.documents.length > 0 && (
-              <Link href="/driver/documents" className="flex items-center justify-center gap-1.5 py-1 text-xs font-medium text-white/60 hover:text-white">
+              <Link href={`/driver/loads/${currentLoad.id}#documents`} className="flex items-center justify-center gap-1.5 py-1 text-xs font-medium text-white/60 hover:text-white">
                 <FileText className="h-3.5 w-3.5" /> {currentLoad.documents.length} document{currentLoad.documents.length === 1 ? "" : "s"} on file
               </Link>
             )}
