@@ -6,24 +6,28 @@ const STEPS = [
   { key: "dispatched", label: "Dispatched" },
   { key: "at_pickup", label: "At pickup" },
   { key: "in_transit", label: "In transit" },
+  { key: "at_delivery", label: "At delivery" },
   { key: "delivered", label: "Delivered" },
 ];
 
-/** completed = index of the last finished step (-1 = none yet); active = the step currently underway. */
+/** completed = index of the last finished step (-1 = none yet); active = the step currently underway.
+ *  Five real milestones, not four — "at_delivery" (arrived at dropoff, not yet confirmed) is its own
+ *  step. Folding it into "Delivered" made the Delivered node light up/pulse before the load was
+ *  actually delivered, which read as the trip finishing early. */
 function stepStatus(stage: LoadStage): { completed: number; active: number } {
   switch (stage) {
     case "dispatched": return { completed: -1, active: 0 };
     case "at_pickup": return { completed: 0, active: 1 };
     case "in_transit": return { completed: 1, active: 2 };
     case "at_delivery": return { completed: 2, active: 3 };
-    case "delivered": return { completed: 3, active: 3 };
+    case "delivered": return { completed: 4, active: 4 };
     default: return { completed: -1, active: 0 };
   }
 }
 
-/** Named-milestone tracker (Dispatched -> At pickup -> In transit -> Delivered), the discrete
- *  complement to TripProgress's continuous line — for the detail page, where a driver checking
- *  "more info" wants to see exactly which checkpoints are done, not just an overall percentage. */
+/** Named-milestone tracker (Dispatched -> At pickup -> In transit -> At delivery -> Delivered), the
+ *  discrete complement to TripProgress's continuous line — for the detail page, where a driver
+ *  checking "more info" wants to see exactly which checkpoints are done, not just an overall percentage. */
 export function TripStepper({ stage, invert }: { stage: LoadStage; invert?: boolean }) {
   const { completed, active } = stepStatus(stage);
   return (
