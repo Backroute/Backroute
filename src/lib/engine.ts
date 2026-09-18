@@ -356,39 +356,10 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
       events.push(mkEvent(load.carrierId, load.id, "dispatched", "Driver dispatched", `${truck.unitNumber} en route to ${load.lane.origin}`, "info"));
       return { load: next, events, truckUpdates: { id: truck.id, status: "on_load", currentLoadId: load.id } };
     }
-    case "dispatched": {
-      next.stage = "at_pickup";
-      events.push(mkEvent(load.carrierId, load.id, "check_call", "Arrived at pickup", `${load.lane.origin}, ${load.lane.originState}`, "info"));
-      break;
-    }
-    case "at_pickup": {
-      next.stage = "in_transit";
-      next.documents = [...load.documents, { id: uid("doc"), type: "bol", name: `BOL_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" }];
-      events.push(mkEvent(load.carrierId, load.id, "document_captured", "BOL captured and verified", `Loaded ${load.weight.toLocaleString()} lbs · departing ${load.lane.origin}`, "success"));
-      break;
-    }
-    case "in_transit": {
-      if (load.ticksInStage < 2 && chance(0.6)) {
-        events.push(mkEvent(load.carrierId, load.id, "check_call", "Automated check call", `On schedule · approaching ${load.lane.destination}`, "info"));
-        return { load: next, events };
-      }
-      next.stage = "at_delivery";
-      events.push(mkEvent(load.carrierId, load.id, "check_call", "Arrived at delivery", `${load.lane.destination}, ${load.lane.destState}`, "info"));
-      break;
-    }
-    case "at_delivery": {
-      next.stage = "delivered";
-      next.documents = [
-        ...load.documents,
-        { id: uid("doc"), type: "pod", name: `POD_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" },
-        { id: uid("doc"), type: "invoice", name: `Invoice_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" },
-      ];
-      events.push(mkEvent(load.carrierId, load.id, "delivered", "Delivered — POD captured, invoice generated", `${load.referenceNumber} · net $${(load.netProfit ?? 0).toLocaleString()}`, "success"));
-      if (truck) {
-        return { load: next, events, truckUpdates: { id: truck.id, status: "available", currentLoadId: null } };
-      }
-      break;
-    }
+    // dispatched / at_pickup / in_transit / at_delivery are intentionally absent here: once a load is
+    // dispatched it's the driver's load, and only confirmLoadStage (an explicit driver tap) may advance
+    // it further. The automatic tick loop's candidate filter excludes these stages entirely (store.ts),
+    // so this switch should never actually see them — no case needed.
     default:
       break;
   }

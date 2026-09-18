@@ -39,6 +39,24 @@ const uid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2,
 const randInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
+/** Promotes a truck's already-chained next load into its current slot the moment it frees up — used both
+ *  by the automatic tick (AI-side deliveries, if any ever land there again) and driverConfirmStage (the
+ *  only place physical deliveries actually happen now), so "zero empty miles" chaining can't quietly stop
+ *  working just because one of its two call sites goes unreachable. */
+function promoteChainedLoad(trucks: Truck[], truckId: string, carrierId: string): { trucks: Truck[]; event: ActivityEvent | null } {
+  const truck = trucks.find((t) => t.id === truckId);
+  if (!truck?.nextLoadId) return { trucks, event: null };
+  const chainedId = truck.nextLoadId;
+  return {
+    trucks: trucks.map((t) => (t.id === truckId ? { ...t, currentLoadId: chainedId, nextLoadId: null } : t)),
+    event: {
+      id: uid("act"), timestamp: new Date().toISOString(), type: "chained",
+      message: "Next load already chained — zero empty miles", detail: `${truck.unitNumber} rolling straight into the next lane`,
+      loadId: chainedId, carrierId, severity: "success",
+    },
+  };
+}
+
 export type Aggressiveness = "conservative" | "balanced" | "aggressive";
 
 export interface AgentSettings {
@@ -288,7 +306,15 @@ export const useStore = create<StoreState>((set, get) => ({
           }
         }
 
-        const candidates = loads.filter((l) => l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "offered" && !l.aiPaused && l.carrierId === PRIMARY_CARRIER_ID);
+        // Once a load is dispatched, the physical milestones (pickup, transit, delivery, docs) belong to the
+        // driver's own confirm actions only — the automatic tick must not touch those stages, or the card
+        // the driver is looking at can silently jump out from under them, racing their own taps.
+        const candidates = loads.filter(
+          (l) =>
+            l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "offered" &&
+            l.stage !== "dispatched" && l.stage !== "at_pickup" && l.stage !== "in_transit" && l.stage !== "at_delivery" &&
+            !l.aiPaused && l.carrierId === PRIMARY_CARRIER_ID,
+        );
         if (candidates.length && Math.random() < 0.88) {
           const target = pick(candidates);
           const broker = state.brokers.find((b) => b.id === target.brokerId);
@@ -308,15 +334,10 @@ export const useStore = create<StoreState>((set, get) => ({
             trucks = trucks.map((t) => (t.id === tu.id ? { ...t, ...tu } : t));
 
             if (tu.status === "available" && tu.currentLoadId === null) {
-              const truckAfter = trucks.find((t) => t.id === tu.id);
-              if (truckAfter?.nextLoadId) {
-                const chainedId = truckAfter.nextLoadId;
-                trucks = trucks.map((t) => (t.id === tu.id ? { ...t, currentLoadId: chainedId, nextLoadId: null } : t));
-                newEvents.push({
-                  id: uid("act"), timestamp: new Date().toISOString(), type: "chained",
-                  message: "Next load already chained — zero empty miles", detail: `${truckAfter.unitNumber} rolling straight into the next lane`,
-                  loadId: chainedId, carrierId: PRIMARY_CARRIER_ID, severity: "success",
-                });
+              const promoted = promoteChainedLoad(trucks, tu.id, PRIMARY_CARRIER_ID);
+              trucks = promoted.trucks;
+              if (promoted.event) {
+                newEvents.push(promoted.event);
               }
             }
           }
@@ -480,14 +501,20 @@ export const useStore = create<StoreState>((set, get) => ({
         const result = confirmLoadStage(load, truck);
         if (result.load === load) return {};
         let trucks = state.trucks;
+        let events = result.events;
         if (result.truckUpdates) {
           const tu = result.truckUpdates;
           trucks = trucks.map((t) => (t.id === tu.id ? { ...t, ...tu } : t));
+          if (tu.status === "available" && tu.currentLoadId === null) {
+            const promoted = promoteChainedLoad(trucks, tu.id, load.carrierId);
+            trucks = promoted.trucks;
+            if (promoted.event) events = [...events, promoted.event];
+          }
         }
         return {
           loads: state.loads.map((l) => (l.id === result.load.id ? result.load : l)),
           trucks,
-          activity: [...result.events, ...state.activity].slice(0, 80),
+          activity: [...events, ...state.activity].slice(0, 80),
         };
       }),
 
