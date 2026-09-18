@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { TripStepper } from "@/components/shared/trip-stepper";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
+import { StageConfirmButton } from "@/components/shared/stage-confirm-button";
 import { useLoad, useCarrierTrucks, usePrimaryDriver } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { STAGE_CONFIRM } from "@/lib/stage-confirm";
@@ -65,7 +66,6 @@ export default function DriverLoadDetailPage() {
   const truck = trucks.find((t) => t.id === driver.truckId);
   const isCurrent = truck?.currentLoadId === load.id;
   const step = STAGE_CONFIRM[load.stage];
-  const Icon = step?.icon;
   const pendingType = step?.doc && !load.documents.some((d) => d.type === step.doc) ? step.doc : null;
 
   return (
@@ -109,14 +109,7 @@ export default function DriverLoadDetailPage() {
             {load.stage === "negotiating" && (
               <CounterOfferButton load={load} onSubmit={(amount) => requestBetterRate(load.id, "driver", amount)} variant="dark" />
             )}
-            {step && Icon && (
-              <button
-                onClick={() => driverConfirmStage(load.id)}
-                className="flex items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-semibold text-ink-950"
-              >
-                <Icon className="h-4 w-4" /> {step.label}
-              </button>
-            )}
+            <StageConfirmButton loadId={load.id} stage={load.stage} onConfirm={driverConfirmStage} />
             <div className="grid grid-cols-2 gap-2">
               <Link href="/driver/messages" className="flex items-center justify-center gap-2 rounded-full border border-white/25 py-3 text-sm font-medium text-white">
                 <MessageCircle className="h-4 w-4" /> Message AI

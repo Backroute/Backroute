@@ -7,10 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { TripProgress } from "@/components/shared/trip-progress";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
+import { StageConfirmButton } from "@/components/shared/stage-confirm-button";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap, truckActiveLoads } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
-import { STAGE_CONFIRM } from "@/lib/stage-confirm";
 import { LOAD_STATUS_HEADLINE, isTransitStage, nextStop } from "@/lib/load-status";
 import { LOAD_STAGE_LABEL } from "@/lib/types";
 import { formatCurrency, formatNumber } from "@/lib/utils";
@@ -123,18 +123,7 @@ export default function DriverHomePage() {
             {currentLoad.stage === "negotiating" && (
               <CounterOfferButton load={currentLoad} onSubmit={(amount) => requestBetterRate(currentLoad.id, "driver", amount)} variant="dark" />
             )}
-            {STAGE_CONFIRM[currentLoad.stage] && (() => {
-              const step = STAGE_CONFIRM[currentLoad.stage]!;
-              const Icon = step.icon;
-              return (
-                <button
-                  onClick={() => driverConfirmStage(currentLoad.id)}
-                  className="flex items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-semibold text-ink-950"
-                >
-                  <Icon className="h-4 w-4" /> {step.label}
-                </button>
-              );
-            })()}
+            <StageConfirmButton loadId={currentLoad.id} stage={currentLoad.stage} onConfirm={driverConfirmStage} />
             <div className="grid grid-cols-2 gap-2">
               <Link href="/driver/messages" className="flex items-center justify-center gap-2 rounded-full border border-white/25 py-3 text-sm font-medium text-white">
                 <MessageCircle className="h-4 w-4" /> Message AI
