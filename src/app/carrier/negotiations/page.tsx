@@ -48,8 +48,15 @@ export default function NegotiationsPage() {
             const truck = load.truckId ? trucks.get(load.truckId) : undefined;
             const driver = truck?.driverId ? drivers.get(truck.driverId) : undefined;
             const lastMsg = load.messages[load.messages.length - 1];
-            const lastOffer = [...load.messages].reverse().find((m) => m.offerAmount)?.offerAmount;
-            const progress = lastOffer ? Math.min(100, (lastOffer / load.targetRate) * 100) : 0;
+            // Whose offer is "last" alternates between the AI and the broker every reply, and the AI's own
+            // asks sit close to its target by design (94-100%) — so lastOffer/target mostly measures "did
+            // the AI or the broker speak most recently," not how close the deal actually is, and jumps
+            // around every message instead of trending toward a close. Track each side's own current
+            // position and measure how much of the original gap between them has actually closed instead.
+            const aiLastOffer = [...load.messages].reverse().find((m) => m.direction === "outbound" && m.offerAmount)?.offerAmount ?? load.targetRate;
+            const brokerLastOffer = [...load.messages].reverse().find((m) => m.direction === "inbound" && m.offerAmount)?.offerAmount ?? null;
+            const openGap = Math.max(1, load.targetRate - load.listedRate);
+            const progress = brokerLastOffer ? Math.max(0, Math.min(100, 100 - (Math.abs(aiLastOffer - brokerLastOffer) / openGap) * 100)) : 0;
             const channelsUsed = Array.from(new Set(load.messages.map((m) => m.channel)));
 
             return (
@@ -83,8 +90,8 @@ export default function NegotiationsPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1">
                       <div className="flex items-center justify-between text-[11px] text-ink-500">
-                        <span>Current offer {lastOffer ? formatCurrency(lastOffer) : "—"}</span>
-                        <span>Target {formatCurrency(load.targetRate)}</span>
+                        <span>Their offer {brokerLastOffer ? formatCurrency(brokerLastOffer) : "—"}</span>
+                        <span>Our ask {formatCurrency(aiLastOffer)}</span>
                       </div>
                       <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-ink-100">
                         <div className="h-full rounded-full bg-ink-950 transition-all" style={{ width: `${progress}%` }} />

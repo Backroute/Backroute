@@ -353,6 +353,7 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
     case "booked": {
       if (!truck) break;
       next.stage = "dispatched";
+      next.progressPct = STAGE_PROGRESS.dispatched;
       events.push(mkEvent(load.carrierId, load.id, "dispatched", "Driver dispatched", `${truck.unitNumber} en route to ${load.lane.origin}`, "info"));
       return { load: next, events, truckUpdates: { id: truck.id, status: "on_load", currentLoadId: load.id } };
     }
