@@ -129,7 +129,15 @@ export function createLoadOfferBatch(
   });
 
   const offerGroupId = uid("offer");
-  const best = candidates.reduce((a, b) => (b.score > a.score ? b : a));
+  // The score itself only carries broker *reliability* (how well they've historically paid/performed),
+  // not the separate fraud-risk flag Broker Shield surfaces on the card — so without this, "AI pick" could
+  // land on a flagged broker purely because its rate/deadhead numbers edged out a clean one, contradicting
+  // the platform's own pitch that Broker Shield screens brokers before the AI will deal with them. Prefer a
+  // clean-broker candidate when the batch has one; only recommend a flagged one if every option is flagged.
+  const brokerById = new Map(brokers.map((b) => [b.id, b]));
+  const isLowRisk = (c: (typeof candidates)[number]) => (brokerById.get(c.brokerId)?.fraudRisk ?? "low") === "low";
+  const pool = candidates.some(isLowRisk) ? candidates.filter(isLowRisk) : candidates;
+  const best = pool.reduce((a, b) => (b.score > a.score ? b : a));
 
   return candidates.map((c) => ({ ...c, offerGroupId, recommended: c.id === best.id }));
 }
