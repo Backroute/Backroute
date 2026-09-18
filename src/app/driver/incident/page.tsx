@@ -2,11 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { AlertTriangle, ArrowLeft, CloudRain, Clock, Wrench } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CloudRain, Clock, Phone, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { usePrimaryDriver, useCarrierTrucks } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
+import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 import type { IncidentType } from "@/lib/types";
 
 const TYPES: { key: IncidentType; label: string; icon: typeof Wrench; desc: string }[] = [
@@ -26,12 +27,17 @@ export default function ReportIncidentPage() {
   const [type, setType] = useState<IncidentType | null>(null);
   const [note, setNote] = useState("");
   const [sent, setSent] = useState(false);
+  const [calling, setCalling] = useState(false);
 
   function handleSubmit() {
     if (!type || !truck) return;
     reportIncident(driver.id, truck.id, type, note.trim());
     setSent(true);
     setTimeout(() => router.push("/driver"), 1400);
+  }
+
+  function handleCallComplete() {
+    router.push("/driver");
   }
 
   if (sent) {
@@ -59,6 +65,17 @@ export default function ReportIncidentPage() {
       <div>
         <h1 className="font-display text-2xl text-ink-950">Report an issue</h1>
         <p className="mt-1 text-sm text-ink-500">Tell us what&apos;s going on — the AI dispatcher takes it from here.</p>
+      </div>
+
+      <button
+        onClick={() => setCalling(true)}
+        className="flex items-center justify-center gap-2 rounded-2xl border border-line py-3 text-sm font-medium text-ink-700"
+      >
+        <Phone className="h-4 w-4" /> Call AI Dispatcher instead
+      </button>
+
+      <div className="flex items-center gap-3 text-[11px] font-medium uppercase tracking-wider text-ink-300">
+        <span className="h-px flex-1 bg-line" /> or type it in <span className="h-px flex-1 bg-line" />
       </div>
 
       <div className="flex flex-col gap-2.5">
@@ -93,6 +110,10 @@ export default function ReportIncidentPage() {
       <Button size="lg" disabled={!type} onClick={handleSubmit}>
         Send to AI dispatcher
       </Button>
+
+      {calling && truck && (
+        <VoiceCallModal spec={{ kind: "incident", driverId: driver.id, truckId: truck.id, onComplete: handleCallComplete }} onClose={() => setCalling(false)} />
+      )}
     </div>
   );
 }

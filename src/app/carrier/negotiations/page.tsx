@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Mail, MessageSquare, Phone } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
@@ -10,6 +11,7 @@ import { ChannelBadge } from "@/components/shared/channel-badge";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { BrokerTrustBadge } from "@/components/shared/broker-trust-badge";
 import { NegotiationComposer } from "@/components/shared/negotiation-composer";
+import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 import { TruckDriverChip } from "@/components/shared/truck-driver-chip";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { useCarrierLoads, useBrokerMap, useTruckMap, useDriverMap } from "@/lib/selectors";
@@ -22,7 +24,10 @@ export default function NegotiationsPage() {
   const trucks = useTruckMap();
   const drivers = useDriverMap();
   const sendNegotiationInstruction = useStore((s) => s.actions.sendNegotiationInstruction);
+  const [callingLoadId, setCallingLoadId] = useState<string | null>(null);
   const active = loads.filter((l) => l.stage === "negotiating" || l.stage === "rate_confirmed");
+  const callingLoad = active.find((l) => l.id === callingLoadId);
+  const callingBroker = callingLoad ? brokers.get(callingLoad.brokerId) : undefined;
 
   const emailCount = active.reduce((s, l) => s + l.messages.filter((m) => m.channel === "email").length, 0);
   const smsCount = active.reduce((s, l) => s + l.messages.filter((m) => m.channel === "sms").length, 0);
@@ -102,7 +107,18 @@ export default function NegotiationsPage() {
                     </Link>
                   </div>
                   {load.stage === "negotiating" && (
-                    <NegotiationComposer compact onSend={(text) => sendNegotiationInstruction(load.id, "carrier", text)} />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCallingLoadId(load.id)}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-ink-700 hover:border-ink-300"
+                        aria-label="Call AI Dispatcher about this load"
+                      >
+                        <Phone className="h-3.5 w-3.5" />
+                      </button>
+                      <div className="flex-1">
+                        <NegotiationComposer compact onSend={(text) => sendNegotiationInstruction(load.id, "carrier", text)} />
+                      </div>
+                    </div>
                   )}
                   {lastMsg && (
                     <p className="text-[11px] text-ink-400">
@@ -115,6 +131,13 @@ export default function NegotiationsPage() {
           })}
         </div>
       </div>
+
+      {callingLoad && callingBroker && (
+        <VoiceCallModal
+          spec={{ kind: "negotiation", loadId: callingLoad.id, actor: "carrier", brokerName: callingBroker.company, origin: callingLoad.lane.origin, dest: callingLoad.lane.destination }}
+          onClose={() => setCallingLoadId(null)}
+        />
+      )}
     </div>
   );
 }

@@ -21,7 +21,7 @@ import {
   type OfferAskDraft,
 } from "./engine";
 import { computeEconomics, computeLoadScore } from "./scoring";
-import { clamp } from "./utils";
+import { clamp, formatDuration } from "./utils";
 import type {
   ActivityEvent,
   Broker,
@@ -33,6 +33,7 @@ import type {
   IncidentType,
   Load,
   Truck,
+  VoiceCall,
 } from "./types";
 
 const uid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
@@ -166,6 +167,9 @@ interface StoreState {
     /** Phase two: the broker's actual answer to a non-rate ask. */
     resolveOfferDetail: (loadId: string, draft: OfferAskDraft) => string;
     sendNegotiationInstruction: (loadId: string, actor: "driver" | "carrier", text: string) => void;
+    /** Persists a driver/carrier voice call about a load once it hangs up, so it shows up in the same call
+     *  history as the AI's own calls to brokers — a call is only real if it leaves a record. */
+    logLoadVoiceCall: (loadId: string, call: Omit<VoiceCall, "id">) => void;
     setAiPaused: (loadId: string, paused: boolean) => void;
     opsOverrideRate: (loadId: string, amount: number) => void;
     toggleAddon: (addonId: string) => void;
@@ -663,6 +667,26 @@ export const useStore = create<StoreState>((set, get) => ({
         return {
           loads: state.loads.map((l) => (l.id === updated.id ? updated : l)),
           activity: [...events, ...state.activity].slice(0, 80),
+        };
+      }),
+
+    logLoadVoiceCall: (loadId, call) =>
+      set((state) => {
+        const load = state.loads.find((l) => l.id === loadId);
+        if (!load) return {};
+        const callerIsDriver = call.transcript.some((l) => l.speaker === "driver");
+        const fullCall: VoiceCall = { id: uid("call"), ...call };
+        return {
+          loads: state.loads.map((l) => (l.id === loadId ? { ...l, calls: [...l.calls, fullCall], updatedAt: new Date().toISOString() } : l)),
+          activity: [
+            {
+              id: uid("act"), timestamp: new Date().toISOString(), type: "call_completed" as const,
+              message: callerIsDriver ? "Driver called the AI dispatcher" : "Carrier called the AI dispatcher",
+              detail: `${load.lane.origin} → ${load.lane.destination} · ${formatDuration(call.durationSec)}${call.outcome ? " · " + call.outcome : ""}`,
+              loadId, carrierId: load.carrierId, severity: "info" as ActivityEvent["severity"],
+            },
+            ...state.activity,
+          ].slice(0, 80),
         };
       }),
 

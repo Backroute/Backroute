@@ -141,7 +141,7 @@ export interface NegotiationMessage {
 }
 
 export interface CallTranscriptLine {
-  speaker: "ai" | "broker";
+  speaker: "ai" | "broker" | "driver" | "carrier";
   text: string;
 }
 

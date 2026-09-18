@@ -1,8 +1,9 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Camera, Fuel, Gauge, Percent, Route, ShieldAlert, TrendingUp, FileText } from "lucide-react";
+import { ArrowLeft, Camera, Fuel, Gauge, Percent, Phone, Route, ShieldAlert, TrendingUp, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LoadStagePill } from "@/components/shared/load-stage";
@@ -12,6 +13,7 @@ import { CounterOfferButton } from "@/components/shared/counter-offer-button";
 import { NegotiationComposer } from "@/components/shared/negotiation-composer";
 import { NegotiationThread } from "@/components/shared/negotiation-thread";
 import { CallTranscript } from "@/components/shared/call-transcript";
+import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 import { LiveDot } from "@/components/shared/live-dot";
 import { TripStepper } from "@/components/shared/trip-stepper";
 import { Progress } from "@/components/ui/progress";
@@ -35,6 +37,7 @@ export default function LoadDetailPage() {
   const drivers = useDriverMap();
   const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
   const sendNegotiationInstruction = useStore((s) => s.actions.sendNegotiationInstruction);
+  const [calling, setCalling] = useState(false);
 
   if (!load) {
     return (
@@ -101,7 +104,16 @@ export default function LoadDetailPage() {
                 )}
               </div>
               {load.stage === "negotiating" && (
-                <CounterOfferButton load={load} onSubmit={(amount) => requestBetterRate(load.id, "carrier", amount)} variant="outline" />
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCalling(true)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-ink-700 hover:border-ink-300"
+                    aria-label="Call AI Dispatcher"
+                  >
+                    <Phone className="h-4 w-4" />
+                  </button>
+                  <CounterOfferButton load={load} onSubmit={(amount) => requestBetterRate(load.id, "carrier", amount)} variant="outline" />
+                </div>
               )}
             </CardHeader>
             <CardContent className="!pt-4">
@@ -109,7 +121,11 @@ export default function LoadDetailPage() {
               {load.calls.length > 0 && (
                 <div className="mt-4 flex flex-col gap-4">
                   {load.calls.map((call) => (
-                    <CallTranscript key={call.id} call={call} />
+                    <CallTranscript
+                      key={call.id}
+                      call={call}
+                      title={call.transcript.some((l) => l.speaker === "driver" || l.speaker === "carrier") ? "Your call with AI Dispatcher" : "Voice Agent Call"}
+                    />
                   ))}
                 </div>
               )}
@@ -231,6 +247,13 @@ export default function LoadDetailPage() {
           )}
         </div>
       </div>
+
+      {calling && broker && (
+        <VoiceCallModal
+          spec={{ kind: "negotiation", loadId: load.id, actor: "carrier", brokerName: broker.company, origin: load.lane.origin, dest: load.lane.destination }}
+          onClose={() => setCalling(false)}
+        />
+      )}
     </div>
   );
 }

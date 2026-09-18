@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, ChevronRight, FileText, LifeBuoy, Link2, MapPin, MessageCircle } from "lucide-react";
+import { useState } from "react";
+import { ArrowUpRight, ChevronRight, FileText, LifeBuoy, Link2, MapPin, MessageCircle, Phone } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { TripProgress } from "@/components/shared/trip-progress";
@@ -9,6 +10,7 @@ import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
 import { StageConfirmButton } from "@/components/shared/stage-confirm-button";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
+import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap, truckActiveLoads } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { LOAD_STATUS_HEADLINE, isTransitStage, nextStop } from "@/lib/load-status";
@@ -26,6 +28,7 @@ export default function DriverHomePage() {
   const requestOfferDetail = useStore((s) => s.actions.requestOfferDetail);
   const resolveOfferDetail = useStore((s) => s.actions.resolveOfferDetail);
   const driverConfirmStage = useStore((s) => s.actions.driverConfirmStage);
+  const [calling, setCalling] = useState(false);
 
   const truck = trucks.find((t) => t.id === driver.truckId);
   const { current: currentLoad, next: nextLoad } = truckActiveLoads(loads, truck);
@@ -124,11 +127,14 @@ export default function DriverHomePage() {
               <CounterOfferButton load={currentLoad} onSubmit={(amount) => requestBetterRate(currentLoad.id, "driver", amount)} variant="dark" />
             )}
             <StageConfirmButton loadId={currentLoad.id} stage={currentLoad.stage} onConfirm={driverConfirmStage} />
-            <div className="grid grid-cols-2 gap-2">
-              <Link href="/driver/messages" className="flex items-center justify-center gap-2 rounded-full border border-white/25 py-3 text-sm font-medium text-white">
-                <MessageCircle className="h-4 w-4" /> Message AI
+            <div className="grid grid-cols-3 gap-2">
+              <button onClick={() => setCalling(true)} className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-white/25 py-2.5 text-[11px] font-medium text-white">
+                <Phone className="h-4 w-4" /> Call AI
+              </button>
+              <Link href="/driver/messages" className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-white/25 py-2.5 text-[11px] font-medium text-white">
+                <MessageCircle className="h-4 w-4" /> Message
               </Link>
-              <Link href="/driver/incident" className="flex items-center justify-center gap-2 rounded-full border border-white/25 py-3 text-sm font-medium text-white">
+              <Link href="/driver/incident" className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-white/25 py-2.5 text-[11px] font-medium text-white">
                 <LifeBuoy className="h-4 w-4" /> Report issue
               </Link>
             </div>
@@ -140,8 +146,11 @@ export default function DriverHomePage() {
           </div>
         </div>
       ) : (
-        <div className="rounded-3xl border border-line p-6 text-center">
+        <div className="flex flex-col items-center gap-3 rounded-3xl border border-line p-6 text-center">
           <p className="text-sm text-ink-500">No active load — the AI is sourcing your next one now.</p>
+          <button onClick={() => setCalling(true)} className="flex items-center gap-1.5 rounded-full border border-line px-4 py-2 text-xs font-medium text-ink-700">
+            <Phone className="h-3.5 w-3.5" /> Call AI Dispatcher
+          </button>
         </div>
       )}
 
@@ -205,6 +214,8 @@ export default function DriverHomePage() {
           </span>
         </Link>
       )}
+
+      {calling && <VoiceCallModal spec={{ kind: "checkin", driverId: driver.id, driverFirstName: driver.name }} onClose={() => setCalling(false)} />}
     </div>
   );
 }

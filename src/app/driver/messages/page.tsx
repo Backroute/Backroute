@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send } from "lucide-react";
+import { Phone, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
 import { usePrimaryDriver } from "@/lib/selectors";
 import { TimeAgo } from "@/components/shared/time-ago";
+import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 
 export default function DriverMessagesPage() {
   const driver = usePrimaryDriver();
   const messages = useStore((s) => s.driverMessages).filter((m) => m.driverId === driver.id);
   const sendMessage = useStore((s) => s.actions.sendDriverMessage);
   const [value, setValue] = useState("");
+  const [calling, setCalling] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -26,9 +28,18 @@ export default function DriverMessagesPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="px-5">
-        <h1 className="font-display text-2xl text-ink-950">AI Dispatcher</h1>
-        <p className="text-xs text-ink-500">Available 24/7 · responds in seconds</p>
+      <div className="flex items-start justify-between px-5">
+        <div>
+          <h1 className="font-display text-2xl text-ink-950">AI Dispatcher</h1>
+          <p className="text-xs text-ink-500">Available 24/7 · responds in seconds</p>
+        </div>
+        <button
+          onClick={() => setCalling(true)}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink-100 text-ink-700"
+          aria-label="Call AI Dispatcher"
+        >
+          <Phone className="h-4 w-4" />
+        </button>
       </div>
 
       <div className="mt-4 flex-1 space-y-3 overflow-y-auto px-5 pb-2">
@@ -61,6 +72,8 @@ export default function DriverMessagesPage() {
           <Send className="h-4 w-4" />
         </button>
       </div>
+
+      {calling && <VoiceCallModal spec={{ kind: "checkin", driverId: driver.id, driverFirstName: driver.name }} onClose={() => setCalling(false)} />}
     </div>
   );
 }

@@ -1,8 +1,15 @@
 import { Phone, PhoneCall } from "lucide-react";
 import { cn, formatDuration } from "@/lib/utils";
-import type { VoiceCall } from "@/lib/types";
+import type { CallTranscriptLine, VoiceCall } from "@/lib/types";
 
-export function CallTranscript({ call }: { call: VoiceCall }) {
+const SPEAKER_LABEL: Record<CallTranscriptLine["speaker"], string> = {
+  ai: "AI",
+  broker: "Broker",
+  driver: "Driver",
+  carrier: "You",
+};
+
+export function CallTranscript({ call, title = "Voice Agent Call" }: { call: VoiceCall; title?: string }) {
   return (
     <div className="rounded-2xl border border-line bg-ink-50/60 p-4">
       <div className="flex items-center justify-between">
@@ -10,7 +17,7 @@ export function CallTranscript({ call }: { call: VoiceCall }) {
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-ink-950 text-white">
             {call.status === "completed" ? <PhoneCall className="h-3.5 w-3.5" /> : <Phone className="h-3.5 w-3.5" />}
           </span>
-          Voice Agent Call
+          {title}
         </div>
         <span className="text-[11px] tabular text-ink-500">{formatDuration(call.durationSec)}</span>
       </div>
@@ -33,7 +40,7 @@ export function CallTranscript({ call }: { call: VoiceCall }) {
               )}
             >
               <span className={cn("mr-1.5 text-[10px] font-semibold uppercase tracking-wide", line.speaker === "ai" ? "text-white/60" : "text-ink-400")}>
-                {line.speaker === "ai" ? "AI" : "Broker"}
+                {SPEAKER_LABEL[line.speaker]}
               </span>
               {line.text}
             </div>
