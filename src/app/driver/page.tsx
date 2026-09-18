@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, CheckCircle2, LifeBuoy, Link2, MapPin, MessageCircle } from "lucide-react";
+import { ArrowUpRight, Camera, CheckCircle2, FileText, LifeBuoy, Link2, MapPin, MessageCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { LoadStagePill } from "@/components/shared/load-stage";
@@ -12,11 +12,13 @@ import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap, truc
 import { useStore } from "@/lib/store";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 
-const STAGE_CONFIRM_LABEL: Partial<Record<string, string>> = {
-  dispatched: "Confirm arrived at pickup",
-  at_pickup: "Confirm loaded — departing",
-  in_transit: "Confirm arrived at delivery",
-  at_delivery: "Confirm delivered",
+/** Stages where confirming is also the moment a document gets captured — the button says so, instead of a
+ *  plain "confirm" silently filing paperwork the driver never saw happen. */
+const STAGE_CONFIRM: Partial<Record<string, { label: string; icon: typeof CheckCircle2; doc?: "bol" | "pod" }>> = {
+  dispatched: { label: "Confirm arrived at pickup", icon: MapPin },
+  at_pickup: { label: "Capture BOL & confirm loaded", icon: Camera, doc: "bol" },
+  in_transit: { label: "Confirm arrived at delivery", icon: MapPin },
+  at_delivery: { label: "Capture POD & confirm delivered", icon: Camera, doc: "pod" },
 };
 
 export default function DriverHomePage() {
@@ -84,16 +86,6 @@ export default function DriverHomePage() {
         </div>
       )}
 
-      {offerGroups.length > 0 && (
-        <NextLoadOffers
-          offerGroups={offerGroups}
-          brokers={brokers}
-          onSelect={(groupId, loadId) => selectLoadOffer(groupId, loadId, "driver")}
-          onAsk={(loadId, text) => requestOfferDetail(loadId, text)}
-          onAskResolve={(loadId, draft) => resolveOfferDetail(loadId, draft)}
-        />
-      )}
-
       {currentLoad ? (
         <div className="rounded-3xl bg-ink-950 p-5 text-white">
           <div className="flex items-center justify-between">
@@ -137,14 +129,18 @@ export default function DriverHomePage() {
             {currentLoad.stage === "negotiating" && (
               <CounterOfferButton load={currentLoad} onSubmit={(amount) => requestBetterRate(currentLoad.id, "driver", amount)} variant="dark" />
             )}
-            {STAGE_CONFIRM_LABEL[currentLoad.stage] && (
-              <button
-                onClick={() => driverConfirmStage(currentLoad.id)}
-                className="flex items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-semibold text-ink-950"
-              >
-                <CheckCircle2 className="h-4 w-4" /> {STAGE_CONFIRM_LABEL[currentLoad.stage]}
-              </button>
-            )}
+            {STAGE_CONFIRM[currentLoad.stage] && (() => {
+              const step = STAGE_CONFIRM[currentLoad.stage]!;
+              const Icon = step.icon;
+              return (
+                <button
+                  onClick={() => driverConfirmStage(currentLoad.id)}
+                  className="flex items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-semibold text-ink-950"
+                >
+                  <Icon className="h-4 w-4" /> {step.label}
+                </button>
+              );
+            })()}
             <div className="grid grid-cols-2 gap-2">
               <Link href="/driver/messages" className="flex items-center justify-center gap-2 rounded-full border border-white/25 py-3 text-sm font-medium text-white">
                 <MessageCircle className="h-4 w-4" /> Message AI
@@ -153,6 +149,11 @@ export default function DriverHomePage() {
                 <LifeBuoy className="h-4 w-4" /> Report issue
               </Link>
             </div>
+            {currentLoad.documents.length > 0 && (
+              <Link href="/driver/documents" className="flex items-center justify-center gap-1.5 py-1 text-xs font-medium text-white/60 hover:text-white">
+                <FileText className="h-3.5 w-3.5" /> {currentLoad.documents.length} document{currentLoad.documents.length === 1 ? "" : "s"} on file
+              </Link>
+            )}
           </div>
         </div>
       ) : (
@@ -186,6 +187,16 @@ export default function DriverHomePage() {
             </div>
           )}
         </div>
+      )}
+
+      {offerGroups.length > 0 && (
+        <NextLoadOffers
+          offerGroups={offerGroups}
+          brokers={brokers}
+          onSelect={(groupId, loadId) => selectLoadOffer(groupId, loadId, "driver")}
+          onAsk={(loadId, text) => requestOfferDetail(loadId, text)}
+          onAskResolve={(loadId, draft) => resolveOfferDetail(loadId, draft)}
+        />
       )}
 
       {driver.homeTimeTarget !== "No preference set" && (

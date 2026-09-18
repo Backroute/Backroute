@@ -136,7 +136,6 @@ interface StoreState {
     routeEscalationToSupport: (id: string) => void;
     sendDriverMessage: (driverId: string, content: string) => void;
     updateSettings: (partial: Partial<AgentSettings>) => void;
-    captureDocument: (loadId: string, type: "bol" | "pod") => void;
     driverConfirmStage: (loadId: string) => void;
     selectLoadOffer: (offerGroupId: string, loadId: string, actor: "driver" | "carrier") => void;
     reportIncident: (driverId: string, truckId: string, type: IncidentType, note: string) => void;
@@ -469,30 +468,6 @@ export const useStore = create<StoreState>((set, get) => ({
               ? state.settings.enabledAddons.filter((id) => id !== addonId)
               : [...state.settings.enabledAddons, addonId],
           },
-        };
-      }),
-
-    captureDocument: (loadId, type) =>
-      set((state) => {
-        const load = state.loads.find((l) => l.id === loadId);
-        if (!load) return {};
-        const doc = {
-          id: uid("doc"),
-          type,
-          name: `${type.toUpperCase()}_${load.referenceNumber}_${randInt(1, 99)}.jpg`,
-          generatedAt: new Date().toISOString(),
-          status: "verified" as const,
-        };
-        return {
-          loads: state.loads.map((l) => (l.id === loadId ? { ...l, documents: [...l.documents, doc] } : l)),
-          activity: [
-            {
-              id: uid("act"), timestamp: new Date().toISOString(), type: "document_captured" as const,
-              message: `${type.toUpperCase()} captured by driver`, detail: `${load.referenceNumber} · verified automatically`,
-              loadId, carrierId: load.carrierId, severity: "success" as const,
-            },
-            ...state.activity,
-          ].slice(0, 80),
         };
       }),
 
