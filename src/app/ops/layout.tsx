@@ -23,6 +23,8 @@ export default function OpsLayout({ children }: { children: React.ReactNode }) {
   const escalations = useStore((s) => s.escalations);
   const activity = useStore((s) => s.activity);
   const carriers = useStore((s) => s.carriers);
+  const loads = useStore((s) => s.loads);
+  const brokers = useStore((s) => s.brokers);
   const openCount = escalations.filter((e) => e.status !== "resolved" && e.carrierId === PRIMARY_CARRIER_ID).length;
   const navWithBadge = NAV.map((n) => (n.href === "/ops/escalations" ? { ...n, badge: openCount } : n));
 
@@ -31,6 +33,19 @@ export default function OpsLayout({ children }: { children: React.ReactNode }) {
     {
       heading: "Carriers",
       items: carriers.slice(0, 30).map((c) => ({ id: c.id, label: c.name, sublabel: c.plan, href: "/ops/carriers" })),
+    },
+    {
+      heading: "Loads",
+      items: loads.slice(0, 30).map((l) => ({
+        id: l.id,
+        label: `${l.lane.origin} → ${l.lane.destination}`,
+        sublabel: l.referenceNumber,
+        href: `/ops/loads/${l.id}`,
+      })),
+    },
+    {
+      heading: "Brokers",
+      items: brokers.map((b) => ({ id: b.id, label: b.company, sublabel: b.contact, href: "/ops/brokers" })),
     },
   ];
 

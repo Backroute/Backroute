@@ -26,6 +26,8 @@ const NAV: NavItem[] = [
 export default function CarrierLayout({ children }: { children: React.ReactNode }) {
   const carrier = usePrimaryCarrier();
   const loads = useCarrierLoads();
+  const trucks = useStore((s) => s.trucks);
+  const drivers = useStore((s) => s.drivers);
   const activity = useStore((s) => s.activity).filter((e) => e.carrierId === carrier.id);
   const pendingOffers = loads.filter((l) => l.stage === "offered").length;
   // Matches exactly what the Negotiations page itself lists, so the badge never disagrees with the page it labels.
@@ -46,6 +48,13 @@ export default function CarrierLayout({ children }: { children: React.ReactNode 
         sublabel: l.referenceNumber,
         href: `/carrier/loads/${l.id}`,
       })),
+    },
+    {
+      heading: "Fleet",
+      items: [
+        ...trucks.map((t) => ({ id: t.id, label: t.unitNumber, sublabel: `${t.currentCity}, ${t.currentState}`, href: "/carrier/fleet" })),
+        ...drivers.map((d) => ({ id: d.id, label: d.name, sublabel: d.homeBase, href: "/carrier/fleet" })),
+      ],
     },
   ];
 
