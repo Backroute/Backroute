@@ -16,6 +16,7 @@ import { NegotiationThread } from "@/components/shared/negotiation-thread";
 import { CallTranscript } from "@/components/shared/call-transcript";
 import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 import { LiveDot } from "@/components/shared/live-dot";
+import { StopsTimeline } from "@/components/shared/stops-timeline";
 import { TripStepper } from "@/components/shared/trip-stepper";
 import { Progress } from "@/components/ui/progress";
 import { useLoad, useBrokerMap, useTruckMap, useDriverMap } from "@/lib/selectors";
@@ -279,6 +280,17 @@ export default function LoadDetailPage() {
                 <div className="mt-3.5">
                   <Row label="Pickup" value={load.pickupWindow} />
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {load.stops && load.stops.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Stops</CardTitle>
+              </CardHeader>
+              <CardContent className="!pt-3">
+                <StopsTimeline load={load} />
               </CardContent>
             </Card>
           )}

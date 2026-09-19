@@ -6,6 +6,7 @@ import { ArrowLeft, Camera, CheckCircle2, Clock, DollarSign, FileText, LifeBuoy,
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { TripStepper } from "@/components/shared/trip-stepper";
+import { StopsTimeline } from "@/components/shared/stops-timeline";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
 import { StageConfirmButton } from "@/components/shared/stage-confirm-button";
@@ -51,6 +52,7 @@ export default function DriverLoadDetailPage() {
   const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
   const driverConfirmStage = useStore((s) => s.actions.driverConfirmStage);
   const recaptureDocument = useStore((s) => s.actions.recaptureDocument);
+  const completeLoadStop = useStore((s) => s.actions.completeLoadStop);
 
   if (!load) {
     return (
@@ -126,27 +128,31 @@ export default function DriverLoadDetailPage() {
       </div>
 
       <SectionCard title="Trip details" icon={MapPin}>
-        <div className="flex flex-col">
-          <div className="flex items-start gap-3">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-ink-950 text-ink-950">
-              <MapPin className="h-3.5 w-3.5" />
-            </span>
-            <div className="pb-3">
-              <p className="text-sm font-medium text-ink-950">{load.lane.origin}, {load.lane.originState}</p>
-              <p className="text-xs text-ink-500">Pickup · {load.pickupWindow}</p>
+        {load.stops && load.stops.length > 0 ? (
+          <StopsTimeline load={load} onCompleteStop={isCurrent ? (stopId) => completeLoadStop(load.id, stopId) : undefined} />
+        ) : (
+          <div className="flex flex-col">
+            <div className="flex items-start gap-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-ink-950 text-ink-950">
+                <MapPin className="h-3.5 w-3.5" />
+              </span>
+              <div className="pb-3">
+                <p className="text-sm font-medium text-ink-950">{load.lane.origin}, {load.lane.originState}</p>
+                <p className="text-xs text-ink-500">Pickup · {load.pickupWindow}</p>
+              </div>
+            </div>
+            <div className="ml-3.5 -my-1 h-3 w-px bg-ink-200" />
+            <div className="flex items-start gap-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink-950 text-white">
+                <MapPin className="h-3.5 w-3.5" />
+              </span>
+              <div>
+                <p className="text-sm font-medium text-ink-950">{load.lane.destination}, {load.lane.destState}</p>
+                <p className="text-xs text-ink-500">Delivery · {load.deliveryWindow}</p>
+              </div>
             </div>
           </div>
-          <div className="ml-3.5 -my-1 h-3 w-px bg-ink-200" />
-          <div className="flex items-start gap-3">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink-950 text-white">
-              <MapPin className="h-3.5 w-3.5" />
-            </span>
-            <div>
-              <p className="text-sm font-medium text-ink-950">{load.lane.destination}, {load.lane.destState}</p>
-              <p className="text-xs text-ink-500">Delivery · {load.deliveryWindow}</p>
-            </div>
-          </div>
-        </div>
+        )}
       </SectionCard>
 
       <SectionCard title="Rate & earnings" icon={DollarSign}>

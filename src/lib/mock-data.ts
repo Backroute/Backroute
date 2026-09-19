@@ -620,6 +620,17 @@ export function generateWorld(seed = 20260916): World {
 
   const loads = specs.map((spec, i) => buildLoad(rng, brokers, spec, i));
 
+  // One demoable multi-stop load — a partial drop plus an extra pickup along the same route, the most
+  // common real-world multi-stop pattern. Additive only: every other load still has zero stops.
+  const multiStopLoad = loads.find((l) => l.stage === "in_transit" && l.truckId === trucks[0]?.id);
+  if (multiStopLoad) {
+    const [midCity, midState] = rng.pick(US_CITY_PAIRS);
+    multiStopLoad.stops = [
+      { id: rng.id("stop"), kind: "delivery", city: midCity, state: midState, window: "Partial drop, today 2:00–4:00 PM", sequence: 1, completed: true },
+      { id: rng.id("stop"), kind: "pickup", city: midCity, state: midState, window: "Additional pickup, today 4:30–6:00 PM", sequence: 2, completed: false },
+    ];
+  }
+
   loads.forEach((load) => {
     if (!load.truckId) return;
     const truck = trucks.find((t) => t.id === load.truckId);

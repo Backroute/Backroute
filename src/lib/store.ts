@@ -183,6 +183,9 @@ interface StoreState {
     /** Always a human call — the carrier approves or denies, never the AI. */
     requestTimeOff: (driverId: string, startDate: string, endDate: string, reason: string) => void;
     respondTimeOff: (id: string, approve: boolean) => void;
+    /** Checks off one intermediate stop on a multi-stop load. Doesn't touch load.stage — the overall
+     *  pickup/transit/delivery lifecycle still runs off the existing stage machine untouched. */
+    completeLoadStop: (loadId: string, stopId: string) => void;
     seedInitialOffers: () => void;
     updateHomeTimeTarget: (driverId: string, target: string) => void;
     requestBetterRate: (loadId: string, actor: "driver" | "carrier", amount?: number) => void;
@@ -857,6 +860,27 @@ export const useStore = create<StoreState>((set, get) => ({
               message: `Time off ${approve ? "approved" : "denied"} — ${driver?.name ?? "driver"}`,
               detail: `${request.startDate} – ${request.endDate}`,
               carrierId: PRIMARY_CARRIER_ID, severity: (approve ? "success" : "info") as ActivityEvent["severity"],
+            },
+            ...state.activity,
+          ].slice(0, 80),
+        };
+      }),
+
+    completeLoadStop: (loadId, stopId) =>
+      set((state) => {
+        const load = state.loads.find((l) => l.id === loadId);
+        const stop = load?.stops?.find((s) => s.id === stopId);
+        if (!load || !stop) return {};
+        return {
+          loads: state.loads.map((l) =>
+            l.id === loadId ? { ...l, stops: l.stops?.map((s) => (s.id === stopId ? { ...s, completed: true } : s)) } : l,
+          ),
+          activity: [
+            {
+              id: uid("act"), timestamp: new Date().toISOString(), type: "check_call" as const,
+              message: `${stop.kind === "pickup" ? "Extra pickup" : "Partial drop"} completed — ${stop.city}, ${stop.state}`,
+              detail: load.referenceNumber,
+              loadId, carrierId: load.carrierId, severity: "success" as const,
             },
             ...state.activity,
           ].slice(0, 80),

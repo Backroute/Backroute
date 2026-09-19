@@ -73,6 +73,20 @@ export interface Lane {
   marketRpm: number;
 }
 
+/** An intermediate stop on a multi-stop load — additional pickups or drop-offs between the lane's
+ *  origin and destination, which stay the first pickup and final delivery everywhere else in the app
+ *  (rate, scoring, IFTA mileage). Purely additive: a load with no stops behaves exactly as before. */
+export interface LoadStop {
+  id: string;
+  kind: "pickup" | "delivery";
+  city: string;
+  state: string;
+  window: string;
+  /** 1-based order between origin and destination. */
+  sequence: number;
+  completed: boolean;
+}
+
 export type HosStatus = "driving" | "on_duty" | "off_duty" | "sleeper";
 
 export interface Driver {
@@ -261,6 +275,9 @@ export interface Load {
   cancellationReason?: string;
   /** Truck-Ordered-Not-Used fee owed by the broker when a truck was already dispatched or at pickup. */
   tonuFee?: number;
+  /** Intermediate stops beyond the lane's origin/destination — absent or empty means a normal single-pickup,
+   *  single-delivery load, which is most of them. */
+  stops?: LoadStop[];
 }
 
 export type ActivityType =
