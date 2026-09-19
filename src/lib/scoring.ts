@@ -65,10 +65,10 @@ export function loadHighlight(opts: {
 }): string {
   const { rpm, marketRpm, deadheadMiles, miles, brokerReliability, brokerTier } = opts;
   const deadheadRatio = deadheadMiles / Math.max(miles + deadheadMiles, 1);
-  if (brokerTier === "preferred" && brokerReliability >= 90) return "Preferred broker — pays reliably";
+  if (brokerTier === "preferred" && brokerReliability >= 90) return "Preferred broker, pays reliably";
   if (deadheadRatio < 0.03) return "Almost zero deadhead miles";
   if (rpm >= marketRpm * 1.05) return "Paying above market rate";
   if (brokerReliability >= 85) return "High-reliability broker";
-  if (deadheadRatio < 0.1) return "Low deadhead — efficient lane";
+  if (deadheadRatio < 0.1) return "Low deadhead, efficient lane";
   return "Solid overall fit for this truck";
 }

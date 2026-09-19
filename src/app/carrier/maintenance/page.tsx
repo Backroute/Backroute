@@ -98,7 +98,7 @@ export default function MaintenancePage() {
                         <span className="flex items-center gap-2 font-medium text-ink-900">
                           <Wrench className="h-3.5 w-3.5 shrink-0" /> {appointment.serviceType} at {appointment.shopName}
                         </span>
-                        <span className="text-ink-500">Scheduled for {formatDate(appointment.scheduledFor)} — held out of the offer pool until complete.</span>
+                        <span className="text-ink-500">Scheduled for {formatDate(appointment.scheduledFor)}. Held out of the offer pool until complete.</span>
                         <Button size="sm" variant="secondary" className="self-start" onClick={() => completeMaintenance(truck.id)}>
                           <CheckCircle2 className="h-3.5 w-3.5" /> Mark service complete
                         </Button>
@@ -110,8 +110,8 @@ export default function MaintenancePage() {
                             {svcStatus === "overdue" ? <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : <Wrench className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
                             <span>
                               {svcStatus === "overdue"
-                                ? "Past service interval — AI will avoid booking a long-haul load on this truck until serviced."
-                                : "Approaching service interval — schedule before the next multi-day load."}
+                                ? "Past service interval. AI won't book a long-haul load on this truck until it's serviced."
+                                : "Approaching service interval. Schedule before the next multi-day load."}
                             </span>
                           </div>
                         )}
@@ -120,8 +120,8 @@ export default function MaintenancePage() {
                             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                             <span>
                               {inspStatus === "overdue"
-                                ? "DOT inspection is past due — AI will avoid booking this truck until it's current."
-                                : "DOT inspection due soon — schedule it before it lapses."}
+                                ? "DOT inspection is past due. AI won't book this truck until it's current."
+                                : "DOT inspection due soon. Schedule it before it lapses."}
                             </span>
                           </div>
                         )}

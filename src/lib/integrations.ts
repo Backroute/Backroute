@@ -16,7 +16,7 @@ export const INTEGRATION_CATEGORIES: IntegrationCategory[] = [
   {
     name: "Load boards",
     items: [
-      { id: "dat-one", name: "DAT One", connected: true, detail: "Largest spot-market board — primary source" },
+      { id: "dat-one", name: "DAT One", connected: true, detail: "Largest spot-market board, primary source" },
       { id: "truckstop", name: "Truckstop.com", connected: true, detail: "Secondary board coverage + rate insight" },
       { id: "123loadboard", name: "123Loadboard", connected: false, detail: "Additional regional board coverage" },
     ],

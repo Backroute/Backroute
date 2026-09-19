@@ -105,7 +105,7 @@ export default function OpsLoadDetailPage() {
             <CardHeader>
               <div>
                 <CardTitle className="flex items-center gap-2"><ShieldAlert className="h-4 w-4 text-[var(--accent-warn)]" /> Ops controls</CardTitle>
-                <CardDescription>Internal only — every action here is logged and visible to the carrier.</CardDescription>
+                <CardDescription>Internal only. Every action here is logged and visible to the carrier.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="!pt-3 flex flex-col gap-3.5">
@@ -115,8 +115,8 @@ export default function OpsLoadDetailPage() {
                   <p className="text-xs text-ink-500">
                     {load.aiPaused
                       ? isTransitStage(load.stage)
-                        ? "Paused — has no effect now; the driver, not the AI, owns pickup/delivery from here."
-                        : "Paused — the AI will not advance this load"
+                        ? "Paused, but has no effect now; the driver, not the AI, owns pickup/delivery from here."
+                        : "Paused. The AI will not advance this load."
                       : "Running normally"}
                   </p>
                 </div>
@@ -136,7 +136,7 @@ export default function OpsLoadDetailPage() {
               <div className="rounded-2xl border border-line p-3.5">
                 <p className="text-sm font-medium text-ink-900">Override rate</p>
                 <p className="mt-0.5 text-xs text-ink-500">
-                  Sets the {load.bookedRate !== null ? "booked" : "target"} rate directly — bypasses AI negotiation entirely.
+                  Sets the {load.bookedRate !== null ? "booked" : "target"} rate directly, bypassing AI negotiation entirely.
                 </p>
                 <div className="mt-2.5 flex items-center gap-2">
                   <div className="relative">

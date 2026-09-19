@@ -19,7 +19,7 @@ export function AddonGate({ addonId, children }: { addonId: string; children: Re
       <p className="mt-3 text-sm font-semibold text-ink-950">{addon?.name ?? "This AI agent"} isn&apos;t turned on</p>
       <p className="mx-auto mt-1 max-w-sm text-xs text-ink-500">{addon?.tagline}</p>
       <Button size="sm" className="mt-4" onClick={() => toggleAddon(addonId)}>
-        Turn on — free
+        Turn on, free
       </Button>
       {addon?.commissionNote && <p className="mx-auto mt-2 max-w-sm text-[11px] text-ink-400">{addon.commissionNote}</p>}
     </div>

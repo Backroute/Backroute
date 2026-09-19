@@ -63,7 +63,7 @@ export default function DriverHomePage() {
                 <div className="flex items-center gap-2">
                   <LifeBuoy className="h-4 w-4 text-[var(--accent-warn)]" />
                   <span className="text-xs font-semibold uppercase tracking-wide text-[var(--accent-warn)]">
-                    {incident.type} reported — AI is on it
+                    {incident.type} reported, AI is on it
                   </span>
                 </div>
                 <div className="mt-2.5 flex flex-col gap-1.5">
@@ -148,7 +148,7 @@ export default function DriverHomePage() {
         </div>
       ) : (
         <div className="flex flex-col items-center gap-3 rounded-3xl border border-line p-6 text-center">
-          <p className="text-sm text-ink-500">No active load — the AI is sourcing your next one now.</p>
+          <p className="text-sm text-ink-500">No active load. The AI is sourcing your next one now.</p>
           <button onClick={() => setCalling(true)} className="flex items-center gap-1.5 rounded-full border border-line px-4 py-2 text-xs font-medium text-ink-700">
             <Phone className="h-3.5 w-3.5" /> Call AI Dispatcher
           </button>
@@ -162,14 +162,14 @@ export default function DriverHomePage() {
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-[var(--accent-info)]">
                 <Link2 className="h-3.5 w-3.5" />
               </span>
-              <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Next load — already chained</span>
+              <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Next load, already chained</span>
             </div>
             <LoadScoreBadge score={nextLoad.score} size="sm" />
           </div>
           <p className="mt-2 font-medium text-ink-950">
             {nextLoad.lane.origin} <span className="text-ink-300">→</span> {nextLoad.lane.destination}
           </p>
-          <p className="mt-0.5 text-xs text-ink-500">{nextLoad.stage === "negotiating" ? "AI is negotiating rate now" : "Rate locked — waiting on your current delivery"}</p>
+          <p className="mt-0.5 text-xs text-ink-500">{nextLoad.stage === "negotiating" ? "AI is negotiating rate now" : "Rate locked, waiting on your current delivery"}</p>
           <div className="mt-2.5 flex items-center gap-4 text-xs">
             <span className="text-ink-500">Total offer <span className="font-semibold tabular text-ink-950">{formatCurrency(nextLoad.bookedRate ?? nextLoad.targetRate)}</span></span>
             <span className="text-ink-500">Est. net <span className="font-semibold tabular text-ink-950">{formatCurrency(nextLoad.netProfit ?? 0)}</span></span>

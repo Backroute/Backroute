@@ -14,7 +14,7 @@ const STATS = [
 
 const FEATURES = [
   { title: "Finds every load", body: "Scans every board and inbox, scored on true profit after fuel, tolls, and deadhead.", icon: Radar },
-  { title: "Negotiates everywhere", body: "Email, SMS, and voice — holding your rate floor, all day, every channel at once.", icon: MessageSquare },
+  { title: "Negotiates everywhere", body: "Email, SMS, and voice, holding your rate floor all day on every channel.", icon: MessageSquare },
   { title: "Books the next one", body: "Confirms, tracks, and documents automatically, then rebooks before this load lands.", icon: Truck },
 ];
 
@@ -63,7 +63,7 @@ export default function Home() {
               <span className="font-normal text-white/45">Freight dispatch,</span><br />fully automated.
             </h1>
             <p className="mt-8 max-w-xl text-lg text-white/55">
-              Sources loads, negotiates rate, and books the next one automatically — the work of a full-time dispatcher, without the headcount.
+              Sources loads, negotiates rate, and books the next one automatically. A full-time dispatcher, without the headcount.
             </p>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
               <Button href="/carrier" size="lg" variant="secondary" className="!bg-white !text-ink-950 hover:!bg-white/90">

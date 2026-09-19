@@ -165,43 +165,43 @@ function costsForLane(rng: ReturnType<typeof createRng>, miles: number, deadhead
 
 const EMAIL_OPENERS = [
   (o: string, d: string, miles: number, pick: string) =>
-    `Hi — saw your ${o} to ${d} (${miles} mi) posted for ${pick} pickup. We have a truck free in the area. What's the best you can do on rate?`,
+    `Hi, saw your ${o} to ${d} (${miles} mi) posted for ${pick} pickup. We have a truck free in the area. What's the best you can do on rate?`,
   (o: string, d: string, miles: number, pick: string) =>
-    `Following up on the ${o}–${d} load, ${pick} pickup. We can cover it today. Can you move on the posted rate?`,
+    `Following up on the ${o} to ${d} load, ${pick} pickup. We can cover it today. Can you move on the posted rate?`,
 ];
 const EMAIL_COUNTERS = [
   (amt: number) => `We can do this one at $${amt.toLocaleString()} all-in, no accessorials. Truck can be there within the appointment window.`,
-  (amt: number) => `$${amt.toLocaleString()} works on our end and we can hold that rate — need confirmation in the next hour to lock the truck.`,
+  (amt: number) => `$${amt.toLocaleString()} works on our end and we can hold that rate. Need confirmation in the next hour to lock the truck.`,
   (amt: number) => `Closest we can get is $${amt.toLocaleString()}. Truck is clean, on-time history is 98%+, empty and ready to roll.`,
 ];
 const EMAIL_CONCEDE = [
   (amt: number) => `We can come down to $${amt.toLocaleString()} to get this locked in today.`,
   (amt: number) => `Alright, we can do $${amt.toLocaleString()} if that gets us confirmed now.`,
-  (amt: number) => `We'll meet you closer — $${amt.toLocaleString()} works if we can lock the truck now.`,
+  (amt: number) => `We'll meet you closer. $${amt.toLocaleString()} works if we can lock the truck now.`,
 ];
 const BROKER_REPLIES_LOW = [
   (amt: number) => `Best I can do right now is $${amt.toLocaleString()}. Shipper is firm on the budget.`,
   (amt: number) => `I hear you, but I'm capped at $${amt.toLocaleString()} on this one.`,
-  (amt: number) => `Let me check with the shipper — can offer $${amt.toLocaleString()} for now.`,
+  (amt: number) => `Let me check with the shipper. Can offer $${amt.toLocaleString()} for now.`,
 ];
 const BROKER_ACCEPTS = [
-  (amt: number) => `Alright, you got it — $${amt.toLocaleString()} all-in. Sending the rate con over now.`,
+  (amt: number) => `Alright, you got it. $${amt.toLocaleString()} all-in. Sending the rate con over now.`,
   (amt: number) => `Deal. $${amt.toLocaleString()}, locking the truck. Rate confirmation on its way.`,
   (amt: number) => `Works for me at $${amt.toLocaleString()}. I'll get the paperwork over shortly.`,
 ];
 const CALL_OPENERS = [
-  (name: string, o: string, d: string) => `Hi ${name}, this is Backroute calling on the ${o} to ${d} load — following up on our offer.`,
-  (name: string, o: string, d: string) => `Hey ${name}, Backroute here on the ${o}–${d} lane. Wanted to close the loop on rate live.`,
-  (name: string, o: string, d: string) => `${name}, thanks for picking up — calling about the ${o} to ${d} load we've been going back and forth on.`,
+  (name: string, o: string, d: string) => `Hi ${name}, this is Backroute calling on the ${o} to ${d} load, following up on our offer.`,
+  (name: string, o: string, d: string) => `Hey ${name}, Backroute here on the ${o} to ${d} lane. Wanted to close the loop on rate live.`,
+  (name: string, o: string, d: string) => `${name}, thanks for picking up. Calling about the ${o} to ${d} load we've been going back and forth on.`,
 ];
 const CALL_BROKER_STALLS = [
-  "Yeah, hey — let me pull it up. We're still a bit apart on rate.",
+  "Yeah, hey, let me pull it up. We're still a bit apart on rate.",
   "Sure, one sec... yeah, shipper's still holding firm on budget.",
-  "Hey, good timing. Let me check where we landed — we're close but not quite there.",
+  "Hey, good timing. Let me check where we landed. We're close but not quite there.",
 ];
 const CALL_AI_HOLDS = [
   (amt: number) => `Understood. We can commit right now at $${amt.toLocaleString()} and have the truck moving within the hour.`,
-  (amt: number) => `I hear you — $${amt.toLocaleString()} is where we can lock this in immediately, truck's empty and close by.`,
+  (amt: number) => `I hear you. $${amt.toLocaleString()} is where we can lock this in immediately, truck's empty and close by.`,
   (amt: number) => `We can make $${amt.toLocaleString()} work today if we can get this confirmed now.`,
 ];
 const CALL_BROKER_CHECKS = [
@@ -210,35 +210,35 @@ const CALL_BROKER_CHECKS = [
   "Hold on, pulling up the shipper's number... yeah, we're good there.",
 ];
 const CALL_AI_CLOSES = [
-  (amt: number) => `Great — confirming $${amt.toLocaleString()} all-in. Sending our MC and insurance now, please send the rate confirmation.`,
-  (amt: number) => `Perfect, locking in $${amt.toLocaleString()}. I'll get our packet over — go ahead and send the rate con when ready.`,
-  (amt: number) => `That works — $${amt.toLocaleString()} confirmed. Sending carrier packet now, we'll be rolling shortly.`,
+  (amt: number) => `Great, confirming $${amt.toLocaleString()} all-in. Sending our MC and insurance now, please send the rate confirmation.`,
+  (amt: number) => `Perfect, locking in $${amt.toLocaleString()}. I'll get our packet over. Go ahead and send the rate con when ready.`,
+  (amt: number) => `That works. $${amt.toLocaleString()} confirmed. Sending carrier packet now, we'll be rolling shortly.`,
 ];
 const CALL_BROKER_CONFIRMS = [
   "Sounds good, you're booked. Rate con going out now.",
-  "Deal — I'll send the rate confirmation over in a few minutes.",
+  "Deal. I'll send the rate confirmation over in a few minutes.",
   "You got it, locking the truck on my end. Paperwork's on its way.",
 ];
 const CALL_BROKER_CHECKS_PENDING = [
   "Let me check with the shipper and call you right back.",
-  "I'm not authorized to close at that — give me a few minutes to confirm.",
+  "I'm not authorized to close at that. Give me a few minutes to confirm.",
   "Have to run it by my manager on this one, hang tight.",
 ];
 const CALL_AI_FOLLOWUP = [
-  (amt: number) => `Understood — let's hold $${amt.toLocaleString()} for you. Call me back the second you're clear to close.`,
+  (amt: number) => `Understood. Let's hold $${amt.toLocaleString()} for you. Call me back the second you're clear to close.`,
   (amt: number) => `We'll keep $${amt.toLocaleString()} open on our end. Get the sign-off and we'll send the packet right away.`,
   (amt: number) => `$${amt.toLocaleString()} still works for us. Confirm with your shipper and we can lock the truck.`,
 ];
 const CALL_BROKER_PENDING = [
   "Okay, I'll call you back once I hear from the shipper.",
-  "Give me a bit — I'll follow up as soon as I know.",
+  "Give me a bit, I'll follow up as soon as I know.",
   "Noted, I'll get back to you shortly on that.",
 ];
 
 const SMS_NUDGES = [
-  "Just checking in — still have the truck available if we can get to a number that works.",
+  "Just checking in, still have the truck available if we can get to a number that works.",
   "Any movement on that rate? We're ready to roll as soon as we're locked.",
-  "Can hold this truck another 20 min — let me know if we have a deal.",
+  "Can hold this truck another 20 min. Let me know if we have a deal.",
 ];
 
 function buildNegotiationThread(
@@ -653,7 +653,7 @@ export function generateWorld(seed = 20260916): World {
       id: rng.id("esc"),
       loadId: loads.find((l) => l.stage === "negotiating")?.id ?? loads[3].id,
       carrierId: PRIMARY_CARRIER_ID,
-      reason: "Broker requesting rate 9% below carrier floor — needs a judgment call on accept or walk.",
+      reason: "Broker requesting rate 9% below carrier floor. Needs a judgment call on accept or walk.",
       createdAt: iso(-18),
       status: "open",
       complexity: "critical",
@@ -662,19 +662,19 @@ export function generateWorld(seed = 20260916): World {
       id: rng.id("esc"),
       loadId: loads.find((l) => l.stage === "in_transit")?.id ?? loads[10].id,
       carrierId: PRIMARY_CARRIER_ID,
-      reason: "Detention at receiver exceeding 2 hours — invoice ready to send.",
+      reason: "Detention at receiver exceeding 2 hours. Invoice ready to send.",
       createdAt: iso(-46),
       status: "open",
       complexity: "routine",
       recommendedAction: "approve",
-      recommendedLabel: "Approve — send detention invoice",
+      recommendedLabel: "Approve, send detention invoice",
     },
   ];
 
   const activity: ActivityEvent[] = [
     { id: rng.id("act"), timestamp: iso(-4), type: "load_sourced", message: "New load sourced from DAT One", detail: `Dallas, TX → Atlanta, GA · $${loads[1]?.listedRate ?? 1850}`, loadId: loads[1]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info" },
     { id: rng.id("act"), timestamp: iso(-11), type: "negotiation_sms", channel: "sms", message: "AI countered broker via SMS", detail: "Meridian Freight Services · Countered at $2,140", loadId: loads[4]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info" },
-    { id: rng.id("act"), timestamp: iso(-26), type: "call_completed", channel: "voice", message: "Voice call closed — rate locked", detail: "Cascade Logistics Partners · $2,310 all-in", loadId: loads[6]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "success" },
+    { id: rng.id("act"), timestamp: iso(-26), type: "call_completed", channel: "voice", message: "Voice call closed, rate locked", detail: "Cascade Logistics Partners · $2,310 all-in", loadId: loads[6]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "success" },
     { id: rng.id("act"), timestamp: iso(-33), type: "tms_synced", message: "Load synced to TMS", detail: `Reference ${loads[7]?.referenceNumber}`, loadId: loads[7]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "success" },
     { id: rng.id("act"), timestamp: iso(-58), type: "check_call", message: "Automated check call completed", detail: "Truck T-107 · On schedule, ETA 6:40 PM", loadId: loads[9]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info" },
     { id: rng.id("act"), timestamp: iso(-72), type: "chained", message: "Next load pre-negotiated before delivery", detail: "Truck T-107 · 0 deadhead miles projected", loadId: loads[5]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "success" },
@@ -684,14 +684,14 @@ export function generateWorld(seed = 20260916): World {
   activity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   const driverMessages: DriverMessage[] = [
-    { id: rng.id("dm"), driverId: PRIMARY_DRIVER_ID, from: "ai", content: "Morning Marcus — you're loaded and headed to Atlanta. Traffic's clear on I-20, ETA holding at 6:40 PM.", timestamp: iso(-410) },
+    { id: rng.id("dm"), driverId: PRIMARY_DRIVER_ID, from: "ai", content: "Morning Marcus, you're loaded and headed to Atlanta. Traffic's clear on I-20, ETA holding at 6:40 PM.", timestamp: iso(-410) },
     { id: rng.id("dm"), driverId: PRIMARY_DRIVER_ID, from: "driver", content: "Sounds good, stopping for fuel in Shreveport.", timestamp: iso(-395) },
-    { id: rng.id("dm"), driverId: PRIMARY_DRIVER_ID, from: "ai", content: "Got it, noted. I'm already working your next load out of Atlanta so you won't run empty — will confirm rate shortly.", timestamp: iso(-390) },
+    { id: rng.id("dm"), driverId: PRIMARY_DRIVER_ID, from: "ai", content: "Got it, noted. I'm already working your next load out of Atlanta so you won't run empty. Will confirm rate shortly.", timestamp: iso(-390) },
     { id: rng.id("dm"), driverId: PRIMARY_DRIVER_ID, from: "ai", content: "Heads up: receiver in Atlanta closes at 6 PM sharp, you're tracking to arrive with room to spare.", timestamp: iso(-60) },
   ];
 
   const carrierMessages: CarrierMessage[] = [
-    { id: rng.id("cm"), carrierId: PRIMARY_CARRIER_ID, from: "ai", content: "Morning — 13 loads active, net profit's tracking to $14.2k this cycle. Two things need your eyes: an escalation on the Chicago–Memphis lane and T-109's DOT inspection is overdue.", timestamp: iso(-410) },
+    { id: rng.id("cm"), carrierId: PRIMARY_CARRIER_ID, from: "ai", content: "Morning. 13 loads active, net profit's tracking to $14.2k this cycle. Two things need your eyes: an escalation on the Chicago to Memphis lane and T-109's DOT inspection is overdue.", timestamp: iso(-410) },
     { id: rng.id("cm"), carrierId: PRIMARY_CARRIER_ID, from: "carrier", content: "Thanks, will check the escalation now.", timestamp: iso(-405) },
   ];
 

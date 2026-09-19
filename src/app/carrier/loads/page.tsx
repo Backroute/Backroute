@@ -100,7 +100,7 @@ export default function CarrierLoadsPage() {
         {group === "offers" ? (
           <div className="mt-5">
             {offerGroups.length === 0 ? (
-              <p className="py-12 text-center text-sm text-ink-400">No pending load choices right now — the AI will surface options as trucks free up.</p>
+              <p className="py-12 text-center text-sm text-ink-400">No pending load choices right now. The AI will surface options as trucks free up.</p>
             ) : (
               <NextLoadOffers
                 offerGroups={offerGroups}

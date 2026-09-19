@@ -199,33 +199,33 @@ export function autoResolveStaleOffers(loads: Load[], staleMs: number, autoBookE
 }
 
 const EMAIL_OPEN = (o: string, d: string, miles: number) =>
-  `Hi — saw your ${o} to ${d} (${miles} mi) posted. We have a truck available. What's the best you can do on rate?`;
+  `Hi, saw your ${o} to ${d} (${miles} mi) posted. We have a truck available. What's the best you can do on rate?`;
 const AI_OPEN_ASK = [
-  (amt: number) => `We can commit at $${amt.toLocaleString()} all-in — truck is clean and ready to move within the appointment window.`,
-  (amt: number) => `$${amt.toLocaleString()} is where we're at based on the lane and truck's availability — that's the number that works for us.`,
-  (amt: number) => `Best we can do is $${amt.toLocaleString()} — truck's ready to roll as soon as we can lock it in.`,
+  (amt: number) => `We can commit at $${amt.toLocaleString()} all-in. Truck is clean and ready to move within the appointment window.`,
+  (amt: number) => `$${amt.toLocaleString()} is where we're at based on the lane and truck's availability. That's the number that works for us.`,
+  (amt: number) => `Best we can do is $${amt.toLocaleString()}. Truck's ready to roll as soon as we can lock it in.`,
 ];
 const AI_CONCEDE = [
   (amt: number) => `We can come down to $${amt.toLocaleString()} to get this locked in today.`,
   (amt: number) => `Alright, we can do $${amt.toLocaleString()} if that gets us confirmed now.`,
-  (amt: number) => `We'll meet you closer — $${amt.toLocaleString()} works if we can lock the truck now.`,
+  (amt: number) => `We'll meet you closer. $${amt.toLocaleString()} works if we can lock the truck now.`,
 ];
 const BROKER_LOW = (amt: number) => `Best I can do right now is $${amt.toLocaleString()}. Shipper's tight on budget this week.`;
-const BROKER_ACCEPT = (amt: number) => `Alright, you've got it — $${amt.toLocaleString()} all-in. Sending the rate con over now.`;
+const BROKER_ACCEPT = (amt: number) => `Alright, you've got it. $${amt.toLocaleString()} all-in. Sending the rate con over now.`;
 
 const CALL_OPENERS = [
   (name: string, o: string, d: string) => `Hi ${name}, this is Backroute calling on the ${o} to ${d} load.`,
-  (name: string, o: string, d: string) => `Hey ${name}, Backroute here on the ${o}–${d} lane — got a minute?`,
+  (name: string, o: string, d: string) => `Hey ${name}, Backroute here on the ${o} to ${d} lane. Got a minute?`,
   (name: string, o: string, d: string) => `${name}, calling to close the loop on the ${o} to ${d} load.`,
 ];
 const CALL_BROKER_STALLS = [
-  "Hey, let me pull it up — we're still a bit apart on rate.",
+  "Hey, let me pull it up. We're still a bit apart on rate.",
   "Sure, one sec... yeah, shipper's holding firm on budget.",
-  "Good timing — let me check where we landed.",
+  "Good timing. Let me check where we landed.",
 ];
 const CALL_AI_HOLDS = [
   (amt: number) => `We can commit right now at $${amt.toLocaleString()} and have the truck moving within the hour.`,
-  (amt: number) => `$${amt.toLocaleString()} is where we can lock this in immediately — truck's close by and empty.`,
+  (amt: number) => `$${amt.toLocaleString()} is where we can lock this in immediately. Truck's close by and empty.`,
   (amt: number) => `We can make $${amt.toLocaleString()} work today if we get this confirmed now.`,
 ];
 const CALL_BROKER_CHECKS = [
@@ -236,11 +236,11 @@ const CALL_BROKER_CHECKS = [
 const CALL_AI_CLOSES = [
   (amt: number) => `Confirming $${amt.toLocaleString()} all-in. Sending MC and insurance now.`,
   (amt: number) => `Locking in $${amt.toLocaleString()}. Sending our packet over now.`,
-  (amt: number) => `$${amt.toLocaleString()} confirmed — sending carrier packet, we'll be rolling shortly.`,
+  (amt: number) => `$${amt.toLocaleString()} confirmed. Sending carrier packet, we'll be rolling shortly.`,
 ];
 const CALL_BROKER_CONFIRMS = [
   "You're booked. Rate con going out now.",
-  "Deal — sending the rate confirmation over in a few minutes.",
+  "Deal. I'll send the rate confirmation over in a few minutes.",
   "Locking the truck on my end. Paperwork's on its way.",
 ];
 
@@ -400,7 +400,7 @@ export function confirmLoadStage(load: Load, truck: Truck | undefined): StepResu
     events.push(mkEvent(load.carrierId, load.id, "check_call", "Driver confirmed arrival at pickup", `${load.lane.origin}, ${load.lane.originState}`, "info"));
   } else if (nextStage === "in_transit") {
     next.documents = [...load.documents, { id: uid("doc"), type: "bol", name: `BOL_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" }];
-    events.push(mkEvent(load.carrierId, load.id, "document_captured", "Driver confirmed loaded — BOL captured", `Loaded ${load.weight.toLocaleString()} lbs · departing ${load.lane.origin}`, "success"));
+    events.push(mkEvent(load.carrierId, load.id, "document_captured", "Driver confirmed loaded, BOL captured", `Loaded ${load.weight.toLocaleString()} lbs · departing ${load.lane.origin}`, "success"));
   } else if (nextStage === "at_delivery") {
     events.push(mkEvent(load.carrierId, load.id, "check_call", "Driver confirmed arrival at delivery", `${load.lane.destination}, ${load.lane.destState}`, "info"));
   } else if (nextStage === "delivered") {
@@ -409,7 +409,7 @@ export function confirmLoadStage(load: Load, truck: Truck | undefined): StepResu
       { id: uid("doc"), type: "pod", name: `POD_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" },
       { id: uid("doc"), type: "invoice", name: `Invoice_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" },
     ];
-    events.push(mkEvent(load.carrierId, load.id, "delivered", "Driver confirmed delivery — POD captured, invoice generated", `${load.referenceNumber} · net $${(load.netProfit ?? 0).toLocaleString()}`, "success"));
+    events.push(mkEvent(load.carrierId, load.id, "delivered", "Driver confirmed delivery, POD captured, invoice generated", `${load.referenceNumber} · net $${(load.netProfit ?? 0).toLocaleString()}`, "success"));
   }
 
   const truckUpdates = nextStage === "delivered" && truck ? { id: truck.id, status: "available" as const, currentLoadId: null } : undefined;
@@ -421,13 +421,13 @@ export function shouldChainNextLoad(load: Load, truck: Truck | undefined): boole
 }
 
 const PUSH_REQUEST_COPY: Record<"driver" | "carrier", (target: number) => string> = {
-  driver: (target) => `Driver asked us to push harder on this one — following up to see if we can get closer to $${target.toLocaleString()}.`,
-  carrier: (target) => `Following up per carrier request — any room to move toward $${target.toLocaleString()} on this one?`,
+  driver: (target) => `Driver asked us to push harder on this one. Following up to see if we can get closer to $${target.toLocaleString()}.`,
+  carrier: (target) => `Following up per carrier request. Any room to move toward $${target.toLocaleString()} on this one?`,
 };
 
 const COUNTER_REQUEST_COPY: Record<"driver" | "carrier", (target: number) => string> = {
-  driver: (target) => `Driver countered at $${target.toLocaleString()} — going back to the broker with that number now.`,
-  carrier: (target) => `Carrier countered at $${target.toLocaleString()} — going back to the broker with that number now.`,
+  driver: (target) => `Driver countered at $${target.toLocaleString()}. Going back to the broker with that number now.`,
+  carrier: (target) => `Carrier countered at $${target.toLocaleString()}. Going back to the broker with that number now.`,
 };
 
 /** Wherever the AI's ask actually stands in the live thread right now — it may have conceded below
@@ -529,11 +529,11 @@ export function classifyInstruction(text: string): InstructionCategory {
 function instructionMessage(category: InstructionCategory, text: string, b: Broker): NegotiationMessage {
   const content =
     category === "detention"
-      ? `Also flagging detention/lumper terms on this one — can you confirm what's covered if we run over on time?`
+      ? `Also flagging detention/lumper terms on this one. Can you confirm what's covered if we run over on time?`
       : category === "schedule"
         ? `Any flexibility on the pickup window? We can move earlier or later if it helps lock this in.`
         : category === "payment"
-          ? `Quick one on terms, ${b.contact.split(" ")[0]} — any chance of quick pay or a shorter cycle on this load?`
+          ? `Quick one on terms, ${b.contact.split(" ")[0]}. Any chance of quick pay or a shorter cycle on this load?`
           : `Also wanted to flag on this one: "${text}"`;
   return { id: uid("msg"), channel: "email", direction: "outbound", from: "Backroute AI", timestamp: new Date().toISOString(), content };
 }
@@ -575,10 +575,10 @@ export interface OfferAskDraft {
 }
 
 const OFFER_PENDING_REPLY: Record<Exclude<InstructionCategory, "rate">, (company: string) => string> = {
-  detention: (company) => `Reached out to ${company} about detention terms — waiting on their response.`,
-  schedule: (company) => `Reached out to ${company} about the pickup window — waiting on their response.`,
-  payment: (company) => `Reached out to ${company} about payment terms — waiting on their response.`,
-  general: (company) => `Reached out to ${company} — waiting on their response.`,
+  detention: (company) => `Reached out to ${company} about detention terms. Waiting on their response.`,
+  schedule: (company) => `Reached out to ${company} about the pickup window. Waiting on their response.`,
+  payment: (company) => `Reached out to ${company} about payment terms. Waiting on their response.`,
+  general: (company) => `Reached out to ${company}. Waiting on their response.`,
 };
 
 /**
@@ -622,7 +622,7 @@ export function resolveOfferAsk(load: Load, broker: Broker | undefined, draft: O
     detention: `${b.company} confirmed detention pay kicks in after 2 free hours.`,
     schedule: `${b.company} can flex the pickup window if it helps lock this in.`,
     payment: `${b.company} can offer quick pay on this load for a small fee.`,
-    general: `${b.company} responded — nothing here changes what's shown on this card.`,
+    general: `${b.company} responded. Nothing here changes what's shown on this card.`,
   };
   return { load, reply: REPLY[draft.category] };
 }
@@ -684,7 +684,7 @@ export function incidentOpenedEvent(incident: Incident, truck: Truck | undefined
     incident.carrierId,
     incident.loadId ?? undefined,
     "incident",
-    `${INCIDENT_LABEL[incident.type]} reported${truck ? ` — ${truck.unitNumber}` : ""}`,
+    `${INCIDENT_LABEL[incident.type]} reported${truck ? `: ${truck.unitNumber}` : ""}`,
     incident.humanNotified ? `${base} A live safety specialist has also been notified.` : base,
     "warning",
   );

@@ -92,8 +92,8 @@ export default function EarningsPage() {
   const avgMarketRpm = rpmCount ? marketRpmSum / rpmCount : 0;
   const rateFloorNote =
     avgRpmAll >= avgMarketRpm * 1.02
-      ? "You're consistently beating market rate — worth testing a higher rate floor."
-      : "You're tracking close to market rate — hold your current floor for now.";
+      ? "You're consistently beating market rate. Worth testing a higher rate floor."
+      : "You're tracking close to market rate. Hold your current floor for now.";
 
   return (
     <div>
@@ -149,7 +149,7 @@ export default function EarningsPage() {
                 </ResponsiveContainer>
               </div>
               <p className="mt-3 text-xs text-ink-500">
-                About <span className="font-medium text-ink-900">{formatCurrency(1500 - 539)}</span> saved per truck, per month — {formatCurrency((1500 - 539) * trucks.length)} across your fleet.
+                About <span className="font-medium text-ink-900">{formatCurrency(1500 - 539)}</span> saved per truck, per month. {formatCurrency((1500 - 539) * trucks.length)} across your fleet.
               </p>
             </CardContent>
           </Card>
@@ -159,7 +159,7 @@ export default function EarningsPage() {
           <CardHeader>
             <div>
               <CardTitle className="flex items-center gap-2"><Lightbulb className="h-4 w-4" /> Weekly insights</CardTitle>
-              <CardDescription>Where your fleet is making the most — and least — money.</CardDescription>
+              <CardDescription>Where your fleet makes the most and least money.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="!pt-3">

@@ -119,7 +119,7 @@ export default function FleetPage() {
                         <LoadStagePill stage={currentLoad.stage} />
                       </Link>
                     ) : (
-                      <span className="text-xs text-ink-400">None — available</span>
+                      <span className="text-xs text-ink-400">Available</span>
                     )}
                   </div>
                   {currentLoad && (

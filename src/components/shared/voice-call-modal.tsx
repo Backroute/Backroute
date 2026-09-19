@@ -29,36 +29,36 @@ const INCIDENT_TYPES: { key: IncidentType; label: string; icon: typeof Wrench }[
 ];
 
 const NEGOTIATION_CALL_REPLY: Record<Exclude<ReturnType<typeof classifyInstruction>, "general">, (broker: string) => string> = {
-  rate: (broker) => `On it — taking that back to ${broker} right now, I'll confirm the second they answer.`,
-  detention: (broker) => `Got it — I'm asking ${broker} to confirm detention and lumper terms on this one.`,
-  schedule: (broker) => `Understood — checking with ${broker} on flexibility for the pickup window.`,
-  payment: (broker) => `On it — asking ${broker} about quick pay on this load.`,
+  rate: (broker) => `On it. Taking that back to ${broker} right now, I'll confirm the second they answer.`,
+  detention: (broker) => `Got it. I'm asking ${broker} to confirm detention and lumper terms on this one.`,
+  schedule: (broker) => `Understood. Checking with ${broker} on flexibility for the pickup window.`,
+  payment: (broker) => `On it. Asking ${broker} about quick pay on this load.`,
 };
 
 function greeting(spec: VoiceCallSpec): string {
   switch (spec.kind) {
     case "checkin":
-      return `Hey ${spec.driverFirstName.split(" ")[0]}, AI Dispatcher here — what's going on?`;
+      return `Hey ${spec.driverFirstName.split(" ")[0]}, AI Dispatcher here. What's going on?`;
     case "fleet":
-      return "AI Dispatcher — what do you need on your fleet?";
+      return "AI Dispatcher. What do you need on your fleet?";
     case "incident":
-      return "AI Dispatcher — go ahead, what happened?";
+      return "AI Dispatcher. Go ahead, what happened?";
     case "negotiation":
-      return `Calling about the ${spec.origin} → ${spec.dest} load with ${spec.brokerName} — what do you need me to push on?`;
+      return `Calling about the ${spec.origin} → ${spec.dest} load with ${spec.brokerName}. What do you need me to push on?`;
   }
 }
 
 function outcomeFor(spec: VoiceCallSpec, saidSomething: boolean): string {
-  if (!saidSomething) return "Call ended — nothing logged.";
+  if (!saidSomething) return "Call ended, nothing logged.";
   switch (spec.kind) {
     case "checkin":
       return "Logged with your AI dispatcher.";
     case "fleet":
       return "Logged with your AI dispatcher.";
     case "incident":
-      return "Incident reported — AI dispatcher is on it.";
+      return "Incident reported, AI dispatcher is on it.";
     case "negotiation":
-      return "Relayed to the broker — check the negotiation thread for updates.";
+      return "Relayed to the broker. Check the negotiation thread for updates.";
   }
 }
 
@@ -149,7 +149,7 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
       const category = classifyInstruction(value);
       sendNegotiationInstruction(spec.loadId, spec.actor, value);
       setTimeout(() => {
-        const reply = category === "general" ? "Got it — I'll flag that with the broker now." : NEGOTIATION_CALL_REPLY[category](spec.brokerName);
+        const reply = category === "general" ? "Got it. I'll flag that with the broker now." : NEGOTIATION_CALL_REPLY[category](spec.brokerName);
         setTranscript((prev) => [...prev, { speaker: "ai", text: reply }]);
         setPending(false);
       }, 900);
@@ -164,7 +164,7 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
     const closing =
       incidentType === "accident"
         ? "Notifying the broker, working the checklist, and looping in a live human safety specialist now."
-        : "Notifying the broker and working the checklist now — check Home for live status.";
+        : "Notifying the broker and working the checklist now. Check Home for live status.";
     setTranscript((prev) => [...prev, { speaker: "ai", text: closing }]);
     setSaidSomething(true);
     setPhase("ended");

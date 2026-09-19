@@ -60,7 +60,7 @@ function EmptyState({ text }: { text: string }) {
 }
 
 function FactoringList({ loads, now }: { loads: Load[]; now: number | null }) {
-  if (loads.length === 0) return <EmptyState text="No delivered loads yet — settlements appear the moment a load delivers." />;
+  if (loads.length === 0) return <EmptyState text="No delivered loads yet. Settlements appear the moment a load delivers." />;
   if (now === null) return null;
 
   const settlements = loads.map((l) => deriveFactoringSettlement(l, now));
@@ -93,7 +93,7 @@ function FactoringList({ loads, now }: { loads: Load[]; now: number | null }) {
       </div>
 
       <p className="text-xs text-ink-400">
-        Free to you — Backroute earns {formatCurrency(backrouteCommission)} in referral commission from our factoring partner on these invoices, not charged to you.
+        Free to you. Backroute earns {formatCurrency(backrouteCommission)} in referral commission from our factoring partner on these invoices, not charged to you.
       </p>
 
       <div className="flex flex-col gap-2">
@@ -118,7 +118,7 @@ function FactoringList({ loads, now }: { loads: Load[]; now: number | null }) {
 }
 
 function DriverPayList({ loads, drivers, trucks }: { loads: Load[]; drivers: Map<string, Driver>; trucks: Map<string, Truck> }) {
-  if (loads.length === 0) return <EmptyState text="No delivered loads yet — pay statements appear the moment a load delivers." />;
+  if (loads.length === 0) return <EmptyState text="No delivered loads yet. Pay statements appear the moment a load delivers." />;
 
   const rows = loads
     .flatMap((l) => {

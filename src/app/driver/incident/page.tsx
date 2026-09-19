@@ -49,8 +49,8 @@ export default function ReportIncidentPage() {
         <p className="font-display text-xl text-ink-950">AI dispatcher is on it</p>
         <p className="text-sm text-ink-500">
           {type === "accident"
-            ? "Notifying the broker, working the checklist, and looping in a live human safety specialist now — check Home for live status."
-            : "Notifying the broker and working the checklist now — check Home for live status."}
+            ? "Notifying the broker, working the checklist, and looping in a live safety specialist. Check Home for live status."
+            : "Notifying the broker and working the checklist. Check Home for live status."}
         </p>
       </div>
     );
@@ -64,7 +64,7 @@ export default function ReportIncidentPage() {
 
       <div>
         <h1 className="font-display text-2xl text-ink-950">Report an issue</h1>
-        <p className="mt-1 text-sm text-ink-500">Tell us what&apos;s going on — the AI dispatcher takes it from here.</p>
+        <p className="mt-1 text-sm text-ink-500">Tell us what&apos;s going on. The AI dispatcher takes it from here.</p>
       </div>
 
       <button

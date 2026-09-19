@@ -45,9 +45,9 @@ export default function CompliancePage() {
         <Card>
           <CardHeader>
             <div>
-              <CardTitle className="flex items-center gap-2"><FileCheck2 className="h-4 w-4" /> IFTA — this quarter</CardTitle>
+              <CardTitle className="flex items-center gap-2"><FileCheck2 className="h-4 w-4" /> IFTA this quarter</CardTitle>
               <CardDescription>
-                Free estimate from lane miles per truck — not a substitute for your ELD&apos;s official mileage report. Filing is a flat {formatCurrency(IFTA_FILING_FEE)}/quarter, no subscription.
+                Estimated from lane miles, not your ELD&apos;s official report. Filing is a flat {formatCurrency(IFTA_FILING_FEE)}/quarter, no subscription.
               </CardDescription>
             </div>
             <Button
@@ -79,11 +79,11 @@ export default function CompliancePage() {
               ))}
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-emerald-50 px-4 py-3">
-              <span className="flex items-center gap-2 text-sm text-[var(--accent-live)]"><CheckCircle2 className="h-4 w-4" /> Draft filing ready — no missing receipts flagged</span>
+              <span className="flex items-center gap-2 text-sm text-[var(--accent-live)]"><CheckCircle2 className="h-4 w-4" /> Draft filing ready, no missing receipts</span>
               {filed ? (
                 <Badge tone="success"><CheckCircle2 className="h-3 w-3" /> Filed</Badge>
               ) : (
-                <Button size="sm" variant="outline" onClick={() => setFiled(true)}>File this quarter — {formatCurrency(IFTA_FILING_FEE)}</Button>
+                <Button size="sm" variant="outline" onClick={() => setFiled(true)}>File this quarter · {formatCurrency(IFTA_FILING_FEE)}</Button>
               )}
             </div>
           </CardContent>
@@ -110,7 +110,7 @@ export default function CompliancePage() {
               </div>
 
               <p className="mt-3 text-xs text-ink-400">
-                Free to you — Backroute earned {formatCurrency(INSURANCE_REFERRAL_FEE)} in referral commission from {INSURANCE_POLICY.carrier} when this policy was bound.
+                Free to you. Backroute earned {formatCurrency(INSURANCE_REFERRAL_FEE)} in referral commission from {INSURANCE_POLICY.carrier} when this policy was bound.
               </p>
 
               {activeAccidents.length > 0 ? (
@@ -118,7 +118,7 @@ export default function CompliancePage() {
                   {activeAccidents.map((incident) => (
                     <div key={incident.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 px-4 py-3">
                       <span className="flex items-center gap-2 text-sm text-[var(--accent-warn)]">
-                        <AlertTriangle className="h-4 w-4" /> Accident reported — claim assist ready
+                        <AlertTriangle className="h-4 w-4" /> Accident reported, claim assist ready
                       </span>
                       <Button size="sm" variant="outline">Start claim</Button>
                     </div>

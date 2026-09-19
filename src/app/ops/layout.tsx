@@ -68,7 +68,7 @@ export default function OpsLayout({ children }: { children: React.ReactNode }) {
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-1.5 rounded-xl bg-white/5 px-3 py-2 text-[11px] text-white/40">
             <Lock className="h-3 w-3" />
-            Internal only — not part of the customer product
+            Internal only, not part of the customer product
           </div>
           <div className="flex items-center gap-2.5 rounded-xl border border-white/15 px-3 py-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-[11px] font-bold text-ink-950">HD</div>

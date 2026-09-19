@@ -58,7 +58,7 @@ function promoteChainedLoad(trucks: Truck[], truckId: string, carrierId: string)
     trucks: trucks.map((t) => (t.id === truckId ? { ...t, currentLoadId: chainedId, nextLoadId: null } : t)),
     event: {
       id: uid("act"), timestamp: new Date().toISOString(), type: "chained",
-      message: "Next load already chained — zero empty miles", detail: `${truck.unitNumber} rolling straight into the next lane`,
+      message: "Next load already chained, zero empty miles", detail: `${truck.unitNumber} rolling straight into the next lane`,
       loadId: chainedId, carrierId, severity: "success",
     },
   };
@@ -101,43 +101,43 @@ interface EscalationTemplate {
 /** Routine cases: the AI already knows the right call — carrier gets a one-tap default action. Critical cases: no safe default, routed to human support instead. */
 const ESCALATION_TEMPLATES: EscalationTemplate[] = [
   {
-    reason: "Detention exceeding 2 hours at the receiver — invoice ready to send.",
+    reason: "Detention exceeding 2 hours at the receiver. Invoice ready to send.",
     complexity: "routine",
     recommendedAction: "approve",
-    recommendedLabel: "Approve — send detention invoice",
+    recommendedLabel: "Approve, send detention invoice",
   },
   {
-    reason: "Broker unresponsive after 45 minutes — AI recommends re-sourcing this lane.",
+    reason: "Broker unresponsive after 45 minutes. AI recommends re-sourcing this lane.",
     complexity: "routine",
     recommendedAction: "approve",
-    recommendedLabel: "Approve — re-source the lane",
+    recommendedLabel: "Approve, re-source the lane",
   },
   {
     reason: "Receiver requesting appointment change outside driver's HOS window.",
     complexity: "routine",
     recommendedAction: "reject",
-    recommendedLabel: "Decline — propose next available window",
+    recommendedLabel: "Decline, propose next available window",
   },
   {
-    reason: "Minor weight discrepancy at scale — within normal tolerance.",
+    reason: "Minor weight discrepancy at scale, within normal tolerance.",
     complexity: "routine",
     recommendedAction: "approve",
-    recommendedLabel: "Approve — confirm accessorial with broker",
+    recommendedLabel: "Approve, confirm accessorial with broker",
   },
   {
-    reason: "Broker requesting rate 8% below carrier floor — needs a judgment call on accept or walk.",
+    reason: "Broker requesting rate 8% below carrier floor. Needs a judgment call on accept or walk.",
     complexity: "critical",
   },
   {
-    reason: "Broker disputing the signed rate confirmation — refusing to pay the agreed amount.",
+    reason: "Broker disputing the signed rate confirmation, refusing to pay the agreed amount.",
     complexity: "critical",
   },
   {
-    reason: "Cargo claim filed for alleged in-transit damage — carrier liability at stake.",
+    reason: "Cargo claim filed for alleged in-transit damage. Carrier liability at stake.",
     complexity: "critical",
   },
   {
-    reason: "Driver reports an unsafe delivery location after hours — needs a real-time call.",
+    reason: "Driver reports an unsafe delivery location after hours. Needs a real-time call.",
     complexity: "critical",
   },
 ];
@@ -222,42 +222,42 @@ function craftDriverReply(content: string, ctx: { driver?: Driver; currentLoad?:
   const { driver, currentLoad } = ctx;
 
   if (/how (does|do|is).*(dispatch|score|scoring|match|work)|how (backroute|this|it) works|explain.*dispatch/.test(c)) {
-    return "I scan every connected board and inbox, score each load on real profit after fuel and deadhead, negotiate rate by phone, text, and email, then book, track, and document the trip automatically — you just pick which load, I handle the rest.";
+    return "I scan every connected board and inbox, score each load on real profit after fuel and deadhead, then negotiate rate by phone, text, and email. Book, track, and document the trip automatically. You just pick which load, I handle the rest.";
   }
   if (/\b(decline|reject|turn down|pass on|skip)\b.*load|what happens if i (decline|reject|skip)/.test(c)) {
-    return "Nothing bad — decline it and I'll keep sourcing others. If nobody picks within the window, your carrier's autonomy settings decide whether I auto-book the top-scored option or just keep waiting.";
+    return "Nothing bad. Decline it and I'll keep sourcing others. If nobody picks within the window, your carrier's autonomy settings decide whether I auto-book the top-scored option or keep waiting.";
   }
   if (/\b(hours|hos|log ?book|eld|drive time)\b/.test(c)) {
     return driver
-      ? `You've got ${driver.hoursRemaining.toFixed(1)} hours left on your clock today — I factor that into anything I book next.`
-      : "Check your Profile tab for your live HOS clock — I factor it into every load I offer you.";
+      ? `You've got ${driver.hoursRemaining.toFixed(1)} hours left on your clock today. I factor that into anything I book next.`
+      : "Check your Profile tab for your live HOS clock. I factor it into every load I offer you.";
   }
   if (/\bhome\b.*(weekend|time|friday|saturday|sunday)|when.*home|get home|home time/.test(c)) {
     return driver
-      ? `Your home-time preference is set to "${driver.homeTimeTarget}" — I'm already weighing that when scoring your next options. Change it anytime in Profile.`
+      ? `Your home-time preference is set to "${driver.homeTimeTarget}." Already weighing that when scoring your next options. Change it anytime in Profile.`
       : "Set your home-time preference in Profile and I'll weigh it when scoring your next loads.";
   }
   if (/\b(pay|earn|settlement|paycheck)\b|how much.*(make|get)/.test(c)) {
     return driver
-      ? `You're on ${driver.payType === "percentage" ? `${Math.round(driver.payRate * 100)}% of the rate` : `$${driver.payRate.toFixed(2)}/mile`} — Profile has this week's running total and every past settlement.`
-      : "Check Profile for your pay statements — they update automatically after every delivery.";
+      ? `You're on ${driver.payType === "percentage" ? `${Math.round(driver.payRate * 100)}% of the rate` : `$${driver.payRate.toFixed(2)}/mile`}. Profile has this week's running total and every past settlement.`
+      : "Check Profile for your pay statements. They update automatically after every delivery.";
   }
   if (c.includes("eta") || (c.includes("time") && !c.includes("home"))) {
     if (currentLoad) {
       const stop = nextStop(currentLoad);
-      return `You're tracking on time for ${stop.label.toLowerCase()} — ${stop.window}. I'll ping you if that changes.`;
+      return `You're tracking on time for ${stop.label.toLowerCase()}: ${stop.window}. I'll ping you if that changes.`;
     }
-    return "You're tracking on time — I'll ping you if that changes based on traffic or weather.";
+    return "You're tracking on time. I'll ping you if that changes based on traffic or weather.";
   }
-  if (c.includes("fuel")) return "Noted — nearest in-network fuel stop is 12 miles ahead, best price on your card today.";
+  if (c.includes("fuel")) return "Noted. Nearest in-network fuel stop is 12 miles ahead, best price on your card today.";
   if (/\bweigh station|scale house|\bpermit\b|oversize|overweight\b/.test(c)) {
-    return "Nothing flagged on this route that needs a permit — I'll call it out up front if a load ever does.";
+    return "Nothing flagged on this route that needs a permit. I'll call it out up front if a load ever does.";
   }
   if (/\bweather|storm|snow|ice\b/.test(c)) {
-    return "Nothing on radar for your route right now — I'm watching it and will reroute or hold you if that changes.";
+    return "Nothing on radar for your route right now. Watching it, and I'll reroute or hold you if that changes.";
   }
   if (/\bemergency|breakdown|accident\b/.test(c)) {
-    return "For anything urgent, use Report issue below, or call — that routes straight to a live human, day or night.";
+    return "For anything urgent, use Report issue below, or call. That routes straight to a live human, day or night.";
   }
   if (/\bcommodity|what am i hauling|what.?s (on|in) (the|this) (truck|trailer)/.test(c)) {
     return currentLoad
@@ -265,18 +265,18 @@ function craftDriverReply(content: string, ctx: { driver?: Driver; currentLoad?:
       : "Pull up your current load's detail page for the full commodity and weight breakdown.";
   }
   if (/\broute|directions|different way|reroute/.test(c)) {
-    return "I don't turn-by-turn navigate you — run your own GPS — but flag a closure or big delay and I'll get ahead of it with the receiver.";
+    return "I don't turn-by-turn navigate you, run your own GPS, but flag a closure or big delay and I'll get ahead of it with the receiver.";
   }
   if (c.includes("detention") || c.includes("wait") || c.includes("late")) return "Logging the delay now. I'll open a detention claim with the broker if you're over 2 hours.";
-  if (c.includes("next")) return "Already working your next load so you don't run empty — I'll confirm the rate as soon as it's locked.";
-  if (c.includes("doc") || c.includes("pod") || c.includes("bol")) return "Got it — snap a photo in the Documents tab and I'll verify and file it automatically.";
+  if (c.includes("next")) return "Already working your next load so you don't run empty. I'll confirm the rate as soon as it's locked.";
+  if (c.includes("doc") || c.includes("pod") || c.includes("bol")) return "Got it. Snap a photo in the Documents tab and I'll verify and file it automatically.";
 
   // A real dispatcher wouldn't answer a genuine question with an acknowledgment — if nothing above
   // matched but this reads as a question, say so honestly instead of pretending it was logged.
   if (c.trim().endsWith("?")) {
-    return "Good question — I don't have a scripted answer for that one yet, but it's flagged for the team. Report issue below if it's urgent.";
+    return "Good question. I don't have a scripted answer for that one yet, but it's flagged for the team. Report issue below if it's urgent.";
   }
-  return "Got it, thanks for the update — I've logged it and will keep you posted.";
+  return "Got it, thanks for the update. I've logged it and will keep you posted.";
 }
 
 /** Fleet-level counterpart to craftDriverReply — same keyword-matched-against-live-state approach,
@@ -286,11 +286,11 @@ function craftCarrierReply(content: string, ctx: { loads: Load[]; trucks: Truck[
   const { loads, trucks, escalations } = ctx;
 
   if (/how (does|do|is).*(dispatch|score|scoring|match|work)|how (backroute|this|it) works|explain.*dispatch/.test(c)) {
-    return "I scan every connected board and inbox for your fleet, score each load on real profit after fuel and deadhead, negotiate rate by phone, text, and email, then book, track, and document the trip — your drivers just pick which load, I handle the rest.";
+    return "I scan every connected board and inbox for your fleet, score each load on real profit after fuel and deadhead, then negotiate rate by phone, text, and email. Book, track, and document the trip. Your drivers just pick which load, I handle the rest.";
   }
   if (/\b(escalat|need my attention|anything urgent|what needs (my|me)|approval)\b/.test(c)) {
     const open = escalations.filter((e) => e.status !== "resolved");
-    if (open.length === 0) return "Nothing waiting on you right now — I'll ping you the moment something needs a human call.";
+    if (open.length === 0) return "Nothing waiting on you right now. I'll ping you the moment something needs a human call.";
     const reasons = open.slice(0, 3).map((e) => e.reason.replace(/\.+$/, ""));
     return `${open.length} open: ${reasons.join(" · ")}${open.length > 3 ? ", and more" : ""}. Check Escalations for the full list.`;
   }
@@ -308,23 +308,23 @@ function craftCarrierReply(content: string, ctx: { loads: Load[]; trucks: Truck[
   }
   if (/\b(dot|inspection|compliance)\b/.test(c)) {
     const overdue = trucks.filter((t) => new Date(t.nextInspectionDue).getTime() < Date.now());
-    if (overdue.length === 0) return "Every truck's DOT inspection is current — nothing overdue.";
+    if (overdue.length === 0) return "Every truck's DOT inspection is current. Nothing overdue.";
     return `${overdue.length} truck${overdue.length === 1 ? "" : "s"} overdue on DOT inspection: ${overdue.map((t) => t.unitNumber).join(", ")}. I'll avoid booking them until that clears.`;
   }
   if (/\b(worst broker|broker to avoid|low(est)? reliability broker)\b/.test(c)) {
-    return "Check Negotiations — brokers marked 'watch' tier or flagged for elevated fraud risk are the ones I'm most cautious with, and I'll never negotiate with one your settings exclude.";
+    return "Check Negotiations. Brokers marked 'watch' tier or flagged for elevated fraud risk are the ones I'm most cautious with, and I'll never negotiate with one your settings exclude.";
   }
   if (/\b(best (lane|broker)|most profitable)\b/.test(c)) {
     return "Earnings has a live breakdown of your best lane and most profitable equipment type this cycle, updated after every delivery.";
   }
   if (/\b(setting|aggressive|autonomy|auto.?book)\b/.test(c)) {
-    return "Your negotiation aggressiveness and autonomy toggles are in Settings — I follow whatever you've set there on every load.";
+    return "Your negotiation aggressiveness and autonomy toggles are in Settings. I follow whatever you've set there on every load.";
   }
 
   if (c.trim().endsWith("?")) {
-    return "Good question — I don't have a scripted answer for that one yet, but it's flagged for the team.";
+    return "Good question. I don't have a scripted answer for that one yet, but it's flagged for the team.";
   }
-  return "Got it, thanks for the update — I've logged it and will keep you posted.";
+  return "Got it, thanks for the update. I've logged it and will keep you posted.";
 }
 
 function formatCurrencyShort(value: number): string {
@@ -332,10 +332,10 @@ function formatCurrencyShort(value: number): string {
 }
 
 const NEGOTIATION_REPLY: Record<Exclude<InstructionCategory, "general">, (brokerName: string, origin: string, dest: string) => string> = {
-  rate: (brokerName, origin, dest) => `On it — taking that back to ${brokerName} on the ${origin} to ${dest} load now.`,
-  detention: (brokerName) => `Got it — asking ${brokerName} about detention/lumper terms on that load now.`,
-  schedule: (brokerName) => `Understood — checking with ${brokerName} about the pickup window.`,
-  payment: (brokerName) => `On it — asking ${brokerName} about quick pay on this one.`,
+  rate: (brokerName, origin, dest) => `On it. Taking that back to ${brokerName} on the ${origin} to ${dest} load now.`,
+  detention: (brokerName) => `Got it. Asking ${brokerName} about detention/lumper terms on that load now.`,
+  schedule: (brokerName) => `Understood. Checking with ${brokerName} about the pickup window.`,
+  payment: (brokerName) => `On it. Asking ${brokerName} about quick pay on this one.`,
 };
 
 function findNegotiatingLoadForDriver(state: StoreState, driverId: string): Load | undefined {
@@ -410,7 +410,7 @@ export const useStore = create<StoreState>((set, get) => ({
           loads = [...offers, ...loads];
           newEvents.push({
             id: uid("act"), timestamp: new Date().toISOString(), type: "load_offered",
-            message: `AI found ${offers.length} ${truck.equipmentType.toLowerCase()} loads for ${truck.unitNumber}`, detail: `Scanned every connected board — awaiting ${driver ? driver.name.split(" ")[0] : "driver"}'s pick`,
+            message: `AI found ${offers.length} ${truck.equipmentType.toLowerCase()} loads for ${truck.unitNumber}`, detail: `Scanned every connected board, awaiting ${driver ? driver.name.split(" ")[0] : "driver"}'s pick`,
             loadId: offers[0]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info",
           });
         }
@@ -431,7 +431,7 @@ export const useStore = create<StoreState>((set, get) => ({
             loads = [...offers, ...loads];
             newEvents.push({
               id: uid("act"), timestamp: new Date().toISOString(), type: "load_offered",
-              message: `Next-load options ready for ${truck.unitNumber}`, detail: `Pre-negotiating before delivery — ${offers.length} options found`,
+              message: `Next-load options ready for ${truck.unitNumber}`, detail: `Pre-negotiating before delivery, ${offers.length} options found`,
               loadId: offers[0]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info",
             });
           }
@@ -512,7 +512,7 @@ export const useStore = create<StoreState>((set, get) => ({
           escalations = [esc, ...escalations];
           newEvents.push({
             id: uid("act"), timestamp: new Date().toISOString(), type: "escalation",
-            message: template.complexity === "critical" ? "Escalated — needs a human judgment call" : "Escalated for a quick approval",
+            message: template.complexity === "critical" ? "Escalated, needs a human judgment call" : "Escalated for a quick approval",
             detail: esc.reason, loadId: target.id, carrierId: PRIMARY_CARRIER_ID, severity: "warning",
           });
         }
@@ -564,7 +564,7 @@ export const useStore = create<StoreState>((set, get) => ({
         activity: [
           {
             id: uid("act"), timestamp: new Date().toISOString(), type: "escalation" as const,
-            message: approve ? `Escalation approved by ${actor}` : `Escalation rejected by ${actor} — AI re-sourcing`,
+            message: approve ? `Escalation approved by ${actor}` : `Escalation rejected by ${actor}, AI re-sourcing`,
             detail: state.escalations.find((e) => e.id === id)?.reason ?? "",
             loadId: state.escalations.find((e) => e.id === id)?.loadId,
             carrierId: PRIMARY_CARRIER_ID, severity: (approve ? "success" : "info") as ActivityEvent["severity"],
@@ -579,7 +579,7 @@ export const useStore = create<StoreState>((set, get) => ({
         activity: [
           {
             id: uid("act"), timestamp: new Date().toISOString(), type: "escalation" as const,
-            message: "Routed to Backroute Support — a specialist is reviewing this now",
+            message: "Routed to Backroute Support, a specialist is reviewing this now",
             detail: state.escalations.find((e) => e.id === id)?.reason ?? "",
             loadId: state.escalations.find((e) => e.id === id)?.loadId,
             carrierId: PRIMARY_CARRIER_ID, severity: "info" as ActivityEvent["severity"],
@@ -615,7 +615,7 @@ export const useStore = create<StoreState>((set, get) => ({
           if (!target && category === "rate") {
             const reply: DriverMessage = {
               id: uid("dm"), driverId, from: "ai",
-              content: "Nothing open to negotiate on right now — I'll push for the best number the moment I'm working a rate for you.",
+              content: "Nothing open to negotiate on right now. I'll push for the best number the moment I'm working a rate for you.",
               timestamp: new Date().toISOString(),
             };
             return { driverMessages: [...state.driverMessages, reply] };
@@ -757,7 +757,7 @@ export const useStore = create<StoreState>((set, get) => ({
             {
               id: uid("act"), timestamp: new Date().toISOString(), type: "maintenance" as const,
               message: `${truck.unitNumber} scheduled at ${shopName}`,
-              detail: `${serviceType} — AI will hold this truck out of the offer pool until service completes.`,
+              detail: `${serviceType}. AI will hold this truck out of the offer pool until service completes.`,
               carrierId: PRIMARY_CARRIER_ID, severity: "info" as const,
             },
             ...state.activity,
@@ -800,7 +800,7 @@ export const useStore = create<StoreState>((set, get) => ({
         const kindLabel = kind === "pre_trip" ? "Pre-trip" : "Post-trip";
         const activityEvent: ActivityEvent = {
           id: uid("act"), timestamp: new Date().toISOString(), type: "dvir" as const,
-          message: `${kindLabel} DVIR ${overallStatus === "pass" ? "passed" : "flagged a defect"} — ${truck?.unitNumber ?? truckId}`,
+          message: `${kindLabel} DVIR ${overallStatus === "pass" ? "passed" : "flagged a defect"}: ${truck?.unitNumber ?? truckId}`,
           detail: overallStatus === "defect" ? items.filter((i) => i.status === "defect").map((i) => i.label).join(", ") : undefined,
           carrierId: PRIMARY_CARRIER_ID, severity: (overallStatus === "pass" ? "success" : "warning") as ActivityEvent["severity"],
         };
@@ -857,7 +857,7 @@ export const useStore = create<StoreState>((set, get) => ({
           activity: [
             {
               id: uid("act"), timestamp: new Date().toISOString(), type: "time_off" as const,
-              message: `Time off ${approve ? "approved" : "denied"} — ${driver?.name ?? "driver"}`,
+              message: `Time off ${approve ? "approved" : "denied"}: ${driver?.name ?? "driver"}`,
               detail: `${request.startDate} – ${request.endDate}`,
               carrierId: PRIMARY_CARRIER_ID, severity: (approve ? "success" : "info") as ActivityEvent["severity"],
             },
@@ -878,7 +878,7 @@ export const useStore = create<StoreState>((set, get) => ({
           activity: [
             {
               id: uid("act"), timestamp: new Date().toISOString(), type: "check_call" as const,
-              message: `${stop.kind === "pickup" ? "Extra pickup" : "Partial drop"} completed — ${stop.city}, ${stop.state}`,
+              message: `${stop.kind === "pickup" ? "Extra pickup" : "Partial drop"} completed: ${stop.city}, ${stop.state}`,
               detail: load.referenceNumber,
               loadId, carrierId: load.carrierId, severity: "success" as const,
             },
@@ -903,7 +903,7 @@ export const useStore = create<StoreState>((set, get) => ({
             {
               id: uid("act"), timestamp: new Date().toISOString(), type: "load_offered" as const,
               message: `Next-load options ready for ${truck.unitNumber}`,
-              detail: `Pre-negotiating before delivery — ${offers.length} options found`,
+              detail: `Pre-negotiating before delivery, ${offers.length} options found`,
               loadId: offers[0]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info" as const,
             },
             ...state.activity,
@@ -951,8 +951,8 @@ export const useStore = create<StoreState>((set, get) => ({
           activity: [
             {
               id: uid("act"), timestamp: now, type: "load_cancelled" as const,
-              message: `Load cancelled — ${broker?.company ?? load.source}`,
-              detail: tonuFee ? `${reason} — TONU fee of ${formatCurrencyShort(tonuFee)} invoiced to broker` : reason,
+              message: `Load cancelled: ${broker?.company ?? load.source}`,
+              detail: tonuFee ? `${reason}. TONU fee of ${formatCurrencyShort(tonuFee)} invoiced to broker` : reason,
               loadId, carrierId: load.carrierId, severity: (tonuFee ? "warning" : "info") as ActivityEvent["severity"],
             },
             ...state.activity,
@@ -995,7 +995,7 @@ export const useStore = create<StoreState>((set, get) => ({
         activity: [
           {
             id: uid("act"), timestamp: new Date().toISOString(), type: "negotiation_email" as const,
-            message: updated !== load ? "Broker responded to our ask — offer updated" : "Broker responded to our ask",
+            message: updated !== load ? "Broker responded to our ask, offer updated" : "Broker responded to our ask",
             detail: `${broker?.company ?? load.source} · ${reply}`,
             loadId: updated.id, carrierId: updated.carrierId, severity: "info" as const, channel: "email" as const,
           },

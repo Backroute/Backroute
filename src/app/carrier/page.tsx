@@ -174,7 +174,7 @@ export default function CarrierOverviewPage() {
               </CardHeader>
               <CardContent className="!pt-3">
                 {escalations.length === 0 ? (
-                  <p className="text-sm text-ink-400">Nothing needs your attention — the AI is handling everything.</p>
+                  <p className="text-sm text-ink-400">Nothing needs your attention. The AI has it handled.</p>
                 ) : (
                   <div className="flex flex-col gap-3">
                     {escalations.map((e) => {
@@ -190,7 +190,7 @@ export default function CarrierOverviewPage() {
                           <p className="text-xs leading-relaxed text-ink-800">{e.reason}</p>
                           {e.status === "with_support" ? (
                             <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-ink-500">
-                              <LifeBuoy className="h-3.5 w-3.5 animate-pulse" /> Backroute Support is reviewing this — you&apos;ll be notified
+                              <LifeBuoy className="h-3.5 w-3.5 animate-pulse" /> Backroute Support is reviewing this. You&apos;ll be notified.
                             </p>
                           ) : e.complexity === "routine" && e.recommendedAction && e.recommendedLabel ? (
                             <div className="mt-2 flex flex-wrap items-center gap-3">

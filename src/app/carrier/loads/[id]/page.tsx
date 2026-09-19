@@ -104,7 +104,7 @@ export default function LoadDetailPage() {
         )}
         {load.stage === "cancelled" && (
           <div className="mt-4 rounded-xl bg-red-50 px-3.5 py-2.5 text-xs font-medium text-[var(--accent-danger)]">
-            <p className="flex items-center gap-1.5"><Ban className="h-3.5 w-3.5" /> Cancelled — {load.cancellationReason}</p>
+            <p className="flex items-center gap-1.5"><Ban className="h-3.5 w-3.5" /> Cancelled: {load.cancellationReason}</p>
             {load.tonuFee && <p className="mt-1 text-[var(--accent-warn)]">TONU fee of {formatCurrency(load.tonuFee)} invoiced to the broker.</p>}
           </div>
         )}
@@ -316,7 +316,7 @@ function CancelForm({ stage, onCancel, onConfirm }: { stage: LoadStage; onCancel
       {tonuApplies && (
         <p className="flex items-start gap-1.5 text-xs font-medium text-[var(--accent-warn)]">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          Truck already {stage === "at_pickup" ? "at pickup" : "dispatched"} — a {formatCurrency(250)} TONU fee will be invoiced to the broker.
+          Truck already {stage === "at_pickup" ? "at pickup" : "dispatched"}. A {formatCurrency(250)} TONU fee will be invoiced to the broker.
         </p>
       )}
       <label className="flex flex-col gap-1 text-xs text-ink-500">

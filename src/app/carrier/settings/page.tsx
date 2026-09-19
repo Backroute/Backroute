@@ -203,7 +203,7 @@ export default function SettingsPage() {
           <CardHeader>
             <div>
               <CardTitle className="flex items-center gap-2"><Sparkles className="h-4 w-4" /> AI Add-ons</CardTitle>
-              <CardDescription>Extra AI agents beyond dispatch — all free, no per-feature charge.</CardDescription>
+              <CardDescription>Extra AI agents beyond dispatch, all free, no per-feature charge.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="!pt-3 flex flex-col gap-5">
@@ -223,7 +223,7 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">Partner referrals — free to you</p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">Partner referrals, free to you</p>
               <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
                 {commissionAddons.map((addon) => {
                   const enabled = settings.enabledAddons.includes(addon.id);
@@ -247,7 +247,7 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle>Billing</CardTitle>
             <CardDescription>
-              {carrier.plan} plan &middot; {formatCurrency(carrier.mrr)}/mo + 2% of booked freight. AI add-ons are free — Backroute earns from partner referrals instead.
+              {carrier.plan} plan &middot; {formatCurrency(carrier.mrr)}/mo + 2% of booked freight. AI add-ons are free; Backroute earns from partner referrals instead.
             </CardDescription>
           </CardHeader>
           <CardContent className="!pt-3 flex flex-col gap-5">

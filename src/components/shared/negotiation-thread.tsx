@@ -5,7 +5,7 @@ import { TimeAgo } from "./time-ago";
 
 export function NegotiationThread({ messages }: { messages: NegotiationMessage[] }) {
   if (messages.length === 0) {
-    return <p className="py-6 text-center text-sm text-ink-400">No messages yet — AI hasn’t reached out on this load.</p>;
+    return <p className="py-6 text-center text-sm text-ink-400">No messages yet. AI hasn’t reached out on this load.</p>;
   }
   return (
     <div className="flex flex-col gap-3">

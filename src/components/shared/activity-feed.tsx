@@ -58,7 +58,7 @@ export const SEVERITY_TONE: Record<ActivityEvent["severity"], string> = {
 
 export function ActivityFeed({ events, className, dense }: { events: ActivityEvent[]; className?: string; dense?: boolean }) {
   if (events.length === 0) {
-    return <p className="py-8 text-center text-sm text-ink-400">No activity yet — the AI is watching the boards.</p>;
+    return <p className="py-8 text-center text-sm text-ink-400">No activity yet. The AI is watching the boards.</p>;
   }
   return (
     <ul className={cn("flex flex-col", className)}>

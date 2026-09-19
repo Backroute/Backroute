@@ -34,7 +34,7 @@ export default function CarrierMessagesPage() {
     <div className="flex h-[calc(100vh-73px)] flex-col">
       <PageHeader
         title="Messages"
-        description="Ask your AI dispatcher about your fleet — not tied to one load"
+        description="Ask your AI dispatcher about your fleet, not tied to one load"
         right={
           <>
             <LiveDot />

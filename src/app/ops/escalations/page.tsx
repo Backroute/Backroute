@@ -46,7 +46,7 @@ export default function EscalationsPage() {
         <div>
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-400">Open ({open.length})</h2>
           {open.length === 0 ? (
-            <Card><CardContent className="py-10 text-center text-sm text-ink-400">Queue is clear — nothing needs human review.</CardContent></Card>
+            <Card><CardContent className="py-10 text-center text-sm text-ink-400">Queue is clear. Nothing needs human review.</CardContent></Card>
           ) : (
             <div className="flex flex-col gap-3">
               {open.map((e) => (

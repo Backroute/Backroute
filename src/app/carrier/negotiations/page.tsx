@@ -46,7 +46,7 @@ export default function NegotiationsPage() {
 
         <div className="mt-6 flex flex-col gap-4">
           {active.length === 0 && (
-            <p className="py-12 text-center text-sm text-ink-400">No active negotiations right now — the AI is scanning boards for the next load.</p>
+            <p className="py-12 text-center text-sm text-ink-400">No active negotiations right now. The AI is scanning boards for the next load.</p>
           )}
           {active.map((load) => {
             const broker = brokers.get(load.brokerId);

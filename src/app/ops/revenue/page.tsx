@@ -97,7 +97,7 @@ export default function RevenuePage() {
                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#9d9d95" }} tickFormatter={(v) => `$${v}M`} width={48} />
                     <Tooltip
                       formatter={(value) => [`$${value}M`, "Revenue"]}
-                      labelFormatter={(label, payload) => `${label} — ${payload?.[0]?.payload?.detail ?? ""}`}
+                      labelFormatter={(label, payload) => `${label}: ${payload?.[0]?.payload?.detail ?? ""}`}
                       contentStyle={{ borderRadius: 12, border: "1px solid #e4e4e0", fontSize: 12 }}
                     />
                     <Bar dataKey="revenue" radius={[8, 8, 0, 0]} fill="#0a0a0a" />
@@ -136,7 +136,7 @@ export default function RevenuePage() {
           <CardHeader>
             <div>
               <CardTitle>Partner commission & filing revenue</CardTitle>
-              <CardDescription>Estimated platform-wide — AI add-ons are free to carriers; this is what Backroute earns instead.</CardDescription>
+              <CardDescription>Estimated platform-wide. AI add-ons are free to carriers; this is what Backroute earns instead.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="!pt-3">

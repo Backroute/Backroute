@@ -55,11 +55,11 @@ export default function DvirInspectionPage() {
         <div className={cn("flex h-14 w-14 items-center justify-center rounded-full text-white", submitted === "pass" ? "bg-ink-950" : "bg-[var(--accent-warn)]")}>
           {submitted === "pass" ? <CheckCircle2 className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
         </div>
-        <p className="font-display text-xl text-ink-950">{submitted === "pass" ? "Inspection logged — no defects" : "Defect flagged"}</p>
+        <p className="font-display text-xl text-ink-950">{submitted === "pass" ? "Inspection logged, no defects" : "Defect flagged"}</p>
         <p className="text-sm text-ink-500">
           {submitted === "pass"
             ? "You're clear to roll."
-            : "Sent to your carrier for review — a human will follow up before this truck goes back out."}
+            : "Sent to your carrier for review. A human will follow up before this truck goes back out."}
         </p>
       </div>
     );

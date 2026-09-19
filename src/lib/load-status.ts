@@ -4,12 +4,12 @@ import type { Load, LoadStage } from "./types";
  *  shows instead of a generic stage pill, so the card reads as live progress instead of a static label. */
 export const LOAD_STATUS_HEADLINE: Partial<Record<LoadStage, string>> = {
   negotiating: "AI is negotiating your rate",
-  rate_confirmed: "Rate locked — getting you dispatched",
-  booked: "Booked — getting you dispatched",
+  rate_confirmed: "Rate locked, getting you dispatched",
+  booked: "Booked, getting you dispatched",
   dispatched: "Heading to pickup",
-  at_pickup: "At pickup — load & confirm",
+  at_pickup: "At pickup: load & confirm",
   in_transit: "En route to delivery",
-  at_delivery: "At delivery — unload & confirm",
+  at_delivery: "At delivery: unload & confirm",
   delivered: "Delivered",
 };
 

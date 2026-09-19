@@ -85,7 +85,7 @@ export default function DriverProfilePage() {
             <Users className="h-3.5 w-3.5 text-ink-400" />
             <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">Team driver</p>
           </div>
-          <p className="mt-1 text-xs text-ink-500">Running as a team — one drives while the other&apos;s in the sleeper, so the truck covers more ground per day. Pay per load is split between you.</p>
+          <p className="mt-1 text-xs text-ink-500">One drives while the other&apos;s in the sleeper, so the truck covers more ground per day. Pay per load is split between you.</p>
           <div className="mt-3 flex items-center justify-between rounded-xl bg-ink-50 px-3.5 py-2.5">
             <div>
               <p className="text-sm font-medium text-ink-900">{teammate.name}</p>
@@ -124,7 +124,7 @@ export default function DriverProfilePage() {
           <CalendarClock className="h-3.5 w-3.5 text-ink-400" />
           <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">Time off</p>
         </div>
-        <p className="mt-1 text-xs text-ink-500">Always reviewed by your carrier directly — this is one thing the AI never decides on its own.</p>
+        <p className="mt-1 text-xs text-ink-500">Always reviewed by your carrier directly. The AI never decides this one.</p>
 
         {myTimeOff.length > 0 && (
           <div className="mt-3 flex flex-col gap-2">
