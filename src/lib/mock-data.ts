@@ -4,6 +4,7 @@ import type {
   ActivityEvent,
   Broker,
   Carrier,
+  CarrierMessage,
   Driver,
   DriverMessage,
   EquipmentType,
@@ -513,6 +514,7 @@ export interface World {
   activity: ActivityEvent[];
   escalations: Escalation[];
   driverMessages: DriverMessage[];
+  carrierMessages: CarrierMessage[];
   incidents: Incident[];
 }
 
@@ -668,5 +670,10 @@ export function generateWorld(seed = 20260916): World {
     { id: rng.id("dm"), driverId: PRIMARY_DRIVER_ID, from: "ai", content: "Heads up: receiver in Atlanta closes at 6 PM sharp, you're tracking to arrive with room to spare.", timestamp: iso(-60) },
   ];
 
-  return { carriers, brokers, trucks, drivers, loads, activity, escalations, driverMessages, incidents: [] };
+  const carrierMessages: CarrierMessage[] = [
+    { id: rng.id("cm"), carrierId: PRIMARY_CARRIER_ID, from: "ai", content: "Morning — 13 loads active, net profit's tracking to $14.2k this cycle. Two things need your eyes: an escalation on the Chicago–Memphis lane and T-109's DOT inspection is overdue.", timestamp: iso(-410) },
+    { id: rng.id("cm"), carrierId: PRIMARY_CARRIER_ID, from: "carrier", content: "Thanks, will check the escalation now.", timestamp: iso(-405) },
+  ];
+
+  return { carriers, brokers, trucks, drivers, loads, activity, escalations, driverMessages, carrierMessages, incidents: [] };
 }

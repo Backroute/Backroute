@@ -260,6 +260,16 @@ export interface DriverMessage {
   timestamp: string;
 }
 
+/** Fleet-level chat — not tied to any one load, unlike negotiation messages. The carrier's equivalent
+ *  of DriverMessage: "how's my week going," "which broker should I avoid," not "push this rate." */
+export interface CarrierMessage {
+  id: string;
+  carrierId: string;
+  from: "carrier" | "ai";
+  content: string;
+  timestamp: string;
+}
+
 export type IncidentType = "breakdown" | "accident" | "delay" | "weather";
 
 export interface IncidentStep {

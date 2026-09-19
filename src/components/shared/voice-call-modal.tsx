@@ -8,6 +8,7 @@ import { classifyInstruction } from "@/lib/engine";
 import type { CallTranscriptLine, IncidentType } from "@/lib/types";
 
 type CheckinSpec = { kind: "checkin"; driverId: string; driverFirstName: string };
+type FleetSpec = { kind: "fleet"; carrierId: string };
 type IncidentSpec = { kind: "incident"; driverId: string; truckId: string; onComplete?: () => void };
 type NegotiationSpec = {
   kind: "negotiation";
@@ -18,7 +19,7 @@ type NegotiationSpec = {
   dest: string;
 };
 
-export type VoiceCallSpec = CheckinSpec | IncidentSpec | NegotiationSpec;
+export type VoiceCallSpec = CheckinSpec | FleetSpec | IncidentSpec | NegotiationSpec;
 
 const INCIDENT_TYPES: { key: IncidentType; label: string; icon: typeof Wrench }[] = [
   { key: "breakdown", label: "Breakdown", icon: Wrench },
@@ -38,6 +39,8 @@ function greeting(spec: VoiceCallSpec): string {
   switch (spec.kind) {
     case "checkin":
       return `Hey ${spec.driverFirstName.split(" ")[0]}, AI Dispatcher here — what's going on?`;
+    case "fleet":
+      return "AI Dispatcher — what do you need on your fleet?";
     case "incident":
       return "AI Dispatcher — go ahead, what happened?";
     case "negotiation":
@@ -49,6 +52,8 @@ function outcomeFor(spec: VoiceCallSpec, saidSomething: boolean): string {
   if (!saidSomething) return "Call ended — nothing logged.";
   switch (spec.kind) {
     case "checkin":
+      return "Logged with your AI dispatcher.";
+    case "fleet":
       return "Logged with your AI dispatcher.";
     case "incident":
       return "Incident reported — AI dispatcher is on it.";
@@ -65,10 +70,12 @@ function outcomeFor(spec: VoiceCallSpec, saidSomething: boolean): string {
  */
 export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose: () => void }) {
   const sendDriverMessage = useStore((s) => s.actions.sendDriverMessage);
+  const sendCarrierMessage = useStore((s) => s.actions.sendCarrierMessage);
   const reportIncident = useStore((s) => s.actions.reportIncident);
   const sendNegotiationInstruction = useStore((s) => s.actions.sendNegotiationInstruction);
   const logLoadVoiceCall = useStore((s) => s.actions.logLoadVoiceCall);
   const driverMessages = useStore((s) => s.driverMessages);
+  const carrierMessages = useStore((s) => s.carrierMessages);
 
   const [phase, setPhase] = useState<"connecting" | "live" | "ended">("connecting");
   const [transcript, setTranscript] = useState<CallTranscriptLine[]>([]);
@@ -82,7 +89,7 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
   const seenMessageIds = useRef<Set<string>>(new Set());
   const startedAt = useRef(new Date().toISOString());
 
-  const youSpeaker: CallTranscriptLine["speaker"] = spec.kind === "negotiation" ? spec.actor : "driver";
+  const youSpeaker: CallTranscriptLine["speaker"] = spec.kind === "negotiation" ? spec.actor : spec.kind === "fleet" ? "carrier" : "driver";
 
   // Ring, then connect and speak the opening line.
   useEffect(() => {
@@ -105,16 +112,24 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [transcript, pending]);
 
-  // Watch for the real async AI reply landing in driverMessages (checkin mode only).
+  // Watch for the real async AI reply landing in driverMessages/carrierMessages (checkin/fleet modes only).
   useEffect(() => {
-    if (spec.kind !== "checkin") return;
-    for (const m of driverMessages) {
-      if (m.driverId !== spec.driverId || m.from !== "ai" || seenMessageIds.current.has(m.id)) continue;
-      seenMessageIds.current.add(m.id);
-      setTranscript((prev) => [...prev, { speaker: "ai", text: m.content }]);
-      setPending(false);
+    if (spec.kind === "checkin") {
+      for (const m of driverMessages) {
+        if (m.driverId !== spec.driverId || m.from !== "ai" || seenMessageIds.current.has(m.id)) continue;
+        seenMessageIds.current.add(m.id);
+        setTranscript((prev) => [...prev, { speaker: "ai", text: m.content }]);
+        setPending(false);
+      }
+    } else if (spec.kind === "fleet") {
+      for (const m of carrierMessages) {
+        if (m.carrierId !== spec.carrierId || m.from !== "ai" || seenMessageIds.current.has(m.id)) continue;
+        seenMessageIds.current.add(m.id);
+        setTranscript((prev) => [...prev, { speaker: "ai", text: m.content }]);
+        setPending(false);
+      }
     }
-  }, [driverMessages, spec]);
+  }, [driverMessages, carrierMessages, spec]);
 
   function say(spoken: string) {
     const value = spoken.trim();
@@ -127,6 +142,9 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
     if (spec.kind === "checkin") {
       sendDriverMessage(spec.driverId, value);
       // reply arrives via the driverMessages watcher above
+    } else if (spec.kind === "fleet") {
+      sendCarrierMessage(spec.carrierId, value);
+      // reply arrives via the carrierMessages watcher above
     } else if (spec.kind === "negotiation") {
       const category = classifyInstruction(value);
       sendNegotiationInstruction(spec.loadId, spec.actor, value);
@@ -173,9 +191,11 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
   const quickLines =
     spec.kind === "checkin"
       ? ["Give me an ETA update", "I'm running behind schedule", "Any word on my next load?", "Question about a fuel stop"]
-      : spec.kind === "negotiation"
-        ? ["Push for a better rate", "Ask about detention pay", "Ask about the pickup window", "Ask about quick pay terms"]
-        : [];
+      : spec.kind === "fleet"
+        ? ["What needs my attention?", "How's net profit looking?", "How many trucks are available?", "Any DOT inspections due?"]
+        : spec.kind === "negotiation"
+          ? ["Push for a better rate", "Ask about detention pay", "Ask about the pickup window", "Ask about quick pay terms"]
+          : [];
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-ink-950 text-white">

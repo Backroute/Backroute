@@ -27,6 +27,7 @@ import type {
   ActivityEvent,
   Broker,
   Carrier,
+  CarrierMessage,
   Driver,
   DriverMessage,
   Escalation,
@@ -146,6 +147,7 @@ interface StoreState {
   activity: ActivityEvent[];
   escalations: Escalation[];
   driverMessages: DriverMessage[];
+  carrierMessages: CarrierMessage[];
   incidents: Incident[];
   settings: AgentSettings;
   liveMetrics: LiveMetrics;
@@ -155,6 +157,9 @@ interface StoreState {
     resolveEscalation: (id: string, approve: boolean, actor?: "carrier" | "ops") => void;
     routeEscalationToSupport: (id: string) => void;
     sendDriverMessage: (driverId: string, content: string) => void;
+    /** Fleet-level chat — the carrier's counterpart to sendDriverMessage. Not tied to any one load;
+     *  answers from the carrier's whole book (active loads, net profit, open escalations, fleet status). */
+    sendCarrierMessage: (carrierId: string, content: string) => void;
     updateSettings: (partial: Partial<AgentSettings>) => void;
     driverConfirmStage: (loadId: string) => void;
     recaptureDocument: (loadId: string, type: "bol" | "pod") => void;
@@ -248,6 +253,58 @@ function craftDriverReply(content: string, ctx: { driver?: Driver; currentLoad?:
     return "Good question — I don't have a scripted answer for that one yet, but it's flagged for the team. Report issue below if it's urgent.";
   }
   return "Got it, thanks for the update — I've logged it and will keep you posted.";
+}
+
+/** Fleet-level counterpart to craftDriverReply — same keyword-matched-against-live-state approach,
+ *  scoped to the carrier's whole book instead of one driver's current load. */
+function craftCarrierReply(content: string, ctx: { loads: Load[]; trucks: Truck[]; escalations: Escalation[] }): string {
+  const c = content.toLowerCase();
+  const { loads, trucks, escalations } = ctx;
+
+  if (/how (does|do|is).*(dispatch|score|scoring|match|work)|how (backroute|this|it) works|explain.*dispatch/.test(c)) {
+    return "I scan every connected board and inbox for your fleet, score each load on real profit after fuel and deadhead, negotiate rate by phone, text, and email, then book, track, and document the trip — your drivers just pick which load, I handle the rest.";
+  }
+  if (/\b(escalat|need my attention|anything urgent|what needs (my|me)|approval)\b/.test(c)) {
+    const open = escalations.filter((e) => e.status !== "resolved");
+    if (open.length === 0) return "Nothing waiting on you right now — I'll ping you the moment something needs a human call.";
+    const reasons = open.slice(0, 3).map((e) => e.reason.replace(/\.+$/, ""));
+    return `${open.length} open: ${reasons.join(" · ")}${open.length > 3 ? ", and more" : ""}. Check Escalations for the full list.`;
+  }
+  if (/\b(how many trucks|fleet size|trucks (do i have|available))\b/.test(c)) {
+    const available = trucks.filter((t) => t.status === "available").length;
+    return `${trucks.length} trucks on the roster, ${available} sitting available right now.`;
+  }
+  if (/\b(net profit|revenue|how much (have i|did i) (make|earn)|profit this)\b/.test(c)) {
+    const netProfit = loads.reduce((s, l) => s + (l.netProfit ?? 0), 0);
+    return `Net profit is tracking to ${formatCurrencyShort(netProfit)} this cycle across ${loads.length} loads.`;
+  }
+  if (/\b(active loads|how many loads|loads (right now|active))\b/.test(c)) {
+    const active = loads.filter((l) => l.stage !== "delivered" && l.stage !== "declined").length;
+    return `${active} loads active right now, ${loads.filter((l) => l.stage === "delivered").length} delivered this cycle.`;
+  }
+  if (/\b(dot|inspection|compliance)\b/.test(c)) {
+    const overdue = trucks.filter((t) => new Date(t.nextInspectionDue).getTime() < Date.now());
+    if (overdue.length === 0) return "Every truck's DOT inspection is current — nothing overdue.";
+    return `${overdue.length} truck${overdue.length === 1 ? "" : "s"} overdue on DOT inspection: ${overdue.map((t) => t.unitNumber).join(", ")}. I'll avoid booking them until that clears.`;
+  }
+  if (/\b(worst broker|broker to avoid|low(est)? reliability broker)\b/.test(c)) {
+    return "Check Negotiations — brokers marked 'watch' tier or flagged for elevated fraud risk are the ones I'm most cautious with, and I'll never negotiate with one your settings exclude.";
+  }
+  if (/\b(best (lane|broker)|most profitable)\b/.test(c)) {
+    return "Earnings has a live breakdown of your best lane and most profitable equipment type this cycle, updated after every delivery.";
+  }
+  if (/\b(setting|aggressive|autonomy|auto.?book)\b/.test(c)) {
+    return "Your negotiation aggressiveness and autonomy toggles are in Settings — I follow whatever you've set there on every load.";
+  }
+
+  if (c.trim().endsWith("?")) {
+    return "Good question — I don't have a scripted answer for that one yet, but it's flagged for the team.";
+  }
+  return "Got it, thanks for the update — I've logged it and will keep you posted.";
+}
+
+function formatCurrencyShort(value: number): string {
+  return value.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
 const NEGOTIATION_REPLY: Record<Exclude<InstructionCategory, "general">, (brokerName: string, origin: string, dest: string) => string> = {
@@ -547,6 +604,25 @@ export const useStore = create<StoreState>((set, get) => ({
             timestamp: new Date().toISOString(),
           };
           return { driverMessages: [...state.driverMessages, reply] };
+        });
+      }, 1100 + Math.random() * 1000);
+    },
+
+    sendCarrierMessage: (carrierId, content) => {
+      const msg: CarrierMessage = { id: uid("cm"), carrierId, from: "carrier", content, timestamp: new Date().toISOString() };
+      set((state) => ({ carrierMessages: [...state.carrierMessages, msg] }));
+
+      setTimeout(() => {
+        set((state) => {
+          const loads = state.loads.filter((l) => l.carrierId === carrierId);
+          const trucks = state.trucks.filter((t) => t.carrierId === carrierId);
+          const escalations = state.escalations.filter((e) => e.carrierId === carrierId);
+          const reply: CarrierMessage = {
+            id: uid("cm"), carrierId, from: "ai",
+            content: craftCarrierReply(content, { loads, trucks, escalations }),
+            timestamp: new Date().toISOString(),
+          };
+          return { carrierMessages: [...state.carrierMessages, reply] };
         });
       }, 1100 + Math.random() * 1000);
     },
