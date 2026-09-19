@@ -21,6 +21,7 @@ import {
   type OfferAskDraft,
 } from "./engine";
 import { computeEconomics, computeLoadScore } from "./scoring";
+import { nextStop } from "./load-status";
 import { clamp, formatDuration } from "./utils";
 import type {
   ActivityEvent,
@@ -178,13 +179,74 @@ interface StoreState {
 
 const world = generateWorld();
 
-function craftDriverReply(content: string): string {
+/**
+ * Keyword-matched, not a real model — every branch below is checked against a fixed driver-state
+ * snapshot rather than generated, so accuracy depends entirely on covering the phrases drivers
+ * actually use and ordering specific matches before broad ones. The old broad `c.includes("load")`
+ * check is the cautionary example: it fired on any sentence mentioning "load" at all, so "Why did
+ * you pick THIS load for me?" and "What happens if I decline this load?" both got answered with
+ * "Already working your next load..." — a reply to a question nobody asked. Narrowed to "next"
+ * specifically, and meta/topic questions are checked first so they never reach it.
+ */
+function craftDriverReply(content: string, ctx: { driver?: Driver; currentLoad?: Load }): string {
   const c = content.toLowerCase();
-  if (c.includes("eta") || c.includes("time")) return "You're tracking on time — I'll ping you if that changes based on traffic or weather.";
+  const { driver, currentLoad } = ctx;
+
+  if (/how (does|do|is).*(dispatch|score|scoring|match|work)|how (backroute|this|it) works|explain.*dispatch/.test(c)) {
+    return "I scan every connected board and inbox, score each load on real profit after fuel and deadhead, negotiate rate by phone, text, and email, then book, track, and document the trip automatically — you just pick which load, I handle the rest.";
+  }
+  if (/\b(decline|reject|turn down|pass on|skip)\b.*load|what happens if i (decline|reject|skip)/.test(c)) {
+    return "Nothing bad — decline it and I'll keep sourcing others. If nobody picks within the window, your carrier's autonomy settings decide whether I auto-book the top-scored option or just keep waiting.";
+  }
+  if (/\b(hours|hos|log ?book|eld|drive time)\b/.test(c)) {
+    return driver
+      ? `You've got ${driver.hoursRemaining.toFixed(1)} hours left on your clock today — I factor that into anything I book next.`
+      : "Check your Profile tab for your live HOS clock — I factor it into every load I offer you.";
+  }
+  if (/\bhome\b.*(weekend|time|friday|saturday|sunday)|when.*home|get home|home time/.test(c)) {
+    return driver
+      ? `Your home-time preference is set to "${driver.homeTimeTarget}" — I'm already weighing that when scoring your next options. Change it anytime in Profile.`
+      : "Set your home-time preference in Profile and I'll weigh it when scoring your next loads.";
+  }
+  if (/\b(pay|earn|settlement|paycheck)\b|how much.*(make|get)/.test(c)) {
+    return driver
+      ? `You're on ${driver.payType === "percentage" ? `${Math.round(driver.payRate * 100)}% of the rate` : `$${driver.payRate.toFixed(2)}/mile`} — Profile has this week's running total and every past settlement.`
+      : "Check Profile for your pay statements — they update automatically after every delivery.";
+  }
+  if (c.includes("eta") || (c.includes("time") && !c.includes("home"))) {
+    if (currentLoad) {
+      const stop = nextStop(currentLoad);
+      return `You're tracking on time for ${stop.label.toLowerCase()} — ${stop.window}. I'll ping you if that changes.`;
+    }
+    return "You're tracking on time — I'll ping you if that changes based on traffic or weather.";
+  }
   if (c.includes("fuel")) return "Noted — nearest in-network fuel stop is 12 miles ahead, best price on your card today.";
+  if (/\bweigh station|scale house|\bpermit\b|oversize|overweight\b/.test(c)) {
+    return "Nothing flagged on this route that needs a permit — I'll call it out up front if a load ever does.";
+  }
+  if (/\bweather|storm|snow|ice\b/.test(c)) {
+    return "Nothing on radar for your route right now — I'm watching it and will reroute or hold you if that changes.";
+  }
+  if (/\bemergency|breakdown|accident\b/.test(c)) {
+    return "For anything urgent, use Report issue below, or call — that routes straight to a live human, day or night.";
+  }
+  if (/\bcommodity|what am i hauling|what.?s (on|in) (the|this) (truck|trailer)/.test(c)) {
+    return currentLoad
+      ? `${currentLoad.equipmentType} · ${currentLoad.weight.toLocaleString()} lbs, ref ${currentLoad.referenceNumber}.`
+      : "Pull up your current load's detail page for the full commodity and weight breakdown.";
+  }
+  if (/\broute|directions|different way|reroute/.test(c)) {
+    return "I don't turn-by-turn navigate you — run your own GPS — but flag a closure or big delay and I'll get ahead of it with the receiver.";
+  }
   if (c.includes("detention") || c.includes("wait") || c.includes("late")) return "Logging the delay now. I'll open a detention claim with the broker if you're over 2 hours.";
-  if (c.includes("load") || c.includes("next")) return "Already working your next load so you don't run empty — I'll confirm the rate as soon as it's locked.";
+  if (c.includes("next")) return "Already working your next load so you don't run empty — I'll confirm the rate as soon as it's locked.";
   if (c.includes("doc") || c.includes("pod") || c.includes("bol")) return "Got it — snap a photo in the Documents tab and I'll verify and file it automatically.";
+
+  // A real dispatcher wouldn't answer a genuine question with an acknowledgment — if nothing above
+  // matched but this reads as a question, say so honestly instead of pretending it was logged.
+  if (c.trim().endsWith("?")) {
+    return "Good question — I don't have a scripted answer for that one yet, but it's flagged for the team. Report issue below if it's urgent.";
+  }
   return "Got it, thanks for the update — I've logged it and will keep you posted.";
 }
 
@@ -476,7 +538,14 @@ export const useStore = create<StoreState>((set, get) => ({
             return { driverMessages: [...state.driverMessages, reply] };
           }
 
-          const reply: DriverMessage = { id: uid("dm"), driverId, from: "ai", content: craftDriverReply(content), timestamp: new Date().toISOString() };
+          const driver = state.drivers.find((d) => d.id === driverId);
+          const truck = driver ? state.trucks.find((t) => t.id === driver.truckId) : undefined;
+          const currentLoad = truck?.currentLoadId ? state.loads.find((l) => l.id === truck.currentLoadId) : undefined;
+          const reply: DriverMessage = {
+            id: uid("dm"), driverId, from: "ai",
+            content: craftDriverReply(content, { driver, currentLoad }),
+            timestamp: new Date().toISOString(),
+          };
           return { driverMessages: [...state.driverMessages, reply] };
         });
       }, 1100 + Math.random() * 1000);
