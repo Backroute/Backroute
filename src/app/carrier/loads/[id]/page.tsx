@@ -3,9 +3,10 @@
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Camera, Fuel, Gauge, Percent, Phone, Route, ShieldAlert, TrendingUp, FileText } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Ban, Camera, Fuel, Gauge, Percent, Phone, Route, ShieldAlert, TrendingUp, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { BrokerTrustBadge } from "@/components/shared/broker-trust-badge";
@@ -22,6 +23,14 @@ import { useStore } from "@/lib/store";
 import { STAGE_CONFIRM } from "@/lib/stage-confirm";
 import { aiDispatcherNote, isTransitStage } from "@/lib/load-status";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
+import type { LoadStage } from "@/lib/types";
+
+/** Cancellable once rate is locked in; once in transit the freight is already moving, so that's a
+ *  claim situation, not a cancellation. Dispatched/at_pickup carry a TONU fee since the truck already committed. */
+const CANCELLABLE_STAGES: LoadStage[] = ["rate_confirmed", "booked", "dispatched", "at_pickup"];
+const TONU_STAGES: LoadStage[] = ["dispatched", "at_pickup"];
+
+const CANCEL_REASONS = ["Broker cancelled the load", "Receiver refused / detention dispute", "Freight not ready at pickup", "Rate dispute", "Other"];
 
 /** Which document a stage is still waiting on — same source of truth the driver's confirm button
  *  reads from, so this card's pending rows can never disagree with what actually triggers capture. */
@@ -37,7 +46,9 @@ export default function LoadDetailPage() {
   const drivers = useDriverMap();
   const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
   const sendNegotiationInstruction = useStore((s) => s.actions.sendNegotiationInstruction);
+  const cancelLoad = useStore((s) => s.actions.cancelLoad);
   const [calling, setCalling] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   if (!load) {
     return (
@@ -80,13 +91,39 @@ export default function LoadDetailPage() {
             </div>
           </div>
         </div>
-        <div className="mt-4">
-          {isTransitStage(load.stage) ? <TripStepper stage={load.stage} /> : <Progress value={load.progressPct} />}
-        </div>
+        {load.stage !== "cancelled" && (
+          <div className="mt-4">
+            {isTransitStage(load.stage) ? <TripStepper stage={load.stage} /> : <Progress value={load.progressPct} />}
+          </div>
+        )}
         {load.aiPaused && (
           <p className="mt-4 flex items-center gap-1.5 rounded-xl bg-amber-50 px-3.5 py-2.5 text-xs font-medium text-[var(--accent-warn)]">
             <ShieldAlert className="h-3.5 w-3.5" /> Backroute support has paused the AI on this load while they take a look.
           </p>
+        )}
+        {load.stage === "cancelled" && (
+          <div className="mt-4 rounded-xl bg-red-50 px-3.5 py-2.5 text-xs font-medium text-[var(--accent-danger)]">
+            <p className="flex items-center gap-1.5"><Ban className="h-3.5 w-3.5" /> Cancelled — {load.cancellationReason}</p>
+            {load.tonuFee && <p className="mt-1 text-[var(--accent-warn)]">TONU fee of {formatCurrency(load.tonuFee)} invoiced to the broker.</p>}
+          </div>
+        )}
+        {CANCELLABLE_STAGES.includes(load.stage) && (
+          <div className="mt-4">
+            {cancelling ? (
+              <CancelForm
+                stage={load.stage}
+                onCancel={() => setCancelling(false)}
+                onConfirm={(reason) => {
+                  cancelLoad(load.id, reason);
+                  setCancelling(false);
+                }}
+              />
+            ) : (
+              <Button size="sm" variant="danger" onClick={() => setCancelling(true)}>
+                <Ban className="h-3.5 w-3.5" /> Cancel load
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
@@ -254,6 +291,32 @@ export default function LoadDetailPage() {
           onClose={() => setCalling(false)}
         />
       )}
+    </div>
+  );
+}
+
+function CancelForm({ stage, onCancel, onConfirm }: { stage: LoadStage; onCancel: () => void; onConfirm: (reason: string) => void }) {
+  const [reason, setReason] = useState(CANCEL_REASONS[0]);
+  const tonuApplies = TONU_STAGES.includes(stage);
+
+  return (
+    <div className="flex flex-col gap-2.5 rounded-xl border border-[var(--accent-danger)]/30 bg-red-50/50 p-3.5">
+      {tonuApplies && (
+        <p className="flex items-start gap-1.5 text-xs font-medium text-[var(--accent-warn)]">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          Truck already {stage === "at_pickup" ? "at pickup" : "dispatched"} — a {formatCurrency(250)} TONU fee will be invoiced to the broker.
+        </p>
+      )}
+      <label className="flex flex-col gap-1 text-xs text-ink-500">
+        Reason
+        <select value={reason} onChange={(e) => setReason(e.target.value)} className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm text-ink-900">
+          {CANCEL_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+      </label>
+      <div className="flex items-center gap-2 pt-1">
+        <Button size="sm" variant="danger" onClick={() => onConfirm(reason)}>Confirm cancellation</Button>
+        <Button size="sm" variant="ghost" onClick={onCancel}>Never mind</Button>
+      </div>
     </div>
   );
 }

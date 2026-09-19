@@ -181,6 +181,9 @@ interface StoreState {
     seedInitialOffers: () => void;
     updateHomeTimeTarget: (driverId: string, target: string) => void;
     requestBetterRate: (loadId: string, actor: "driver" | "carrier", amount?: number) => void;
+    /** Cancels a booked load that's fallen through (broker pulled it, detention refused, etc.). A truck
+     *  already dispatched or at pickup earns the broker's TONU fee; earlier than that, no fee applies. */
+    cancelLoad: (loadId: string, reason: string) => void;
     /** Ask the AI a question about a pending offer before committing — detention, schedule, payment terms, anything but rate (the AI already set that from data; pushing further belongs to post-selection negotiation). Phase one logs the ask and returns what to show; `resolved` true means there's nothing to wait on. */
     requestOfferDetail: (loadId: string, text: string) => { draft: OfferAskDraft; pendingReply: string; resolved: boolean };
     /** Phase two: the broker's actual answer to a non-rate ask. */
@@ -292,7 +295,7 @@ function craftCarrierReply(content: string, ctx: { loads: Load[]; trucks: Truck[
     return `Net profit is tracking to ${formatCurrencyShort(netProfit)} this cycle across ${loads.length} loads.`;
   }
   if (/\b(active loads|how many loads|loads (right now|active))\b/.test(c)) {
-    const active = loads.filter((l) => l.stage !== "delivered" && l.stage !== "declined").length;
+    const active = loads.filter((l) => l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "cancelled").length;
     return `${active} loads active right now, ${loads.filter((l) => l.stage === "delivered").length} delivered this cycle.`;
   }
   if (/\b(dot|inspection|compliance)\b/.test(c)) {
@@ -371,7 +374,7 @@ export const useStore = create<StoreState>((set, get) => ({
         const newEvents: ActivityEvent[] = [];
         const excludeTiers: Broker["tier"][] = state.settings.avoidWatchBrokers ? ["watch"] : [];
 
-        const activeLoads = loads.filter((l) => l.stage !== "delivered" && l.stage !== "declined" && l.carrierId === PRIMARY_CARRIER_ID);
+        const activeLoads = loads.filter((l) => l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "cancelled" && l.carrierId === PRIMARY_CARRIER_ID);
 
         // Background market activity: loads the AI is working speculatively, not yet tied to a truck.
         if (activeLoads.length < 13 && Math.random() < 0.32) {
@@ -447,7 +450,7 @@ export const useStore = create<StoreState>((set, get) => ({
         // the driver is looking at can silently jump out from under them, racing their own taps.
         const candidates = loads.filter(
           (l) =>
-            l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "offered" &&
+            l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "cancelled" && l.stage !== "offered" &&
             l.stage !== "dispatched" && l.stage !== "at_pickup" && l.stage !== "in_transit" && l.stage !== "at_delivery" &&
             !l.aiPaused && l.carrierId === PRIMARY_CARRIER_ID,
         );
@@ -851,6 +854,38 @@ export const useStore = create<StoreState>((set, get) => ({
         return {
           loads: state.loads.map((l) => (l.id === updated.id ? updated : l)),
           activity: [...events, ...state.activity].slice(0, 80),
+        };
+      }),
+
+    cancelLoad: (loadId, reason) =>
+      set((state) => {
+        const load = state.loads.find((l) => l.id === loadId);
+        if (!load) return {};
+        const broker = state.brokers.find((b) => b.id === load.brokerId);
+        const tonuEligible = load.stage === "dispatched" || load.stage === "at_pickup";
+        const tonuFee = tonuEligible ? 250 : 0;
+        const now = new Date().toISOString();
+
+        return {
+          loads: state.loads.map((l) =>
+            l.id === loadId
+              ? { ...l, stage: "cancelled" as const, cancellationReason: reason, tonuFee: tonuFee || undefined, updatedAt: now, progressPct: 100 }
+              : l,
+          ),
+          trucks: state.trucks.map((t) =>
+            t.id === load.truckId
+              ? { ...t, status: "available" as const, currentLoadId: t.currentLoadId === loadId ? null : t.currentLoadId, nextLoadId: t.nextLoadId === loadId ? null : t.nextLoadId }
+              : t,
+          ),
+          activity: [
+            {
+              id: uid("act"), timestamp: now, type: "load_cancelled" as const,
+              message: `Load cancelled — ${broker?.company ?? load.source}`,
+              detail: tonuFee ? `${reason} — TONU fee of ${formatCurrencyShort(tonuFee)} invoiced to broker` : reason,
+              loadId, carrierId: load.carrierId, severity: (tonuFee ? "warning" : "info") as ActivityEvent["severity"],
+            },
+            ...state.activity,
+          ].slice(0, 80),
         };
       }),
 

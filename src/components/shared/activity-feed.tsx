@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  Ban,
   CheckCircle2,
   Database,
   FileText,
@@ -43,6 +44,7 @@ export const TYPE_ICON: Record<ActivityType, typeof Radar> = {
   incident: LifeBuoy,
   maintenance: Wrench,
   dvir: ClipboardCheck,
+  load_cancelled: Ban,
 };
 
 export const SEVERITY_TONE: Record<ActivityEvent["severity"], string> = {

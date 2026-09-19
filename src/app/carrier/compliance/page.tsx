@@ -31,7 +31,7 @@ export default function CompliancePage() {
   const activeAccidents = incidents.filter((i) => i.type === "accident" && i.status === "active");
   const [filed, setFiled] = useState(false);
 
-  const quarterLoads = loads.filter((l) => l.stage !== "sourced" && l.stage !== "scoring" && l.stage !== "offered" && l.stage !== "declined");
+  const quarterLoads = loads.filter((l) => l.stage !== "sourced" && l.stage !== "scoring" && l.stage !== "offered" && l.stage !== "declined" && l.stage !== "cancelled");
   const stateMiles = estimateMilesByState(quarterLoads);
   const totalMiles = stateMiles.reduce((s, x) => s + x.miles, 0);
   const avgMpg = trucks.length ? trucks.reduce((s, t) => s + t.mpg, 0) / trucks.length : 6.5;

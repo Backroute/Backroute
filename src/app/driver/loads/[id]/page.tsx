@@ -95,6 +95,9 @@ export default function DriverLoadDetailPage() {
           {load.lane.destination}, {load.lane.destState}
         </p>
         <p className="mt-0.5 text-[11px] text-white/40">{load.referenceNumber} · {load.equipmentType} · {load.lane.miles} mi</p>
+        {load.stage === "cancelled" && load.cancellationReason && (
+          <p className="mt-2 text-xs text-white/60">{load.cancellationReason}</p>
+        )}
 
         <div className="mt-5">
           {isTransitStage(load.stage) ? (

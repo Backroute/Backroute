@@ -466,7 +466,7 @@ function buildLoad(
 
   const progressByStage: Record<LoadStage, number> = {
     sourced: 5, scoring: 12, offered: 16, negotiating: 28, rate_confirmed: 42, booked: 52,
-    dispatched: 62, at_pickup: 70, in_transit: 82, at_delivery: 93, delivered: 100, declined: 100,
+    dispatched: 62, at_pickup: 70, in_transit: 82, at_delivery: 93, delivered: 100, declined: 100, cancelled: 100,
   };
 
   return {

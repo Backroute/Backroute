@@ -14,6 +14,7 @@ const STAGE_TONE: Record<LoadStage, string> = {
   at_delivery: "bg-emerald-50 text-[var(--accent-live)]",
   delivered: "bg-ink-950 text-white",
   declined: "bg-ink-100 text-ink-400",
+  cancelled: "bg-red-50 text-[var(--accent-danger)]",
 };
 
 export function LoadStagePill({ stage, className }: { stage: LoadStage; className?: string }) {

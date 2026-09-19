@@ -10,7 +10,8 @@ export type LoadStage =
   | "in_transit"
   | "at_delivery"
   | "delivered"
-  | "declined";
+  | "declined"
+  | "cancelled";
 
 export const LOAD_STAGE_ORDER: LoadStage[] = [
   "sourced",
@@ -39,6 +40,7 @@ export const LOAD_STAGE_LABEL: Record<LoadStage, string> = {
   at_delivery: "At Delivery",
   delivered: "Delivered",
   declined: "Declined",
+  cancelled: "Cancelled",
 };
 
 export type Channel = "email" | "sms" | "voice";
@@ -238,6 +240,10 @@ export interface Load {
   aiPaused?: boolean;
   /** Set once Ops has manually stepped in (rate override, force-book, etc.) so the carrier can see support was involved. */
   opsOverridden?: boolean;
+  /** Set when stage is "cancelled" — why the load fell through after being booked. */
+  cancellationReason?: string;
+  /** Truck-Ordered-Not-Used fee owed by the broker when a truck was already dispatched or at pickup. */
+  tonuFee?: number;
 }
 
 export type ActivityType =
@@ -260,7 +266,8 @@ export type ActivityType =
   | "offer_selected"
   | "incident"
   | "maintenance"
-  | "dvir";
+  | "dvir"
+  | "load_cancelled";
 
 export interface ActivityEvent {
   id: string;

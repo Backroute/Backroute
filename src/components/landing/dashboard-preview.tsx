@@ -17,7 +17,7 @@ export function DashboardPreview() {
   const activity = useStore((s) => s.activity);
 
   const rows = loads
-    .filter((l) => l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "offered")
+    .filter((l) => l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "cancelled" && l.stage !== "offered")
     .slice(0, 3);
   const netProfit = loads.reduce((s, l) => s + (l.netProfit ?? 0), 0);
   const latest = activity[0];

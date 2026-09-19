@@ -62,7 +62,7 @@ export function truckActiveLoads(loads: Load[], truck: Truck | undefined): { cur
   const dispatched = loads.find((l) => l.id === truck.currentLoadId);
   if (dispatched) return { current: dispatched, next: loads.find((l) => l.id === truck.nextLoadId) };
   const inProgress = loads.find(
-    (l) => l.truckId === truck.id && l.stage !== "offered" && l.stage !== "delivered" && l.stage !== "declined",
+    (l) => l.truckId === truck.id && l.stage !== "offered" && l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "cancelled",
   );
   return { current: inProgress, next: undefined };
 }
