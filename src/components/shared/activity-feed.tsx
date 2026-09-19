@@ -13,6 +13,7 @@ import {
   MousePointerClick,
   Phone,
   Radar,
+  ClipboardCheck,
   ScanLine,
   Truck,
   Wrench,
@@ -41,6 +42,7 @@ export const TYPE_ICON: Record<ActivityType, typeof Radar> = {
   offer_selected: MousePointerClick,
   incident: LifeBuoy,
   maintenance: Wrench,
+  dvir: ClipboardCheck,
 };
 
 export const SEVERITY_TONE: Record<ActivityEvent["severity"], string> = {

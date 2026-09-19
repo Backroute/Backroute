@@ -11,6 +11,7 @@ import type {
   Escalation,
   Incident,
   Lane,
+  DvirInspection,
   Load,
   LoadDocument,
   LoadStage,
@@ -518,6 +519,7 @@ export interface World {
   carrierMessages: CarrierMessage[];
   incidents: Incident[];
   maintenanceAppointments: MaintenanceAppointment[];
+  dvirInspections: DvirInspection[];
 }
 
 export function generateWorld(seed = 20260916): World {
@@ -677,5 +679,8 @@ export function generateWorld(seed = 20260916): World {
     { id: rng.id("cm"), carrierId: PRIMARY_CARRIER_ID, from: "carrier", content: "Thanks, will check the escalation now.", timestamp: iso(-405) },
   ];
 
-  return { carriers, brokers, trucks, drivers, loads, activity, escalations, driverMessages, carrierMessages, incidents: [], maintenanceAppointments: [] };
+  return {
+    carriers, brokers, trucks, drivers, loads, activity, escalations, driverMessages, carrierMessages,
+    incidents: [], maintenanceAppointments: [], dvirInspections: [],
+  };
 }

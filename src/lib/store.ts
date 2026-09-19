@@ -30,6 +30,8 @@ import type {
   CarrierMessage,
   Driver,
   DriverMessage,
+  DvirInspection,
+  DvirItem,
   Escalation,
   Incident,
   IncidentType,
@@ -151,6 +153,7 @@ interface StoreState {
   carrierMessages: CarrierMessage[];
   incidents: Incident[];
   maintenanceAppointments: MaintenanceAppointment[];
+  dvirInspections: DvirInspection[];
   settings: AgentSettings;
   liveMetrics: LiveMetrics;
   tickCount: number;
@@ -172,6 +175,9 @@ interface StoreState {
     scheduleMaintenance: (truckId: string, shopName: string, serviceType: string, scheduledFor: string) => void;
     /** Marks the appointment done, returns the truck to available, and resets the service-interval baseline. */
     completeMaintenance: (truckId: string) => void;
+    /** Logs a pre-trip or post-trip DVIR. A defect on any item routes it to Escalations, same as
+     *  anything else this app can flag but not resolve on its own. */
+    submitDvir: (driverId: string, truckId: string, kind: "pre_trip" | "post_trip", items: DvirItem[], notes?: string) => void;
     seedInitialOffers: () => void;
     updateHomeTimeTarget: (driverId: string, target: string) => void;
     requestBetterRate: (loadId: string, actor: "driver" | "carrier", amount?: number) => void;
@@ -769,6 +775,41 @@ export const useStore = create<StoreState>((set, get) => ({
             },
             ...state.activity,
           ].slice(0, 80),
+        };
+      }),
+
+    submitDvir: (driverId, truckId, kind, items, notes) =>
+      set((state) => {
+        const truck = state.trucks.find((t) => t.id === truckId);
+        const overallStatus: "pass" | "defect" = items.some((i) => i.status === "defect") ? "defect" : "pass";
+        const inspection: DvirInspection = {
+          id: uid("dvir"), driverId, truckId, carrierId: PRIMARY_CARRIER_ID, kind, items, overallStatus, notes,
+          createdAt: new Date().toISOString(),
+        };
+        const kindLabel = kind === "pre_trip" ? "Pre-trip" : "Post-trip";
+        const activityEvent: ActivityEvent = {
+          id: uid("act"), timestamp: new Date().toISOString(), type: "dvir" as const,
+          message: `${kindLabel} DVIR ${overallStatus === "pass" ? "passed" : "flagged a defect"} — ${truck?.unitNumber ?? truckId}`,
+          detail: overallStatus === "defect" ? items.filter((i) => i.status === "defect").map((i) => i.label).join(", ") : undefined,
+          carrierId: PRIMARY_CARRIER_ID, severity: (overallStatus === "pass" ? "success" : "warning") as ActivityEvent["severity"],
+        };
+
+        if (overallStatus === "pass") {
+          return {
+            dvirInspections: [inspection, ...state.dvirInspections],
+            activity: [activityEvent, ...state.activity].slice(0, 80),
+          };
+        }
+
+        const escalation: Escalation = {
+          id: uid("esc"), loadId: truck?.currentLoadId ?? "", carrierId: PRIMARY_CARRIER_ID,
+          reason: `${kindLabel} DVIR on ${truck?.unitNumber ?? truckId} flagged a defect: ${items.filter((i) => i.status === "defect").map((i) => i.label).join(", ")}.`,
+          createdAt: new Date().toISOString(), status: "open", complexity: "critical",
+        };
+        return {
+          dvirInspections: [inspection, ...state.dvirInspections],
+          escalations: [escalation, ...state.escalations],
+          activity: [activityEvent, ...state.activity].slice(0, 80),
         };
       }),
 

@@ -112,6 +112,27 @@ export interface Truck {
   nextInspectionDue: string;
 }
 
+/** One checklist item in a DVIR (Driver Vehicle Inspection Report). */
+export interface DvirItem {
+  label: string;
+  status: "ok" | "defect";
+}
+
+/** FMCSA requires a pre-trip and post-trip inspection report for every driven vehicle. A defect on
+ *  any item makes the whole report "defect" — that's what routes it to an escalation, same as any
+ *  other thing this app can't resolve without a human call. */
+export interface DvirInspection {
+  id: string;
+  driverId: string;
+  truckId: string;
+  carrierId: string;
+  kind: "pre_trip" | "post_trip";
+  items: DvirItem[];
+  overallStatus: "pass" | "defect";
+  notes?: string;
+  createdAt: string;
+}
+
 /** A booked appointment at a repair shop — created by "Schedule at a shop" on the Maintenance page.
  *  Scheduling puts the truck into "maintenance" status immediately (in-shop), which the offer engine
  *  already treats as unavailable, so this doesn't need separate booking logic. */
@@ -238,7 +259,8 @@ export type ActivityType =
   | "load_offered"
   | "offer_selected"
   | "incident"
-  | "maintenance";
+  | "maintenance"
+  | "dvir";
 
 export interface ActivityEvent {
   id: string;

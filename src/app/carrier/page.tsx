@@ -195,18 +195,22 @@ export default function CarrierOverviewPage() {
                               <Button size="sm" variant="primary" onClick={() => resolveEscalation(e.id, e.recommendedAction === "approve")}>
                                 <Check className="h-3.5 w-3.5" /> {e.recommendedLabel}
                               </Button>
-                              <Link href={`/carrier/loads/${e.loadId}`} className="text-xs font-medium text-ink-500 hover:underline">
-                                Review manually
-                              </Link>
+                              {e.loadId && (
+                                <Link href={`/carrier/loads/${e.loadId}`} className="text-xs font-medium text-ink-500 hover:underline">
+                                  Review manually
+                                </Link>
+                              )}
                             </div>
                           ) : (
                             <div className="mt-2 flex flex-wrap items-center gap-3">
                               <Button size="sm" variant="outline" onClick={() => routeEscalationToSupport(e.id)}>
                                 <LifeBuoy className="h-3.5 w-3.5" /> Get human support
                               </Button>
-                              <Link href={`/carrier/loads/${e.loadId}`} className="text-xs font-medium text-ink-500 hover:underline">
-                                Review load →
-                              </Link>
+                              {e.loadId && (
+                                <Link href={`/carrier/loads/${e.loadId}`} className="text-xs font-medium text-ink-500 hover:underline">
+                                  Review load →
+                                </Link>
+                              )}
                             </div>
                           )}
                         </div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowUpRight, ChevronRight, FileText, LifeBuoy, Link2, MapPin, MessageCircle, Phone } from "lucide-react";
+import { ArrowUpRight, ChevronRight, ClipboardCheck, FileText, LifeBuoy, Link2, MapPin, MessageCircle, Phone } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { TripProgress } from "@/components/shared/trip-progress";
@@ -23,6 +23,7 @@ export default function DriverHomePage() {
   const loads = useCarrierLoads();
   const brokers = useBrokerMap();
   const incidents = useStore((s) => s.incidents).filter((i) => i.driverId === driver.id && i.status === "active");
+  const dvirInspections = useStore((s) => s.dvirInspections).filter((d) => d.driverId === driver.id);
   const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
   const selectLoadOffer = useStore((s) => s.actions.selectLoadOffer);
   const requestOfferDetail = useStore((s) => s.actions.requestOfferDetail);
@@ -211,6 +212,19 @@ export default function DriverHomePage() {
           </span>
           <span className="flex items-center gap-1 text-ink-950">
             Load history <ArrowUpRight className="h-3.5 w-3.5" />
+          </span>
+        </Link>
+      )}
+
+      {truck && (
+        <Link href="/driver/inspection" className="flex items-center justify-between rounded-2xl border border-line px-4 py-3.5 text-sm text-ink-700">
+          <span className="flex items-center gap-2">
+            <ClipboardCheck className="h-4 w-4 text-ink-400" /> Vehicle inspection (DVIR)
+          </span>
+          <span className="flex items-center gap-1 text-ink-950">
+            {dvirInspections.some((d) => new Date(d.createdAt).toDateString() === new Date().toDateString())
+              ? "Done today"
+              : "Start"} <ArrowUpRight className="h-3.5 w-3.5" />
           </span>
         </Link>
       )}

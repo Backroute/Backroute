@@ -68,10 +68,15 @@ export default function EscalationsPage() {
                           <p className="mt-0.5 text-xs text-ink-500">AI recommends: {e.recommendedLabel}</p>
                         )}
                         <p className="mt-1 text-xs text-ink-400">
-                          {carrier.name} · <TimeAgo iso={e.createdAt} /> ·{" "}
-                          <Link href={`/ops/loads/${e.loadId}`} className="inline-flex items-center gap-0.5 text-ink-500 hover:text-ink-950 hover:underline">
-                            View load <ArrowUpRight className="h-3 w-3" />
-                          </Link>
+                          {carrier.name} · <TimeAgo iso={e.createdAt} />
+                          {e.loadId && (
+                            <>
+                              {" · "}
+                              <Link href={`/ops/loads/${e.loadId}`} className="inline-flex items-center gap-0.5 text-ink-500 hover:text-ink-950 hover:underline">
+                                View load <ArrowUpRight className="h-3 w-3" />
+                              </Link>
+                            </>
+                          )}
                         </p>
                       </div>
                     </div>
