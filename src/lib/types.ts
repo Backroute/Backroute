@@ -112,6 +112,21 @@ export interface Truck {
   nextInspectionDue: string;
 }
 
+/** A booked appointment at a repair shop — created by "Schedule at a shop" on the Maintenance page.
+ *  Scheduling puts the truck into "maintenance" status immediately (in-shop), which the offer engine
+ *  already treats as unavailable, so this doesn't need separate booking logic. */
+export interface MaintenanceAppointment {
+  id: string;
+  truckId: string;
+  carrierId: string;
+  shopName: string;
+  serviceType: string;
+  scheduledFor: string;
+  status: "scheduled" | "completed";
+  createdAt: string;
+  completedAt?: string;
+}
+
 export interface Carrier {
   id: string;
   name: string;
@@ -222,7 +237,8 @@ export type ActivityType =
   | "escalation"
   | "load_offered"
   | "offer_selected"
-  | "incident";
+  | "incident"
+  | "maintenance";
 
 export interface ActivityEvent {
   id: string;

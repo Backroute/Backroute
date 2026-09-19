@@ -15,6 +15,7 @@ import {
   Radar,
   ScanLine,
   Truck,
+  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ActivityEvent, ActivityType } from "@/lib/types";
@@ -39,6 +40,7 @@ export const TYPE_ICON: Record<ActivityType, typeof Radar> = {
   load_offered: ListChecks,
   offer_selected: MousePointerClick,
   incident: LifeBuoy,
+  maintenance: Wrench,
 };
 
 export const SEVERITY_TONE: Record<ActivityEvent["severity"], string> = {

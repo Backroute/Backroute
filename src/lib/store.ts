@@ -34,6 +34,7 @@ import type {
   Incident,
   IncidentType,
   Load,
+  MaintenanceAppointment,
   Truck,
   VoiceCall,
 } from "./types";
@@ -149,6 +150,7 @@ interface StoreState {
   driverMessages: DriverMessage[];
   carrierMessages: CarrierMessage[];
   incidents: Incident[];
+  maintenanceAppointments: MaintenanceAppointment[];
   settings: AgentSettings;
   liveMetrics: LiveMetrics;
   tickCount: number;
@@ -165,6 +167,11 @@ interface StoreState {
     recaptureDocument: (loadId: string, type: "bol" | "pod") => void;
     selectLoadOffer: (offerGroupId: string, loadId: string, actor: "driver" | "carrier") => void;
     reportIncident: (driverId: string, truckId: string, type: IncidentType, note: string) => void;
+    /** Books a shop appointment and takes the truck out of the offer pool immediately (in-shop) rather
+     *  than waiting for the appointment date — a scheduled truck isn't one the AI should still be booking. */
+    scheduleMaintenance: (truckId: string, shopName: string, serviceType: string, scheduledFor: string) => void;
+    /** Marks the appointment done, returns the truck to available, and resets the service-interval baseline. */
+    completeMaintenance: (truckId: string) => void;
     seedInitialOffers: () => void;
     updateHomeTimeTarget: (driverId: string, target: string) => void;
     requestBetterRate: (loadId: string, actor: "driver" | "carrier", amount?: number) => void;
@@ -715,6 +722,53 @@ export const useStore = create<StoreState>((set, get) => ({
         return {
           incidents: [incident, ...state.incidents],
           activity: [incidentOpenedEvent(incident, truck), ...state.activity].slice(0, 80),
+        };
+      }),
+
+    scheduleMaintenance: (truckId, shopName, serviceType, scheduledFor) =>
+      set((state) => {
+        const truck = state.trucks.find((t) => t.id === truckId);
+        if (!truck) return {};
+        const appointment: MaintenanceAppointment = {
+          id: uid("mnt"), truckId, carrierId: PRIMARY_CARRIER_ID, shopName, serviceType, scheduledFor,
+          status: "scheduled", createdAt: new Date().toISOString(),
+        };
+        return {
+          maintenanceAppointments: [appointment, ...state.maintenanceAppointments],
+          trucks: state.trucks.map((t) => (t.id === truckId ? { ...t, status: "maintenance" as const } : t)),
+          activity: [
+            {
+              id: uid("act"), timestamp: new Date().toISOString(), type: "maintenance" as const,
+              message: `${truck.unitNumber} scheduled at ${shopName}`,
+              detail: `${serviceType} — AI will hold this truck out of the offer pool until service completes.`,
+              carrierId: PRIMARY_CARRIER_ID, severity: "info" as const,
+            },
+            ...state.activity,
+          ].slice(0, 80),
+        };
+      }),
+
+    completeMaintenance: (truckId) =>
+      set((state) => {
+        const truck = state.trucks.find((t) => t.id === truckId);
+        const appointment = state.maintenanceAppointments.find((a) => a.truckId === truckId && a.status === "scheduled");
+        if (!truck) return {};
+        return {
+          maintenanceAppointments: state.maintenanceAppointments.map((a) =>
+            a.id === appointment?.id ? { ...a, status: "completed" as const, completedAt: new Date().toISOString() } : a,
+          ),
+          trucks: state.trucks.map((t) =>
+            t.id === truckId ? { ...t, status: "available" as const, lastServiceMiles: t.odometer } : t,
+          ),
+          activity: [
+            {
+              id: uid("act"), timestamp: new Date().toISOString(), type: "maintenance" as const,
+              message: `${truck.unitNumber} back in service`,
+              detail: appointment ? `${appointment.serviceType} completed at ${appointment.shopName}` : "Service completed",
+              carrierId: PRIMARY_CARRIER_ID, severity: "success" as const,
+            },
+            ...state.activity,
+          ].slice(0, 80),
         };
       }),
 

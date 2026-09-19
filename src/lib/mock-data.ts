@@ -14,6 +14,7 @@ import type {
   Load,
   LoadDocument,
   LoadStage,
+  MaintenanceAppointment,
   NegotiationMessage,
   Truck,
   VoiceCall,
@@ -516,6 +517,7 @@ export interface World {
   driverMessages: DriverMessage[];
   carrierMessages: CarrierMessage[];
   incidents: Incident[];
+  maintenanceAppointments: MaintenanceAppointment[];
 }
 
 export function generateWorld(seed = 20260916): World {
@@ -675,5 +677,5 @@ export function generateWorld(seed = 20260916): World {
     { id: rng.id("cm"), carrierId: PRIMARY_CARRIER_ID, from: "carrier", content: "Thanks, will check the escalation now.", timestamp: iso(-405) },
   ];
 
-  return { carriers, brokers, trucks, drivers, loads, activity, escalations, driverMessages, carrierMessages, incidents: [] };
+  return { carriers, brokers, trucks, drivers, loads, activity, escalations, driverMessages, carrierMessages, incidents: [], maintenanceAppointments: [] };
 }
