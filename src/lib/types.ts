@@ -138,6 +138,20 @@ export interface DvirInspection {
   createdAt: string;
 }
 
+/** A driver's request for time off, routed to the carrier for a yes/no — this is the one thing in the
+ *  app that's always a human call, never something the AI can approve on its own. */
+export interface TimeOffRequest {
+  id: string;
+  driverId: string;
+  carrierId: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: "pending" | "approved" | "denied";
+  createdAt: string;
+  respondedAt?: string;
+}
+
 /** A booked appointment at a repair shop — created by "Schedule at a shop" on the Maintenance page.
  *  Scheduling puts the truck into "maintenance" status immediately (in-shop), which the offer engine
  *  already treats as unavailable, so this doesn't need separate booking logic. */
@@ -270,7 +284,8 @@ export type ActivityType =
   | "incident"
   | "maintenance"
   | "dvir"
-  | "load_cancelled";
+  | "load_cancelled"
+  | "time_off";
 
 export interface ActivityEvent {
   id: string;

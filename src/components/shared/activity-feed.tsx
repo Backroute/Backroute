@@ -14,6 +14,7 @@ import {
   MousePointerClick,
   Phone,
   Radar,
+  CalendarClock,
   ClipboardCheck,
   ScanLine,
   Truck,
@@ -45,6 +46,7 @@ export const TYPE_ICON: Record<ActivityType, typeof Radar> = {
   maintenance: Wrench,
   dvir: ClipboardCheck,
   load_cancelled: Ban,
+  time_off: CalendarClock,
 };
 
 export const SEVERITY_TONE: Record<ActivityEvent["severity"], string> = {

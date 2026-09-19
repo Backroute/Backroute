@@ -33,6 +33,7 @@ import type {
   DvirInspection,
   DvirItem,
   Escalation,
+  TimeOffRequest,
   Incident,
   IncidentType,
   Load,
@@ -154,6 +155,7 @@ interface StoreState {
   incidents: Incident[];
   maintenanceAppointments: MaintenanceAppointment[];
   dvirInspections: DvirInspection[];
+  timeOffRequests: TimeOffRequest[];
   settings: AgentSettings;
   liveMetrics: LiveMetrics;
   tickCount: number;
@@ -178,6 +180,9 @@ interface StoreState {
     /** Logs a pre-trip or post-trip DVIR. A defect on any item routes it to Escalations, same as
      *  anything else this app can flag but not resolve on its own. */
     submitDvir: (driverId: string, truckId: string, kind: "pre_trip" | "post_trip", items: DvirItem[], notes?: string) => void;
+    /** Always a human call — the carrier approves or denies, never the AI. */
+    requestTimeOff: (driverId: string, startDate: string, endDate: string, reason: string) => void;
+    respondTimeOff: (id: string, approve: boolean) => void;
     seedInitialOffers: () => void;
     updateHomeTimeTarget: (driverId: string, target: string) => void;
     requestBetterRate: (loadId: string, actor: "driver" | "carrier", amount?: number) => void;
@@ -813,6 +818,48 @@ export const useStore = create<StoreState>((set, get) => ({
           dvirInspections: [inspection, ...state.dvirInspections],
           escalations: [escalation, ...state.escalations],
           activity: [activityEvent, ...state.activity].slice(0, 80),
+        };
+      }),
+
+    requestTimeOff: (driverId, startDate, endDate, reason) =>
+      set((state) => {
+        const driver = state.drivers.find((d) => d.id === driverId);
+        const request: TimeOffRequest = {
+          id: uid("pto"), driverId, carrierId: PRIMARY_CARRIER_ID, startDate, endDate, reason,
+          status: "pending", createdAt: new Date().toISOString(),
+        };
+        return {
+          timeOffRequests: [request, ...state.timeOffRequests],
+          activity: [
+            {
+              id: uid("act"), timestamp: new Date().toISOString(), type: "time_off" as const,
+              message: `${driver?.name ?? "Driver"} requested time off`,
+              detail: `${startDate} – ${endDate} · ${reason}`,
+              carrierId: PRIMARY_CARRIER_ID, severity: "info" as const,
+            },
+            ...state.activity,
+          ].slice(0, 80),
+        };
+      }),
+
+    respondTimeOff: (id, approve) =>
+      set((state) => {
+        const request = state.timeOffRequests.find((r) => r.id === id);
+        if (!request) return {};
+        const driver = state.drivers.find((d) => d.id === request.driverId);
+        return {
+          timeOffRequests: state.timeOffRequests.map((r) =>
+            r.id === id ? { ...r, status: (approve ? "approved" : "denied") as "approved" | "denied", respondedAt: new Date().toISOString() } : r,
+          ),
+          activity: [
+            {
+              id: uid("act"), timestamp: new Date().toISOString(), type: "time_off" as const,
+              message: `Time off ${approve ? "approved" : "denied"} — ${driver?.name ?? "driver"}`,
+              detail: `${request.startDate} – ${request.endDate}`,
+              carrierId: PRIMARY_CARRIER_ID, severity: (approve ? "success" : "info") as ActivityEvent["severity"],
+            },
+            ...state.activity,
+          ].slice(0, 80),
         };
       }),
 

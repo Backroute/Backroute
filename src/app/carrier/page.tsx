@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, Check, LifeBuoy, Link2 } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CalendarClock, Check, LifeBuoy, Link2, X } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
@@ -31,6 +31,8 @@ export default function CarrierOverviewPage() {
   const resolveOfferDetail = useStore((s) => s.actions.resolveOfferDetail);
   const resolveEscalation = useStore((s) => s.actions.resolveEscalation);
   const routeEscalationToSupport = useStore((s) => s.actions.routeEscalationToSupport);
+  const respondTimeOff = useStore((s) => s.actions.respondTimeOff);
+  const pendingTimeOff = useStore((s) => s.timeOffRequests).filter((r) => r.carrierId === carrier.id && r.status === "pending");
 
   const activeLoads = loads.filter((l) => l.stage !== "delivered");
   const netProfitMonth = loads.reduce((sum, l) => sum + (l.netProfit ?? 0), 0);
@@ -220,6 +222,37 @@ export default function CarrierOverviewPage() {
                 )}
               </CardContent>
             </Card>
+
+            {pendingTimeOff.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CalendarClock className="h-4 w-4 text-ink-400" /> Time off requests
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="!pt-3">
+                  <div className="flex flex-col gap-3">
+                    {pendingTimeOff.map((r) => {
+                      const requester = driverMap.get(r.driverId);
+                      return (
+                        <div key={r.id} className="rounded-xl bg-ink-50 p-3">
+                          <p className="text-sm font-medium text-ink-900">{requester?.name ?? "Driver"}</p>
+                          <p className="mt-0.5 text-xs text-ink-500">{r.startDate} – {r.endDate} · {r.reason}</p>
+                          <div className="mt-2 flex items-center gap-2">
+                            <Button size="sm" variant="primary" onClick={() => respondTimeOff(r.id, true)}>
+                              <Check className="h-3.5 w-3.5" /> Approve
+                            </Button>
+                            <Button size="sm" variant="danger" onClick={() => respondTimeOff(r.id, false)}>
+                              <X className="h-3.5 w-3.5" /> Deny
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>

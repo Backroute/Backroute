@@ -17,6 +17,7 @@ import type {
   LoadStage,
   MaintenanceAppointment,
   NegotiationMessage,
+  TimeOffRequest,
   Truck,
   VoiceCall,
 } from "./types";
@@ -521,6 +522,7 @@ export interface World {
   incidents: Incident[];
   maintenanceAppointments: MaintenanceAppointment[];
   dvirInspections: DvirInspection[];
+  timeOffRequests: TimeOffRequest[];
 }
 
 export function generateWorld(seed = 20260916): World {
@@ -682,8 +684,16 @@ export function generateWorld(seed = 20260916): World {
     { id: rng.id("cm"), carrierId: PRIMARY_CARRIER_ID, from: "carrier", content: "Thanks, will check the escalation now.", timestamp: iso(-405) },
   ];
 
+  const timeOffRequests: TimeOffRequest[] = [
+    {
+      id: rng.id("pto"), driverId: "driver-2", carrierId: PRIMARY_CARRIER_ID,
+      startDate: iso(10 * 1440).slice(0, 10), endDate: iso(13 * 1440).slice(0, 10),
+      reason: "Family event out of state", status: "pending", createdAt: iso(-180),
+    },
+  ];
+
   return {
     carriers, brokers, trucks, drivers, loads, activity, escalations, driverMessages, carrierMessages,
-    incidents: [], maintenanceAppointments: [], dvirInspections: [],
+    incidents: [], maintenanceAppointments: [], dvirInspections: [], timeOffRequests,
   };
 }
