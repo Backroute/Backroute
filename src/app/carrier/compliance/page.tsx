@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2, FileCheck2, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, FileCheck2, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { useStore } from "@/lib/store";
 import { PRIMARY_CARRIER_ID } from "@/lib/mock-data";
 import { estimateMilesByState, estimateFuelTaxOwed } from "@/lib/ifta";
 import { IFTA_FILING_FEE, INSURANCE_REFERRAL_FEE } from "@/lib/commissions";
+import { downloadCsv } from "@/lib/csv-export";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 
 const INSURANCE_POLICY = {
@@ -49,6 +50,19 @@ export default function CompliancePage() {
                 Free estimate from lane miles per truck — not a substitute for your ELD&apos;s official mileage report. Filing is a flat {formatCurrency(IFTA_FILING_FEE)}/quarter, no subscription.
               </CardDescription>
             </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() =>
+                downloadCsv(
+                  `ifta-jurisdictions-${new Date().toISOString().slice(0, 10)}.csv`,
+                  ["State", "Miles", "Estimated Tax Owed"],
+                  stateMiles.map((s) => [s.state, s.miles, totalMiles ? Math.round((s.miles / totalMiles) * fuelTaxOwed) : 0]),
+                )
+              }
+            >
+              <Download className="h-3.5 w-3.5" /> Export CSV
+            </Button>
           </CardHeader>
           <CardContent className="!pt-3">
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">

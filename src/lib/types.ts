@@ -250,6 +250,7 @@ export interface Escalation {
   /** Human-readable label for the default-action button, e.g. "Approve — send detention invoice". */
   recommendedLabel?: string;
   resolvedBy?: "carrier" | "support" | "ops";
+  resolvedAt?: string;
 }
 
 export interface DriverMessage {

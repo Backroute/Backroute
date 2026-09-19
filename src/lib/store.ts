@@ -534,7 +534,9 @@ export const useStore = create<StoreState>((set, get) => ({
 
     resolveEscalation: (id, approve, actor = "carrier") =>
       set((state) => ({
-        escalations: state.escalations.map((e) => (e.id === id ? { ...e, status: "resolved" as const, resolvedBy: actor } : e)),
+        escalations: state.escalations.map((e) =>
+          e.id === id ? { ...e, status: "resolved" as const, resolvedBy: actor, resolvedAt: new Date().toISOString() } : e,
+        ),
         activity: [
           {
             id: uid("act"), timestamp: new Date().toISOString(), type: "escalation" as const,

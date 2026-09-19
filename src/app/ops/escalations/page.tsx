@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, Check, LifeBuoy, X } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Check, Download, LifeBuoy, X } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,25 @@ import { Button } from "@/components/ui/button";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { useStore } from "@/lib/store";
 import { usePrimaryCarrier } from "@/lib/selectors";
+import { downloadCsv } from "@/lib/csv-export";
+import type { Escalation } from "@/lib/types";
+
+/** Hours an escalation has sat open, for the urgency badge — a plain "3d ago" reads as a log entry,
+ *  not an SLA signal, so this makes the wait time itself the thing you look at. */
+function ageBadge(createdAt: string) {
+  const hours = (Date.now() - new Date(createdAt).getTime()) / 3_600_000;
+  const label = hours < 1 ? "<1h open" : hours < 24 ? `${Math.floor(hours)}h open` : `${Math.floor(hours / 24)}d open`;
+  const tone = hours >= 24 ? "danger" : hours >= 8 ? "warning" : "neutral";
+  return { label, tone } as const;
+}
+
+function exportResolved(resolved: Escalation[], carrierName: string) {
+  downloadCsv(
+    `escalations-resolved-${new Date().toISOString().slice(0, 10)}.csv`,
+    ["Reason", "Carrier", "Load ID", "Complexity", "Resolved By", "Created At", "Resolved At"],
+    resolved.map((e) => [e.reason, carrierName, e.loadId, e.complexity, e.resolvedBy ?? "", e.createdAt, e.resolvedAt ?? ""]),
+  );
+}
 
 export default function EscalationsPage() {
   const escalations = useStore((s) => s.escalations);
@@ -42,6 +61,7 @@ export default function EscalationsPage() {
                           <Badge tone={e.complexity === "critical" ? "danger" : "neutral"}>
                             {e.complexity === "critical" ? "Needs judgment call" : "AI has a recommendation"}
                           </Badge>
+                          <Badge tone={ageBadge(e.createdAt).tone}>{ageBadge(e.createdAt).label}</Badge>
                         </div>
                         <p className="mt-1 text-sm text-ink-900">{e.reason}</p>
                         {e.complexity === "routine" && e.recommendedLabel && (
@@ -82,7 +102,10 @@ export default function EscalationsPage() {
                         <LifeBuoy className="h-4 w-4" />
                       </span>
                       <div>
-                        <p className="text-sm text-ink-900">{e.reason}</p>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge tone={ageBadge(e.createdAt).tone}>{ageBadge(e.createdAt).label}</Badge>
+                        </div>
+                        <p className="mt-1 text-sm text-ink-900">{e.reason}</p>
                         <p className="mt-1 text-xs text-ink-400">
                           {carrier.name} routed this to support · <TimeAgo iso={e.createdAt} /> ·{" "}
                           <Link href={`/ops/loads/${e.loadId}`} className="inline-flex items-center gap-0.5 text-ink-500 hover:text-ink-950 hover:underline">
@@ -108,14 +131,22 @@ export default function EscalationsPage() {
 
         {resolved.length > 0 && (
           <div>
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-400">Resolved ({resolved.length})</h2>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-400">Resolved ({resolved.length})</h2>
+              <Button size="sm" variant="secondary" onClick={() => exportResolved(resolved, carrier.name)}>
+                <Download className="h-3.5 w-3.5" /> Export CSV
+              </Button>
+            </div>
             <div className="flex flex-col gap-2">
               {resolved.map((e) => (
-                <div key={e.id} className="flex items-center justify-between gap-4 rounded-xl border border-line bg-white px-4 py-3">
+                <div key={e.id} className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-line bg-white px-4 py-3">
                   <p className="text-sm text-ink-500 line-through decoration-ink-300">{e.reason}</p>
-                  <Badge tone="success">
-                    {e.resolvedBy === "support" ? "Resolved by support" : e.resolvedBy === "ops" ? "Resolved by Ops" : "Resolved by carrier"}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {e.resolvedAt && <span className="text-xs text-ink-400"><TimeAgo iso={e.resolvedAt} /></span>}
+                    <Badge tone="success">
+                      {e.resolvedBy === "support" ? "Resolved by support" : e.resolvedBy === "ops" ? "Resolved by Ops" : "Resolved by carrier"}
+                    </Badge>
+                  </div>
                 </div>
               ))}
             </div>

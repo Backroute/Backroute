@@ -1,18 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Clock } from "lucide-react";
+import { CheckCircle2, Clock, Download } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Tabs } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { StatTile } from "@/components/ui/stat-tile";
 import { AddonGate } from "@/components/shared/addon-gate";
 import { useCarrierLoads, useDriverMap, useTruckMap } from "@/lib/selectors";
 import { useNow } from "@/lib/hooks";
 import { deriveFactoringSettlement, computeDriverPay, FACTORING_FEE_PCT } from "@/lib/settlements";
 import { computeFactoringCommission } from "@/lib/commissions";
+import { downloadCsv } from "@/lib/csv-export";
 import { formatCurrency } from "@/lib/utils";
 import type { Driver, Load, Truck } from "@/lib/types";
 
@@ -68,6 +70,22 @@ function FactoringList({ loads, now }: { loads: Load[]; now: number | null }) {
 
   return (
     <div className="flex flex-col gap-5">
+      <div className="flex items-center justify-end">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() =>
+            downloadCsv(
+              `settlements-factoring-${new Date().toISOString().slice(0, 10)}.csv`,
+              ["Lane", "Reference", "Invoice Amount", "Factoring Fee", "Net Payout", "Status"],
+              settlements.map((s) => [s.lane, s.referenceNumber, s.invoiceAmount, s.factoringFee, s.netPayout, s.status]),
+            )
+          }
+        >
+          <Download className="h-3.5 w-3.5" /> Export CSV
+        </Button>
+      </div>
+
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <Card><CardContent><StatTile label="Funded" value={formatCurrency(funded.reduce((s, x) => s + x.netPayout, 0))} sublabel={`${funded.length} invoices`} /></CardContent></Card>
         <Card><CardContent><StatTile label="Pending funding" value={formatCurrency(pending.reduce((s, x) => s + x.netPayout, 0))} sublabel={`${pending.length} invoices`} /></CardContent></Card>
@@ -114,6 +132,29 @@ function DriverPayList({ loads, drivers, trucks }: { loads: Load[]; drivers: Map
 
   return (
     <div className="flex flex-col gap-5">
+      <div className="flex items-center justify-end">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() =>
+            downloadCsv(
+              `settlements-driver-pay-${new Date().toISOString().slice(0, 10)}.csv`,
+              ["Driver", "Lane", "Reference", "Pay Type", "Pay Rate", "Pay"],
+              rows.map((r) => [
+                r.driver.name,
+                `${r.load.lane.origin} → ${r.load.lane.destination}`,
+                r.load.referenceNumber,
+                r.driver.payType,
+                r.driver.payRate,
+                r.pay,
+              ]),
+            )
+          }
+        >
+          <Download className="h-3.5 w-3.5" /> Export CSV
+        </Button>
+      </div>
+
       <Card><CardContent><StatTile label="Total driver pay" value={formatCurrency(totalPay)} sublabel={`${rows.length} loads`} /></CardContent></Card>
 
       <div className="flex flex-col gap-2">

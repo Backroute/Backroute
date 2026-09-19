@@ -2,8 +2,10 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { Download } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Tabs } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { LiveDot } from "@/components/shared/live-dot";
 import { TimeAgo } from "@/components/shared/time-ago";
@@ -12,7 +14,29 @@ import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { useCarrierLoads, useBrokerMap, useTruckMap, useDriverMap } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { cn, formatCurrency } from "@/lib/utils";
-import type { LoadStage } from "@/lib/types";
+import { downloadCsv } from "@/lib/csv-export";
+import type { Broker, Load, LoadStage, Truck } from "@/lib/types";
+
+function exportLoads(loads: Load[], brokers: Map<string, Broker>, trucks: Map<string, Truck>) {
+  downloadCsv(
+    `loads-${new Date().toISOString().slice(0, 10)}.csv`,
+    ["Reference", "Origin", "Destination", "Broker", "Score", "Stage", "Truck", "Equipment", "Miles", "Rate", "Net Profit", "Updated"],
+    loads.map((l) => [
+      l.referenceNumber,
+      `${l.lane.origin}, ${l.lane.originState}`,
+      `${l.lane.destination}, ${l.lane.destState}`,
+      brokers.get(l.brokerId)?.company ?? "",
+      l.score,
+      l.stage,
+      (l.truckId ? trucks.get(l.truckId)?.unitNumber : "") ?? "",
+      l.equipmentType,
+      l.lane.miles,
+      l.bookedRate ?? l.targetRate,
+      l.netProfit ?? "",
+      l.updatedAt,
+    ]),
+  );
+}
 
 const GROUPS: { key: string; label: string; stages: LoadStage[] | "all" }[] = [
   { key: "active", label: "Active", stages: ["sourced", "scoring", "offered", "negotiating", "rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery"] },
@@ -56,7 +80,18 @@ export default function CarrierLoadsPage() {
 
   return (
     <div>
-      <PageHeader title="Loads" description={`${loads.length} loads`} right={<LiveDot />} />
+      <PageHeader
+        title="Loads"
+        description={`${loads.length} loads`}
+        right={
+          <div className="flex items-center gap-3">
+            <Button size="sm" variant="secondary" onClick={() => exportLoads(filtered, brokers, trucks)}>
+              <Download className="h-3.5 w-3.5" /> Export CSV
+            </Button>
+            <LiveDot />
+          </div>
+        }
+      />
 
       <div className="px-4 py-6 sm:px-8">
         <Tabs tabs={GROUPS.map((g) => ({ key: g.key, label: g.label, count: counts[g.key] }))} active={group} onChange={setGroup} />
