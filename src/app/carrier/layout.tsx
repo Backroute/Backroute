@@ -4,6 +4,7 @@ import { BarChart3, LayoutGrid, MessageCircle, MessageSquareText, Receipt, Setti
 import { PortalShell, type NavItem } from "@/components/shared/portal-shell";
 import { TopBar } from "@/components/shared/top-bar";
 import { CommandPalette, type CommandGroup } from "@/components/shared/command-palette";
+import { NotificationToastHost } from "@/components/shared/notification-toast";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
@@ -76,6 +77,7 @@ export default function CarrierLayout({ children }: { children: React.ReactNode 
     >
       <CommandPalette groups={commandGroups} />
       {children}
+      <NotificationToastHost events={activity} hrefFor={(e) => (e.loadId ? `/carrier/loads/${e.loadId}` : undefined)} />
     </PortalShell>
   );
 }

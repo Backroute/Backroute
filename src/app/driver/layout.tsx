@@ -6,7 +6,9 @@ import { Home, MessageCircle, Truck, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/shared/logo";
 import { Avatar } from "@/components/ui/avatar";
-import { usePrimaryDriver } from "@/lib/selectors";
+import { NotificationToastHost } from "@/components/shared/notification-toast";
+import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, truckActiveLoads } from "@/lib/selectors";
+import { useStore } from "@/lib/store";
 
 /** No standalone Docs tab — documents live on each load's own detail page (current or past), opened from
  *  the Loads tab, so there's one place per load instead of a second list that has to agree with it. */
@@ -20,6 +22,13 @@ const TABS = [
 export default function DriverLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const driver = usePrimaryDriver();
+  const trucks = useCarrierTrucks();
+  const loads = useCarrierLoads();
+  const activity = useStore((s) => s.activity);
+  const truck = trucks.find((t) => t.id === driver.truckId);
+  const { current, next } = truckActiveLoads(loads, truck);
+  const relevantLoadIds = new Set([current?.id, next?.id].filter(Boolean));
+  const driverActivity = activity.filter((e) => e.loadId && relevantLoadIds.has(e.loadId));
 
   return (
     <div className="flex min-h-screen justify-center bg-ink-100">
@@ -53,6 +62,7 @@ export default function DriverLayout({ children }: { children: React.ReactNode }
           })}
         </nav>
       </div>
+      <NotificationToastHost events={driverActivity} hrefFor={(e) => (e.loadId ? `/driver/loads/${e.loadId}` : undefined)} />
     </div>
   );
 }

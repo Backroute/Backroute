@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import type { ActivityEvent, ActivityType } from "@/lib/types";
 import { TimeAgo } from "./time-ago";
 
-const TYPE_ICON: Record<ActivityType, typeof Radar> = {
+export const TYPE_ICON: Record<ActivityType, typeof Radar> = {
   load_sourced: Radar,
   scoring_done: ScanLine,
   negotiation_email: Mail,
@@ -41,7 +41,7 @@ const TYPE_ICON: Record<ActivityType, typeof Radar> = {
   incident: LifeBuoy,
 };
 
-const SEVERITY_TONE: Record<ActivityEvent["severity"], string> = {
+export const SEVERITY_TONE: Record<ActivityEvent["severity"], string> = {
   info: "bg-ink-100 text-ink-600",
   success: "bg-emerald-50 text-[var(--accent-live)]",
   warning: "bg-amber-50 text-[var(--accent-warn)]",

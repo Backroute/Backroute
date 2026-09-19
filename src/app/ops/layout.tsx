@@ -4,6 +4,7 @@ import { BarChart3, Building2, LayoutGrid, Lock, Radio, ShieldAlert, Truck, User
 import { PortalShell, type NavItem } from "@/components/shared/portal-shell";
 import { TopBar } from "@/components/shared/top-bar";
 import { CommandPalette, type CommandGroup } from "@/components/shared/command-palette";
+import { NotificationToastHost } from "@/components/shared/notification-toast";
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
 import { PRIMARY_CARRIER_ID } from "@/lib/mock-data";
@@ -67,6 +68,7 @@ export default function OpsLayout({ children }: { children: React.ReactNode }) {
     >
       <CommandPalette groups={commandGroups} />
       {children}
+      <NotificationToastHost events={activity} hrefFor={(e) => (e.loadId ? `/ops/loads/${e.loadId}` : undefined)} />
     </PortalShell>
   );
 }
