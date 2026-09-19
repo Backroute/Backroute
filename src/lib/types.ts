@@ -98,6 +98,9 @@ export interface Truck {
   id: string;
   unitNumber: string;
   driverId: string | null;
+  /** Team driving — a second driver paired on the same truck so it can run further per day (one drives
+   *  while the other's in the sleeper). Optional: most trucks run solo. */
+  secondDriverId?: string | null;
   carrierId: string;
   equipmentType: EquipmentType;
   status: "available" | "on_load" | "maintenance";

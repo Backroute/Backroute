@@ -74,6 +74,7 @@ const DRIVER_ROSTER: { name: string; phone: string; cdl: string; homeBase: strin
   { name: "Ava Whitmore", phone: "(972) 555-0163", cdl: "CDL-A TX 71234", homeBase: "Plano, TX", homeTimeTarget: "Home by Sunday" },
   { name: "Deshawn Price", phone: "(214) 555-0187", cdl: "CDL-A TX 69022", homeBase: "Arlington, TX", homeTimeTarget: "No preference set" },
   { name: "Nina Castillo", phone: "(469) 555-0129", cdl: "CDL-A TX 73310", homeBase: "Irving, TX", homeTimeTarget: "Home by Friday" },
+  { name: "Priya Anand", phone: "(214) 555-0116", cdl: "CDL-A TX 82097", homeBase: "Dallas, TX", homeTimeTarget: "No preference set" },
 ];
 
 const CARRIER_PREFIXES = [
@@ -547,7 +548,7 @@ export function generateWorld(seed = 20260916): World {
   const otherCarriers = buildLightweightCarriers(rng, 27);
   const carriers = [primaryCarrier, ...otherCarriers];
 
-  const trucks: Truck[] = DRIVER_ROSTER.map((d, i) => {
+  const trucks: Truck[] = DRIVER_ROSTER.slice(0, 6).map((d, i) => {
     const odometer = rng.int(80000, 340000);
     const serviceIntervalMiles = 25000;
     return {
@@ -574,12 +575,13 @@ export function generateWorld(seed = 20260916): World {
 
   const drivers: Driver[] = DRIVER_ROSTER.map((d, i) => {
     const payType: Driver["payType"] = rng.bool(0.6) ? "percentage" : "per_mile";
+    const truck = trucks[i] ?? trucks[0];
     return {
-      id: i === 0 ? PRIMARY_DRIVER_ID : `driver-${i + 1}`,
+      id: i === 0 ? PRIMARY_DRIVER_ID : i < trucks.length ? `driver-${i + 1}` : "driver-team-1",
       name: d.name,
       phone: d.phone,
       email: `${d.name.toLowerCase().replace(/\s+/g, ".")}@titanfreight.com`,
-      truckId: trucks[i].id,
+      truckId: truck.id,
       carrierId: PRIMARY_CARRIER_ID,
       hosStatus: rng.pick(["driving", "driving", "on_duty", "off_duty", "sleeper"]),
       hoursRemaining: pct(rng, 2.5, 10.5),
@@ -592,6 +594,7 @@ export function generateWorld(seed = 20260916): World {
       payRate: payType === "percentage" ? pct(rng, 0.25, 0.32, 2) : pct(rng, 0.58, 0.68, 2),
     };
   });
+  trucks[0].secondDriverId = "driver-team-1";
 
   const specs: LoadSpec[] = [
     { stage: "sourced", truckId: null, createdOffset: -8 },

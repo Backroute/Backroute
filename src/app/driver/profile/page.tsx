@@ -1,6 +1,6 @@
 "use client";
 
-import { DollarSign, Home, Phone, Star } from "lucide-react";
+import { DollarSign, Home, Phone, Star, Users } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -23,14 +23,19 @@ export default function DriverProfilePage() {
   const driver = usePrimaryDriver();
   const carrier = usePrimaryCarrier();
   const trucks = useCarrierTrucks();
+  const drivers = useStore((s) => s.drivers);
   const loads = useCarrierLoads();
   const truck = trucks.find((t) => t.id === driver.truckId);
   const updateHomeTimeTarget = useStore((s) => s.actions.updateHomeTimeTarget);
 
+  const isTeam = !!truck?.secondDriverId;
+  const teammateId = truck?.driverId === driver.id ? truck?.secondDriverId : truck?.driverId;
+  const teammate = teammateId ? drivers.find((d) => d.id === teammateId) : undefined;
+
   const paidLoads = loads
     .filter((l) => l.stage === "delivered" && l.truckId === truck?.id)
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  const totalPay = paidLoads.reduce((s, l) => s + computeDriverPay(l, driver), 0);
+  const totalPay = paidLoads.reduce((s, l) => s + computeDriverPay(l, driver, isTeam), 0);
 
   return (
     <div className="flex flex-col gap-5 px-5">
@@ -51,6 +56,23 @@ export default function DriverProfilePage() {
         <Progress value={(driver.hoursRemaining / 11) * 100} className="mt-2" />
         <p className="mt-1.5 text-xs text-ink-400">{driver.hoursRemaining.toFixed(1)} hours remaining today</p>
       </div>
+
+      {teammate && (
+        <div className="rounded-2xl border border-line p-4">
+          <div className="flex items-center gap-2">
+            <Users className="h-3.5 w-3.5 text-ink-400" />
+            <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">Team driver</p>
+          </div>
+          <p className="mt-1 text-xs text-ink-500">Running as a team — one drives while the other&apos;s in the sleeper, so the truck covers more ground per day. Pay per load is split between you.</p>
+          <div className="mt-3 flex items-center justify-between rounded-xl bg-ink-50 px-3.5 py-2.5">
+            <div>
+              <p className="text-sm font-medium text-ink-900">{teammate.name}</p>
+              <p className="text-xs text-ink-400">{teammate.hoursRemaining.toFixed(1)}h HOS remaining</p>
+            </div>
+            <Badge tone={HOS_TONE[teammate.hosStatus]}>{teammate.hosStatus.replace("_", " ")}</Badge>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-2xl border border-line p-4">
         <div className="flex items-center gap-2">
@@ -106,7 +128,7 @@ export default function DriverProfilePage() {
                     <p className="truncate text-sm text-ink-800">{l.lane.origin} → {l.lane.destination}</p>
                     <p className="text-[11px] text-ink-400">{formatDate(l.updatedAt)}</p>
                   </div>
-                  <p className="shrink-0 text-sm font-semibold tabular text-ink-950">{formatCurrency(computeDriverPay(l, driver))}</p>
+                  <p className="shrink-0 text-sm font-semibold tabular text-ink-950">{formatCurrency(computeDriverPay(l, driver, isTeam))}</p>
                 </div>
               ))}
             </div>

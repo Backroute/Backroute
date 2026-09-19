@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Link2, MapPin, Phone, Sparkles } from "lucide-react";
+import { Link2, MapPin, Phone, Sparkles, Users } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,7 @@ export default function FleetPage() {
       <div className="grid gap-5 px-4 py-6 sm:px-8 sm:grid-cols-2 xl:grid-cols-3">
         {trucks.map((truck) => {
           const driver = drivers.get(truck.driverId ?? "");
+          const secondDriver = truck.secondDriverId ? drivers.get(truck.secondDriverId) : undefined;
           const { current: currentLoad, next: nextLoad } = truckActiveLoads(loads, truck);
           const pendingOffers = loads.filter((l) => l.truckId === truck.id && l.stage === "offered");
           const hosPct = driver ? Math.min(100, (driver.hoursRemaining / 11) * 100) : 0;
@@ -49,7 +50,10 @@ export default function FleetPage() {
               <CardContent className="flex flex-col gap-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="font-display text-xl text-ink-950">{truck.unitNumber}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-display text-xl text-ink-950">{truck.unitNumber}</p>
+                      {secondDriver && <Badge tone="info"><Users className="h-3 w-3" /> Team</Badge>}
+                    </div>
                     <p className="text-xs text-ink-500">{truck.equipmentType} · {formatNumber(truck.odometer)} mi · {truck.mpg.toFixed(1)} mpg</p>
                     <p className="mt-1 flex items-center gap-1 text-[11px] text-ink-400">
                       <MapPin className="h-3 w-3" /> {truck.currentCity}, {truck.currentState}
@@ -75,6 +79,19 @@ export default function FleetPage() {
                   </div>
                 )}
 
+                {secondDriver && (
+                  <div className="flex items-center gap-3">
+                    <Avatar name={secondDriver.name} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-ink-900">{secondDriver.name} <span className="text-ink-400">· co-driver</span></p>
+                      <p className="truncate text-xs text-ink-400">{secondDriver.phone}</p>
+                    </div>
+                    <a href={`tel:${secondDriver.phone.replace(/[^\d+]/g, "")}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-100 text-ink-600 hover:bg-ink-200">
+                      <Phone className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                )}
+
                 {driver && (
                   <div>
                     <div className="flex items-center justify-between text-xs text-ink-500">
@@ -82,6 +99,15 @@ export default function FleetPage() {
                       <span className="tabular">{driver.hoursRemaining.toFixed(1)}h left</span>
                     </div>
                     <Progress value={hosPct} className="mt-2" />
+                  </div>
+                )}
+                {secondDriver && (
+                  <div>
+                    <div className="flex items-center justify-between text-xs text-ink-500">
+                      <span>Co-driver HOS · <Badge tone={HOS_TONE[secondDriver.hosStatus]}>{secondDriver.hosStatus.replace("_", " ")}</Badge></span>
+                      <span className="tabular">{secondDriver.hoursRemaining.toFixed(1)}h left</span>
+                    </div>
+                    <Progress value={Math.min(100, (secondDriver.hoursRemaining / 11) * 100)} className="mt-2" />
                   </div>
                 )}
 

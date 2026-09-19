@@ -121,10 +121,16 @@ function DriverPayList({ loads, drivers, trucks }: { loads: Load[]; drivers: Map
   if (loads.length === 0) return <EmptyState text="No delivered loads yet — pay statements appear the moment a load delivers." />;
 
   const rows = loads
-    .map((l) => {
+    .flatMap((l) => {
       const truck = l.truckId ? trucks.get(l.truckId) : undefined;
-      const driver = truck?.driverId ? drivers.get(truck.driverId) : undefined;
-      return driver ? { load: l, driver, pay: computeDriverPay(l, driver) } : null;
+      if (!truck) return [];
+      const isTeam = !!truck.secondDriverId;
+      const primary = truck.driverId ? drivers.get(truck.driverId) : undefined;
+      const second = truck.secondDriverId ? drivers.get(truck.secondDriverId) : undefined;
+      return [
+        primary ? { load: l, driver: primary, pay: computeDriverPay(l, primary, isTeam) } : null,
+        second ? { load: l, driver: second, pay: computeDriverPay(l, second, isTeam) } : null,
+      ];
     })
     .filter((r): r is { load: Load; driver: Driver; pay: number } => r !== null);
 
@@ -159,7 +165,7 @@ function DriverPayList({ loads, drivers, trucks }: { loads: Load[]; drivers: Map
 
       <div className="flex flex-col gap-2">
         {rows.map(({ load, driver, pay }) => (
-          <div key={load.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-white p-4">
+          <div key={`${load.id}-${driver.id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-white p-4">
             <div className="flex items-center gap-3">
               <Avatar name={driver.name} size="sm" />
               <div>

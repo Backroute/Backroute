@@ -34,8 +34,10 @@ export function deriveFactoringSettlement(load: Load, now: number): FactoringSet
   };
 }
 
-/** Driver Settlement AI: what a driver is actually owed for a load, computed from their pay structure. */
-export function computeDriverPay(load: Load, driver: Driver): number {
+/** Driver Settlement AI: what a driver is actually owed for a load, computed from their pay structure.
+ *  A team truck splits one driver-pay budget between its two drivers rather than paying each in full. */
+export function computeDriverPay(load: Load, driver: Driver, teamSplit = false): number {
   const rate = load.bookedRate ?? load.targetRate;
-  return Math.round(driver.payType === "percentage" ? rate * driver.payRate : load.lane.miles * driver.payRate);
+  const full = driver.payType === "percentage" ? rate * driver.payRate : load.lane.miles * driver.payRate;
+  return Math.round(teamSplit ? full / 2 : full);
 }
