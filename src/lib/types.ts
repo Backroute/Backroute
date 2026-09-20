@@ -166,6 +166,22 @@ export interface TimeOffRequest {
   respondedAt?: string;
 }
 
+/** An out-of-pocket cost a driver fronted on the road — lumper fee, detention, parking, scale ticket —
+ *  submitted for reimbursement. Always a human call on the carrier side, same as time off; the AI
+ *  handles the load's own fuel/toll/deadhead costs, but it doesn't touch a driver's own money. */
+export interface Expense {
+  id: string;
+  driverId: string;
+  carrierId: string;
+  loadId: string | null;
+  category: "lumper" | "detention" | "parking" | "scale" | "other";
+  amount: number;
+  note: string;
+  status: "pending" | "approved" | "denied";
+  createdAt: string;
+  respondedAt?: string;
+}
+
 /** A booked appointment at a repair shop — created by "Schedule at a shop" on the Maintenance page.
  *  Scheduling puts the truck into "maintenance" status immediately (in-shop), which the offer engine
  *  already treats as unavailable, so this doesn't need separate booking logic. */
@@ -303,7 +319,8 @@ export type ActivityType =
   | "dvir"
   | "load_cancelled"
   | "time_off"
-  | "truck_reassigned";
+  | "truck_reassigned"
+  | "expense";
 
 export interface ActivityEvent {
   id: string;

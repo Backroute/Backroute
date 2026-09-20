@@ -1,16 +1,22 @@
 "use client";
 
 import { PageHeader } from "@/components/shared/portal-shell";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { BrokerTrustBadge } from "@/components/shared/broker-trust-badge";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import type { Broker } from "@/lib/types";
 
-const TIER_TONE = { preferred: "success", standard: "neutral", watch: "warning" } as const;
+const TIER_TONE: Record<Broker["tier"], string> = {
+  preferred: "bg-emerald-50 text-[var(--accent-live)]",
+  standard: "bg-ink-100 text-ink-700",
+  watch: "bg-amber-50 text-[var(--accent-warn)]",
+};
+const TIERS = ["preferred", "standard", "watch"] as const;
 
 export default function BrokersPage() {
   const brokers = useStore((s) => s.brokers);
+  const opsSetBrokerTier = useStore((s) => s.actions.opsSetBrokerTier);
   const sorted = [...brokers].sort((a, b) => b.reliability - a.reliability);
 
   return (
@@ -27,7 +33,7 @@ export default function BrokersPage() {
                   <p className="text-xs text-ink-400">{b.contact}</p>
                   <BrokerTrustBadge broker={b} className="mt-1" />
                 </div>
-                <Badge tone={TIER_TONE[b.tier]}>{b.tier}</Badge>
+                <TierSelect tier={b.tier} onChange={(tier) => opsSetBrokerTier(b.id, tier)} />
               </div>
               <div className="mt-3 flex items-center gap-2">
                 <Progress value={b.reliability} className="w-20" />
@@ -66,7 +72,7 @@ export default function BrokersPage() {
                     <p className="text-xs text-ink-400">{b.contact}</p>
                     <BrokerTrustBadge broker={b} className="mt-1" />
                   </td>
-                  <td className="px-5 py-3.5"><Badge tone={TIER_TONE[b.tier]}>{b.tier}</Badge></td>
+                  <td className="px-5 py-3.5"><TierSelect tier={b.tier} onChange={(tier) => opsSetBrokerTier(b.id, tier)} /></td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
                       <Progress value={b.reliability} className="w-20" />
@@ -88,5 +94,24 @@ export default function BrokersPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function TierSelect({ tier, onChange }: { tier: Broker["tier"]; onChange: (tier: Broker["tier"]) => void }) {
+  return (
+    <select
+      value={tier}
+      onChange={(e) => onChange(e.target.value as Broker["tier"])}
+      className={cn(
+        "cursor-pointer appearance-none rounded-full border-0 px-2.5 py-1 text-[11px] font-medium tracking-tight outline-none",
+        TIER_TONE[tier],
+      )}
+    >
+      {TIERS.map((t) => (
+        <option key={t} value={t}>
+          {t}
+        </option>
+      ))}
+    </select>
   );
 }

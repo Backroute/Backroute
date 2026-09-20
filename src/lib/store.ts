@@ -33,6 +33,7 @@ import type {
   DvirInspection,
   DvirItem,
   Escalation,
+  Expense,
   TimeOffRequest,
   Incident,
   IncidentType,
@@ -45,6 +46,14 @@ import type {
 const uid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 const randInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+const EXPENSE_CATEGORY_LABEL: Record<Expense["category"], string> = {
+  lumper: "lumper fee",
+  detention: "detention",
+  parking: "parking",
+  scale: "scale ticket",
+  other: "other",
+};
 
 /** Promotes a truck's already-chained next load into its current slot the moment it frees up — used both
  *  by the automatic tick (AI-side deliveries, if any ever land there again) and driverConfirmStage (the
@@ -156,6 +165,7 @@ interface StoreState {
   maintenanceAppointments: MaintenanceAppointment[];
   dvirInspections: DvirInspection[];
   timeOffRequests: TimeOffRequest[];
+  expenses: Expense[];
   settings: AgentSettings;
   liveMetrics: LiveMetrics;
   tickCount: number;
@@ -186,6 +196,10 @@ interface StoreState {
     /** Always a human call — the carrier approves or denies, never the AI. */
     requestTimeOff: (driverId: string, startDate: string, endDate: string, reason: string) => void;
     respondTimeOff: (id: string, approve: boolean) => void;
+    /** Out-of-pocket cost a driver fronted on the road, submitted for reimbursement. Same human-only
+     *  approval pattern as time off — this is the driver's own money, not the load's economics. */
+    submitExpense: (driverId: string, loadId: string | null, category: Expense["category"], amount: number, note: string) => void;
+    respondExpense: (id: string, approve: boolean) => void;
     /** Checks off one intermediate stop on a multi-stop load. Doesn't touch load.stage — the overall
      *  pickup/transit/delivery lifecycle still runs off the existing stage machine untouched. */
     completeLoadStop: (loadId: string, stopId: string) => void;
@@ -209,6 +223,10 @@ interface StoreState {
     logLoadVoiceCall: (loadId: string, call: Omit<VoiceCall, "id">) => void;
     setAiPaused: (loadId: string, paused: boolean) => void;
     opsOverrideRate: (loadId: string, amount: number) => void;
+    /** Ops manually re-tiers a broker — after investigating a complaint, a false-positive fraud flag,
+     *  whatever the automated score missed. Same "internal action, visible to the carrier" transparency
+     *  as the load-level overrides above. */
+    opsSetBrokerTier: (brokerId: string, tier: Broker["tier"]) => void;
     toggleAddon: (addonId: string) => void;
   };
 }
@@ -892,6 +910,49 @@ export const useStore = create<StoreState>((set, get) => ({
         };
       }),
 
+    submitExpense: (driverId, loadId, category, amount, note) =>
+      set((state) => {
+        if (!Number.isFinite(amount) || amount <= 0) return {};
+        const driver = state.drivers.find((d) => d.id === driverId);
+        const expense: Expense = {
+          id: uid("exp"), driverId, carrierId: PRIMARY_CARRIER_ID, loadId, category, amount: Math.round(amount), note,
+          status: "pending", createdAt: new Date().toISOString(),
+        };
+        return {
+          expenses: [expense, ...state.expenses],
+          activity: [
+            {
+              id: uid("act"), timestamp: new Date().toISOString(), type: "expense" as const,
+              message: `${driver?.name ?? "Driver"} submitted a ${EXPENSE_CATEGORY_LABEL[category]} expense`,
+              detail: `$${expense.amount.toLocaleString()}${note ? ` · ${note}` : ""}`,
+              carrierId: PRIMARY_CARRIER_ID, severity: "info" as const,
+            },
+            ...state.activity,
+          ].slice(0, 80),
+        };
+      }),
+
+    respondExpense: (id, approve) =>
+      set((state) => {
+        const expense = state.expenses.find((e) => e.id === id);
+        if (!expense) return {};
+        const driver = state.drivers.find((d) => d.id === expense.driverId);
+        return {
+          expenses: state.expenses.map((e) =>
+            e.id === id ? { ...e, status: (approve ? "approved" : "denied") as "approved" | "denied", respondedAt: new Date().toISOString() } : e,
+          ),
+          activity: [
+            {
+              id: uid("act"), timestamp: new Date().toISOString(), type: "expense" as const,
+              message: `Expense ${approve ? "approved" : "denied"}: ${driver?.name ?? "driver"}`,
+              detail: `$${expense.amount.toLocaleString()} · ${EXPENSE_CATEGORY_LABEL[expense.category]}`,
+              carrierId: PRIMARY_CARRIER_ID, severity: (approve ? "success" : "info") as ActivityEvent["severity"],
+            },
+            ...state.activity,
+          ].slice(0, 80),
+        };
+      }),
+
     completeLoadStop: (loadId, stopId) =>
       set((state) => {
         const load = state.loads.find((l) => l.id === loadId);
@@ -1138,6 +1199,24 @@ export const useStore = create<StoreState>((set, get) => ({
               id: uid("act"), timestamp: new Date().toISOString(), type: "negotiation_email" as const,
               message: "Ops manually overrode the rate", detail: `${broker?.company ?? load.source} · set to $${amount.toLocaleString()}`,
               loadId, carrierId: load.carrierId, severity: "warning" as const,
+            },
+            ...state.activity,
+          ].slice(0, 80),
+        };
+      }),
+
+    opsSetBrokerTier: (brokerId, tier) =>
+      set((state) => {
+        const broker = state.brokers.find((b) => b.id === brokerId);
+        if (!broker || broker.tier === tier) return {};
+        return {
+          brokers: state.brokers.map((b) => (b.id === brokerId ? { ...b, tier } : b)),
+          activity: [
+            {
+              id: uid("act"), timestamp: new Date().toISOString(), type: "escalation" as const,
+              message: `Ops re-tiered ${broker.company}`,
+              detail: `${broker.tier} → ${tier}`,
+              carrierId: PRIMARY_CARRIER_ID, severity: (tier === "watch" ? "warning" : "info") as ActivityEvent["severity"],
             },
             ...state.activity,
           ].slice(0, 80),

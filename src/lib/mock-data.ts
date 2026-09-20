@@ -9,6 +9,7 @@ import type {
   DriverMessage,
   EquipmentType,
   Escalation,
+  Expense,
   Incident,
   Lane,
   DvirInspection,
@@ -555,6 +556,7 @@ export interface World {
   maintenanceAppointments: MaintenanceAppointment[];
   dvirInspections: DvirInspection[];
   timeOffRequests: TimeOffRequest[];
+  expenses: Expense[];
 }
 
 export function generateWorld(seed = 20260916): World {
@@ -739,6 +741,6 @@ export function generateWorld(seed = 20260916): World {
 
   return {
     carriers, brokers, trucks, drivers, loads, activity, escalations, driverMessages, carrierMessages,
-    incidents: [], maintenanceAppointments: [], dvirInspections: [], timeOffRequests,
+    incidents: [], maintenanceAppointments: [], dvirInspections: [], timeOffRequests, expenses: [],
   };
 }

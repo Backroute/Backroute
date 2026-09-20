@@ -17,6 +17,7 @@ import {
   Radar,
   CalendarClock,
   ClipboardCheck,
+  ReceiptText,
   ScanLine,
   Truck,
   Wrench,
@@ -49,6 +50,7 @@ export const TYPE_ICON: Record<ActivityType, typeof Radar> = {
   load_cancelled: Ban,
   time_off: CalendarClock,
   truck_reassigned: ArrowRightLeft,
+  expense: ReceiptText,
 };
 
 export const SEVERITY_TONE: Record<ActivityEvent["severity"], string> = {

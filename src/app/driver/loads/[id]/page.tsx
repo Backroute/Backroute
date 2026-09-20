@@ -1,10 +1,12 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Camera, CheckCircle2, Clock, DollarSign, FileText, LifeBuoy, MapPin, MessageCircle } from "lucide-react";
+import { ArrowLeft, Camera, CheckCircle2, Clock, DollarSign, FileText, LifeBuoy, MapPin, MessageCircle, Receipt } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { TripStepper } from "@/components/shared/trip-stepper";
 import { StopsTimeline } from "@/components/shared/stops-timeline";
 import { LoadScoreBadge } from "@/components/shared/load-score";
@@ -15,7 +17,18 @@ import { useStore } from "@/lib/store";
 import { STAGE_CONFIRM } from "@/lib/stage-confirm";
 import { LOAD_STATUS_HEADLINE, aiDispatcherNote, isTransitStage } from "@/lib/load-status";
 import { LOAD_STAGE_LABEL } from "@/lib/types";
+import type { Expense } from "@/lib/types";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
+
+const EXPENSE_CATEGORIES: { key: Expense["category"]; label: string }[] = [
+  { key: "lumper", label: "Lumper fee" },
+  { key: "detention", label: "Detention" },
+  { key: "parking", label: "Parking" },
+  { key: "scale", label: "Scale ticket" },
+  { key: "other", label: "Other" },
+];
+
+const EXPENSE_STATUS_TONE = { pending: "warning", approved: "success", denied: "danger" } as const;
 
 /** Which document a stage is still waiting on — matched against STAGE_CONFIRM so this page's
  *  pending rows always agree with what the confirm button above them is about to do. */
@@ -53,6 +66,12 @@ export default function DriverLoadDetailPage() {
   const driverConfirmStage = useStore((s) => s.actions.driverConfirmStage);
   const recaptureDocument = useStore((s) => s.actions.recaptureDocument);
   const completeLoadStop = useStore((s) => s.actions.completeLoadStop);
+  const submitExpense = useStore((s) => s.actions.submitExpense);
+  const allExpenses = useStore((s) => s.expenses);
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [expenseCategory, setExpenseCategory] = useState<Expense["category"]>("lumper");
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseNote, setExpenseNote] = useState("");
 
   if (!load) {
     return (
@@ -69,6 +88,17 @@ export default function DriverLoadDetailPage() {
   const isCurrent = truck?.currentLoadId === load.id;
   const step = STAGE_CONFIRM[load.stage];
   const pendingType = step?.doc && !load.documents.some((d) => d.type === step.doc) ? step.doc : null;
+  const loadId = load.id;
+  const loadExpenses = allExpenses.filter((e) => e.loadId === loadId && e.driverId === driver.id);
+
+  function handleSubmitExpense() {
+    const amount = Number(expenseAmount);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    submitExpense(driver.id, loadId, expenseCategory, amount, expenseNote.trim());
+    setExpenseAmount("");
+    setExpenseNote("");
+    setShowExpenseForm(false);
+  }
 
   return (
     <div className="flex flex-col gap-5 px-5">
@@ -160,6 +190,69 @@ export default function DriverLoadDetailPage() {
           <Row label="Total offer" value={formatCurrency(load.bookedRate ?? load.targetRate)} strong />
           <Row label={load.bookedRate ? "Net profit" : "Est. net profit"} value={formatCurrency(load.netProfit ?? 0)} />
           <Row label="Rate / mile" value={load.rpm ? `$${load.rpm.toFixed(2)}` : "—"} />
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Expenses" icon={Receipt}>
+        <div className="flex flex-col gap-2">
+          {loadExpenses.length === 0 && !showExpenseForm && (
+            <p className="py-2 text-sm text-ink-400">No expenses submitted for this load.</p>
+          )}
+          {loadExpenses.map((e) => (
+            <div key={e.id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3.5 py-3">
+              <div>
+                <p className="text-xs font-medium text-ink-900">{EXPENSE_CATEGORIES.find((c) => c.key === e.category)?.label}</p>
+                {e.note && <p className="text-[11px] text-ink-400">{e.note}</p>}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold tabular text-ink-950">{formatCurrency(e.amount)}</span>
+                <Badge tone={EXPENSE_STATUS_TONE[e.status]}>{e.status}</Badge>
+              </div>
+            </div>
+          ))}
+
+          {showExpenseForm ? (
+            <div className="mt-1 flex flex-col gap-2.5 rounded-xl border border-line bg-ink-50/60 p-3.5">
+              <div className="flex flex-wrap gap-1.5">
+                {EXPENSE_CATEGORIES.map((c) => (
+                  <button
+                    key={c.key}
+                    onClick={() => setExpenseCategory(c.key)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                      expenseCategory === c.key ? "bg-ink-950 text-white" : "bg-white text-ink-600 border border-line"
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-400">$</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={expenseAmount}
+                  onChange={(e) => setExpenseAmount(e.target.value)}
+                  placeholder="0"
+                  className="w-full rounded-lg border border-line bg-white py-2 pl-6 pr-3 text-sm outline-none focus:border-ink-400"
+                />
+              </div>
+              <input
+                value={expenseNote}
+                onChange={(e) => setExpenseNote(e.target.value)}
+                placeholder="Note (optional)"
+                className="rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-ink-400"
+              />
+              <div className="flex items-center gap-2">
+                <Button size="sm" disabled={!expenseAmount.trim()} onClick={handleSubmitExpense}>Submit for reimbursement</Button>
+                <Button size="sm" variant="ghost" onClick={() => setShowExpenseForm(false)}>Cancel</Button>
+              </div>
+            </div>
+          ) : (
+            <Button size="sm" variant="outline" className="mt-1 self-start" onClick={() => setShowExpenseForm(true)}>
+              Submit an expense
+            </Button>
+          )}
         </div>
       </SectionCard>
 
