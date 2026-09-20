@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 // A single shared clock, ticking once a second, shared by every useNow() consumer.
 // One interval for the whole app instead of one per component avoids the timer
@@ -39,4 +39,15 @@ function subscribeNever() {
 
 export function useMounted() {
   return useSyncExternalStore(subscribeNever, () => true, () => false);
+}
+
+export function useEscapeKey(onEscape: () => void, active = true) {
+  useEffect(() => {
+    if (!active) return;
+    function handler(e: KeyboardEvent) {
+      if (e.key === "Escape") onEscape();
+    }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onEscape, active]);
 }

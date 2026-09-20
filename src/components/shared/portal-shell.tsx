@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowLeftRight, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useEscapeKey } from "@/lib/hooks";
 import { Logo } from "./logo";
 
 export interface NavItem {
@@ -147,6 +148,8 @@ export function PortalShell({
     ? cloneElement(topBar, { onMenuClick: () => setMobileNavOpen(true) })
     : topBar;
 
+  useEscapeKey(() => setMobileNavOpen(false), mobileNavOpen);
+
   return (
     <div className="flex min-h-screen w-full bg-white">
       <aside
@@ -162,6 +165,9 @@ export function PortalShell({
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileNavOpen(false)} />
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation menu"
             className={cn(
               "relative flex h-full w-72 max-w-[80vw] flex-col justify-between px-5 py-6 shadow-2xl",
               dark ? "bg-ink-950" : "bg-white",

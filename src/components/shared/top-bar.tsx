@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bell, LogOut, Menu, Search, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useNow } from "@/lib/hooks";
+import { useEscapeKey, useNow } from "@/lib/hooks";
 import { openCommandPalette } from "./command-palette";
 import { ActivityFeed } from "./activity-feed";
 import { Avatar } from "@/components/ui/avatar";
@@ -43,6 +43,8 @@ export function TopBar({
   const accountRef = useRef<HTMLDivElement>(null);
   useClickOutside(notifRef, () => setNotifOpen(false));
   useClickOutside(accountRef, () => setAccountOpen(false));
+  useEscapeKey(() => setNotifOpen(false), notifOpen);
+  useEscapeKey(() => setAccountOpen(false), accountOpen);
 
   const now = useNow();
   const recentCount = now === null ? 0 : notifications.filter((n) => now - new Date(n.timestamp).getTime() < 120_000).length;

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Clock, CloudRain, Phone, PhoneOff, Send, Wrench } from "lucide-react";
 import { cn, formatDuration } from "@/lib/utils";
+import { useEscapeKey } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { classifyInstruction } from "@/lib/engine";
 import type { CallTranscriptLine, IncidentType } from "@/lib/types";
@@ -188,6 +189,12 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
     onClose();
   }
 
+  useEscapeKey(() => {
+    if (phase === "connecting") onClose();
+    else if (phase === "live") hangUp();
+    else finish();
+  });
+
   const quickLines =
     spec.kind === "checkin"
       ? ["Give me an ETA update", "I'm running behind schedule", "Any word on my next load?", "Question about a fuel stop"]
@@ -198,7 +205,7 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
           : [];
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-ink-950 text-white">
+    <div role="dialog" aria-modal="true" aria-label="Voice call with AI Dispatcher" className="fixed inset-0 z-50 flex flex-col bg-ink-950 text-white">
       <div className="flex flex-col items-center gap-2 px-6 pb-4 pt-10">
         <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-white/10">
           {phase === "connecting" && (
