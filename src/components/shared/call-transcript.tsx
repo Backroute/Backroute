@@ -1,4 +1,7 @@
-import { Phone, PhoneCall } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { ChevronDown, ChevronUp, Phone, PhoneCall } from "lucide-react";
 import { cn, formatDuration } from "@/lib/utils";
 import type { CallTranscriptLine, VoiceCall } from "@/lib/types";
 
@@ -9,7 +12,9 @@ const SPEAKER_LABEL: Record<CallTranscriptLine["speaker"], string> = {
   carrier: "You",
 };
 
-export function CallTranscript({ call, title = "Voice Agent Call" }: { call: VoiceCall; title?: string }) {
+export function CallTranscript({ call, title = "Voice Agent Call", defaultCollapsed = false }: { call: VoiceCall; title?: string; defaultCollapsed?: boolean }) {
+  const [expanded, setExpanded] = useState(!defaultCollapsed);
+
   return (
     <div className="rounded-2xl border border-line bg-ink-50/60 p-4">
       <div className="flex items-center justify-between">
@@ -30,26 +35,36 @@ export function CallTranscript({ call, title = "Voice Agent Call" }: { call: Voi
           />
         ))}
       </div>
-      <div className="mt-4 flex flex-col gap-2.5">
-        {call.transcript.map((line, i) => (
-          <div key={i} className={cn("flex", line.speaker === "ai" ? "justify-end" : "justify-start")}>
-            <div
-              className={cn(
-                "max-w-[85%] rounded-xl px-3 py-2 text-[12.5px] leading-relaxed",
-                line.speaker === "ai" ? "bg-ink-950 text-white rounded-br-sm" : "bg-white border border-line text-ink-800 rounded-bl-sm",
-              )}
-            >
-              <span className={cn("mr-1.5 text-[10px] font-semibold uppercase tracking-wide", line.speaker === "ai" ? "text-white/60" : "text-ink-400")}>
-                {SPEAKER_LABEL[line.speaker]}
-              </span>
-              {line.text}
+      {expanded && (
+        <div className="mt-4 flex flex-col gap-2.5">
+          {call.transcript.map((line, i) => (
+            <div key={i} className={cn("flex", line.speaker === "ai" ? "justify-end" : "justify-start")}>
+              <div
+                className={cn(
+                  "max-w-[85%] rounded-xl px-3 py-2 text-[12.5px] leading-relaxed",
+                  line.speaker === "ai" ? "bg-ink-950 text-white rounded-br-sm" : "bg-white border border-line text-ink-800 rounded-bl-sm",
+                )}
+              >
+                <span className={cn("mr-1.5 text-[10px] font-semibold uppercase tracking-wide", line.speaker === "ai" ? "text-white/60" : "text-ink-400")}>
+                  {SPEAKER_LABEL[line.speaker]}
+                </span>
+                {line.text}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-      {call.outcome && (
-        <p className="mt-3 border-t border-line pt-2.5 text-xs font-medium text-ink-700">Outcome: {call.outcome}</p>
+          ))}
+        </div>
       )}
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-2.5">
+        {call.outcome && <p className="text-xs font-medium text-ink-700">Outcome: {call.outcome}</p>}
+        {defaultCollapsed && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="ml-auto flex shrink-0 items-center gap-1 text-xs font-medium text-ink-500 hover:text-ink-950"
+          >
+            {expanded ? <>Hide transcript <ChevronUp className="h-3 w-3" /></> : <>Show transcript <ChevronDown className="h-3 w-3" /></>}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

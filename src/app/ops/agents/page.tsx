@@ -67,7 +67,7 @@ export default function AgentsPage() {
                       <p className="mb-2 text-xs text-ink-500">
                         {load.lane.origin} → {load.lane.destination} · {brokers.get(load.brokerId)?.company}
                       </p>
-                      <CallTranscript call={call} />
+                      <CallTranscript call={call} defaultCollapsed />
                     </div>
                   ))}
                 </div>
