@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowUpRight, Check, Download, LifeBuoy, X } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
@@ -24,8 +25,42 @@ function ageBadge(createdAt: string) {
 function exportResolved(resolved: Escalation[], carrierName: string) {
   downloadCsv(
     `escalations-resolved-${new Date().toISOString().slice(0, 10)}.csv`,
-    ["Reason", "Carrier", "Load ID", "Complexity", "Resolved By", "Created At", "Resolved At"],
-    resolved.map((e) => [e.reason, carrierName, e.loadId, e.complexity, e.resolvedBy ?? "", e.createdAt, e.resolvedAt ?? ""]),
+    ["Reason", "Carrier", "Load ID", "Complexity", "Resolved By", "Resolution Note", "Created At", "Resolved At"],
+    resolved.map((e) => [e.reason, carrierName, e.loadId, e.complexity, e.resolvedBy ?? "", e.resolutionNote ?? "", e.createdAt, e.resolvedAt ?? ""]),
+  );
+}
+
+function EscalationActions({ onResolve }: { onResolve: (approve: boolean, note?: string) => void }) {
+  const [rejecting, setRejecting] = useState(false);
+  const [note, setNote] = useState("");
+
+  if (rejecting) {
+    return (
+      <div className="flex w-full flex-col gap-2 sm:w-72">
+        <input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Why? (optional)"
+          className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm text-ink-900 outline-none focus:border-ink-400"
+          autoFocus
+        />
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="danger" onClick={() => onResolve(false, note.trim())}>Confirm reject</Button>
+          <Button size="sm" variant="ghost" onClick={() => setRejecting(false)}>Never mind</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <Button size="sm" variant="danger" onClick={() => setRejecting(true)}>
+        <X className="h-3.5 w-3.5" /> Reject
+      </Button>
+      <Button size="sm" variant="primary" onClick={() => onResolve(true)}>
+        <Check className="h-3.5 w-3.5" /> Approve
+      </Button>
+    </div>
   );
 }
 
@@ -80,14 +115,7 @@ export default function EscalationsPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" variant="danger" onClick={() => resolve(e.id, false, "ops")}>
-                        <X className="h-3.5 w-3.5" /> Reject
-                      </Button>
-                      <Button size="sm" variant="primary" onClick={() => resolve(e.id, true, "ops")}>
-                        <Check className="h-3.5 w-3.5" /> Approve
-                      </Button>
-                    </div>
+                    <EscalationActions onResolve={(approve, note) => resolve(e.id, approve, "ops", note)} />
                   </CardContent>
                 </Card>
               ))}
@@ -119,14 +147,7 @@ export default function EscalationsPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" variant="danger" onClick={() => resolve(e.id, false, "ops")}>
-                        <X className="h-3.5 w-3.5" /> Reject
-                      </Button>
-                      <Button size="sm" variant="primary" onClick={() => resolve(e.id, true, "ops")}>
-                        <Check className="h-3.5 w-3.5" /> Approve
-                      </Button>
-                    </div>
+                    <EscalationActions onResolve={(approve, note) => resolve(e.id, approve, "ops", note)} />
                   </CardContent>
                 </Card>
               ))}
@@ -145,7 +166,10 @@ export default function EscalationsPage() {
             <div className="flex flex-col gap-2">
               {resolved.map((e) => (
                 <div key={e.id} className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-line bg-white px-4 py-3">
-                  <p className="text-sm text-ink-500 line-through decoration-ink-300">{e.reason}</p>
+                  <div>
+                    <p className="text-sm text-ink-500 line-through decoration-ink-300">{e.reason}</p>
+                    {e.resolutionNote && <p className="mt-0.5 text-xs text-ink-400">&ldquo;{e.resolutionNote}&rdquo;</p>}
+                  </div>
                   <div className="flex items-center gap-2">
                     {e.resolvedAt && <span className="text-xs text-ink-400"><TimeAgo iso={e.resolvedAt} /></span>}
                     <Badge tone="success">

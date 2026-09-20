@@ -171,7 +171,7 @@ interface StoreState {
   tickCount: number;
   actions: {
     tick: () => void;
-    resolveEscalation: (id: string, approve: boolean, actor?: "carrier" | "ops") => void;
+    resolveEscalation: (id: string, approve: boolean, actor?: "carrier" | "ops", note?: string) => void;
     routeEscalationToSupport: (id: string) => void;
     sendDriverMessage: (driverId: string, content: string) => void;
     /** Fleet-level chat — the carrier's counterpart to sendDriverMessage. Not tied to any one load;
@@ -588,16 +588,18 @@ export const useStore = create<StoreState>((set, get) => ({
         };
       }),
 
-    resolveEscalation: (id, approve, actor = "carrier") =>
+    resolveEscalation: (id, approve, actor = "carrier", note) =>
       set((state) => ({
         escalations: state.escalations.map((e) =>
-          e.id === id ? { ...e, status: "resolved" as const, resolvedBy: actor, resolvedAt: new Date().toISOString() } : e,
+          e.id === id
+            ? { ...e, status: "resolved" as const, resolvedBy: actor, resolvedAt: new Date().toISOString(), resolutionNote: note || undefined }
+            : e,
         ),
         activity: [
           {
             id: uid("act"), timestamp: new Date().toISOString(), type: "escalation" as const,
             message: approve ? `Escalation approved by ${actor}` : `Escalation rejected by ${actor}, AI re-sourcing`,
-            detail: state.escalations.find((e) => e.id === id)?.reason ?? "",
+            detail: note || state.escalations.find((e) => e.id === id)?.reason || "",
             loadId: state.escalations.find((e) => e.id === id)?.loadId,
             carrierId: PRIMARY_CARRIER_ID, severity: (approve ? "success" : "info") as ActivityEvent["severity"],
           },

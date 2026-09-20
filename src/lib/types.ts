@@ -352,6 +352,9 @@ export interface Escalation {
   recommendedLabel?: string;
   resolvedBy?: "carrier" | "support" | "ops";
   resolvedAt?: string;
+  /** Why Ops said no — captured on reject so a rejected escalation leaves more of a trail than a
+   *  vanished card. Approvals don't ask for one; they're the expected outcome, not a decision to explain. */
+  resolutionNote?: string;
 }
 
 export interface DriverMessage {

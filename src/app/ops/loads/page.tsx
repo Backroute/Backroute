@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { Pause } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { LiveDot } from "@/components/shared/live-dot";
+import { Badge } from "@/components/ui/badge";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { LOAD_STAGE_ORDER, LOAD_STAGE_LABEL } from "@/lib/types";
 import { useStore } from "@/lib/store";
@@ -18,10 +20,24 @@ export default function OpsLoadsPage() {
 
   const sorted = [...loads].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   const counts = Object.fromEntries(LOAD_STAGE_ORDER.map((stage) => [stage, loads.filter((l) => l.stage === stage).length]));
+  const pausedCount = loads.filter((l) => l.aiPaused).length;
 
   return (
     <div>
-      <PageHeader title="Loads" description={`${loads.length} loads · Titan Freight LLC`} right={<LiveDot />} />
+      <PageHeader
+        title="Loads"
+        description={`${loads.length} loads · Titan Freight LLC`}
+        right={
+          <div className="flex items-center gap-3">
+            {pausedCount > 0 && (
+              <Badge tone="danger">
+                <Pause className="h-3 w-3" /> {pausedCount} paused
+              </Badge>
+            )}
+            <LiveDot />
+          </div>
+        }
+      />
 
       <div className="px-4 py-6 sm:px-8">
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-5 lg:grid-cols-10">
@@ -46,6 +62,7 @@ export default function OpsLoadsPage() {
               </div>
               <div className="mt-2.5 flex items-center gap-2">
                 <LoadStagePill stage={load.stage} />
+                {load.aiPaused && <Badge tone="danger"><Pause className="h-3 w-3" /> Paused</Badge>}
                 <span className="text-xs text-ink-400"><TimeAgo iso={load.updatedAt} /></span>
               </div>
               <div className="mt-3 flex items-center gap-4 border-t border-line pt-3 text-xs">
@@ -83,7 +100,12 @@ export default function OpsLoadsPage() {
                   <td className="px-5 py-3.5 text-ink-600">{carrier.name}</td>
                   <td className="px-5 py-3.5 text-ink-600">{brokers.get(load.brokerId)?.company ?? "—"}</td>
                   <td className="px-5 py-3.5"><LoadScoreBadge score={load.score} size="sm" /></td>
-                  <td className="px-5 py-3.5"><LoadStagePill stage={load.stage} /></td>
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-1.5">
+                      <LoadStagePill stage={load.stage} />
+                      {load.aiPaused && <Badge tone="danger"><Pause className="h-3 w-3" /> Paused</Badge>}
+                    </div>
+                  </td>
                   <td className="px-5 py-3.5 text-right tabular">{formatCurrency(load.bookedRate ?? load.targetRate)}</td>
                   <td className="px-5 py-3.5 text-right tabular font-medium text-ink-950">{load.netProfit !== null ? formatCurrency(load.netProfit) : "—"}</td>
                   <td className="px-5 py-3.5 text-right text-xs text-ink-400"><TimeAgo iso={load.updatedAt} /></td>
