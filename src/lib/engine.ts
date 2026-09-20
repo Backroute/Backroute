@@ -217,31 +217,49 @@ const CALL_OPENERS = [
   (name: string, o: string, d: string) => `Hi ${name}, this is Backroute calling on the ${o} to ${d} load.`,
   (name: string, o: string, d: string) => `Hey ${name}, Backroute here on the ${o} to ${d} lane. Got a minute?`,
   (name: string, o: string, d: string) => `${name}, calling to close the loop on the ${o} to ${d} load.`,
+  (name: string, o: string, d: string) => `Hey ${name}, it's Backroute. Quick call on ${o} to ${d} instead of another email.`,
+  (name: string, o: string, d: string) => `${name}, good timing. Calling on ${o} to ${d} to see if we can get it locked today.`,
+  (name: string, o: string, d: string) => `Hi ${name}, Backroute here. Following up live on ${o} to ${d}.`,
 ];
 const CALL_BROKER_STALLS = [
   "Hey, let me pull it up. We're still a bit apart on rate.",
   "Sure, one sec... yeah, shipper's holding firm on budget.",
   "Good timing. Let me check where we landed.",
+  "Oh hey, yeah, we're not far off but not quite there yet.",
+  "Let me pull the load up... shipper hasn't moved much.",
+  "One sec, switching screens. We're close, just need to close the gap.",
 ];
 const CALL_AI_HOLDS = [
   (amt: number) => `We can commit right now at $${amt.toLocaleString()} and have the truck moving within the hour.`,
   (amt: number) => `$${amt.toLocaleString()} is where we can lock this in immediately. Truck's close by and empty.`,
   (amt: number) => `We can make $${amt.toLocaleString()} work today if we get this confirmed now.`,
+  (amt: number) => `$${amt.toLocaleString()} gets a truck rolling on this one right now, no waiting around.`,
+  (amt: number) => `Here's where we can land it: $${amt.toLocaleString()}, ready to dispatch as soon as you say go.`,
+  (amt: number) => `We can hold at $${amt.toLocaleString()}. Truck's close by and ready to move once it's confirmed.`,
 ];
 const CALL_BROKER_CHECKS = [
   "Let me check with the shipper... okay, I can make that work.",
   "Give me a second to confirm... alright, that'll clear.",
   "Hold on... yeah, we're good there.",
+  "Let me run that by the desk... that number works.",
+  "One sec, checking our floor... okay, we can do that.",
+  "Let me see what we've got room for... that'll clear on our end.",
 ];
 const CALL_AI_CLOSES = [
   (amt: number) => `Confirming $${amt.toLocaleString()} all-in. Sending MC and insurance now.`,
   (amt: number) => `Locking in $${amt.toLocaleString()}. Sending our packet over now.`,
   (amt: number) => `$${amt.toLocaleString()} confirmed. Sending carrier packet, we'll be rolling shortly.`,
+  (amt: number) => `Appreciate it, $${amt.toLocaleString()} it is. Packet's headed your way now.`,
+  (amt: number) => `Good deal, $${amt.toLocaleString()} confirmed. Sending insurance and authority now.`,
+  (amt: number) => `Locking it in at $${amt.toLocaleString()}. Truck will be moving shortly after.`,
 ];
 const CALL_BROKER_CONFIRMS = [
   "You're booked. Rate con going out now.",
   "Deal. I'll send the rate confirmation over in a few minutes.",
   "Locking the truck on my end. Paperwork's on its way.",
+  "Appreciate it, you're all set. Rate con's on its way.",
+  "That's a deal, getting the paperwork moving on our side now.",
+  "Good to go, booking it now. You'll have the confirmation shortly.",
 ];
 
 interface StepResult {

@@ -198,46 +198,73 @@ const CALL_OPENERS = [
   (name: string, o: string, d: string) => `Hi ${name}, this is Backroute calling on the ${o} to ${d} load, following up on our offer.`,
   (name: string, o: string, d: string) => `Hey ${name}, Backroute here on the ${o} to ${d} lane. Wanted to close the loop on rate live.`,
   (name: string, o: string, d: string) => `${name}, thanks for picking up. Calling about the ${o} to ${d} load we've been going back and forth on.`,
+  (name: string, o: string, d: string) => `Hey ${name}, it's Backroute. Got a truck lined up for the ${o} to ${d} run, figured a call beats another round of emails.`,
+  (name: string, o: string, d: string) => `${name}, good timing. Calling on ${o} to ${d} — want to see if we can get this one over the line today.`,
+  (name: string, o: string, d: string) => `Hi ${name}, Backroute calling back on ${o} to ${d}. Truck's still available, just need to land on a number.`,
 ];
 const CALL_BROKER_STALLS = [
   "Yeah, hey, let me pull it up. We're still a bit apart on rate.",
   "Sure, one sec... yeah, shipper's still holding firm on budget.",
   "Hey, good timing. Let me check where we landed. We're close but not quite there.",
+  "Oh hey, yeah. Been meaning to call you back, we're not far off but not there yet.",
+  "Let me pull the load up... okay, shipper hasn't moved much on their end.",
+  "Give me a second, switching screens. We're in the ballpark, just need to close the gap.",
 ];
 const CALL_AI_HOLDS = [
   (amt: number) => `Understood. We can commit right now at $${amt.toLocaleString()} and have the truck moving within the hour.`,
   (amt: number) => `I hear you. $${amt.toLocaleString()} is where we can lock this in immediately, truck's empty and close by.`,
   (amt: number) => `We can make $${amt.toLocaleString()} work today if we can get this confirmed now.`,
+  (amt: number) => `Fair enough. $${amt.toLocaleString()} gets a truck rolling on this one right now, no waiting around.`,
+  (amt: number) => `Here's where we can land it today: $${amt.toLocaleString()}, and we're ready to dispatch as soon as you say go.`,
+  (amt: number) => `We can hold at $${amt.toLocaleString()}. Truck's sitting close by and ready to move the second it's confirmed.`,
 ];
 const CALL_BROKER_CHECKS = [
   "Let me check with the shipper real quick... okay, I can make that work.",
   "Give me one minute to confirm... alright, that'll clear.",
   "Hold on, pulling up the shipper's number... yeah, we're good there.",
+  "Let me run that by the desk... yeah, that number works.",
+  "One sec, checking our floor on this one... okay, we can do that.",
+  "Let me see what we've got room for... alright, that'll clear on our end.",
 ];
 const CALL_AI_CLOSES = [
   (amt: number) => `Great, confirming $${amt.toLocaleString()} all-in. Sending our MC and insurance now, please send the rate confirmation.`,
   (amt: number) => `Perfect, locking in $${amt.toLocaleString()}. I'll get our packet over. Go ahead and send the rate con when ready.`,
   (amt: number) => `That works. $${amt.toLocaleString()} confirmed. Sending carrier packet now, we'll be rolling shortly.`,
+  (amt: number) => `Appreciate it, $${amt.toLocaleString()} it is. Carrier packet's headed your way now, we'll dispatch as soon as it's signed.`,
+  (amt: number) => `Good deal, $${amt.toLocaleString()} confirmed on our end. Sending insurance and authority now, send the rate con over.`,
+  (amt: number) => `Locking it in at $${amt.toLocaleString()}. Packet's on its way, truck will be moving shortly after.`,
 ];
 const CALL_BROKER_CONFIRMS = [
   "Sounds good, you're booked. Rate con going out now.",
   "Deal. I'll send the rate confirmation over in a few minutes.",
   "You got it, locking the truck on my end. Paperwork's on its way.",
+  "Appreciate it, you're all set. Rate con's on its way over.",
+  "That's a deal, I'll get the paperwork moving on our side now.",
+  "Good to go, booking it now. You'll have the confirmation shortly.",
 ];
 const CALL_BROKER_CHECKS_PENDING = [
   "Let me check with the shipper and call you right back.",
   "I'm not authorized to close at that. Give me a few minutes to confirm.",
   "Have to run it by my manager on this one, hang tight.",
+  "That's above what I can approve on my own, let me get a sign-off.",
+  "Need to loop in my manager on this one, won't take long.",
+  "Let me get that cleared with the shipper first, I'll call you back.",
 ];
 const CALL_AI_FOLLOWUP = [
   (amt: number) => `Understood. Let's hold $${amt.toLocaleString()} for you. Call me back the second you're clear to close.`,
   (amt: number) => `We'll keep $${amt.toLocaleString()} open on our end. Get the sign-off and we'll send the packet right away.`,
   (amt: number) => `$${amt.toLocaleString()} still works for us. Confirm with your shipper and we can lock the truck.`,
+  (amt: number) => `No problem, we'll sit at $${amt.toLocaleString()} until you hear back. Just give us a call when it's cleared.`,
+  (amt: number) => `That's fine, take the time you need. $${amt.toLocaleString()} is good on our end whenever you're ready.`,
+  (amt: number) => `Understood, we'll hold the truck at $${amt.toLocaleString()}. Ring us back once you've got the go-ahead.`,
 ];
 const CALL_BROKER_PENDING = [
   "Okay, I'll call you back once I hear from the shipper.",
   "Give me a bit, I'll follow up as soon as I know.",
   "Noted, I'll get back to you shortly on that.",
+  "Alright, sitting tight on my end too. Talk soon.",
+  "Will do, should hear back within the hour and I'll ring you.",
+  "Got it, I'll follow up the second it clears on my side.",
 ];
 
 const SMS_NUDGES = [
@@ -695,8 +722,10 @@ export function generateWorld(seed = 20260916): World {
     { id: rng.id("dm"), driverId: PRIMARY_DRIVER_ID, from: "ai", content: "Heads up: receiver in Atlanta closes at 6 PM sharp, you're tracking to arrive with room to spare.", timestamp: iso(-60) },
   ];
 
+  const escalationLoad = loads.find((l) => l.id === escalations[0].loadId);
+  const escalationLaneLabel = escalationLoad ? `${escalationLoad.lane.origin} to ${escalationLoad.lane.destination}` : "one of your loads";
   const carrierMessages: CarrierMessage[] = [
-    { id: rng.id("cm"), carrierId: PRIMARY_CARRIER_ID, from: "ai", content: "Morning. 13 loads active, net profit's tracking to $14.2k this cycle. Two things need your eyes: an escalation on the Chicago to Memphis lane and T-109's DOT inspection is overdue.", timestamp: iso(-410) },
+    { id: rng.id("cm"), carrierId: PRIMARY_CARRIER_ID, from: "ai", content: `Morning. 13 loads active, net profit's tracking to $14.2k this cycle. Two things need your eyes: an escalation on the ${escalationLaneLabel} lane and T-109's DOT inspection is overdue.`, timestamp: iso(-410) },
     { id: rng.id("cm"), carrierId: PRIMARY_CARRIER_ID, from: "carrier", content: "Thanks, will check the escalation now.", timestamp: iso(-405) },
   ];
 
