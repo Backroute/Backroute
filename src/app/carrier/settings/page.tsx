@@ -10,10 +10,19 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
+import { Tabs } from "@/components/ui/tabs";
 import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierTrucks } from "@/lib/selectors";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Aggressiveness } from "@/lib/store";
+
+const TABS = [
+  { key: "general", label: "General" },
+  { key: "integrations", label: "Integrations" },
+  { key: "addons", label: "AI Add-ons" },
+  { key: "billing", label: "Billing & Team" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
 
 const INVOICES = [
   { id: "inv-1", date: "2026-09-01T00:00:00Z", amount: 3159, status: "Paid" as const },
@@ -45,6 +54,7 @@ export default function SettingsPage() {
   const [connections, setConnections] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(INTEGRATION_CATEGORIES.flatMap((c) => c.items).map((i) => [i.id, i.connected])),
   );
+  const [tab, setTab] = useState<TabKey>("general");
 
   function handleInvite() {
     const email = inviteEmail.trim();
@@ -58,283 +68,299 @@ export default function SettingsPage() {
     <div>
       <PageHeader title="Settings" />
 
-      <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Company profile</CardTitle>
-          </CardHeader>
-          <CardContent className="!pt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <Field label="Legal name" value={carrier.name} />
-            <Field label="MC number" value={carrier.mc} />
-            <Field label="DOT number" value={carrier.dot} />
-            <Field label="Fleet size" value={`${trucks.length} trucks`} />
-          </CardContent>
-        </Card>
+      <div className="px-4 py-6 sm:px-8">
+        <Tabs tabs={TABS.map((t) => ({ key: t.key, label: t.label }))} active={tab} onChange={(k) => setTab(k as TabKey)} />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Negotiation aggressiveness</CardTitle>
-            <CardDescription>How hard the AI pushes before it accepts, holds, or escalates.</CardDescription>
-          </CardHeader>
-          <CardContent className="!pt-3">
-            <div className="grid gap-3 sm:grid-cols-3">
-              {AGGRESSIVENESS_OPTIONS.map((opt) => (
-                <button
-                  key={opt.key}
-                  onClick={() => updateSettings({ aggressiveness: opt.key })}
-                  className={cn(
-                    "rounded-2xl border p-4 text-left transition-colors",
-                    settings.aggressiveness === opt.key ? "border-ink-950 bg-ink-950 text-white" : "border-line hover:border-ink-300",
-                  )}
-                >
-                  <p className="text-sm font-semibold">{opt.label}</p>
-                  <p className={cn("mt-1 text-xs", settings.aggressiveness === opt.key ? "text-white/60" : "text-ink-500")}>{opt.desc}</p>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="mt-5 flex flex-col gap-6">
+          {tab === "general" && (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Company profile</CardTitle>
+                </CardHeader>
+                <CardContent className="!pt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <Field label="Legal name" value={carrier.name} />
+                  <Field label="MC number" value={carrier.mc} />
+                  <Field label="DOT number" value={carrier.dot} />
+                  <Field label="Fleet size" value={`${trucks.length} trucks`} />
+                </CardContent>
+              </Card>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Autonomy</CardTitle>
-            </CardHeader>
-            <CardContent className="!pt-3 flex flex-col gap-4">
-              <ToggleRow
-                label="Auto-select when driver doesn't choose"
-                desc="If nobody picks a load option within ~15s, AI books its top-scored pick automatically"
-                checked={settings.autoBookEnabled}
-                onChange={(v) => updateSettings({ autoBookEnabled: v })}
-              />
-              <ToggleRow label="Avoid low-reliability brokers" desc="Never source or negotiate with 'watch' tier brokers" checked={settings.avoidWatchBrokers} onChange={(v) => updateSettings({ avoidWatchBrokers: v })} />
-              <ToggleRow label="Voice agent" desc="Allow the AI to call brokers directly" checked={settings.voiceEnabled} onChange={(v) => updateSettings({ voiceEnabled: v })} />
-              <ToggleRow label="SMS agent" desc="Allow rate checks and counters over SMS" checked={settings.smsEnabled} onChange={(v) => updateSettings({ smsEnabled: v })} />
-              <ToggleRow label="Email agent" desc="Allow inbox monitoring and negotiation by email" checked={settings.emailEnabled} onChange={(v) => updateSettings({ emailEnabled: v })} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Notifications</CardTitle>
-            </CardHeader>
-            <CardContent className="!pt-3 flex flex-col gap-4">
-              <ToggleRow label="Email me on escalations" desc="Only when the AI needs your approval" checked={settings.notifyEmail} onChange={(v) => updateSettings({ notifyEmail: v })} />
-              <ToggleRow label="Text me on escalations" desc="High-priority exceptions only" checked={settings.notifySms} onChange={(v) => updateSettings({ notifySms: v })} />
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Integrations</CardTitle>
-            <CardDescription>The load boards, TMS, ELD, and back-office tools the AI reads and writes to.</CardDescription>
-          </CardHeader>
-          <CardContent className="!pt-3 flex flex-col gap-5">
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">TMS</p>
-              <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
-                <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-950 text-[10px] font-bold text-white">
-                      {initials(settings.tmsProvider)}
-                    </span>
-                    <div>
-                      <p className="text-sm font-medium text-ink-900">{settings.tmsProvider}</p>
-                      <p className="text-xs text-ink-500">Booked loads sync automatically after rate confirmation.</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {settings.tmsConnected ? (
-                      <Badge tone="success"><CheckCircle2 className="h-3 w-3" /> Connected</Badge>
-                    ) : (
-                      <Badge tone="warning">Disconnected</Badge>
-                    )}
-                    <Button variant="outline" size="sm" onClick={() => updateSettings({ tmsConnected: true })}>
-                      <RefreshCw className="h-3.5 w-3.5" /> Sync now
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {INTEGRATION_CATEGORIES.map((cat) => (
-              <div key={cat.name}>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">{cat.name}</p>
-                <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
-                  {cat.items.map((item) => {
-                    const connected = connections[item.id];
-                    return (
-                      <div key={item.id} className="flex flex-wrap items-center justify-between gap-4 px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-[10px] font-bold text-ink-700">
-                            {initials(item.name)}
-                          </span>
-                          <div>
-                            <p className="text-sm font-medium text-ink-900">{item.name}</p>
-                            <p className="text-xs text-ink-500">{item.detail}</p>
-                          </div>
-                        </div>
-                        {connected ? (
-                          <div className="flex items-center gap-2">
-                            <Badge tone="success"><CheckCircle2 className="h-3 w-3" /> Connected</Badge>
-                            <button
-                              onClick={() => setConnections((c) => ({ ...c, [item.id]: false }))}
-                              className="text-xs font-medium text-ink-400 hover:text-[var(--accent-danger)]"
-                            >
-                              Disconnect
-                            </button>
-                          </div>
-                        ) : (
-                          <Button variant="outline" size="sm" onClick={() => setConnections((c) => ({ ...c, [item.id]: true }))}>
-                            Connect
-                          </Button>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Negotiation aggressiveness</CardTitle>
+                  <CardDescription>How hard the AI pushes before it accepts, holds, or escalates.</CardDescription>
+                </CardHeader>
+                <CardContent className="!pt-3">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {AGGRESSIVENESS_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.key}
+                        onClick={() => updateSettings({ aggressiveness: opt.key })}
+                        className={cn(
+                          "rounded-2xl border p-4 text-left transition-colors",
+                          settings.aggressiveness === opt.key ? "border-ink-950 bg-ink-950 text-white" : "border-line hover:border-ink-300",
                         )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+                      >
+                        <p className="text-sm font-semibold">{opt.label}</p>
+                        <p className={cn("mt-1 text-xs", settings.aggressiveness === opt.key ? "text-white/60" : "text-ink-500")}>{opt.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
 
-        <Card>
-          <CardHeader>
-            <div>
-              <CardTitle className="flex items-center gap-2"><Sparkles className="h-4 w-4" /> AI Add-ons</CardTitle>
-              <CardDescription>Extra AI agents beyond dispatch, all free, no per-feature charge.</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="!pt-3 flex flex-col gap-5">
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">Included with your plan</p>
-              <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
-                {includedAddons.map((addon) => (
-                  <div key={addon.id} className="flex flex-wrap items-center justify-between gap-4 px-4 py-3.5">
-                    <div className="max-w-md">
-                      <p className="text-sm font-medium text-ink-900">{addon.name}</p>
-                      <p className="text-xs text-ink-500">{addon.tagline}</p>
+              <div className="grid gap-6 lg:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Autonomy</CardTitle>
+                  </CardHeader>
+                  <CardContent className="!pt-3 flex flex-col gap-4">
+                    <ToggleRow
+                      label="Auto-select when driver doesn't choose"
+                      desc="If nobody picks a load option within ~15s, AI books its top-scored pick automatically"
+                      checked={settings.autoBookEnabled}
+                      onChange={(v) => updateSettings({ autoBookEnabled: v })}
+                    />
+                    <ToggleRow label="Avoid low-reliability brokers" desc="Never source or negotiate with 'watch' tier brokers" checked={settings.avoidWatchBrokers} onChange={(v) => updateSettings({ avoidWatchBrokers: v })} />
+                    <ToggleRow label="Voice agent" desc="Allow the AI to call brokers directly" checked={settings.voiceEnabled} onChange={(v) => updateSettings({ voiceEnabled: v })} />
+                    <ToggleRow label="SMS agent" desc="Allow rate checks and counters over SMS" checked={settings.smsEnabled} onChange={(v) => updateSettings({ smsEnabled: v })} />
+                    <ToggleRow label="Email agent" desc="Allow inbox monitoring and negotiation by email" checked={settings.emailEnabled} onChange={(v) => updateSettings({ emailEnabled: v })} />
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Notifications</CardTitle>
+                  </CardHeader>
+                  <CardContent className="!pt-3 flex flex-col gap-4">
+                    <ToggleRow label="Email me on escalations" desc="Only when the AI needs your approval" checked={settings.notifyEmail} onChange={(v) => updateSettings({ notifyEmail: v })} />
+                    <ToggleRow label="Text me on escalations" desc="High-priority exceptions only" checked={settings.notifySms} onChange={(v) => updateSettings({ notifySms: v })} />
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
+
+          {tab === "integrations" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Integrations</CardTitle>
+                <CardDescription>The load boards, TMS, ELD, and back-office tools the AI reads and writes to.</CardDescription>
+              </CardHeader>
+              <CardContent className="!pt-3 flex flex-col gap-5">
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">TMS</p>
+                  <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
+                    <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-950 text-[10px] font-bold text-white">
+                          {initials(settings.tmsProvider)}
+                        </span>
+                        <div>
+                          <p className="text-sm font-medium text-ink-900">{settings.tmsProvider}</p>
+                          <p className="text-xs text-ink-500">Booked loads sync automatically after rate confirmation.</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {settings.tmsConnected ? (
+                          <Badge tone="success"><CheckCircle2 className="h-3 w-3" /> Connected</Badge>
+                        ) : (
+                          <Badge tone="warning">Disconnected</Badge>
+                        )}
+                        <Button variant="outline" size="sm" onClick={() => updateSettings({ tmsConnected: true })}>
+                          <RefreshCw className="h-3.5 w-3.5" /> Sync now
+                        </Button>
+                      </div>
                     </div>
-                    <Badge tone="success"><CheckCircle2 className="h-3 w-3" /> Included</Badge>
+                  </div>
+                </div>
+
+                {INTEGRATION_CATEGORIES.map((cat) => (
+                  <div key={cat.name}>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">{cat.name}</p>
+                    <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
+                      {cat.items.map((item) => {
+                        const connected = connections[item.id];
+                        return (
+                          <div key={item.id} className="flex flex-wrap items-center justify-between gap-4 px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-[10px] font-bold text-ink-700">
+                                {initials(item.name)}
+                              </span>
+                              <div>
+                                <p className="text-sm font-medium text-ink-900">{item.name}</p>
+                                <p className="text-xs text-ink-500">{item.detail}</p>
+                              </div>
+                            </div>
+                            {connected ? (
+                              <div className="flex items-center gap-2">
+                                <Badge tone="success"><CheckCircle2 className="h-3 w-3" /> Connected</Badge>
+                                <button
+                                  onClick={() => setConnections((c) => ({ ...c, [item.id]: false }))}
+                                  className="text-xs font-medium text-ink-400 hover:text-[var(--accent-danger)]"
+                                >
+                                  Disconnect
+                                </button>
+                              </div>
+                            ) : (
+                              <Button variant="outline" size="sm" onClick={() => setConnections((c) => ({ ...c, [item.id]: true }))}>
+                                Connect
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 ))}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
+          )}
 
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">Partner referrals, free to you</p>
-              <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
-                {commissionAddons.map((addon) => {
-                  const enabled = settings.enabledAddons.includes(addon.id);
-                  return (
-                    <div key={addon.id} className="flex flex-wrap items-center justify-between gap-4 px-4 py-3.5">
-                      <div className="max-w-md">
-                        <p className="text-sm font-medium text-ink-900">{addon.name}</p>
-                        <p className="text-xs text-ink-500">{addon.tagline}</p>
-                        {addon.commissionNote && <p className="mt-1 text-[11px] text-ink-400">{addon.commissionNote}</p>}
-                      </div>
-                      <Switch checked={enabled} onChange={() => toggleAddon(addon.id)} label={addon.name} />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Billing</CardTitle>
-            <CardDescription>
-              {carrier.plan} plan &middot; {formatCurrency(carrier.mrr)}/mo + 2% of booked freight. AI add-ons are free; Backroute earns from partner referrals instead.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="!pt-3 flex flex-col gap-5">
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line p-4">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-ink-100 text-ink-600">
-                  <CreditCard className="h-4 w-4" />
-                </span>
+          {tab === "addons" && (
+            <Card>
+              <CardHeader>
                 <div>
-                  <p className="text-sm font-medium text-ink-900">Visa •••• 4242</p>
-                  <p className="text-xs text-ink-500">Expires 08/29 &middot; Next charge Oct 1</p>
+                  <CardTitle className="flex items-center gap-2"><Sparkles className="h-4 w-4" /> AI Add-ons</CardTitle>
+                  <CardDescription>Extra AI agents beyond dispatch, all free, no per-feature charge.</CardDescription>
                 </div>
-              </div>
-              <Button variant="outline" size="sm">Update payment method</Button>
-            </div>
+              </CardHeader>
+              <CardContent className="!pt-3 flex flex-col gap-5">
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">Included with your plan</p>
+                  <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
+                    {includedAddons.map((addon) => (
+                      <div key={addon.id} className="flex flex-wrap items-center justify-between gap-4 px-4 py-3.5">
+                        <div className="max-w-md">
+                          <p className="text-sm font-medium text-ink-900">{addon.name}</p>
+                          <p className="text-xs text-ink-500">{addon.tagline}</p>
+                        </div>
+                        <Badge tone="success"><CheckCircle2 className="h-3 w-3" /> Included</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">Invoice history</p>
-              <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
-                {INVOICES.map((inv) => (
-                  <div key={inv.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">Partner referrals, free to you</p>
+                  <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
+                    {commissionAddons.map((addon) => {
+                      const enabled = settings.enabledAddons.includes(addon.id);
+                      return (
+                        <div key={addon.id} className="flex flex-wrap items-center justify-between gap-4 px-4 py-3.5">
+                          <div className="max-w-md">
+                            <p className="text-sm font-medium text-ink-900">{addon.name}</p>
+                            <p className="text-xs text-ink-500">{addon.tagline}</p>
+                            {addon.commissionNote && <p className="mt-1 text-[11px] text-ink-400">{addon.commissionNote}</p>}
+                          </div>
+                          <Switch checked={enabled} onChange={() => toggleAddon(addon.id)} label={addon.name} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {tab === "billing" && (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Billing</CardTitle>
+                  <CardDescription>
+                    {carrier.plan} plan &middot; {formatCurrency(carrier.mrr)}/mo + 2% of booked freight. AI add-ons are free; Backroute earns from partner referrals instead.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="!pt-3 flex flex-col gap-5">
+                  <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line p-4">
                     <div className="flex items-center gap-3">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-100 text-ink-600">
-                        <FileText className="h-4 w-4" />
+                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-ink-100 text-ink-600">
+                        <CreditCard className="h-4 w-4" />
                       </span>
                       <div>
-                        <p className="text-sm font-medium text-ink-900">{formatDate(inv.date)}</p>
-                        <p className="text-xs text-ink-500">{formatCurrency(inv.amount)}</p>
+                        <p className="text-sm font-medium text-ink-900">Visa •••• 4242</p>
+                        <p className="text-xs text-ink-500">Expires 08/29 &middot; Next charge Oct 1</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <Badge tone="success">{inv.status}</Badge>
-                      <button className="flex h-8 w-8 items-center justify-center rounded-full text-ink-500 hover:bg-ink-100">
-                        <Download className="h-3.5 w-3.5" />
-                      </button>
+                    <Button variant="outline" size="sm">Update payment method</Button>
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">Invoice history</p>
+                    <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
+                      {INVOICES.map((inv) => (
+                        <div key={inv.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-100 text-ink-600">
+                              <FileText className="h-4 w-4" />
+                            </span>
+                            <div>
+                              <p className="text-sm font-medium text-ink-900">{formatDate(inv.date)}</p>
+                              <p className="text-xs text-ink-500">{formatCurrency(inv.amount)}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Badge tone="success">{inv.status}</Badge>
+                            <button className="flex h-8 w-8 items-center justify-center rounded-full text-ink-500 hover:bg-ink-100">
+                              <Download className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                </CardContent>
+              </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Team</CardTitle>
-            <CardDescription>Who can see loads, negotiations, and approve escalations.</CardDescription>
-          </CardHeader>
-          <CardContent className="!pt-3 flex flex-col gap-4">
-            <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
-              {team.map((member) => (
-                <div key={member.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <Avatar name={member.name} size="sm" />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-ink-900">{member.name}</p>
-                      <p className="truncate text-xs text-ink-500">{member.email}</p>
-                    </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Team</CardTitle>
+                  <CardDescription>Who can see loads, negotiations, and approve escalations.</CardDescription>
+                </CardHeader>
+                <CardContent className="!pt-3 flex flex-col gap-4">
+                  <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
+                    {team.map((member) => (
+                      <div key={member.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar name={member.name} size="sm" />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-ink-900">{member.name}</p>
+                            <p className="truncate text-xs text-ink-500">{member.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge tone={member.role === "Owner" ? "dark" : "neutral"}>{member.role}</Badge>
+                          {member.role !== "Owner" && (
+                            <button
+                              onClick={() => setTeam((t) => t.filter((m) => m.id !== member.id))}
+                              className="flex h-7 w-7 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 hover:text-[var(--accent-danger)]"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge tone={member.role === "Owner" ? "dark" : "neutral"}>{member.role}</Badge>
-                    {member.role !== "Owner" && (
-                      <button
-                        onClick={() => setTeam((t) => t.filter((m) => m.id !== member.id))}
-                        className="flex h-7 w-7 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 hover:text-[var(--accent-danger)]"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
+                    <input
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleInvite()}
+                      placeholder="teammate@company.com"
+                      className="flex-1 rounded-full border border-line bg-ink-50/60 px-4 py-2 text-sm outline-none focus:border-ink-400"
+                    />
+                    <Button size="sm" onClick={handleInvite}>
+                      <Plus className="h-3.5 w-3.5" /> Invite
+                    </Button>
                   </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleInvite()}
-                placeholder="teammate@company.com"
-                className="flex-1 rounded-full border border-line bg-ink-50/60 px-4 py-2 text-sm outline-none focus:border-ink-400"
-              />
-              <Button size="sm" onClick={handleInvite}>
-                <Plus className="h-3.5 w-3.5" /> Invite
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
