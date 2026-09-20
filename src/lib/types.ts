@@ -213,6 +213,9 @@ export interface Carrier {
   gmvMonth: number;
   avgSavingsPerTruck: number;
   detailed?: boolean;
+  /** Ops staff flagged this account for a closer look — a health-score dip, a support ticket, whatever
+   *  isn't captured elsewhere. Purely an internal note; carriers never see it. */
+  flaggedForReview?: boolean;
 }
 
 export interface NegotiationMessage {

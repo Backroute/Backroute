@@ -231,6 +231,9 @@ interface StoreState {
      *  whatever the automated score missed. Same "internal action, visible to the carrier" transparency
      *  as the load-level overrides above. */
     opsSetBrokerTier: (brokerId: string, tier: Broker["tier"]) => void;
+    /** Internal-only bookmark on a carrier account for follow-up — no carrier-facing effect, no activity
+     *  log entry; just something Ops sees when scanning the Carriers table. */
+    opsToggleCarrierFlag: (carrierId: string) => void;
     toggleAddon: (addonId: string) => void;
   };
 }
@@ -1254,6 +1257,11 @@ export const useStore = create<StoreState>((set, get) => ({
           ].slice(0, 80),
         };
       }),
+
+    opsToggleCarrierFlag: (carrierId) =>
+      set((state) => ({
+        carriers: state.carriers.map((c) => (c.id === carrierId ? { ...c, flaggedForReview: !c.flaggedForReview } : c)),
+      })),
   },
 }));
 

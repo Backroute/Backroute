@@ -1,17 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Flag } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Tabs } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useStore } from "@/lib/store";
-import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
+import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 
 const PLAN_TABS = ["all", "Starter", "Growth", "Fleet"] as const;
 
 export default function CarriersPage() {
   const carriers = useStore((s) => s.carriers);
+  const opsToggleCarrierFlag = useStore((s) => s.actions.opsToggleCarrierFlag);
   const [plan, setPlan] = useState<(typeof PLAN_TABS)[number]>("all");
 
   const filtered = useMemo(() => {
@@ -32,13 +34,22 @@ export default function CarriersPage() {
 
         <div className="mt-5 flex flex-col gap-3 lg:hidden">
           {filtered.map((c) => (
-            <div key={c.id} className="rounded-2xl border border-line bg-white p-4">
+            <div key={c.id} className={cn("rounded-2xl border p-4", c.flaggedForReview ? "border-[var(--accent-warn)]/40 bg-amber-50/30" : "border-line bg-white")}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-medium text-ink-950">{c.name}</p>
                   <p className="text-xs text-ink-400">{c.mc} · {c.city}, {c.state}</p>
                 </div>
-                <Badge tone={c.plan === "Fleet" ? "dark" : "neutral"}>{c.plan}</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge tone={c.plan === "Fleet" ? "dark" : "neutral"}>{c.plan}</Badge>
+                  <button
+                    onClick={() => opsToggleCarrierFlag(c.id)}
+                    className={cn("flex h-7 w-7 items-center justify-center rounded-full", c.flaggedForReview ? "text-[var(--accent-warn)]" : "text-ink-300 hover:text-ink-500")}
+                    aria-label={c.flaggedForReview ? "Unflag carrier" : "Flag carrier for review"}
+                  >
+                    <Flag className={cn("h-4 w-4", c.flaggedForReview && "fill-current")} />
+                  </button>
+                </div>
               </div>
               <div className="mt-3 flex items-center gap-4 text-xs">
                 <span className="text-ink-500">Trucks <span className="font-semibold tabular text-ink-950">{c.trucks}</span></span>
@@ -65,11 +76,12 @@ export default function CarriersPage() {
                 <th className="px-5 py-3 font-medium text-right">Take-rate</th>
                 <th className="px-5 py-3 font-medium">Health</th>
                 <th className="px-5 py-3 font-medium text-right">Joined</th>
+                <th className="px-5 py-3 font-medium text-right">Flag</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((c) => (
-                <tr key={c.id} className="border-b border-line last:border-0 hover:bg-ink-50/60">
+                <tr key={c.id} className={cn("border-b border-line last:border-0 hover:bg-ink-50/60", c.flaggedForReview && "bg-amber-50/30")}>
                   <td className="px-5 py-3.5">
                     <p className="font-medium text-ink-950">{c.name}</p>
                     <p className="text-xs text-ink-400">{c.mc} · {c.city}, {c.state}</p>
@@ -85,6 +97,15 @@ export default function CarriersPage() {
                     </div>
                   </td>
                   <td className="px-5 py-3.5 text-right text-xs text-ink-400">{formatDate(c.joinedAt)}</td>
+                  <td className="px-5 py-3.5 text-right">
+                    <button
+                      onClick={() => opsToggleCarrierFlag(c.id)}
+                      className={cn("inline-flex h-7 w-7 items-center justify-center rounded-full", c.flaggedForReview ? "text-[var(--accent-warn)]" : "text-ink-300 hover:text-ink-500")}
+                      aria-label={c.flaggedForReview ? "Unflag carrier" : "Flag carrier for review"}
+                    >
+                      <Flag className={cn("h-4 w-4", c.flaggedForReview && "fill-current")} />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
