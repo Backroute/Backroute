@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Mail, MessageSquare, Phone } from "lucide-react";
+import { ArrowUpRight, Ban, Mail, MessageSquare, Phone } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { LiveDot } from "@/components/shared/live-dot";
 import { ChannelBadge } from "@/components/shared/channel-badge";
 import { LoadScoreBadge } from "@/components/shared/load-score";
@@ -18,13 +19,17 @@ import { useCarrierLoads, useBrokerMap, useTruckMap, useDriverMap } from "@/lib/
 import { useStore } from "@/lib/store";
 import { formatCurrency } from "@/lib/utils";
 
+const DECLINE_REASONS = ["Broker won't move on rate", "Better option found elsewhere", "Lane no longer needed", "Other"];
+
 export default function NegotiationsPage() {
   const loads = useCarrierLoads();
   const brokers = useBrokerMap();
   const trucks = useTruckMap();
   const drivers = useDriverMap();
   const sendNegotiationInstruction = useStore((s) => s.actions.sendNegotiationInstruction);
+  const declineLoad = useStore((s) => s.actions.declineLoad);
   const [callingLoadId, setCallingLoadId] = useState<string | null>(null);
+  const [decliningLoadId, setDecliningLoadId] = useState<string | null>(null);
   const active = loads.filter((l) => l.stage === "negotiating" || l.stage === "rate_confirmed");
   const callingLoad = active.find((l) => l.id === callingLoadId);
   const callingBroker = callingLoad ? brokers.get(callingLoad.brokerId) : undefined;
@@ -107,18 +112,36 @@ export default function NegotiationsPage() {
                     </Link>
                   </div>
                   {load.stage === "negotiating" && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setCallingLoadId(load.id)}
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-ink-700 hover:border-ink-300"
-                        aria-label="Call AI Dispatcher about this load"
-                      >
-                        <Phone className="h-3.5 w-3.5" />
-                      </button>
-                      <div className="flex-1">
-                        <NegotiationComposer compact onSend={(text) => sendNegotiationInstruction(load.id, "carrier", text)} />
+                    <>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setCallingLoadId(load.id)}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-ink-700 hover:border-ink-300"
+                          aria-label="Call AI Dispatcher about this load"
+                        >
+                          <Phone className="h-3.5 w-3.5" />
+                        </button>
+                        <div className="flex-1">
+                          <NegotiationComposer compact onSend={(text) => sendNegotiationInstruction(load.id, "carrier", text)} />
+                        </div>
+                        <button
+                          onClick={() => setDecliningLoadId(decliningLoadId === load.id ? null : load.id)}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-ink-400 hover:border-[var(--accent-danger)]/40 hover:text-[var(--accent-danger)]"
+                          aria-label="Walk away from this negotiation"
+                        >
+                          <Ban className="h-3.5 w-3.5" />
+                        </button>
                       </div>
-                    </div>
+                      {decliningLoadId === load.id && (
+                        <DeclineForm
+                          onCancel={() => setDecliningLoadId(null)}
+                          onConfirm={(reason) => {
+                            declineLoad(load.id, reason);
+                            setDecliningLoadId(null);
+                          }}
+                        />
+                      )}
+                    </>
                   )}
                   {lastMsg && (
                     <p className="text-[11px] text-ink-400">
@@ -138,6 +161,25 @@ export default function NegotiationsPage() {
           onClose={() => setCallingLoadId(null)}
         />
       )}
+    </div>
+  );
+}
+
+function DeclineForm({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: (reason: string) => void }) {
+  const [reason, setReason] = useState(DECLINE_REASONS[0]);
+
+  return (
+    <div className="flex flex-col gap-2.5 rounded-xl border border-[var(--accent-danger)]/30 bg-red-50/50 p-3.5">
+      <label className="flex flex-col gap-1 text-xs text-ink-500">
+        Reason for walking away
+        <select value={reason} onChange={(e) => setReason(e.target.value)} className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm text-ink-900">
+          {DECLINE_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+      </label>
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="danger" onClick={() => onConfirm(reason)}>Walk away</Button>
+        <Button size="sm" variant="ghost" onClick={onCancel}>Never mind</Button>
+      </div>
     </div>
   );
 }

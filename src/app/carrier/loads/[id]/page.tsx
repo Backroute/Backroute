@@ -35,6 +35,7 @@ const TONU_STAGES: LoadStage[] = ["dispatched", "at_pickup"];
 const REASSIGNABLE_STAGES: LoadStage[] = ["booked", "dispatched", "at_pickup"];
 
 const CANCEL_REASONS = ["Broker cancelled the load", "Receiver refused / detention dispute", "Freight not ready at pickup", "Rate dispute", "Other"];
+const DECLINE_REASONS = ["Broker won't move on rate", "Better option found elsewhere", "Lane no longer needed", "Other"];
 
 /** Which document a stage is still waiting on — same source of truth the driver's confirm button
  *  reads from, so this card's pending rows can never disagree with what actually triggers capture. */
@@ -52,9 +53,11 @@ export default function LoadDetailPage() {
   const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
   const sendNegotiationInstruction = useStore((s) => s.actions.sendNegotiationInstruction);
   const cancelLoad = useStore((s) => s.actions.cancelLoad);
+  const declineLoad = useStore((s) => s.actions.declineLoad);
   const reassignTruck = useStore((s) => s.actions.reassignTruck);
   const [calling, setCalling] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [declining, setDeclining] = useState(false);
   const [reassigning, setReassigning] = useState(false);
 
   if (!load) {
@@ -108,6 +111,11 @@ export default function LoadDetailPage() {
             <ShieldAlert className="h-3.5 w-3.5" /> Backroute support has paused the AI on this load while they take a look.
           </p>
         )}
+        {load.stage === "declined" && load.cancellationReason && (
+          <div className="mt-4 rounded-xl bg-ink-100 px-3.5 py-2.5 text-xs font-medium text-ink-500">
+            <p className="flex items-center gap-1.5"><Ban className="h-3.5 w-3.5" /> Walked away: {load.cancellationReason}</p>
+          </div>
+        )}
         {load.stage === "cancelled" && (
           <div className="mt-4 rounded-xl bg-red-50 px-3.5 py-2.5 text-xs font-medium text-[var(--accent-danger)]">
             <p className="flex items-center gap-1.5"><Ban className="h-3.5 w-3.5" /> Cancelled: {load.cancellationReason}</p>
@@ -128,6 +136,23 @@ export default function LoadDetailPage() {
             ) : (
               <Button size="sm" variant="danger" onClick={() => setCancelling(true)}>
                 <Ban className="h-3.5 w-3.5" /> Cancel load
+              </Button>
+            )}
+          </div>
+        )}
+        {load.stage === "negotiating" && (
+          <div className="mt-4">
+            {declining ? (
+              <DeclineForm
+                onCancel={() => setDeclining(false)}
+                onConfirm={(reason) => {
+                  declineLoad(load.id, reason);
+                  setDeclining(false);
+                }}
+              />
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => setDeclining(true)}>
+                <Ban className="h-3.5 w-3.5" /> Walk away from negotiation
               </Button>
             )}
           </div>
@@ -395,6 +420,25 @@ function CancelForm({ stage, onCancel, onConfirm }: { stage: LoadStage; onCancel
       </label>
       <div className="flex items-center gap-2 pt-1">
         <Button size="sm" variant="danger" onClick={() => onConfirm(reason)}>Confirm cancellation</Button>
+        <Button size="sm" variant="ghost" onClick={onCancel}>Never mind</Button>
+      </div>
+    </div>
+  );
+}
+
+function DeclineForm({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: (reason: string) => void }) {
+  const [reason, setReason] = useState(DECLINE_REASONS[0]);
+
+  return (
+    <div className="flex flex-col gap-2.5 rounded-xl border border-line bg-ink-50/60 p-3.5">
+      <label className="flex flex-col gap-1 text-xs text-ink-500">
+        Reason for walking away
+        <select value={reason} onChange={(e) => setReason(e.target.value)} className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm text-ink-900">
+          {DECLINE_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+      </label>
+      <div className="flex items-center gap-2 pt-1">
+        <Button size="sm" variant="danger" onClick={() => onConfirm(reason)}>Walk away</Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>Never mind</Button>
       </div>
     </div>

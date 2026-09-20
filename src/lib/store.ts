@@ -209,6 +209,10 @@ interface StoreState {
     /** Cancels a booked load that's fallen through (broker pulled it, detention refused, etc.). A truck
      *  already dispatched or at pickup earns the broker's TONU fee; earlier than that, no fee applies. */
     cancelLoad: (loadId: string, reason: string) => void;
+    /** Walks away from an in-progress negotiation — broker won't move, a better lane came up, whatever.
+     *  Nothing's booked yet so there's no TONU; just stops pursuing this one and frees any truck it had
+     *  tentatively chained to. */
+    declineLoad: (loadId: string, reason: string) => void;
     /** Swaps which truck is running a load — breakdown, driver calls in sick, whatever. Only offered
      *  before the freight is actually moving (booked through at_pickup); frees the old truck back to
      *  available and puts the new one on_load. */
@@ -1041,6 +1045,34 @@ export const useStore = create<StoreState>((set, get) => ({
               message: `Load cancelled: ${broker?.company ?? load.source}`,
               detail: tonuFee ? `${reason}. TONU fee of ${formatCurrencyShort(tonuFee)} invoiced to broker` : reason,
               loadId, carrierId: load.carrierId, severity: (tonuFee ? "warning" : "info") as ActivityEvent["severity"],
+            },
+            ...state.activity,
+          ].slice(0, 80),
+        };
+      }),
+
+    declineLoad: (loadId, reason) =>
+      set((state) => {
+        const load = state.loads.find((l) => l.id === loadId);
+        if (!load || load.stage !== "negotiating") return {};
+        const broker = state.brokers.find((b) => b.id === load.brokerId);
+        const now = new Date().toISOString();
+
+        return {
+          loads: state.loads.map((l) =>
+            l.id === loadId ? { ...l, stage: "declined" as const, cancellationReason: reason, updatedAt: now, progressPct: 100 } : l,
+          ),
+          trucks: state.trucks.map((t) =>
+            t.id === load.truckId
+              ? { ...t, nextLoadId: t.nextLoadId === loadId ? null : t.nextLoadId }
+              : t,
+          ),
+          activity: [
+            {
+              id: uid("act"), timestamp: now, type: "load_cancelled" as const,
+              message: `Stopped negotiating: ${broker?.company ?? load.source}`,
+              detail: reason,
+              loadId, carrierId: load.carrierId, severity: "info" as const,
             },
             ...state.activity,
           ].slice(0, 80),
