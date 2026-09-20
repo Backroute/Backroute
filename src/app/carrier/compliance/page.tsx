@@ -1,20 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2, Download, FileCheck2, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardCheck, Download, FileCheck2, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatTile } from "@/components/ui/stat-tile";
 import { AddonGate } from "@/components/shared/addon-gate";
-import { useCarrierLoads, useCarrierTrucks } from "@/lib/selectors";
+import { useCarrierLoads, useCarrierTrucks, useDriverMap } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { PRIMARY_CARRIER_ID } from "@/lib/mock-data";
 import { estimateMilesByState, estimateFuelTaxOwed } from "@/lib/ifta";
 import { IFTA_FILING_FEE, INSURANCE_REFERRAL_FEE } from "@/lib/commissions";
 import { downloadCsv } from "@/lib/csv-export";
-import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDateTime, formatNumber } from "@/lib/utils";
 
 const INSURANCE_POLICY = {
   carrier: "Reliance Commercial Insurance",
@@ -27,9 +27,15 @@ const INSURANCE_POLICY = {
 export default function CompliancePage() {
   const loads = useCarrierLoads();
   const trucks = useCarrierTrucks();
+  const drivers = useDriverMap();
+  const truckMap = new Map(trucks.map((t) => [t.id, t]));
   const incidents = useStore((s) => s.incidents).filter((i) => i.carrierId === PRIMARY_CARRIER_ID);
   const activeAccidents = incidents.filter((i) => i.type === "accident" && i.status === "active");
   const startClaim = useStore((s) => s.actions.startClaim);
+  const dvirInspections = useStore((s) => s.dvirInspections)
+    .filter((d) => d.carrierId === PRIMARY_CARRIER_ID)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const defectCount = dvirInspections.filter((d) => d.overallStatus === "defect").length;
   const [filed, setFiled] = useState(false);
 
   const quarterLoads = loads.filter((l) => l.stage !== "sourced" && l.stage !== "scoring" && l.stage !== "offered" && l.stage !== "declined" && l.stage !== "cancelled");
@@ -138,6 +144,69 @@ export default function CompliancePage() {
                 <p className="mt-4 text-xs text-ink-400">No open incidents requiring a claim.</p>
               )}
             </AddonGate>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4" /> Vehicle inspections</CardTitle>
+              <CardDescription>Pre-trip and post-trip DVIR reports logged by drivers.</CardDescription>
+            </div>
+            {dvirInspections.length > 0 && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() =>
+                  downloadCsv(
+                    `dvir-inspections-${new Date().toISOString().slice(0, 10)}.csv`,
+                    ["Truck", "Driver", "Type", "Status", "Notes", "Date"],
+                    dvirInspections.map((d) => [
+                      truckMap.get(d.truckId)?.unitNumber ?? d.truckId,
+                      drivers.get(d.driverId)?.name ?? "",
+                      d.kind === "pre_trip" ? "Pre-trip" : "Post-trip",
+                      d.overallStatus,
+                      d.notes ?? "",
+                      d.createdAt,
+                    ]),
+                  )
+                }
+              >
+                <Download className="h-3.5 w-3.5" /> Export CSV
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent className="!pt-3">
+            {dvirInspections.length === 0 ? (
+              <p className="py-6 text-center text-sm text-ink-400">No inspections logged yet. Drivers submit these before and after every trip.</p>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                  <StatTile label="Logged" value={dvirInspections.length} />
+                  <StatTile label="Defects flagged" value={defectCount} />
+                  <StatTile label="Trucks covered" value={new Set(dvirInspections.map((d) => d.truckId)).size} />
+                </div>
+                <div className="mt-5 flex flex-col divide-y divide-line rounded-2xl border border-line">
+                  {dvirInspections.slice(0, 8).map((d) => (
+                    <div key={d.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                      <div>
+                        <p className="text-sm font-medium text-ink-900">
+                          {truckMap.get(d.truckId)?.unitNumber ?? "Truck"} · {d.kind === "pre_trip" ? "Pre-trip" : "Post-trip"}
+                        </p>
+                        <p className="text-xs text-ink-400">
+                          {drivers.get(d.driverId)?.name ?? "Driver"} · {formatDateTime(d.createdAt)}
+                          {d.notes ? ` · ${d.notes}` : ""}
+                        </p>
+                      </div>
+                      <Badge tone={d.overallStatus === "pass" ? "success" : "danger"}>
+                        {d.overallStatus === "pass" ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                        {d.overallStatus === "pass" ? "Pass" : "Defect noted"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
