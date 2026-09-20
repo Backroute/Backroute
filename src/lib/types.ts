@@ -302,7 +302,8 @@ export type ActivityType =
   | "maintenance"
   | "dvir"
   | "load_cancelled"
-  | "time_off";
+  | "time_off"
+  | "truck_reassigned";
 
 export interface ActivityEvent {
   id: string;

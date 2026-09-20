@@ -192,6 +192,10 @@ interface StoreState {
     /** Cancels a booked load that's fallen through (broker pulled it, detention refused, etc.). A truck
      *  already dispatched or at pickup earns the broker's TONU fee; earlier than that, no fee applies. */
     cancelLoad: (loadId: string, reason: string) => void;
+    /** Swaps which truck is running a load — breakdown, driver calls in sick, whatever. Only offered
+     *  before the freight is actually moving (booked through at_pickup); frees the old truck back to
+     *  available and puts the new one on_load. */
+    reassignTruck: (loadId: string, newTruckId: string) => void;
     /** Ask the AI a question about a pending offer before committing — detention, schedule, payment terms, anything but rate (the AI already set that from data; pushing further belongs to post-selection negotiation). Phase one logs the ask and returns what to show; `resolved` true means there's nothing to wait on. */
     requestOfferDetail: (loadId: string, text: string) => { draft: OfferAskDraft; pendingReply: string; resolved: boolean };
     /** Phase two: the broker's actual answer to a non-rate ask. */
@@ -954,6 +958,37 @@ export const useStore = create<StoreState>((set, get) => ({
               message: `Load cancelled: ${broker?.company ?? load.source}`,
               detail: tonuFee ? `${reason}. TONU fee of ${formatCurrencyShort(tonuFee)} invoiced to broker` : reason,
               loadId, carrierId: load.carrierId, severity: (tonuFee ? "warning" : "info") as ActivityEvent["severity"],
+            },
+            ...state.activity,
+          ].slice(0, 80),
+        };
+      }),
+
+    reassignTruck: (loadId, newTruckId) =>
+      set((state) => {
+        const load = state.loads.find((l) => l.id === loadId);
+        const newTruck = state.trucks.find((t) => t.id === newTruckId);
+        if (!load || !newTruck || newTruck.status !== "available") return {};
+        const oldTruckId = load.truckId;
+        const now = new Date().toISOString();
+
+        return {
+          loads: state.loads.map((l) => (l.id === loadId ? { ...l, truckId: newTruckId, updatedAt: now } : l)),
+          trucks: state.trucks.map((t) => {
+            if (t.id === oldTruckId) {
+              return { ...t, status: "available" as const, currentLoadId: t.currentLoadId === loadId ? null : t.currentLoadId, nextLoadId: t.nextLoadId === loadId ? null : t.nextLoadId };
+            }
+            if (t.id === newTruckId) {
+              return { ...t, status: "on_load" as const, currentLoadId: loadId, currentCity: load.lane.origin, currentState: load.lane.originState };
+            }
+            return t;
+          }),
+          activity: [
+            {
+              id: uid("act"), timestamp: now, type: "truck_reassigned" as const,
+              message: `Reassigned to ${newTruck.unitNumber}`,
+              detail: `${load.lane.origin} → ${load.lane.destination} · ${load.referenceNumber}`,
+              loadId, carrierId: load.carrierId, severity: "info" as const,
             },
             ...state.activity,
           ].slice(0, 80),

@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, Ban, Camera, Fuel, Gauge, Percent, Phone, Route, ShieldAlert, TrendingUp, FileText } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRightLeft, Ban, Camera, Fuel, Gauge, Percent, Phone, Route, ShieldAlert, TrendingUp, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,17 +19,20 @@ import { LiveDot } from "@/components/shared/live-dot";
 import { StopsTimeline } from "@/components/shared/stops-timeline";
 import { TripStepper } from "@/components/shared/trip-stepper";
 import { Progress } from "@/components/ui/progress";
-import { useLoad, useBrokerMap, useTruckMap, useDriverMap } from "@/lib/selectors";
+import { useLoad, useBrokerMap, useTruckMap, useDriverMap, useCarrierTrucks } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { STAGE_CONFIRM } from "@/lib/stage-confirm";
 import { aiDispatcherNote, isTransitStage } from "@/lib/load-status";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
-import type { LoadStage } from "@/lib/types";
+import type { Driver, LoadStage, Truck } from "@/lib/types";
 
 /** Cancellable once rate is locked in; once in transit the freight is already moving, so that's a
  *  claim situation, not a cancellation. Dispatched/at_pickup carry a TONU fee since the truck already committed. */
 const CANCELLABLE_STAGES: LoadStage[] = ["rate_confirmed", "booked", "dispatched", "at_pickup"];
 const TONU_STAGES: LoadStage[] = ["dispatched", "at_pickup"];
+/** Swappable up through at_pickup — once freight is actually moving with a truck, that's a mid-route
+ *  problem (see incident reporting), not a reassignment. */
+const REASSIGNABLE_STAGES: LoadStage[] = ["booked", "dispatched", "at_pickup"];
 
 const CANCEL_REASONS = ["Broker cancelled the load", "Receiver refused / detention dispute", "Freight not ready at pickup", "Rate dispute", "Other"];
 
@@ -45,11 +48,14 @@ export default function LoadDetailPage() {
   const brokers = useBrokerMap();
   const trucks = useTruckMap();
   const drivers = useDriverMap();
+  const carrierTrucks = useCarrierTrucks();
   const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
   const sendNegotiationInstruction = useStore((s) => s.actions.sendNegotiationInstruction);
   const cancelLoad = useStore((s) => s.actions.cancelLoad);
+  const reassignTruck = useStore((s) => s.actions.reassignTruck);
   const [calling, setCalling] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [reassigning, setReassigning] = useState(false);
 
   if (!load) {
     return (
@@ -271,6 +277,14 @@ export default function LoadDetailPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Assignment</CardTitle>
+                {REASSIGNABLE_STAGES.includes(load.stage) && !reassigning && (
+                  <button
+                    onClick={() => setReassigning(true)}
+                    className="flex items-center gap-1.5 text-xs font-medium text-ink-500 hover:text-ink-950"
+                  >
+                    <ArrowRightLeft className="h-3 w-3" /> Reassign
+                  </button>
+                )}
               </CardHeader>
               <CardContent className="!pt-3">
                 <Row label="Truck" value={truck.unitNumber} />
@@ -280,6 +294,18 @@ export default function LoadDetailPage() {
                 <div className="mt-3.5">
                   <Row label="Pickup" value={load.pickupWindow} />
                 </div>
+                {reassigning && (
+                  <ReassignForm
+                    currentTruckId={truck.id}
+                    trucks={carrierTrucks}
+                    drivers={drivers}
+                    onCancel={() => setReassigning(false)}
+                    onConfirm={(newTruckId) => {
+                      reassignTruck(load.id, newTruckId);
+                      setReassigning(false);
+                    }}
+                  />
+                )}
               </CardContent>
             </Card>
           )}
@@ -303,6 +329,48 @@ export default function LoadDetailPage() {
           onClose={() => setCalling(false)}
         />
       )}
+    </div>
+  );
+}
+
+function ReassignForm({
+  currentTruckId,
+  trucks,
+  drivers,
+  onCancel,
+  onConfirm,
+}: {
+  currentTruckId: string;
+  trucks: Truck[];
+  drivers: Map<string, Driver>;
+  onCancel: () => void;
+  onConfirm: (newTruckId: string) => void;
+}) {
+  const available = trucks.filter((t) => t.id !== currentTruckId && t.status === "available");
+
+  return (
+    <div className="mt-3.5 flex flex-col gap-2 border-t border-line pt-3.5">
+      {available.length === 0 ? (
+        <p className="text-xs text-ink-400">No other trucks are free right now.</p>
+      ) : (
+        available.map((t) => {
+          const d = t.driverId ? drivers.get(t.driverId) : undefined;
+          return (
+            <button
+              key={t.id}
+              onClick={() => onConfirm(t.id)}
+              className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2.5 text-left hover:border-ink-300"
+            >
+              <div>
+                <p className="text-sm font-medium text-ink-900">{t.unitNumber}</p>
+                <p className="text-xs text-ink-400">{d?.name ?? "Unassigned"} · {t.currentCity}, {t.currentState}</p>
+              </div>
+              <span className="text-xs font-medium text-ink-500">Move here</span>
+            </button>
+          );
+        })
+      )}
+      <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
     </div>
   );
 }

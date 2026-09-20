@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  ArrowRightLeft,
   Ban,
   CheckCircle2,
   Database,
@@ -47,6 +48,7 @@ export const TYPE_ICON: Record<ActivityType, typeof Radar> = {
   dvir: ClipboardCheck,
   load_cancelled: Ban,
   time_off: CalendarClock,
+  truck_reassigned: ArrowRightLeft,
 };
 
 export const SEVERITY_TONE: Record<ActivityEvent["severity"], string> = {
