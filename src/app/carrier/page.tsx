@@ -257,6 +257,11 @@ export default function CarrierOverviewPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Driver roster</CardTitle>
+                {drivers.length > 5 && (
+                  <Button href="/carrier/fleet" variant="ghost" size="sm">
+                    View all {drivers.length} <ArrowUpRight className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </CardHeader>
               <CardContent className="!pt-3">
                 <div className="flex flex-col divide-y divide-line">
