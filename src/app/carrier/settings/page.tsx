@@ -13,6 +13,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Tabs } from "@/components/ui/tabs";
 import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierTrucks } from "@/lib/selectors";
+import { downloadCsv } from "@/lib/csv-export";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Aggressiveness } from "@/lib/store";
 
@@ -55,6 +56,10 @@ export default function SettingsPage() {
     Object.fromEntries(INTEGRATION_CATEGORIES.flatMap((c) => c.items).map((i) => [i.id, i.connected])),
   );
   const [tab, setTab] = useState<TabKey>("general");
+  const [card, setCard] = useState({ brand: "Visa", last4: "4242", expiry: "08/29" });
+  const [editingCard, setEditingCard] = useState(false);
+  const [cardNumberInput, setCardNumberInput] = useState("");
+  const [cardExpiryInput, setCardExpiryInput] = useState("");
 
   function handleInvite() {
     const email = inviteEmail.trim();
@@ -274,17 +279,60 @@ export default function SettingsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="!pt-3 flex flex-col gap-5">
-                  <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line p-4">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-ink-100 text-ink-600">
-                        <CreditCard className="h-4 w-4" />
-                      </span>
-                      <div>
-                        <p className="text-sm font-medium text-ink-900">Visa •••• 4242</p>
-                        <p className="text-xs text-ink-500">Expires 08/29 &middot; Next charge Oct 1</p>
+                  <div className="rounded-2xl border border-line p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-ink-100 text-ink-600">
+                          <CreditCard className="h-4 w-4" />
+                        </span>
+                        <div>
+                          <p className="text-sm font-medium text-ink-900">{card.brand} •••• {card.last4}</p>
+                          <p className="text-xs text-ink-500">Expires {card.expiry} &middot; Next charge Oct 1</p>
+                        </div>
                       </div>
+                      {!editingCard && (
+                        <Button variant="outline" size="sm" onClick={() => setEditingCard(true)}>Update payment method</Button>
+                      )}
                     </div>
-                    <Button variant="outline" size="sm">Update payment method</Button>
+                    {editingCard && (
+                      <div className="mt-4 flex flex-col gap-2.5 border-t border-line pt-4">
+                        <div className="flex flex-wrap gap-2.5">
+                          <label className="flex flex-1 flex-col gap-1 text-xs text-ink-500">
+                            Card number
+                            <input
+                              value={cardNumberInput}
+                              onChange={(e) => setCardNumberInput(e.target.value.replace(/\D/g, "").slice(0, 16))}
+                              placeholder="4242 4242 4242 4242"
+                              className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm text-ink-900 outline-none focus:border-ink-400"
+                            />
+                          </label>
+                          <label className="flex w-28 flex-col gap-1 text-xs text-ink-500">
+                            Expiry
+                            <input
+                              value={cardExpiryInput}
+                              onChange={(e) => setCardExpiryInput(e.target.value)}
+                              placeholder="MM/YY"
+                              className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm text-ink-900 outline-none focus:border-ink-400"
+                            />
+                          </label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            disabled={cardNumberInput.length < 4 || !cardExpiryInput.trim()}
+                            onClick={() => {
+                              setCard({ brand: "Visa", last4: cardNumberInput.slice(-4), expiry: cardExpiryInput.trim() });
+                              setEditingCard(false);
+                              setCardNumberInput("");
+                              setCardExpiryInput("");
+                            }}
+                          >
+                            Save card
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingCard(false)}>Cancel</Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -303,7 +351,13 @@ export default function SettingsPage() {
                           </div>
                           <div className="flex items-center gap-3">
                             <Badge tone="success">{inv.status}</Badge>
-                            <button className="flex h-8 w-8 items-center justify-center rounded-full text-ink-500 hover:bg-ink-100">
+                            <button
+                              onClick={() =>
+                                downloadCsv(`invoice-${inv.date.slice(0, 10)}.csv`, ["Date", "Amount", "Status"], [[formatDate(inv.date), inv.amount, inv.status]])
+                              }
+                              className="flex h-8 w-8 items-center justify-center rounded-full text-ink-500 hover:bg-ink-100"
+                              aria-label="Download invoice"
+                            >
                               <Download className="h-3.5 w-3.5" />
                             </button>
                           </div>

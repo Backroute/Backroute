@@ -372,4 +372,7 @@ export interface Incident {
   status: "active" | "resolved";
   steps: IncidentStep[];
   humanNotified: boolean;
+  /** Formal insurance claim, kicked off from Compliance — separate from the automated incident-response
+   *  steps above, which just get everyone safe and moving again. */
+  claimStartedAt?: string;
 }

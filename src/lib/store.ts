@@ -172,6 +172,9 @@ interface StoreState {
     recaptureDocument: (loadId: string, type: "bol" | "pod") => void;
     selectLoadOffer: (offerGroupId: string, loadId: string, actor: "driver" | "carrier") => void;
     reportIncident: (driverId: string, truckId: string, type: IncidentType, note: string) => void;
+    /** Kicks off the formal insurance claim for an accident — separate from the automated incident-
+     *  response steps, which just handle getting everyone safe and the load moving again. */
+    startClaim: (incidentId: string) => void;
     /** Books a shop appointment and takes the truck out of the offer pool immediately (in-shop) rather
      *  than waiting for the appointment date — a scheduled truck isn't one the AI should still be booking. */
     scheduleMaintenance: (truckId: string, shopName: string, serviceType: string, scheduledFor: string) => void;
@@ -743,6 +746,25 @@ export const useStore = create<StoreState>((set, get) => ({
         return {
           incidents: [incident, ...state.incidents],
           activity: [incidentOpenedEvent(incident, truck), ...state.activity].slice(0, 80),
+        };
+      }),
+
+    startClaim: (incidentId) =>
+      set((state) => {
+        const incident = state.incidents.find((i) => i.id === incidentId);
+        if (!incident || incident.claimStartedAt) return {};
+        const now = new Date().toISOString();
+        return {
+          incidents: state.incidents.map((i) => (i.id === incidentId ? { ...i, claimStartedAt: now } : i)),
+          activity: [
+            {
+              id: uid("act"), timestamp: now, type: "incident" as const,
+              message: "Insurance claim started",
+              detail: "Claim assist AI is preparing the filing with your policy details.",
+              carrierId: incident.carrierId, severity: "info" as const,
+            },
+            ...state.activity,
+          ].slice(0, 80),
         };
       }),
 

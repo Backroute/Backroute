@@ -29,6 +29,7 @@ export default function CompliancePage() {
   const trucks = useCarrierTrucks();
   const incidents = useStore((s) => s.incidents).filter((i) => i.carrierId === PRIMARY_CARRIER_ID);
   const activeAccidents = incidents.filter((i) => i.type === "accident" && i.status === "active");
+  const startClaim = useStore((s) => s.actions.startClaim);
   const [filed, setFiled] = useState(false);
 
   const quarterLoads = loads.filter((l) => l.stage !== "sourced" && l.stage !== "scoring" && l.stage !== "offered" && l.stage !== "declined" && l.stage !== "cancelled");
@@ -115,14 +116,23 @@ export default function CompliancePage() {
 
               {activeAccidents.length > 0 ? (
                 <div className="mt-4 flex flex-col gap-2.5">
-                  {activeAccidents.map((incident) => (
-                    <div key={incident.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 px-4 py-3">
-                      <span className="flex items-center gap-2 text-sm text-[var(--accent-warn)]">
-                        <AlertTriangle className="h-4 w-4" /> Accident reported, claim assist ready
-                      </span>
-                      <Button size="sm" variant="outline">Start claim</Button>
-                    </div>
-                  ))}
+                  {activeAccidents.map((incident) =>
+                    incident.claimStartedAt ? (
+                      <div key={incident.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-emerald-50 px-4 py-3">
+                        <span className="flex items-center gap-2 text-sm text-[var(--accent-live)]">
+                          <CheckCircle2 className="h-4 w-4" /> Claim started, {INSURANCE_POLICY.carrier} notified
+                        </span>
+                        <Badge tone="success">In progress</Badge>
+                      </div>
+                    ) : (
+                      <div key={incident.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 px-4 py-3">
+                        <span className="flex items-center gap-2 text-sm text-[var(--accent-warn)]">
+                          <AlertTriangle className="h-4 w-4" /> Accident reported, claim assist ready
+                        </span>
+                        <Button size="sm" variant="outline" onClick={() => startClaim(incident.id)}>Start claim</Button>
+                      </div>
+                    ),
+                  )}
                 </div>
               ) : (
                 <p className="mt-4 text-xs text-ink-400">No open incidents requiring a claim.</p>
