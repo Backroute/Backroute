@@ -154,6 +154,7 @@ export function LoadOfferCard({
               <button
                 onClick={handleSend}
                 disabled={!text.trim()}
+                aria-label="Send"
                 className={cn(
                   "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg disabled:opacity-40",
                   dark ? "bg-white text-ink-950" : "bg-ink-950 text-white",
@@ -163,6 +164,7 @@ export function LoadOfferCard({
               </button>
               <button
                 onClick={reset}
+                aria-label="Cancel"
                 className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", dark ? "text-white/50 hover:bg-white/10" : "text-ink-400 hover:bg-ink-100")}
               >
                 <X className="h-3.5 w-3.5" />

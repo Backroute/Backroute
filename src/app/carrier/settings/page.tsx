@@ -389,6 +389,7 @@ export default function SettingsPage() {
                           {member.role !== "Owner" && (
                             <button
                               onClick={() => setTeam((t) => t.filter((m) => m.id !== member.id))}
+                              aria-label={`Remove ${member.name}`}
                               className="flex h-7 w-7 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 hover:text-[var(--accent-danger)]"
                             >
                               <Trash2 className="h-3.5 w-3.5" />

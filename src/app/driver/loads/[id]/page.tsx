@@ -103,7 +103,7 @@ export default function DriverLoadDetailPage() {
   return (
     <div className="flex flex-col gap-5 px-5">
       <div className="flex items-center gap-3">
-        <Link href="/driver" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-ink-700 hover:bg-ink-50">
+        <Link href="/driver" aria-label="Back to home" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-ink-700 hover:bg-ink-50">
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <h1 className="text-sm font-semibold text-ink-950">Load detail</h1>

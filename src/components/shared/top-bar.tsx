@@ -58,6 +58,7 @@ export function TopBar({
         {onMenuClick && (
           <button
             onClick={onMenuClick}
+            aria-label="Open menu"
             className={cn(
               "flex h-9 w-9 shrink-0 items-center justify-center rounded-full lg:hidden",
               dark ? "text-white/60 hover:bg-white/10" : "text-ink-500 hover:bg-ink-100",
@@ -68,6 +69,7 @@ export function TopBar({
         )}
         <button
           onClick={openCommandPalette}
+          aria-label="Search"
           className={cn(
             "flex w-full max-w-xs items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm transition-colors",
             dark ? "border-white/15 text-white/40 hover:border-white/30" : "border-line text-ink-400 hover:border-ink-300",
@@ -85,6 +87,7 @@ export function TopBar({
         <div className="relative" ref={notifRef}>
           <button
             onClick={() => setNotifOpen((o) => !o)}
+            aria-label="Notifications"
             className={cn(
               "relative flex h-9 w-9 items-center justify-center rounded-full transition-colors",
               dark ? "text-white/60 hover:bg-white/10" : "text-ink-500 hover:bg-ink-100",
@@ -108,7 +111,7 @@ export function TopBar({
         </div>
 
         <div className="relative" ref={accountRef}>
-          <button onClick={() => setAccountOpen((o) => !o)} className="flex items-center gap-2 rounded-full p-0.5">
+          <button onClick={() => setAccountOpen((o) => !o)} aria-label="Account menu" className="flex items-center gap-2 rounded-full p-0.5">
             <Avatar name={accountName} size="sm" />
           </button>
           {accountOpen && (

@@ -62,12 +62,14 @@ export function CounterOfferButton({
         </div>
         <button
           onClick={submit}
+          aria-label="Submit counter offer"
           className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", dark ? "bg-white text-ink-950" : "bg-ink-950 text-white")}
         >
           <Check className="h-3.5 w-3.5" />
         </button>
         <button
           onClick={() => setOpen(false)}
+          aria-label="Cancel"
           className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", dark ? "text-white/60 hover:bg-white/10" : "text-ink-400 hover:bg-ink-100")}
         >
           <X className="h-3.5 w-3.5" />

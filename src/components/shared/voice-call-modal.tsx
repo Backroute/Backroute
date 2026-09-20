@@ -291,6 +291,7 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
                   <button
                     onClick={() => say(text)}
                     disabled={!text.trim() || pending}
+                    aria-label="Send"
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-ink-950 disabled:opacity-30"
                   >
                     <Send className="h-4 w-4" />
