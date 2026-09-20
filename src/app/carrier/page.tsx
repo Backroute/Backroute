@@ -14,7 +14,7 @@ import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { TruckDriverChip } from "@/components/shared/truck-driver-chip";
 import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks, useCarrierDrivers, useCarrierEscalations, useDriverMap, useBrokerMap, useTruckMap, truckActiveLoads } from "@/lib/selectors";
-import { formatCurrency, formatNumber } from "@/lib/utils";
+import { formatCurrency, formatNumber, formatDate } from "@/lib/utils";
 
 export default function CarrierOverviewPage() {
   const carrier = usePrimaryCarrier();
@@ -109,7 +109,7 @@ export default function CarrierOverviewPage() {
               <CardHeader>
                 <div>
                   <CardTitle>Fleet snapshot</CardTitle>
-                  <p className="mt-1 text-xs text-ink-500">{chainedCount} of {trucks.length} trucks already have their next load chained</p>
+                  <p className="mt-1 text-xs text-ink-500">{chainedCount} of {trucks.length} trucks already {chainedCount === 1 ? "has" : "have"} their next load chained</p>
                 </div>
                 <Button href="/carrier/fleet" variant="ghost" size="sm">
                   View fleet <ArrowUpRight className="h-3.5 w-3.5" />
@@ -237,7 +237,7 @@ export default function CarrierOverviewPage() {
                       return (
                         <div key={r.id} className="rounded-xl bg-ink-50 p-3">
                           <p className="text-sm font-medium text-ink-900">{requester?.name ?? "Driver"}</p>
-                          <p className="mt-0.5 text-xs text-ink-500">{r.startDate} – {r.endDate} · {r.reason}</p>
+                          <p className="mt-0.5 text-xs text-ink-500">{formatDate(r.startDate)} – {formatDate(r.endDate)} · {r.reason}</p>
                           <div className="mt-2 flex items-center gap-2">
                             <Button size="sm" variant="primary" onClick={() => respondTimeOff(r.id, true)}>
                               <Check className="h-3.5 w-3.5" /> Approve

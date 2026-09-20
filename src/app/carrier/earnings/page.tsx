@@ -118,8 +118,25 @@ export default function EarningsPage() {
                   <LineChart data={revenueTrend} margin={{ left: -12, right: 12, top: 8 }}>
                     <CartesianGrid stroke="#e4e4e0" vertical={false} />
                     <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#9d9d95" }} />
-                    <YAxis yAxisId="revenue" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#9d9d95" }} tickFormatter={(v) => `$${Math.round(v / 1000)}k`} width={48} />
-                    <YAxis yAxisId="saved" orientation="right" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#0f8a4b" }} tickFormatter={(v) => `$${Math.round(v / 1000)}k`} width={48} />
+                    <YAxis
+                      yAxisId="revenue"
+                      domain={[(min: number) => Math.floor(min * 0.9), (max: number) => Math.ceil(max * 1.05)]}
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fontSize: 12, fill: "#9d9d95" }}
+                      tickFormatter={(v) => `$${Math.round(v / 1000)}k`}
+                      width={48}
+                    />
+                    <YAxis
+                      yAxisId="saved"
+                      orientation="right"
+                      domain={[(min: number) => Math.floor(min * 0.9), (max: number) => Math.ceil(max * 1.05)]}
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fontSize: 12, fill: "#0f8a4b" }}
+                      tickFormatter={(v) => `$${Math.round(v / 1000)}k`}
+                      width={48}
+                    />
                     <Tooltip
                       formatter={(value, key) => [formatCurrency(Number(value)), key === "revenue" ? "GMV" : "Saved vs. human dispatch"]}
                       contentStyle={{ borderRadius: 12, border: "1px solid #e4e4e0", fontSize: 12 }}

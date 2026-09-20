@@ -25,7 +25,12 @@ import type {
 export const PRIMARY_CARRIER_ID = "carrier-titan";
 export const PRIMARY_DRIVER_ID = "driver-marcus-bell";
 
-const BASE_TIME = new Date("2026-09-16T14:00:00Z").getTime();
+// Anchored to load time (not a fixed historical date) so every "Nd ago" / "LIVE" badge
+// in the app stays fresh no matter how long it's been since this demo was last redeployed.
+// Rounded to a 15-minute bucket so the server-rendered HTML and the client's hydration
+// pass compute the same anchor (they run in separate JS contexts a few seconds apart) —
+// an unrounded Date.now() here would make every "time ago" mismatch on hydration.
+const BASE_TIME = Math.floor(Date.now() / 900_000) * 900_000;
 const iso = (offsetMin: number) => new Date(BASE_TIME + offsetMin * 60_000).toISOString();
 
 // ---------- Reference data ----------
@@ -534,8 +539,8 @@ export function generateWorld(seed = 20260916): World {
     name: "Titan Freight LLC",
     mc: "MC-548213",
     dot: "DOT-2871940",
-    plan: "Growth",
-    mrr: 499,
+    plan: "Fleet",
+    mrr: 999,
     trucks: 6,
     healthScore: 94,
     joinedAt: iso(-95 * 1440),
