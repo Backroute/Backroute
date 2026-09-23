@@ -2,19 +2,17 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowDown, ArrowUpRight, ChevronRight, ClipboardCheck, Clock, FileText, LifeBuoy, Link2, MapPin, MessageCircle, Phone, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUpRight, ClipboardCheck, LifeBuoy, Link2, MapPin, Phone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LoadScoreBadge } from "@/components/shared/load-score";
-import { LoadJourney } from "@/components/shared/load-journey";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
-import { StageConfirmButton } from "@/components/shared/stage-confirm-button";
+import { DriverTripCard, DriverTripCompleteCard } from "@/components/shared/driver-trip-card";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap, truckActiveLoads } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
-import { DRIVER_IDLE_NOTE, LOAD_STATUS_HEADLINE, nextLoadStatus, nextStop } from "@/lib/load-status";
 import { STAGE_CONFIRM } from "@/lib/stage-confirm";
-import { LOAD_STAGE_LABEL, type Load, type LoadStage } from "@/lib/types";
+import type { LoadStage } from "@/lib/types";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 
 /** Stages where the truck hasn't rolled with freight yet — the window where a pre-trip DVIR is still due. */
@@ -32,6 +30,7 @@ export default function DriverHomePage() {
   const requestOfferDetail = useStore((s) => s.actions.requestOfferDetail);
   const resolveOfferDetail = useStore((s) => s.actions.resolveOfferDetail);
   const driverConfirmStage = useStore((s) => s.actions.driverConfirmStage);
+  const acknowledgeDelivery = useStore((s) => s.actions.acknowledgeDelivery);
   const [calling, setCalling] = useState(false);
 
   const truck = trucks.find((t) => t.id === driver.truckId);
@@ -50,8 +49,9 @@ export default function DriverHomePage() {
 
   const dvirDoneToday = dvirInspections.some((d) => new Date(d.createdAt).toDateString() === new Date().toDateString());
   const needsPreTrip = !!currentLoad && !dvirDoneToday && PRE_TRIP_STAGES.includes(currentLoad.stage);
-  const hasStageAction = !!currentLoad && !!STAGE_CONFIRM[currentLoad.stage];
-  const todoCount = Number(hasStageAction) + Number(hasOffers) + Number(needsPreTrip) + incidents.length;
+  const completedLoad = truck?.lastDeliveredLoadId ? loads.find((l) => l.id === truck.lastDeliveredLoadId) : undefined;
+  const hasStageAction = !completedLoad && !!currentLoad && !!STAGE_CONFIRM[currentLoad.stage];
+  const todoCount = Number(hasStageAction) + Number(hasOffers) + Number(!completedLoad && needsPreTrip) + incidents.length;
 
   const weekLoads = loads.filter((l) => l.truckId === truck?.id);
   const weekMiles = weekLoads.reduce((s, l) => s + l.lane.miles, 0);
@@ -62,9 +62,11 @@ export default function DriverHomePage() {
         <h1 className="font-display text-2xl text-ink-950">Hi {driver.name.split(" ")[0]}</h1>
         <p className="mt-1 flex items-center gap-2 text-sm text-ink-500">
           <span className={cn("h-2 w-2 shrink-0 rounded-full", todoCount ? "bg-[var(--accent-warn)]" : "bg-[var(--accent-live)]")} />
-          {todoCount === 0
-            ? "Nothing needs you. AI Dispatcher has it handled."
-            : `${todoCount} thing${todoCount === 1 ? "" : "s"} for you. AI handles the rest.`}
+          {completedLoad
+            ? "Load delivered. Nice work."
+            : todoCount === 0
+              ? "Nothing needs you. AI Dispatcher has it handled."
+              : `${todoCount} thing${todoCount === 1 ? "" : "s"} for you. AI handles the rest.`}
         </p>
       </div>
 
@@ -98,11 +100,20 @@ export default function DriverHomePage() {
         </div>
       )}
 
-      {currentLoad ? (
-        <CurrentLoadCard
+      {completedLoad && truck ? (
+        <DriverTripCompleteCard
+          load={completedLoad}
+          brokerName={brokers.get(completedLoad.brokerId)?.company}
+          nextLoad={currentLoad}
+          offersCount={pendingOffers.length}
+          onContinue={() => acknowledgeDelivery(truck.id)}
+        />
+      ) : currentLoad ? (
+        <DriverTripCard
           load={currentLoad}
-          nextStatus={nextLoadStatus(nextLoad, hasOffers)}
+          brokerName={brokers.get(currentLoad.brokerId)?.company}
           needsPreTrip={needsPreTrip}
+          upNext={nextLoad ? "chained" : hasOffers ? "choose" : "searching"}
           onCall={() => setCalling(true)}
           onConfirm={driverConfirmStage}
           onCounter={(amount) => requestBetterRate(currentLoad.id, "driver", amount)}
@@ -122,14 +133,14 @@ export default function DriverHomePage() {
         </div>
       )}
 
-      {nextLoad && (
+      {nextLoad && !completedLoad && (
         <div className="rounded-3xl border border-line p-5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-[var(--accent-info)]">
                 <Link2 className="h-3.5 w-3.5" />
               </span>
-              <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Next load, already lined up</span>
+              <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Up next</span>
             </div>
             <LoadScoreBadge score={nextLoad.score} size="sm" />
           </div>
@@ -137,7 +148,7 @@ export default function DriverHomePage() {
             {nextLoad.lane.origin} <span className="text-ink-300">→</span> {nextLoad.lane.destination}
           </p>
           <p className="mt-0.5 text-xs text-ink-500">
-            {nextLoad.stage === "negotiating"
+            {nextLoad.stage === "negotiating" || nextLoad.stage === "scoring" || nextLoad.stage === "sourced"
               ? "AI is negotiating the rate now"
               : "Rate locked. It becomes your current load the moment you deliver."}
           </p>
@@ -201,100 +212,6 @@ export default function DriverHomePage() {
       )}
 
       {calling && <VoiceCallModal spec={{ kind: "checkin", driverId: driver.id, driverFirstName: driver.name }} onClose={() => setCalling(false)} />}
-    </div>
-  );
-}
-
-/** Built to be read at a glance from the cab: where you're going and when first, then the one thing to
- *  tap, then everything else. */
-function CurrentLoadCard({
-  load,
-  nextStatus,
-  needsPreTrip,
-  onCall,
-  onConfirm,
-  onCounter,
-}: {
-  load: Load;
-  nextStatus: ReturnType<typeof nextLoadStatus>;
-  needsPreTrip: boolean;
-  onCall: () => void;
-  onConfirm: (loadId: string) => void;
-  onCounter: (amount: number) => void;
-}) {
-  const stop = nextStop(load);
-  const isDelivery = stop.label === "Delivery";
-  const stopCity = isDelivery ? `${load.lane.destination}, ${load.lane.destState}` : `${load.lane.origin}, ${load.lane.originState}`;
-  const idleNote = DRIVER_IDLE_NOTE[load.stage];
-
-  return (
-    <div className="rounded-3xl bg-ink-950 p-5 text-white">
-      <Link href={`/driver/loads/${load.id}`} className="block">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-medium uppercase tracking-wider text-white/50">Current load · {load.referenceNumber}</span>
-          <LoadScoreBadge score={load.score} size="sm" invert />
-        </div>
-        <p className="mt-4 text-[11px] font-medium uppercase tracking-wider text-white/50">{isDelivery ? "Deliver to" : "Pick up at"}</p>
-        <p className="mt-0.5 text-2xl font-semibold leading-tight">{stopCity}</p>
-        <p className="mt-1.5 flex items-center gap-1.5 text-sm text-white/80">
-          <Clock className="h-3.5 w-3.5" /> {stop.window}
-        </p>
-        <p className="mt-2 text-xs text-white/40">
-          {load.lane.origin} → {load.lane.destination} · {load.equipmentType} · {load.lane.miles} mi
-        </p>
-      </Link>
-
-      <div className="mt-4 rounded-2xl bg-white/5 px-3 pb-3 pt-2.5">
-        <p className="mb-2.5 text-xs font-medium text-white/80">{LOAD_STATUS_HEADLINE[load.stage] ?? LOAD_STAGE_LABEL[load.stage]}</p>
-        <LoadJourney stage={load.stage} next={nextStatus} perspective="driver" invert />
-      </div>
-
-      <div className="mt-4 flex flex-col gap-2">
-        {load.stage === "negotiating" && <CounterOfferButton load={load} onSubmit={onCounter} variant="dark" />}
-        {STAGE_CONFIRM[load.stage] ? (
-          <StageConfirmButton loadId={load.id} stage={load.stage} onConfirm={onConfirm} />
-        ) : idleNote ? (
-          <p className="flex items-start gap-2 rounded-2xl border border-white/15 px-3.5 py-3 text-xs leading-relaxed text-white/70">
-            <Sparkles className="mt-px h-3.5 w-3.5 shrink-0" /> {idleNote}
-          </p>
-        ) : null}
-        {needsPreTrip && (
-          <Link href="/driver/inspection" className="flex items-center justify-between rounded-2xl bg-amber-400/15 px-3.5 py-2.5 text-xs font-medium text-amber-200">
-            <span className="flex items-center gap-2"><ClipboardCheck className="h-3.5 w-3.5" /> Pre-trip inspection due today</span>
-            <span className="flex items-center gap-0.5">Start <ChevronRight className="h-3.5 w-3.5" /></span>
-          </Link>
-        )}
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <div className="rounded-2xl bg-white/5 px-3.5 py-2.5">
-          <p className="text-[10px] uppercase tracking-wider text-white/40">Total offer</p>
-          <p className="mt-0.5 text-sm font-semibold tabular">{formatCurrency(load.bookedRate ?? load.targetRate)}</p>
-        </div>
-        <div className="rounded-2xl bg-white/5 px-3.5 py-2.5">
-          <p className="text-[10px] uppercase tracking-wider text-white/40">Est. net</p>
-          <p className="mt-0.5 text-sm font-semibold tabular">{formatCurrency(load.netProfit ?? 0)}</p>
-        </div>
-      </div>
-
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        <button onClick={onCall} className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-white/25 py-2.5 text-[11px] font-medium text-white">
-          <Phone className="h-4 w-4" /> Call AI
-        </button>
-        <Link href="/driver/messages" className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-white/25 py-2.5 text-[11px] font-medium text-white">
-          <MessageCircle className="h-4 w-4" /> Message
-        </Link>
-        <Link href="/driver/incident" className="flex flex-col items-center justify-center gap-1 rounded-2xl border border-red-400/40 py-2.5 text-[11px] font-medium text-red-200">
-          <LifeBuoy className="h-4 w-4" /> Report issue
-        </Link>
-      </div>
-
-      <Link href={`/driver/loads/${load.id}`} className="mt-3 flex items-center justify-between rounded-2xl bg-white/5 px-3.5 py-2.5 text-xs font-medium text-white/70 transition-colors hover:bg-white/10">
-        <span className="flex items-center gap-1.5">
-          <FileText className="h-3.5 w-3.5" /> Load details & documents{load.documents.length > 0 ? ` (${load.documents.length})` : ""}
-        </span>
-        <ChevronRight className="h-3.5 w-3.5" />
-      </Link>
     </div>
   );
 }

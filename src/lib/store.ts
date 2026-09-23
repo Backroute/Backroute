@@ -179,6 +179,8 @@ interface StoreState {
     sendCarrierMessage: (carrierId: string, content: string) => void;
     updateSettings: (partial: Partial<AgentSettings>) => void;
     driverConfirmStage: (loadId: string) => void;
+    /** Driver dismissed the "load complete" card — the truck's current (or next-to-pick) load takes over. */
+    acknowledgeDelivery: (truckId: string) => void;
     recaptureDocument: (loadId: string, type: "bol" | "pod") => void;
     selectLoadOffer: (offerGroupId: string, loadId: string, actor: "driver" | "carrier") => void;
     reportIncident: (driverId: string, truckId: string, type: IncidentType, note: string) => void;
@@ -494,8 +496,12 @@ export const useStore = create<StoreState>((set, get) => ({
             l.stage !== "dispatched" && l.stage !== "at_pickup" && l.stage !== "in_transit" && l.stage !== "at_delivery" &&
             !l.aiPaused && l.carrierId === PRIMARY_CARRIER_ID,
         );
+        // A truck sitting empty while its own current load is still being booked is costing money right now —
+        // the AI works those first, the way a dispatcher would, instead of leaving the driver parked on a
+        // random draw across the whole fleet.
+        const idleTruckLoads = candidates.filter((l) => trucks.some((t) => t.currentLoadId === l.id));
         if (candidates.length && Math.random() < 0.88) {
-          const target = pick(candidates);
+          const target = idleTruckLoads.length && Math.random() < 0.7 ? pick(idleTruckLoads) : pick(candidates);
           const broker = state.brokers.find((b) => b.id === target.brokerId);
           let effectiveTruck = trucks.find((t) => t.id === target.truckId);
 
@@ -513,6 +519,7 @@ export const useStore = create<StoreState>((set, get) => ({
             trucks = trucks.map((t) => (t.id === tu.id ? { ...t, ...tu } : t));
 
             if (tu.status === "available" && tu.currentLoadId === null) {
+              trucks = trucks.map((t) => (t.id === tu.id ? { ...t, lastDeliveredLoadId: result.load.id } : t));
               const promoted = promoteChainedLoad(trucks, tu.id, PRIMARY_CARRIER_ID);
               trucks = promoted.trucks;
               if (promoted.event) {
@@ -715,6 +722,7 @@ export const useStore = create<StoreState>((set, get) => ({
           const tu = result.truckUpdates;
           trucks = trucks.map((t) => (t.id === tu.id ? { ...t, ...tu } : t));
           if (tu.status === "available" && tu.currentLoadId === null) {
+            trucks = trucks.map((t) => (t.id === tu.id ? { ...t, lastDeliveredLoadId: load.id } : t));
             const promoted = promoteChainedLoad(trucks, tu.id, load.carrierId);
             trucks = promoted.trucks;
             if (promoted.event) events = [...events, promoted.event];
@@ -726,6 +734,11 @@ export const useStore = create<StoreState>((set, get) => ({
           activity: [...events, ...state.activity].slice(0, 80),
         };
       }),
+
+    acknowledgeDelivery: (truckId) =>
+      set((state) => ({
+        trucks: state.trucks.map((t) => (t.id === truckId ? { ...t, lastDeliveredLoadId: null } : t)),
+      })),
 
     recaptureDocument: (loadId, type) =>
       set((state) => {

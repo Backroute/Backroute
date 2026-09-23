@@ -123,6 +123,9 @@ export interface Truck {
   homeBase: string;
   currentLoadId: string | null;
   nextLoadId: string | null;
+  /** A load this truck just delivered that the driver hasn't dismissed yet — keeps the "load complete"
+   *  card on screen even though the chained next load has already been promoted into currentLoadId. */
+  lastDeliveredLoadId?: string | null;
   mpg: number;
   odometer: number;
   /** Maintenance AI tracking. */

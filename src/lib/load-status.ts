@@ -45,6 +45,8 @@ export function nextStop(load: Load): { label: string; window: string } {
 /** Carrier-facing version of the same status: who is actually working the load right now, so a fleet
  *  row reads as "AI is negotiating" vs. "driver is loading" at a glance. */
 export const LOAD_STATUS_CARRIER: Partial<Record<LoadStage, { owner: "ai" | "driver"; text: string }>> = {
+  sourced: { owner: "ai", text: "AI contacting broker" },
+  scoring: { owner: "ai", text: "AI contacting broker" },
   negotiating: { owner: "ai", text: "AI negotiating rate" },
   rate_confirmed: { owner: "ai", text: "AI dispatching driver" },
   booked: { owner: "ai", text: "AI dispatching driver" },
@@ -53,14 +55,6 @@ export const LOAD_STATUS_CARRIER: Partial<Record<LoadStage, { owner: "ai" | "dri
   in_transit: { owner: "driver", text: "En route to delivery" },
   at_delivery: { owner: "driver", text: "Unloading at delivery" },
   delivered: { owner: "ai", text: "Invoicing broker" },
-};
-
-/** When the driver has nothing to tap, say so and say what the AI is doing instead — an empty action
- *  slot otherwise reads like something is broken or waiting on them. */
-export const DRIVER_IDLE_NOTE: Partial<Record<LoadStage, string>> = {
-  negotiating: "Nothing for you yet. AI is getting the best rate from the broker.",
-  rate_confirmed: "Nothing for you yet. AI is sending the rate con and will dispatch you.",
-  booked: "Nothing for you yet. AI is sending the rate con and will dispatch you.",
 };
 
 export type JourneyStepKey = "book" | "pickup" | "deliver" | "paid" | "next";

@@ -13,10 +13,12 @@ export function StageConfirmButton({
   loadId,
   stage,
   onConfirm,
+  className,
 }: {
   loadId: string;
   stage: LoadStage;
   onConfirm: (loadId: string) => void;
+  className?: string;
 }) {
   const [capturing, setCapturing] = useState(false);
   const step = STAGE_CONFIRM[stage];
@@ -40,6 +42,7 @@ export function StageConfirmButton({
       className={cn(
         "flex items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-semibold text-ink-950 transition-opacity",
         capturing && "opacity-70",
+        className,
       )}
     >
       <Icon className={cn("h-4 w-4", capturing && "animate-spin")} />
