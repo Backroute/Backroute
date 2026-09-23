@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ClipboardCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,14 +24,23 @@ const CHECKLIST = [
 ];
 
 export default function DvirInspectionPage() {
+  return (
+    <Suspense>
+      <DvirInspection />
+    </Suspense>
+  );
+}
+
+function DvirInspection() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const driver = usePrimaryDriver();
   const trucks = useCarrierTrucks();
   const truck = trucks.find((t) => t.id === driver.truckId);
   const submitDvir = useStore((s) => s.actions.submitDvir);
   const inspections = useStore((s) => s.dvirInspections).filter((d) => d.driverId === driver.id);
 
-  const [kind, setKind] = useState<"pre_trip" | "post_trip">("pre_trip");
+  const [kind, setKind] = useState<"pre_trip" | "post_trip">(searchParams.get("kind") === "post_trip" ? "post_trip" : "pre_trip");
   const [items, setItems] = useState<Record<string, "ok" | "defect">>(() => Object.fromEntries(CHECKLIST.map((c) => [c, "ok"])));
   const [notes, setNotes] = useState("");
   const [submitted, setSubmitted] = useState<"pass" | "defect" | null>(null);

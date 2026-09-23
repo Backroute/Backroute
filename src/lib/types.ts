@@ -126,6 +126,8 @@ export interface Truck {
   /** A load this truck just delivered that the driver hasn't dismissed yet — keeps the "load complete"
    *  card on screen even though the chained next load has already been promoted into currentLoadId. */
   lastDeliveredLoadId?: string | null;
+  /** When on, the AI books the top-scored next load by itself instead of asking the driver/carrier to pick. */
+  autoChainNextLoad?: boolean;
   mpg: number;
   odometer: number;
   /** Maintenance AI tracking. */

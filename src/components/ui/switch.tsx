@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 
-export function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label?: string }) {
+export function Switch({ checked, onChange, label, dark }: { checked: boolean; onChange: (v: boolean) => void; label?: string; dark?: boolean }) {
   return (
     <button
       role="switch"
@@ -11,7 +11,7 @@ export function Switch({ checked, onChange, label }: { checked: boolean; onChang
       onClick={() => onChange(!checked)}
       className={cn(
         "relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200",
-        checked ? "bg-ink-950" : "bg-ink-200",
+        dark ? (checked ? "bg-[var(--accent-live)]" : "bg-white/20") : checked ? "bg-ink-950" : "bg-ink-200",
       )}
     >
       <span

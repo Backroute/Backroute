@@ -81,7 +81,7 @@ export function SwipeToConfirm({
         style={{ width: x + KNOB + PAD * 2 }}
       />
       <span
-        className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 pl-12 pr-4 text-sm font-semibold text-ink-950"
+        className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 whitespace-nowrap pl-14 pr-4 text-sm font-semibold text-ink-950"
         style={{ opacity: busy ? 1 : 1 - fill * 1.4 }}
       >
         {busy ? (

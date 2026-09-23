@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { AlertTriangle, ArrowDown, ArrowUpRight, CalendarClock, Check, LifeBuoy, Sparkles, X } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,12 +10,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LiveDot } from "@/components/shared/live-dot";
 import { ActivityFeed } from "@/components/shared/activity-feed";
-import { LoadJourney } from "@/components/shared/load-journey";
+import { TripCompactCard, TripDetails, TripSheet } from "@/components/shared/trip-compact";
+import type { DriverTripCardProps } from "@/components/shared/driver-trip-card";
+import { Switch } from "@/components/ui/switch";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { TruckDriverChip } from "@/components/shared/truck-driver-chip";
 import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks, useCarrierDrivers, useCarrierEscalations, useDriverMap, useBrokerMap, useTruckMap, truckActiveLoads } from "@/lib/selectors";
-import { LOAD_STATUS_CARRIER, isTransitStage, nextLoadStatus, nextStop } from "@/lib/load-status";
+import { isTransitStage } from "@/lib/load-status";
+import { PRE_TRIP_STAGES } from "@/lib/trip-state";
+import type { Driver, Load, Truck } from "@/lib/types";
 import { cn, formatCurrency, formatNumber, formatDate } from "@/lib/utils";
 
 export default function CarrierOverviewPage() {
@@ -34,6 +39,10 @@ export default function CarrierOverviewPage() {
   const routeEscalationToSupport = useStore((s) => s.actions.routeEscalationToSupport);
   const respondTimeOff = useStore((s) => s.actions.respondTimeOff);
   const pendingTimeOff = useStore((s) => s.timeOffRequests).filter((r) => r.carrierId === carrier.id && r.status === "pending");
+  const dvirs = useStore((s) => s.dvirInspections);
+  const setAutoChain = useStore((s) => s.actions.setAutoChain);
+  const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
+  const [openTruckId, setOpenTruckId] = useState<string | null>(null);
 
   const activeLoads = loads.filter((l) => l.stage !== "delivered");
   const netProfitMonth = loads.reduce((sum, l) => sum + (l.netProfit ?? 0), 0);
@@ -57,6 +66,31 @@ export default function CarrierOverviewPage() {
   const trucksWithOffers = new Set(offerGroups.map(([, group]) => group[0]?.truckId).filter(Boolean));
 
   const fleet = trucks.map((truck) => ({ truck, driver: driverMap.get(truck.driverId ?? ""), ...truckActiveLoads(loads, truck) }));
+  const openTrip = fleet.find((f) => f.truck.id === openTruckId);
+  const today = new Date().toDateString();
+
+  /** The same trip cards the driver sees, read-only: the driver's steps show who they're waiting on. */
+  function carrierTripProps(truck: Truck, driver: Driver | undefined, current: Load, next: Load | undefined, hasOffers: boolean): DriverTripCardProps {
+    const preTripDone = dvirs.some((d) => d.driverId === driver?.id && d.kind === "pre_trip" && new Date(d.createdAt).toDateString() === today);
+    return {
+      load: current,
+      viewer: "carrier",
+      driverName: driver?.name,
+      brokerName: brokers.get(current.brokerId)?.company,
+      truckCity: truck.currentCity,
+      truckState: truck.currentState,
+      needsPreTrip: !preTripDone && PRE_TRIP_STAGES.includes(current.stage),
+      upNext: next ? "chained" : hasOffers ? "choose" : "searching",
+      onCounter: (amount) => requestBetterRate(current.id, "carrier", amount),
+      // Driver-only actions: the carrier's cards never render the controls that would call these.
+      onCall: () => {},
+      onConfirm: () => {},
+      onTripStep: () => {},
+      onSeal: () => {},
+      onUpload: () => {},
+    };
+  }
+
   const onRoad = fleet.filter((f) => f.current && isTransitStage(f.current.stage)).length;
   const booking = fleet.filter((f) => f.current && !isTransitStage(f.current.stage)).length;
   const available = fleet.filter((f) => !f.current).length;
@@ -106,14 +140,21 @@ export default function CarrierOverviewPage() {
                 const truck = group[0]?.truckId ? truckMap.get(group[0].truckId) : undefined;
                 const driver = truck?.driverId ? driverMap.get(truck.driverId) : undefined;
                 return (
-                  <a key={groupId} href="#next-load" className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--accent-warn)]/40 bg-amber-50/70 p-4">
-                    <div className="min-w-0">
-                      {(truck || driver) && <TruckDriverChip truck={truck} driver={driver} className="mb-2 !bg-white/60" />}
-                      <p className="text-sm font-medium text-ink-900">Pick the next load</p>
-                      <p className="mt-0.5 text-xs text-ink-600">AI scored {group.length} option{group.length === 1 ? "" : "s"}. Your pick, then AI books it.</p>
+                  <div key={groupId} className="rounded-2xl border border-[var(--accent-warn)]/40 bg-amber-50/70 p-4">
+                    {(truck || driver) && <TruckDriverChip truck={truck} driver={driver} className="mb-2 !bg-white/60" />}
+                    <p className="text-sm font-medium text-ink-900">Pick the next load</p>
+                    <p className="mt-0.5 text-xs text-ink-600">AI found the top {group.length}. Your pick, then AI books it.</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <Button href="#next-load" size="sm" variant="primary">
+                        Choose <ArrowDown className="h-3.5 w-3.5" />
+                      </Button>
+                      {truck && (
+                        <Button size="sm" variant="outline" onClick={() => setAutoChain(truck.id, true)}>
+                          <Sparkles className="h-3.5 w-3.5" /> Let AI pick
+                        </Button>
+                      )}
                     </div>
-                    <ArrowDown className="h-4 w-4 shrink-0 text-ink-500" />
-                  </a>
+                  </div>
                 );
               })}
 
@@ -196,74 +237,48 @@ export default function CarrierOverviewPage() {
           </div>
         )}
 
-        <Card>
-          <CardHeader>
+        <section aria-labelledby="live-loads-title">
+          <div className="mb-3 flex items-end justify-between gap-3">
             <div>
-              <CardTitle>Live loads</CardTitle>
-              <p className="mt-1 text-xs text-ink-500">Where every truck is in the job, and who&apos;s on it.</p>
+              <h2 id="live-loads-title" className="text-sm font-semibold text-ink-950">Live loads</h2>
+              <p className="mt-0.5 text-xs text-ink-500">Tap a load for the full trip, the AI&apos;s log and the paperwork.</p>
             </div>
             <Button href="/carrier/fleet" variant="ghost" size="sm">
               View fleet <ArrowUpRight className="h-3.5 w-3.5" />
             </Button>
-          </CardHeader>
-          <CardContent className="!pt-2">
-            <div className="flex flex-col divide-y divide-line">
-              {fleet.map(({ truck, driver, current, next }) => {
-                const hasOffers = trucksWithOffers.has(truck.id);
-                const status = current ? LOAD_STATUS_CARRIER[current.stage] : undefined;
-                const stop = current ? nextStop(current) : undefined;
-                const href = current ? `/carrier/loads/${current.id}` : hasOffers ? "#next-load" : "/carrier/fleet";
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {fleet.map(({ truck, driver, current, next }) => {
+              const hasOffers = trucksWithOffers.has(truck.id);
+              if (!current) {
                 return (
-                  <Link
-                    key={truck.id}
-                    href={href}
-                    className="-mx-2 grid gap-3 rounded-xl px-2 py-4 transition-colors hover:bg-ink-50 sm:grid-cols-[minmax(0,1fr)_280px] sm:items-center"
-                  >
-                    <div className="flex min-w-0 items-start gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-ink-100 text-xs font-semibold text-ink-700">
-                        {truck.unitNumber.replace("T-", "")}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs text-ink-500">{truck.unitNumber} · {driver?.name ?? "Unassigned"}</p>
-                        {current ? (
-                          <p className="truncate text-sm font-medium text-ink-950">
-                            {current.lane.origin}, {current.lane.originState} <span className="text-ink-300">→</span> {current.lane.destination}, {current.lane.destState}
-                          </p>
-                        ) : (
-                          <p className="text-sm font-medium text-ink-950">Available in {truck.currentCity}, {truck.currentState}</p>
-                        )}
-                        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-ink-500">
-                          {status ? (
-                            <>
-                              <OwnerTag owner={status.owner} />
-                              <span className="text-ink-700">{status.text}</span>
-                              {stop && isTransitStage(current!.stage) && <span>· {stop.label} {stop.window}</span>}
-                            </>
-                          ) : hasOffers ? (
-                            <span className="font-medium text-[var(--accent-warn)]">Needs your pick for the next load</span>
-                          ) : (
-                            <>
-                              <OwnerTag owner="ai" />
-                              <span>Sourcing the next load</span>
-                            </>
-                          )}
-                        </p>
-                      </div>
+                  <div key={truck.id} className="flex flex-col justify-between gap-3 rounded-3xl border border-line bg-white p-4">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-400">{truck.unitNumber} · {driver?.name ?? "Unassigned"}</p>
+                      <p className="mt-0.5 text-lg font-semibold text-ink-950">Available in {truck.currentCity}, {truck.currentState}</p>
+                      <p className="mt-1 text-xs text-ink-500">
+                        {hasOffers ? "AI's top options are waiting for your pick." : "AI is sourcing the next load."}
+                      </p>
                     </div>
-                    {current && (
-                      <LoadJourney
-                        stage={current.stage}
-                        next={nextLoadStatus(next, hasOffers)}
-                        perspective="carrier"
-                        compact
-                      />
-                    )}
-                  </Link>
+                    <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
+                      <span className="text-xs font-medium text-ink-700">Auto-pick the next load</span>
+                      <Switch checked={!!truck.autoChainNextLoad} onChange={(on) => setAutoChain(truck.id, on)} label={`Auto-pick the next load for ${truck.unitNumber}`} />
+                    </div>
+                  </div>
                 );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+              }
+              return (
+                <TripCompactCard
+                  key={truck.id}
+                  {...carrierTripProps(truck, driver, current, next, hasOffers)}
+                  showMap={false}
+                  truckLabel={`${truck.unitNumber} · ${driver?.name ?? "Unassigned"}`}
+                  onOpen={() => setOpenTruckId(truck.id)}
+                />
+              );
+            })}
+          </div>
+        </section>
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Card>
@@ -330,6 +345,17 @@ export default function CarrierOverviewPage() {
           </Card>
         </div>
       </div>
+
+      {openTrip?.current && (
+        <TripSheet open onClose={() => setOpenTruckId(null)} title={`${openTrip.truck.unitNumber} · ${openTrip.driver?.name ?? "Unassigned"}`} wide>
+          <TripDetails
+            {...carrierTripProps(openTrip.truck, openTrip.driver, openTrip.current, openTrip.next, trucksWithOffers.has(openTrip.truck.id))}
+            autoPick={!!openTrip.truck.autoChainNextLoad}
+            onAutoPick={(on) => setAutoChain(openTrip.truck.id, on)}
+            loadHref={`/carrier/loads/${openTrip.current.id}`}
+          />
+        </TripSheet>
+      )}
     </div>
   );
 }
@@ -340,18 +366,5 @@ function BannerTile({ label, value }: { label: string; value: number }) {
       <p className="font-display text-xl tabular">{value}</p>
       <p className="text-[11px] text-white/50">{label}</p>
     </div>
-  );
-}
-
-function OwnerTag({ owner }: { owner: "ai" | "driver" }) {
-  return (
-    <span
-      className={cn(
-        "rounded-full px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide",
-        owner === "ai" ? "bg-ink-100 text-ink-600" : "bg-emerald-50 text-[var(--accent-live)]",
-      )}
-    >
-      {owner === "ai" ? "AI" : "Driver"}
-    </span>
   );
 }

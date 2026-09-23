@@ -75,6 +75,37 @@ function promoteChainedLoad(trucks: Truck[], truckId: string, carrierId: string)
   };
 }
 
+/** Auto-pick: take the AI's recommended option from a fresh offer batch and line it up for the truck, the
+ *  same as if the driver had tapped "Select this load" on it. */
+function autoPickOffer(loads: Load[], trucks: Truck[], offers: Load[], truckId: string): { loads: Load[]; trucks: Truck[]; events: ActivityEvent[] } {
+  const best = offers.find((o) => o.recommended) ?? offers.reduce((a, b) => (b.score > a.score ? b : a), offers[0]);
+  if (!best?.offerGroupId) return { loads, trucks, events: [] };
+  const resolved = resolveLoadOffer(loads, best.offerGroupId, best.id, "ai");
+  return {
+    loads: resolved.loads,
+    trucks: trucks.map((t) => (t.id === truckId && t.currentLoadId ? { ...t, nextLoadId: best.id } : t)),
+    events: resolved.events,
+  };
+}
+
+/** What the AI tells the broker and does in the background at each physical milestone — the calls, emails and
+ *  paperwork a human dispatcher would otherwise be making all day. */
+function aiMilestoneEvent(load: Load, brokerName: string): ActivityEvent | null {
+  const base = { id: uid("act"), timestamp: new Date().toISOString(), loadId: load.id, carrierId: load.carrierId };
+  switch (load.stage) {
+    case "at_pickup":
+      return { ...base, type: "check_call", channel: "email", message: `AI told ${brokerName} the driver checked in`, detail: `${load.referenceNumber} · detention clock running, 2 hrs free`, severity: "info" };
+    case "in_transit":
+      return { ...base, type: "document_captured", channel: "email", message: `AI sent the BOL to ${brokerName}`, detail: `${load.referenceNumber} · live tracking shared, ETA updates go out automatically`, severity: "success" };
+    case "at_delivery":
+      return { ...base, type: "check_call", channel: "email", message: `AI told ${brokerName} the driver is at the receiver`, detail: `${load.referenceNumber} · detention clock running, 2 hrs free`, severity: "info" };
+    case "delivered":
+      return { ...base, type: "document_captured", channel: "email", message: `AI emailed the POD and invoice to ${brokerName}`, detail: `${load.referenceNumber} · payment tracked until it lands`, severity: "success" };
+    default:
+      return null;
+  }
+}
+
 export type DriverDocType = "bol" | "pod" | "lumper_receipt";
 
 const DRIVER_DOC_LABEL: Record<DriverDocType, string> = { bol: "BOL", pod: "POD", lumper_receipt: "lumper receipt" };
@@ -198,6 +229,8 @@ interface StoreState {
     driverConfirmStage: (loadId: string) => void;
     /** Driver dismissed the "load complete" card — the truck's current (or next-to-pick) load takes over. */
     acknowledgeDelivery: (truckId: string) => void;
+    /** Auto-pick on/off for a truck. Turning it on also picks from any options already waiting. */
+    setAutoChain: (truckId: string, on: boolean) => void;
     /** Driver ticks off an on-site step at the stop they're at: loaded at pickup, unloaded at delivery. */
     confirmTripStep: (loadId: string, step: "loaded" | "unloaded") => void;
     setSealNumber: (loadId: string, sealNumber: string) => void;
@@ -466,7 +499,12 @@ export const useStore = create<StoreState>((set, get) => ({
             from: { city: truck.currentCity, state: truck.currentState },
           });
           loads = [...offers, ...loads];
-          newEvents.push({
+          if (truck.autoChainNextLoad) {
+            const picked = autoPickOffer(loads, trucks, offers, truck.id);
+            loads = picked.loads;
+            trucks = picked.trucks;
+            newEvents.push(...picked.events);
+          } else newEvents.push({
             id: uid("act"), timestamp: new Date().toISOString(), type: "load_offered",
             message: `AI found ${offers.length} ${truck.equipmentType.toLowerCase()} loads for ${truck.unitNumber}`, detail: `Scanned every connected board, awaiting ${driver ? driver.name.split(" ")[0] : "driver"}'s pick`,
             loadId: offers[0]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info",
@@ -488,7 +526,12 @@ export const useStore = create<StoreState>((set, get) => ({
               from: { city: currentLoad.lane.destination, state: currentLoad.lane.destState },
             });
             loads = [...offers, ...loads];
-            newEvents.push({
+            if (truck.autoChainNextLoad) {
+              const picked = autoPickOffer(loads, trucks, offers, truck.id);
+              loads = picked.loads;
+              trucks = picked.trucks;
+              newEvents.push(...picked.events);
+            } else newEvents.push({
               id: uid("act"), timestamp: new Date().toISOString(), type: "load_offered",
               message: `Next-load options ready for ${truck.unitNumber}`, detail: `Pre-negotiating before delivery, ${offers.length} options found`,
               loadId: offers[0]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info",
@@ -745,7 +788,8 @@ export const useStore = create<StoreState>((set, get) => ({
         const result = confirmLoadStage(load, truck);
         if (result.load === load) return {};
         let trucks = state.trucks;
-        let events = result.events;
+        const aiEvent = aiMilestoneEvent(result.load, state.brokers.find((b) => b.id === load.brokerId)?.company ?? "the broker");
+        let events = aiEvent ? [...result.events, aiEvent] : result.events;
         if (result.truckUpdates) {
           const tu = result.truckUpdates;
           trucks = trucks.map((t) => (t.id === tu.id ? { ...t, ...tu } : t));
@@ -767,6 +811,21 @@ export const useStore = create<StoreState>((set, get) => ({
       set((state) => ({
         trucks: state.trucks.map((t) => (t.id === truckId ? { ...t, lastDeliveredLoadId: null } : t)),
       })),
+
+    setAutoChain: (truckId, on) =>
+      set((state) => {
+        let trucks = state.trucks.map((t) => (t.id === truckId ? { ...t, autoChainNextLoad: on } : t));
+        let loads = state.loads;
+        let events: ActivityEvent[] = [];
+        const waiting = on ? loads.filter((l) => l.truckId === truckId && l.stage === "offered") : [];
+        if (waiting.length) {
+          const picked = autoPickOffer(loads, trucks, waiting, truckId);
+          loads = picked.loads;
+          trucks = picked.trucks;
+          events = picked.events;
+        }
+        return { trucks, loads, activity: [...events, ...state.activity].slice(0, 80) };
+      }),
 
     confirmTripStep: (loadId, step) =>
       set((state) => {

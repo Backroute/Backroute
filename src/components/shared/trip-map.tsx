@@ -7,6 +7,9 @@ import type { LatLng } from "@/lib/trip-geo";
 
 /** Extra room up top for the phase chip that floats over the map, and at the bottom for the fade. */
 const PADDING = { top: 60, bottom: 44, left: 36, right: 36 };
+/** A short strip (the compact card) can't afford the big card's padding — MapLibre gives up on fitting a route
+ *  when the padding is taller than the map and falls back to the whole world. */
+const COMPACT_PADDING = { top: 34, bottom: 14, left: 28, right: 28 };
 
 /** OpenFreeMap: free vector tiles with no API key, no usage limits and commercial use allowed. */
 const STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
@@ -107,6 +110,7 @@ export function TripMap({
   laneKey,
   progress,
   showTruck,
+  compact,
   className,
 }: {
   from: LatLng;
@@ -115,6 +119,7 @@ export function TripMap({
   laneKey?: string;
   progress: number;
   showTruck: boolean;
+  compact?: boolean;
   className?: string;
 }) {
   const el = useRef<HTMLDivElement>(null);
@@ -137,13 +142,14 @@ export function TripMap({
       if (cancelled || !el.current) return;
       // Bundling breaks MapLibre's own worker lookup; load the worker matching this exact library version.
       ml.setWorkerUrl(`https://cdn.jsdelivr.net/npm/maplibre-gl@${ml.getVersion()}/dist/maplibre-gl-worker.mjs`);
+      const padding = compact ? COMPACT_PADDING : PADDING;
       let map: MapLibreMap;
       try {
         map = new ml.Map({
           container: el.current,
           style: STYLE_URL,
           bounds: new ml.LngLatBounds(lngLat(a), lngLat(a)).extend(lngLat(b)),
-          fitBoundsOptions: { padding: PADDING },
+          fitBoundsOptions: { padding },
           interactive: false,
           attributionControl: false,
           fadeDuration: 0,
@@ -172,7 +178,7 @@ export function TripMap({
         });
       }
       const bounds = path.reduce((acc, p) => acc.extend(lngLat(p)), new ml.LngLatBounds(lngLat(path[0]), lngLat(path[0])));
-      map.fitBounds(bounds, { padding: PADDING, duration: 0 });
+      map.fitBounds(bounds, { padding, duration: 0 });
       state.current.path = path;
       drawProgress(state.current, latest.current.progress, latest.current.showTruck);
     })();
@@ -181,7 +187,7 @@ export function TripMap({
       state.current.map?.remove();
       state.current = {};
     };
-  }, [fromKey, toKey, laneKey]);
+  }, [fromKey, toKey, laneKey, compact]);
 
   // MapLibre's own (unlayered) CSS forces `position: relative` on the element it mounts into, so that element
   // fills an absolutely positioned wrapper rather than being positioned itself.

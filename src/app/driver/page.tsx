@@ -6,17 +6,17 @@ import { ArrowDown, ArrowUpRight, ClipboardCheck, LifeBuoy, Link2, MapPin, Phone
 import { Badge } from "@/components/ui/badge";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
-import { DriverTripCard, DriverTripCompleteCard } from "@/components/shared/driver-trip-card";
+import { DriverTripCompleteCard, type DriverTripCardProps } from "@/components/shared/driver-trip-card";
+import { TripCompactCard, TripDetails, TripSheet } from "@/components/shared/trip-compact";
+import { Switch } from "@/components/ui/switch";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap, truckActiveLoads } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { STAGE_CONFIRM } from "@/lib/stage-confirm";
-import type { LoadStage } from "@/lib/types";
+import { PRE_TRIP_STAGES } from "@/lib/trip-state";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 
-/** Stages where the truck hasn't rolled with freight yet — the window where a pre-trip DVIR is still due. */
-const PRE_TRIP_STAGES: LoadStage[] = ["rate_confirmed", "booked", "dispatched", "at_pickup"];
 
 export default function DriverHomePage() {
   const driver = usePrimaryDriver();
@@ -34,7 +34,9 @@ export default function DriverHomePage() {
   const confirmTripStep = useStore((s) => s.actions.confirmTripStep);
   const setSealNumber = useStore((s) => s.actions.setSealNumber);
   const uploadLoadDocument = useStore((s) => s.actions.uploadLoadDocument);
+  const setAutoChain = useStore((s) => s.actions.setAutoChain);
   const [calling, setCalling] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const truck = trucks.find((t) => t.id === driver.truckId);
   const { current: currentLoad, next: nextLoad } = truckActiveLoads(loads, truck);
@@ -50,11 +52,36 @@ export default function DriverHomePage() {
   })();
   const hasOffers = offerGroups.length > 0;
 
-  const dvirDoneToday = dvirInspections.some((d) => new Date(d.createdAt).toDateString() === new Date().toDateString());
+  const today = new Date().toDateString();
+  const dvirDoneToday = dvirInspections.some((d) => d.kind === "pre_trip" && new Date(d.createdAt).toDateString() === today);
+  const postTripDoneToday = dvirInspections.some((d) => d.kind === "post_trip" && new Date(d.createdAt).toDateString() === today);
   const needsPreTrip = !!currentLoad && !dvirDoneToday && PRE_TRIP_STAGES.includes(currentLoad.stage);
   const completedLoad = truck?.lastDeliveredLoadId ? loads.find((l) => l.id === truck.lastDeliveredLoadId) : undefined;
   const hasStageAction = !completedLoad && !!currentLoad && !!STAGE_CONFIRM[currentLoad.stage];
   const todoCount = Number(hasStageAction) + Number(hasOffers) + Number(!completedLoad && needsPreTrip) + incidents.length;
+
+  const autoPick = !!truck?.autoChainNextLoad;
+  const toggleAutoPick = (on: boolean) => truck && setAutoChain(truck.id, on);
+  const tripProps: DriverTripCardProps | null = currentLoad
+    ? {
+        load: currentLoad,
+        brokerName: brokers.get(currentLoad.brokerId)?.company,
+        truckCity: truck?.currentCity,
+        truckState: truck?.currentState,
+        needsPreTrip,
+        upNext: nextLoad ? "chained" : hasOffers ? "choose" : "searching",
+        onCall: () => setCalling(true),
+        onConfirm: (loadId) => {
+          // Completing the delivery swaps in the "load complete" card — close the sheet so it's seen.
+          if (currentLoad.stage === "at_delivery") setSheetOpen(false);
+          driverConfirmStage(loadId);
+        },
+        onCounter: (amount) => requestBetterRate(currentLoad.id, "driver", amount),
+        onTripStep: confirmTripStep,
+        onSeal: setSealNumber,
+        onUpload: uploadLoadDocument,
+      }
+    : null;
 
   const weekLoads = loads.filter((l) => l.truckId === truck?.id);
   const weekMiles = weekLoads.reduce((s, l) => s + l.lane.miles, 0);
@@ -109,23 +136,18 @@ export default function DriverHomePage() {
           brokerName={brokers.get(completedLoad.brokerId)?.company}
           nextLoad={currentLoad}
           offersCount={pendingOffers.length}
+          postTripDone={postTripDoneToday}
+          autoPick={autoPick}
+          onAutoPick={toggleAutoPick}
           onContinue={() => acknowledgeDelivery(truck.id)}
         />
-      ) : currentLoad ? (
-        <DriverTripCard
-          load={currentLoad}
-          brokerName={brokers.get(currentLoad.brokerId)?.company}
-          truckCity={truck?.currentCity}
-          truckState={truck?.currentState}
-          needsPreTrip={needsPreTrip}
-          upNext={nextLoad ? "chained" : hasOffers ? "choose" : "searching"}
-          onCall={() => setCalling(true)}
-          onConfirm={driverConfirmStage}
-          onCounter={(amount) => requestBetterRate(currentLoad.id, "driver", amount)}
-          onTripStep={confirmTripStep}
-          onSeal={setSealNumber}
-          onUpload={uploadLoadDocument}
-        />
+      ) : tripProps ? (
+        <>
+          <TripCompactCard {...tripProps} onOpen={() => setSheetOpen(true)} />
+          <TripSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Trip details">
+            <TripDetails {...tripProps} autoPick={autoPick} onAutoPick={toggleAutoPick} loadHref={`/driver/loads/${tripProps.load.id}`} />
+          </TripSheet>
+        </>
       ) : (
         <div className="flex flex-col items-center gap-3 rounded-3xl border border-line p-6 text-center">
           {hasOffers ? (
@@ -174,6 +196,13 @@ export default function DriverHomePage() {
 
       {hasOffers && (
         <div id="next-load" className="scroll-mt-4">
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-ink-950">Let the AI pick for me</p>
+              <p className="text-xs text-ink-500">Books the best-scoring option now and every time after.</p>
+            </div>
+            <Switch checked={autoPick} onChange={toggleAutoPick} label="Let the AI pick my next load" />
+          </div>
           <NextLoadOffers
             offerGroups={offerGroups}
             brokers={brokers}
@@ -211,10 +240,10 @@ export default function DriverHomePage() {
       {truck && (
         <Link href="/driver/inspection" className="flex items-center justify-between rounded-2xl border border-line px-4 py-3.5 text-sm text-ink-700">
           <span className="flex items-center gap-2">
-            <ClipboardCheck className="h-4 w-4 text-ink-400" /> Vehicle inspection (DVIR)
+            <ClipboardCheck className="h-4 w-4 text-ink-400" /> Inspections today
           </span>
-          <span className="flex items-center gap-1 text-ink-950">
-            {dvirDoneToday ? "Done today" : "Start"} <ArrowUpRight className="h-3.5 w-3.5" />
+          <span className="flex items-center gap-1 text-xs text-ink-950">
+            Pre-trip {dvirDoneToday ? "✓" : "due"} · Post-trip {postTripDoneToday ? "✓" : "end of day"} <ArrowUpRight className="h-3.5 w-3.5" />
           </span>
         </Link>
       )}
