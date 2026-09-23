@@ -452,14 +452,18 @@ export function confirmLoadStage(load: Load, truck: Truck | undefined): StepResu
   if (nextStage === "at_pickup") {
     events.push(mkEvent(load.carrierId, load.id, "check_call", "Driver confirmed arrival at pickup", `${load.lane.origin}, ${load.lane.originState}`, "info"));
   } else if (nextStage === "in_transit") {
-    next.documents = [...load.documents, { id: uid("doc"), type: "bol", name: `BOL_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" }];
+    // A BOL the driver already uploaded from the pickup checklist is the real one; only stand one in otherwise.
+    if (!load.documents.some((d) => d.type === "bol")) {
+      next.documents = [...load.documents, { id: uid("doc"), type: "bol", name: `BOL_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" }];
+    }
     events.push(mkEvent(load.carrierId, load.id, "document_captured", "Driver confirmed loaded, BOL captured", `Loaded ${load.weight.toLocaleString()} lbs · departing ${load.lane.origin}`, "success"));
   } else if (nextStage === "at_delivery") {
     events.push(mkEvent(load.carrierId, load.id, "check_call", "Driver confirmed arrival at delivery", `${load.lane.destination}, ${load.lane.destState}`, "info"));
   } else if (nextStage === "delivered") {
+    const hasPod = load.documents.some((d) => d.type === "pod");
     next.documents = [
       ...load.documents,
-      { id: uid("doc"), type: "pod", name: `POD_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" },
+      ...(hasPod ? [] : [{ id: uid("doc"), type: "pod" as const, name: `POD_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" as const }]),
       { id: uid("doc"), type: "invoice", name: `Invoice_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" },
     ];
     events.push(mkEvent(load.carrierId, load.id, "delivered", "Driver confirmed delivery, POD captured, invoice generated", `${load.referenceNumber} · net $${(load.netProfit ?? 0).toLocaleString()}`, "success"));

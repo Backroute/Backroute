@@ -39,6 +39,7 @@ import type {
   Incident,
   IncidentType,
   Load,
+  LoadDocument,
   MaintenanceAppointment,
   Truck,
   VoiceCall,
@@ -72,6 +73,21 @@ function promoteChainedLoad(trucks: Truck[], truckId: string, carrierId: string)
       loadId: chainedId, carrierId, severity: "success",
     },
   };
+}
+
+export type DriverDocType = "bol" | "pod" | "lumper_receipt";
+
+const DRIVER_DOC_LABEL: Record<DriverDocType, string> = { bol: "BOL", pod: "POD", lumper_receipt: "lumper receipt" };
+
+/** What the AI "reads" off a driver's document photo — the details a dispatcher would otherwise check by hand. */
+function readDriverDocument(load: Load, type: DriverDocType): { note: string; lumperAmount?: number } {
+  if (type === "bol") {
+    const seal = load.tripChecklist?.sealNumber ? ` · seal ${load.tripChecklist.sealNumber}` : "";
+    return { note: `${randInt(18, 26)} pallets · ${load.weight.toLocaleString()} lbs${seal}. Shipper signed, matches the rate con.` };
+  }
+  if (type === "pod") return { note: "Signed by the receiver, no shortages or damage noted." };
+  const amount = randInt(85, 240);
+  return { note: `$${amount} lumper fee. Sent for reimbursement.`, lumperAmount: amount };
 }
 
 export type Aggressiveness = "conservative" | "balanced" | "aggressive";
@@ -182,6 +198,12 @@ interface StoreState {
     driverConfirmStage: (loadId: string) => void;
     /** Driver dismissed the "load complete" card — the truck's current (or next-to-pick) load takes over. */
     acknowledgeDelivery: (truckId: string) => void;
+    /** Driver ticks off an on-site step at the stop they're at: loaded at pickup, unloaded at delivery. */
+    confirmTripStep: (loadId: string, step: "loaded" | "unloaded") => void;
+    setSealNumber: (loadId: string, sealNumber: string) => void;
+    /** Driver photographs a document at the stop; a moment later the AI has read it and marks it verified
+     *  (and for a lumper receipt, files the reimbursement itself). Re-uploading replaces the previous one. */
+    uploadLoadDocument: (loadId: string, type: DriverDocType, file: { name: string; previewUrl?: string }) => void;
     recaptureDocument: (loadId: string, type: "bol" | "pod") => void;
     selectLoadOffer: (offerGroupId: string, loadId: string, actor: "driver" | "carrier") => void;
     reportIncident: (driverId: string, truckId: string, type: IncidentType, note: string) => void;
@@ -745,6 +767,81 @@ export const useStore = create<StoreState>((set, get) => ({
       set((state) => ({
         trucks: state.trucks.map((t) => (t.id === truckId ? { ...t, lastDeliveredLoadId: null } : t)),
       })),
+
+    confirmTripStep: (loadId, step) =>
+      set((state) => {
+        const load = state.loads.find((l) => l.id === loadId);
+        if (!load) return {};
+        const now = new Date().toISOString();
+        const checklist = step === "loaded" ? { ...load.tripChecklist, loadedAt: now } : { ...load.tripChecklist, unloadedAt: now };
+        const where = step === "loaded" ? `${load.lane.origin}, ${load.lane.originState}` : `${load.lane.destination}, ${load.lane.destState}`;
+        return {
+          loads: state.loads.map((l) => (l.id === loadId ? { ...l, tripChecklist: checklist } : l)),
+          activity: [
+            {
+              id: uid("act"), timestamp: now, type: "check_call" as const,
+              message: step === "loaded" ? "Driver confirmed loaded" : "Driver confirmed unloaded",
+              detail: `${load.referenceNumber} · ${where}`, loadId, carrierId: load.carrierId, severity: "info" as const,
+            },
+            ...state.activity,
+          ].slice(0, 80),
+        };
+      }),
+
+    setSealNumber: (loadId, sealNumber) =>
+      set((state) => ({
+        loads: state.loads.map((l) => (l.id === loadId ? { ...l, tripChecklist: { ...l.tripChecklist, sealNumber: sealNumber.trim() || undefined } } : l)),
+      })),
+
+    uploadLoadDocument: (loadId, type, file) => {
+      const docId = uid("doc");
+      set((state) => {
+        const load = state.loads.find((l) => l.id === loadId);
+        if (!load) return {};
+        const replaced = load.documents.find((d) => d.type === type);
+        if (replaced?.previewUrl) URL.revokeObjectURL(replaced.previewUrl);
+        const now = new Date().toISOString();
+        const doc: LoadDocument = { id: docId, type, name: file.name, generatedAt: now, status: "pending", uploadedBy: "driver", previewUrl: file.previewUrl };
+        return {
+          loads: state.loads.map((l) => (l.id === loadId ? { ...l, documents: [...l.documents.filter((d) => d.type !== type), doc] } : l)),
+          activity: [
+            {
+              id: uid("act"), timestamp: now, type: "document_captured" as const,
+              message: `Driver uploaded the ${DRIVER_DOC_LABEL[type]}`, detail: `${load.referenceNumber} · AI is reading it`,
+              loadId, carrierId: load.carrierId, severity: "info" as const,
+            },
+            ...state.activity,
+          ].slice(0, 80),
+        };
+      });
+      setTimeout(() => {
+        set((state) => {
+          const load = state.loads.find((l) => l.id === loadId);
+          if (!load?.documents.some((d) => d.id === docId)) return {};
+          const { note, lumperAmount } = readDriverDocument(load, type);
+          const now = new Date().toISOString();
+          const driverId = state.trucks.find((t) => t.id === load.truckId)?.driverId;
+          const expense: Expense | null =
+            lumperAmount && driverId
+              ? { id: uid("exp"), driverId, carrierId: load.carrierId, loadId, category: "lumper", amount: lumperAmount, note: "Lumper receipt, read by AI", status: "pending", createdAt: now }
+              : null;
+          return {
+            loads: state.loads.map((l) =>
+              l.id === loadId ? { ...l, documents: l.documents.map((d) => (d.id === docId ? { ...d, status: "verified" as const, aiNote: note } : d)) } : l,
+            ),
+            expenses: expense ? [expense, ...state.expenses] : state.expenses,
+            activity: [
+              {
+                id: uid("act"), timestamp: now, type: "document_captured" as const,
+                message: `AI checked the ${DRIVER_DOC_LABEL[type]}`, detail: `${load.referenceNumber} · ${note}`,
+                loadId, carrierId: load.carrierId, severity: "success" as const,
+              },
+              ...state.activity,
+            ].slice(0, 80),
+          };
+        });
+      }, 1400);
+    },
 
     recaptureDocument: (loadId, type) =>
       set((state) => {

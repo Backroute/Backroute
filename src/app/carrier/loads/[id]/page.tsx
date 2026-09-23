@@ -227,7 +227,8 @@ export default function LoadDetailPage() {
                           </span>
                           <div>
                             <p className="text-sm font-medium text-ink-900">{doc.name}</p>
-                            <p className="text-xs text-ink-400">{formatDateTime(doc.generatedAt)}</p>
+                            <p className="text-xs text-ink-400">{doc.uploadedBy === "driver" ? "Uploaded by driver · " : ""}{formatDateTime(doc.generatedAt)}</p>
+                            {doc.aiNote && <p className="mt-0.5 text-xs text-[var(--accent-live)]">AI checked: {doc.aiNote}</p>}
                           </div>
                         </div>
                         <Badge tone={doc.status === "verified" ? "success" : "warning"}>{doc.status}</Badge>

@@ -11,7 +11,6 @@ import { TripStepper } from "@/components/shared/trip-stepper";
 import { StopsTimeline } from "@/components/shared/stops-timeline";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
-import { StageConfirmButton } from "@/components/shared/stage-confirm-button";
 import { useLoad, useCarrierTrucks, usePrimaryDriver } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { STAGE_CONFIRM } from "@/lib/stage-confirm";
@@ -63,7 +62,6 @@ export default function DriverLoadDetailPage() {
   const driver = usePrimaryDriver();
   const trucks = useCarrierTrucks();
   const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
-  const driverConfirmStage = useStore((s) => s.actions.driverConfirmStage);
   const recaptureDocument = useStore((s) => s.actions.recaptureDocument);
   const completeLoadStop = useStore((s) => s.actions.completeLoadStop);
   const submitExpense = useStore((s) => s.actions.submitExpense);
@@ -144,7 +142,11 @@ export default function DriverLoadDetailPage() {
             {load.stage === "negotiating" && (
               <CounterOfferButton load={load} onSubmit={(amount) => requestBetterRate(load.id, "driver", amount)} variant="dark" />
             )}
-            <StageConfirmButton loadId={load.id} stage={load.stage} onConfirm={driverConfirmStage} />
+            {step && (
+              <Link href="/driver" className="flex items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-semibold text-ink-950">
+                Continue on your trip card
+              </Link>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <Link href="/driver/messages" className="flex items-center justify-center gap-2 rounded-full border border-white/25 py-3 text-sm font-medium text-white">
                 <MessageCircle className="h-4 w-4" /> Message AI
@@ -269,7 +271,8 @@ export default function DriverLoadDetailPage() {
                 </span>
                 <div>
                   <p className="text-xs font-medium text-ink-900">{doc.name}</p>
-                  <p className="text-[11px] text-ink-400">{formatDateTime(doc.generatedAt)}</p>
+                  <p className="text-[11px] text-ink-400">{doc.uploadedBy === "driver" ? "Uploaded by you · " : ""}{formatDateTime(doc.generatedAt)}</p>
+                  {doc.aiNote && <p className="mt-0.5 text-[11px] text-[var(--accent-live)]">AI checked: {doc.aiNote}</p>}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -297,7 +300,7 @@ export default function DriverLoadDetailPage() {
                 <div>
                   <p className="text-xs font-medium text-ink-700">{pendingDocLabel(pendingType)}</p>
                   <p className="text-[11px] text-ink-400">
-                    {isCurrent ? "Captured when you confirm above." : "Captured once this load reaches that stage."}
+                    {isCurrent ? "Upload it from your trip card on Home." : "Captured once this load reaches that stage."}
                   </p>
                 </div>
               </div>

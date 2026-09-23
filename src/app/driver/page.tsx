@@ -31,6 +31,9 @@ export default function DriverHomePage() {
   const resolveOfferDetail = useStore((s) => s.actions.resolveOfferDetail);
   const driverConfirmStage = useStore((s) => s.actions.driverConfirmStage);
   const acknowledgeDelivery = useStore((s) => s.actions.acknowledgeDelivery);
+  const confirmTripStep = useStore((s) => s.actions.confirmTripStep);
+  const setSealNumber = useStore((s) => s.actions.setSealNumber);
+  const uploadLoadDocument = useStore((s) => s.actions.uploadLoadDocument);
   const [calling, setCalling] = useState(false);
 
   const truck = trucks.find((t) => t.id === driver.truckId);
@@ -119,6 +122,9 @@ export default function DriverHomePage() {
           onCall={() => setCalling(true)}
           onConfirm={driverConfirmStage}
           onCounter={(amount) => requestBetterRate(currentLoad.id, "driver", amount)}
+          onTripStep={confirmTripStep}
+          onSeal={setSealNumber}
+          onUpload={uploadLoadDocument}
         />
       ) : (
         <div className="flex flex-col items-center gap-3 rounded-3xl border border-line p-6 text-center">

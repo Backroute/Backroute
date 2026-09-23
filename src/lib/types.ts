@@ -247,10 +247,23 @@ export interface VoiceCall {
 
 export interface LoadDocument {
   id: string;
-  type: "rate_confirmation" | "bol" | "pod" | "invoice";
+  type: "rate_confirmation" | "bol" | "pod" | "invoice" | "lumper_receipt";
   name: string;
   generatedAt: string;
+  /** "pending" while the AI is still reading a driver upload. */
   status: "pending" | "verified";
+  uploadedBy?: "driver";
+  /** In-session preview of the driver's photo (an object URL, so it doesn't survive a reload). */
+  previewUrl?: string;
+  /** What the AI pulled out of the document when it checked it. */
+  aiNote?: string;
+}
+
+/** The driver's on-site checklist for the stop they're at — what they've confirmed and when. */
+export interface TripChecklist {
+  loadedAt?: string;
+  unloadedAt?: string;
+  sealNumber?: string;
 }
 
 export interface Load {
@@ -280,6 +293,7 @@ export interface Load {
   messages: NegotiationMessage[];
   calls: VoiceCall[];
   documents: LoadDocument[];
+  tripChecklist?: TripChecklist;
   createdAt: string;
   updatedAt: string;
   isChained: boolean;

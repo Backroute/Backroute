@@ -14,9 +14,12 @@ export function SwipeToConfirm({
   label,
   busyLabel,
   delayMs = 0,
+  disabledLabel,
   onConfirm,
 }: {
   label: string;
+  /** When set, the bar is locked and shows this instead — e.g. what still has to happen first. */
+  disabledLabel?: string;
   /** Shown while the confirmation "works" (e.g. capturing a document photo) before `onConfirm` fires. */
   busyLabel?: string;
   delayMs?: number;
@@ -58,6 +61,18 @@ export function SwipeToConfirm({
   }
 
   const fill = max ? x / max : 0;
+  const locked = !!disabledLabel;
+
+  if (locked) {
+    return (
+      <div ref={track} className="relative flex h-[60px] select-none items-center justify-center rounded-full border border-white/15 px-16 text-center text-sm font-medium text-white/55">
+        <span aria-hidden className="absolute top-1 flex items-center justify-center rounded-full bg-white/10 text-white/40" style={{ left: PAD, width: KNOB, height: KNOB }}>
+          <ChevronsRight className="h-6 w-6" />
+        </span>
+        {disabledLabel}
+      </div>
+    );
+  }
 
   return (
     <div ref={track} className="relative h-[60px] select-none overflow-hidden rounded-full bg-white">
