@@ -1,5 +1,6 @@
 "use client";
 
+import "maplibre-gl/dist/maplibre-gl.css";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, MessageCircle, Truck, User } from "lucide-react";

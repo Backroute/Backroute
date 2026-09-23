@@ -13,6 +13,7 @@ import {
   createSourcedLoad,
   draftOfferAsk,
   incidentOpenedEvent,
+  pickLaneNear,
   pushForBetterRate,
   resolveLoadOffer,
   resolveOfferAsk,
@@ -440,6 +441,7 @@ export const useStore = create<StoreState>((set, get) => ({
             excludeTiers,
             homeTimeTarget: driver?.homeTimeTarget,
             equipmentType: truck.equipmentType,
+            from: { city: truck.currentCity, state: truck.currentState },
           });
           loads = [...offers, ...loads];
           newEvents.push({
@@ -461,6 +463,7 @@ export const useStore = create<StoreState>((set, get) => ({
               excludeTiers,
               homeTimeTarget: driver?.homeTimeTarget,
               equipmentType: truck.equipmentType,
+              from: { city: currentLoad.lane.destination, state: currentLoad.lane.destState },
             });
             loads = [...offers, ...loads];
             newEvents.push({
@@ -529,7 +532,10 @@ export const useStore = create<StoreState>((set, get) => ({
           }
 
           if (effectiveTruck && shouldChainNextLoad(result.load, effectiveTruck)) {
-            const chained = createSourcedLoad(state.brokers, PRIMARY_CARRIER_ID, state.tickCount + 1, effectiveTruck.id, true, excludeTiers, effectiveTruck.equipmentType);
+            const chained = createSourcedLoad(
+              state.brokers, PRIMARY_CARRIER_ID, state.tickCount + 1, effectiveTruck.id, true, excludeTiers, effectiveTruck.equipmentType,
+              pickLaneNear({ city: result.load.lane.destination, state: result.load.lane.destState }),
+            );
             loads = [chained, ...loads];
             trucks = trucks.map((t) => (t.id === effectiveTruck!.id ? { ...t, nextLoadId: chained.id } : t));
             newEvents.push({
@@ -1002,9 +1008,11 @@ export const useStore = create<StoreState>((set, get) => ({
         const truck = state.trucks.find((t) => t.id === "truck-marcus");
         if (!truck || truck.nextLoadId || !truck.currentLoadId) return {};
         const driver = state.drivers.find((d) => d.id === truck.driverId);
+        const currentLoad = state.loads.find((l) => l.id === truck.currentLoadId);
         const offers = createLoadOfferBatch(state.brokers, PRIMARY_CARRIER_ID, truck.id, state.tickCount, true, state.settings.offersPerTruck, {
           homeTimeTarget: driver?.homeTimeTarget,
           equipmentType: truck.equipmentType,
+          from: currentLoad ? { city: currentLoad.lane.destination, state: currentLoad.lane.destState } : undefined,
         });
         return {
           loads: [...offers, ...state.loads],

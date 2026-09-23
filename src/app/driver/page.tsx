@@ -112,6 +112,8 @@ export default function DriverHomePage() {
         <DriverTripCard
           load={currentLoad}
           brokerName={brokers.get(currentLoad.brokerId)?.company}
+          truckCity={truck?.currentCity}
+          truckState={truck?.currentState}
           needsPreTrip={needsPreTrip}
           upNext={nextLoad ? "chained" : hasOffers ? "choose" : "searching"}
           onCall={() => setCalling(true)}

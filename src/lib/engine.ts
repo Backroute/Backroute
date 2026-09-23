@@ -1,5 +1,6 @@
 import { EQUIPMENT, LANES } from "./mock-data";
 import { computeEconomics, computeLoadScore } from "./scoring";
+import { cityCoords, distanceMiles } from "./trip-geo";
 import type {
   ActivityEvent,
   ActivityType,
@@ -8,6 +9,7 @@ import type {
   EquipmentType,
   Incident,
   IncidentType,
+  Lane,
   Load,
   LoadStage,
   NegotiationMessage,
@@ -31,6 +33,35 @@ function pickBroker(brokers: Broker[], excludeTiers: Broker["tier"][] = []): Bro
   return pick(pool.length ? pool : brokers);
 }
 
+/** Where a truck will be empty and ready for its next pickup. */
+export interface TruckOrigin {
+  city: string;
+  state: string;
+}
+
+export interface LanePlacement {
+  lane: Lane;
+  deadheadMiles: number;
+}
+
+/** Every lane ranked by how far its pickup is from `from`, with the real (road-adjusted) deadhead to reach it —
+ *  the dispatcher's first question is always "what's loading near where this truck empties out?". */
+function lanesNear(from: TruckOrigin | undefined): LanePlacement[] | null {
+  const at = from ? cityCoords(from.city, from.state) : undefined;
+  if (!at) return null;
+  return LANES.map((lane) => {
+    const origin = cityCoords(lane.origin, lane.originState);
+    const miles = origin ? distanceMiles(at, origin) * 1.18 : Infinity;
+    return { lane, deadheadMiles: miles < 15 ? randInt(3, 25) : Math.round(miles) };
+  }).sort((a, b) => a.deadheadMiles - b.deadheadMiles);
+}
+
+/** One of the two lanes loading closest to `from`, or undefined when the location isn't known. */
+export function pickLaneNear(from: TruckOrigin | undefined): LanePlacement | undefined {
+  const ranked = lanesNear(from);
+  return ranked ? pick(ranked.slice(0, 2)) : undefined;
+}
+
 export function createSourcedLoad(
   brokers: Broker[],
   carrierId: string,
@@ -39,13 +70,14 @@ export function createSourcedLoad(
   isChained: boolean,
   excludeTiers: Broker["tier"][] = [],
   equipmentType?: EquipmentType,
+  placement?: LanePlacement,
 ): Load {
   const broker = pickBroker(brokers, excludeTiers);
-  const lane = pick(LANES);
+  const lane = placement?.lane ?? pick(LANES);
   const marketRate = lane.miles * lane.marketRpm;
   const listedRate = Math.round(marketRate * (0.86 + Math.random() * 0.1));
   const targetRate = Math.round(marketRate * (0.98 + Math.random() * 0.07));
-  const deadheadMiles = randInt(0, 85);
+  const deadheadMiles = placement?.deadheadMiles ?? randInt(0, 85);
   const { fuelCost, tollCost } = costsForLane(lane.miles, deadheadMiles);
   const now = new Date().toISOString();
 
@@ -98,6 +130,8 @@ export function createSourcedLoad(
 
 export interface OfferOptions {
   excludeTiers?: Broker["tier"][];
+  /** Where the truck will be free — offers are sourced from the lanes loading nearest to it. */
+  from?: TruckOrigin;
   homeTimeTarget?: string;
   equipmentType?: EquipmentType;
 }
@@ -115,8 +149,9 @@ export function createLoadOfferBatch(
   const wantsHomeTime = !!opts.homeTimeTarget && opts.homeTimeTarget !== "No preference set";
   const homeFitIndex = wantsHomeTime ? randInt(0, count - 1) : -1;
 
+  const nearest = lanesNear(opts.from)?.slice(0, count);
   const candidates = Array.from({ length: count }, (_, i) => {
-    const base = createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType);
+    const base = createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType, nearest?.[i]);
     const { netProfit, rpm } = computeEconomics(base.targetRate, base.lane.miles, base.deadheadMiles, base.fuelCost, base.tollCost);
     return {
       ...base,
@@ -430,7 +465,10 @@ export function confirmLoadStage(load: Load, truck: Truck | undefined): StepResu
     events.push(mkEvent(load.carrierId, load.id, "delivered", "Driver confirmed delivery, POD captured, invoice generated", `${load.referenceNumber} · net $${(load.netProfit ?? 0).toLocaleString()}`, "success"));
   }
 
-  const truckUpdates = nextStage === "delivered" && truck ? { id: truck.id, status: "available" as const, currentLoadId: null } : undefined;
+  const truckUpdates =
+    nextStage === "delivered" && truck
+      ? { id: truck.id, status: "available" as const, currentLoadId: null, currentCity: load.lane.destination, currentState: load.lane.destState }
+      : undefined;
   return { load: next, events, truckUpdates };
 }
 

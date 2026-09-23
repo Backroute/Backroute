@@ -132,6 +132,22 @@ body {
   }
 }
 
+/* Map attribution sits on the dark trip map — keep the required credit, just quieter. MapLibre's own
+   stylesheet loads after this one, so these carry the extra .maplibregl-map scope to win. */
+.maplibregl-map .maplibregl-ctrl-attrib,
+.maplibregl-map .maplibregl-ctrl-attrib.maplibregl-compact {
+  background-color: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 10px;
+}
+.maplibregl-map .maplibregl-ctrl-attrib a {
+  color: rgba(255, 255, 255, 0.8);
+}
+.maplibregl-map .maplibregl-ctrl-attrib-button {
+  background-color: transparent;
+  filter: invert(1);
+}
+
 @keyframes waveform {
   0%, 100% { height: 30%; }
   50% { height: 90%; }
