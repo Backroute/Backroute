@@ -54,7 +54,7 @@ export function tripState(load: Load, now: number | null, needsPreTrip: boolean)
     return {
       card, arrived: false, legP: 0, milesLeft: 0, drive: "", handled: false, docDone: false,
       done: BOOKING_PROGRESS[load.stage] ?? 0.2, total: 1, ready: false,
-      next: { title: BOOKING_NEXT[load.stage] ?? "Booking the load", owner: "ai", action: null },
+      next: { title: load.liveCall ? "On the phone with the broker" : BOOKING_NEXT[load.stage] ?? "Booking the load", owner: "ai", action: null },
     };
   }
 

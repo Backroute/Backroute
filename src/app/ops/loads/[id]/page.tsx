@@ -177,7 +177,7 @@ export default function OpsLoadDetailPage() {
               {load.calls.length > 0 && (
                 <div className="mt-4 flex flex-col gap-4">
                   {load.calls.map((call) => (
-                    <CallTranscript key={call.id} call={call} />
+                    <CallTranscript key={call.id} call={call} brokerName={broker?.company} />
                   ))}
                 </div>
               )}

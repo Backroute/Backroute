@@ -2,15 +2,18 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowRight, Camera, Check, ChevronRight, ClipboardCheck, Clock, FileText, LifeBuoy, Loader2, MessageCircle, Phone } from "lucide-react";
+import { ArrowDown, ArrowRight, Camera, Check, ChevronRight, ClipboardCheck, Clock, FileText, LifeBuoy, Loader2, MessageCircle, Phone, Timer } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useNow } from "@/lib/hooks";
+import { useStore } from "@/lib/store";
 import { cityCoords, pickupLegStart, type LatLng } from "@/lib/trip-geo";
 import { BOOKING_STAGES, tripState, type TripState } from "@/lib/trip-state";
+import { DETENTION_RATE_HR, dockClock, formatDockTime } from "@/lib/detention";
 import { Switch } from "@/components/ui/switch";
 import { CounterOfferButton } from "./counter-offer-button";
 import { SwipeToConfirm } from "./swipe-to-confirm";
 import { TripMap } from "./trip-map";
+import { BrokerCallRow } from "./broker-call";
 import type { DriverDocType } from "@/lib/store";
 import type { Load, LoadDocument } from "@/lib/types";
 
@@ -65,6 +68,8 @@ function BookingCard({ load, brokerName, viewer = "driver", onCall, onCounter }:
   const locked = load.stage === "rate_confirmed" || load.stage === "booked";
   const signed = load.stage === "booked";
   const s = tripState(load, null, false);
+  const contact = useStore((st) => st.brokers.find((b) => b.id === load.brokerId)?.contact);
+  const startBrokerCall = useStore((st) => st.actions.startBrokerCall);
 
   return (
     <CardShell>
@@ -83,7 +88,10 @@ function BookingCard({ load, brokerName, viewer = "driver", onCall, onCounter }:
           title={locked ? "Rate locked" : "Negotiating the rate"}
           detail={locked ? `${formatCurrency(rate)} with ${broker}` : `With ${broker} · asking ${formatCurrency(rate)}`}
         >
-          {load.stage === "negotiating" && <CounterOfferButton load={load} onSubmit={onCounter} variant="dark" />}
+          <div className="flex flex-wrap items-center gap-2">
+            <BrokerCallRow load={load} brokerName={broker} contactName={contact} onCall={() => startBrokerCall(load.id)} />
+            {load.stage === "negotiating" && !load.liveCall && <CounterOfferButton load={load} onSubmit={onCounter} variant="dark" />}
+          </div>
         </Step>
         <Step state={signed ? "done" : locked ? "current" : "todo"} title="Rate confirmation signed" detail={signed ? "Signed and filed" : undefined} />
         <Step
@@ -135,7 +143,12 @@ function PickupCard({ load, brokerName, truckCity, truckState, needsPreTrip, vie
         )}
         <Step state={arrived ? "done" : "current"} title="Drive to the shipper" detail={arrived ? "Checked in" : s.drive} />
         <Step state={loaded ? "done" : arrived ? "current" : "todo"} title="Get loaded" detail={loaded ? "Loaded" : `${load.equipmentType} · ${load.weight.toLocaleString()} lbs`}>
-          {arrived && !loaded && !readOnly && <PillButton onClick={() => onTripStep(load.id, "loaded")}>I&apos;m loaded</PillButton>}
+          {arrived && (
+            <div className="flex flex-col items-start gap-2">
+              <DockTimer load={load} brokerName={brokerName} />
+              {!loaded && !readOnly && <PillButton onClick={() => onTripStep(load.id, "loaded")}>I&apos;m loaded</PillButton>}
+            </div>
+          )}
         </Step>
         <Step state={bolDone ? "done" : arrived && loaded ? "current" : "todo"} title="Upload the signed BOL" last={!arrived}>
           {arrived && <DocumentSlot doc={bol} label="Photo of BOL" readOnly={readOnly} onFile={(f) => onUpload(load.id, "bol", f)} />}
@@ -199,7 +212,12 @@ function DeliveryCard({ load, brokerName, upNext, viewer = "driver", driverName,
       <ol className="mt-5">
         <Step state={arrived ? "done" : "current"} title="Drive to the receiver" detail={arrived ? "Checked in" : s.drive} />
         <Step state={unloaded ? "done" : arrived ? "current" : "todo"} title="Get unloaded" detail={unloaded ? "Unloaded" : undefined}>
-          {arrived && !unloaded && !readOnly && <PillButton onClick={() => onTripStep(load.id, "unloaded")}>I&apos;m unloaded</PillButton>}
+          {arrived && (
+            <div className="flex flex-col items-start gap-2">
+              <DockTimer load={load} brokerName={brokerName} />
+              {!unloaded && !readOnly && <PillButton onClick={() => onTripStep(load.id, "unloaded")}>I&apos;m unloaded</PillButton>}
+            </div>
+          )}
         </Step>
         <Step state={podDone ? "done" : arrived && unloaded ? "current" : "todo"} title="Upload the signed POD" last={!arrived}>
           {arrived && <DocumentSlot doc={pod} label="Photo of POD" readOnly={readOnly} onFile={(f) => onUpload(load.id, "pod", f)} />}
@@ -248,6 +266,48 @@ export function lockReason(s: TripState, docName: "BOL" | "POD", preTrip: boolea
   return undefined;
 }
 
+/** The dock clock at the stop the truck is at: free time counting down, then detention counting up — and once the
+ *  truck is loaded or unloaded, the claim the AI filed for it. */
+export function DockTimer({ load, brokerName, compact }: { load: Load; brokerName?: string; compact?: boolean }) {
+  const now = useNow();
+  const clock = dockClock(load, now);
+  if (!clock) return null;
+  const claim = load.accessorials?.find((a) => a.type === "detention" && a.stop === clock.stop);
+  const broker = brokerName ?? "the broker";
+
+  let tone: "calm" | "warn" | "good";
+  let text: string;
+  if (claim) {
+    tone = "good";
+    text = claim.status === "approved" ? `${broker} approved ${formatCurrency(claim.amount)} detention` : `AI billed ${broker} ${formatCurrency(claim.amount)} detention`;
+  } else if (!clock.running) {
+    tone = "calm";
+    text = `${formatDockTime(clock.minutes)} at the dock, inside free time`;
+  } else if (clock.freeLeft > 0) {
+    tone = "calm";
+    text = compact ? `At the dock ${formatDockTime(clock.minutes)} · ${formatDockTime(clock.freeLeft)} free left` : `At the dock ${formatDockTime(clock.minutes)} · ${formatDockTime(clock.freeLeft)} of free time left`;
+  } else {
+    tone = "warn";
+    text = compact
+      ? `Detention ${formatCurrency(clock.owed)} · ${formatDockTime(clock.minutes)} at the dock`
+      : `Detention running: ${formatCurrency(clock.owed)} so far at ${formatCurrency(DETENTION_RATE_HR)}/hr. AI bills ${broker} when you're done.`;
+  }
+
+  return (
+    <p
+      className={cn(
+        "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium tabular",
+        tone === "warn" && "bg-amber-400/15 text-amber-200",
+        tone === "good" && "bg-emerald-400/15 text-emerald-200",
+        tone === "calm" && "bg-white/10 text-white/70",
+      )}
+    >
+      {tone === "good" ? <Check className="h-3.5 w-3.5 shrink-0" /> : <Timer className="h-3.5 w-3.5 shrink-0" />}
+      <span className={compact ? "truncate" : ""}>{text}</span>
+    </p>
+  );
+}
+
 // ---------- Complete ----------
 
 /** Shown right after delivery until the driver moves on — the Uber "trip complete" moment, kept short: what you
@@ -276,6 +336,7 @@ export function DriverTripCompleteCard({
   const from = cityCoords(load.lane.origin, load.lane.originState);
   const to = cityCoords(load.lane.destination, load.lane.destState);
   const nextIsBooking = nextLoad ? BOOKING_STAGES.includes(nextLoad.stage) : false;
+  const detention = (load.accessorials ?? []).reduce((sum, a) => sum + a.amount, 0);
 
   function chooseNext() {
     onContinue();
@@ -311,6 +372,7 @@ export function DriverTripCompleteCard({
           <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> POD checked</span>
           <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Invoice sent to {brokerName ?? "broker"}</span>
           <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Payment tracked</span>
+          {detention > 0 && <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> {formatCurrency(detention)} detention billed by AI</span>}
         </p>
 
         <div className={cn("mt-4 flex items-center justify-between gap-3 rounded-2xl px-4 py-3", postTripDone ? "bg-white/5" : "bg-amber-400/15")}>

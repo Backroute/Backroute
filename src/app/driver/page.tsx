@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowDown, ArrowUpRight, ClipboardCheck, LifeBuoy, Link2, MapPin, Phone } from "lucide-react";
+import { ArrowDown, ArrowUpRight, CalendarRange, ClipboardCheck, Link2, MapPin, Phone } from "lucide-react";
+import { planWeek } from "@/lib/planner";
 import { Badge } from "@/components/ui/badge";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
@@ -11,6 +12,8 @@ import { TripCompactCard, TripDetails, TripSheet } from "@/components/shared/tri
 import { Switch } from "@/components/ui/switch";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { VoiceCallModal } from "@/components/shared/voice-call-modal";
+import { IncidentCard } from "@/components/shared/incident-card";
+import { useNow } from "@/lib/hooks";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap, truckActiveLoads } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { STAGE_CONFIRM } from "@/lib/stage-confirm";
@@ -23,7 +26,11 @@ export default function DriverHomePage() {
   const trucks = useCarrierTrucks();
   const loads = useCarrierLoads();
   const brokers = useBrokerMap();
-  const incidents = useStore((s) => s.incidents).filter((i) => i.driverId === driver.id && i.status === "active");
+  const now = useNow();
+  // Active incidents, plus ones the AI just finished — so the driver sees the "handled" moment before it goes.
+  const incidents = useStore((s) => s.incidents).filter(
+    (i) => i.driverId === driver.id && (i.status === "active" || (now !== null && now - Date.parse(i.steps.at(-1)?.timestamp ?? i.createdAt) < 20_000)),
+  );
   const dvirInspections = useStore((s) => s.dvirInspections).filter((d) => d.driverId === driver.id);
   const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
   const selectLoadOffer = useStore((s) => s.actions.selectLoadOffer);
@@ -58,7 +65,7 @@ export default function DriverHomePage() {
   const needsPreTrip = !!currentLoad && !dvirDoneToday && PRE_TRIP_STAGES.includes(currentLoad.stage);
   const completedLoad = truck?.lastDeliveredLoadId ? loads.find((l) => l.id === truck.lastDeliveredLoadId) : undefined;
   const hasStageAction = !completedLoad && !!currentLoad && !!STAGE_CONFIRM[currentLoad.stage];
-  const todoCount = Number(hasStageAction) + Number(hasOffers) + Number(!completedLoad && needsPreTrip) + incidents.length;
+  const todoCount = Number(hasStageAction) + Number(hasOffers) + Number(!completedLoad && needsPreTrip) + incidents.filter((i) => i.status === "active").length;
 
   const autoPick = !!truck?.autoChainNextLoad;
   const toggleAutoPick = (on: boolean) => truck && setAutoChain(truck.id, on);
@@ -83,6 +90,7 @@ export default function DriverHomePage() {
       }
     : null;
 
+  const plan = truck && now !== null ? planWeek(truck, driver, currentLoad, nextLoad, new Date(now)) : null;
   const weekLoads = loads.filter((l) => l.truckId === truck?.id);
   const weekMiles = weekLoads.reduce((s, l) => s + l.lane.miles, 0);
 
@@ -100,35 +108,9 @@ export default function DriverHomePage() {
         </p>
       </div>
 
-      {incidents.length > 0 && (
-        <div className="rounded-2xl border border-[var(--accent-warn)]/40 bg-amber-50/60 p-4">
-          {incidents.map((incident) => {
-            const doneCount = incident.steps.filter((s) => s.status === "done").length;
-            return (
-              <div key={incident.id}>
-                <div className="flex items-center gap-2">
-                  <LifeBuoy className="h-4 w-4 text-[var(--accent-warn)]" />
-                  <span className="text-xs font-semibold uppercase tracking-wide text-[var(--accent-warn)]">
-                    {incident.type} reported, AI is on it
-                  </span>
-                </div>
-                <div className="mt-2.5 flex flex-col gap-1.5">
-                  {incident.steps.map((step, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs">
-                      <span className={`h-1.5 w-1.5 rounded-full ${step.status === "done" ? "bg-[var(--accent-live)]" : "bg-ink-300"}`} />
-                      <span className={step.status === "done" ? "text-ink-700 line-through decoration-ink-300" : "text-ink-500"}>{step.label}</span>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-2 text-[11px] text-ink-500">{doneCount}/{incident.steps.length} steps complete</p>
-                {incident.humanNotified && (
-                  <Badge tone="danger" className="mt-2">Human safety specialist notified</Badge>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {incidents.map((incident) => (
+        <IncidentCard key={incident.id} incident={incident} viewer="driver" />
+      ))}
 
       {completedLoad && truck ? (
         <DriverTripCompleteCard
@@ -218,6 +200,21 @@ export default function DriverHomePage() {
         <Stat label="Loads" value={weekLoads.length} />
         <Stat label="HOS left" value={`${driver.hoursRemaining.toFixed(1)}h`} />
       </div>
+
+      {plan && (
+        <Link href="/driver/plan" className="flex items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3.5">
+          <span className="flex min-w-0 items-center gap-3">
+            <CalendarRange className="h-4 w-4 shrink-0 text-ink-400" />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-ink-950">Your next few days, planned by AI</span>
+              <span className="block truncate text-xs text-ink-500">
+                Home in {plan.homeCity} {plan.homeAt} · est. net {formatCurrency(plan.net)}
+              </span>
+            </span>
+          </span>
+          <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-ink-950" />
+        </Link>
+      )}
 
       {driver.homeTimeTarget !== "No preference set" && (
         <div className="flex items-center justify-between rounded-2xl border border-line px-4 py-3 text-sm">

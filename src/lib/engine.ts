@@ -8,8 +8,10 @@ import type {
   CallTranscriptLine,
   EquipmentType,
   Incident,
+  IncidentStep,
   IncidentType,
   Lane,
+  LiveBrokerCall,
   Load,
   LoadStage,
   NegotiationMessage,
@@ -297,6 +299,87 @@ const CALL_BROKER_CONFIRMS = [
   "Good to go, booking it now. You'll have the confirmation shortly.",
 ];
 
+const LIVE_CALL_MARKET = [
+  (rpm: string, amt: number) => `Lane's running about ${rpm} a mile this week, so the going rate is right at $${amt.toLocaleString()}.`,
+  (rpm: string, amt: number) => `Market on this lane is ${rpm} a mile right now. That puts it at $${amt.toLocaleString()}.`,
+];
+const LIVE_CALL_BROKER_MEET = [
+  (amt: number) => `I hear you. I could maybe stretch to $${amt.toLocaleString()}. That's about my ceiling.`,
+  (amt: number) => `Let me see... I can come up to $${amt.toLocaleString()}, but that's pushing it.`,
+  (amt: number) => `Okay, how about we meet at $${amt.toLocaleString()}?`,
+];
+const LIVE_CALL_AI_VALUE = [
+  (dh: number, amt: number) => `Our truck is empty ${dh} miles out and can make your window. $${amt.toLocaleString()} and you can book it right now.`,
+  (dh: number, amt: number) => `The truck is ${dh} miles from the shipper with a clean safety record. At $${amt.toLocaleString()} it's yours.`,
+];
+
+/** Ring time before the broker picks up, then each line takes roughly as long as it would to say it. */
+const CALL_RING_MS = 2600;
+const lineMs = (text: string) => Math.max(2800, text.split(/\s+/).length * 330);
+
+/** Scripts a whole broker call the AI is about to make: open, hear the broker's number, argue it with the
+ *  lane's market rate and the truck's position, meet part of the way, close. The final number comes from
+ *  where the negotiation thread left off, so the call never contradicts the emails before it. */
+export function scriptBrokerCall(load: Load, broker: Broker | undefined): LiveBrokerCall {
+  const b = broker ?? ({ contact: "Broker", company: load.source } as Broker);
+  const aiOffers = load.messages.filter((m) => m.direction === "outbound" && m.offerAmount);
+  const brokerOffers = load.messages.filter((m) => m.direction === "inbound" && m.offerAmount);
+  const ask = Math.max(aiOffers.length ? aiOffers[aiOffers.length - 1].offerAmount! : load.targetRate, Math.round(load.targetRate * 0.97));
+  const opening = brokerOffers.length ? brokerOffers[brokerOffers.length - 1].offerAmount! : load.listedRate;
+  const brokerMeet = Math.round(opening + (ask - opening) * 0.55);
+  const final = Math.max(brokerMeet, Math.round(ask - (ask - brokerMeet) * 0.35));
+  const market = Math.round(load.lane.miles * load.lane.marketRpm);
+  const rpm = `$${load.lane.marketRpm.toFixed(2)}`;
+
+  const script: Omit<LiveBrokerCall["lines"][number], "atMs">[] = [
+    { speaker: "ai", text: pick(CALL_OPENERS)(b.contact.split(" ")[0], load.lane.origin, load.lane.destination) },
+    { speaker: "broker", text: BROKER_LOW(opening), offer: opening },
+    { speaker: "ai", text: `${pick(LIVE_CALL_MARKET)(rpm, market)} We're at $${ask.toLocaleString()}.`, offer: ask },
+    { speaker: "broker", text: pick(LIVE_CALL_BROKER_MEET)(brokerMeet), offer: brokerMeet },
+    { speaker: "ai", text: pick(LIVE_CALL_AI_VALUE)(Math.max(6, load.deadheadMiles), final), offer: final },
+    { speaker: "broker", text: pick(CALL_BROKER_CHECKS) },
+    { speaker: "ai", text: pick(CALL_AI_CLOSES)(final), offer: final },
+    { speaker: "broker", text: pick(CALL_BROKER_CONFIRMS) },
+  ];
+  let at = CALL_RING_MS;
+  const lines = script.map((line) => {
+    const timed = { ...line, atMs: at };
+    at += lineMs(line.text);
+    return timed;
+  });
+  return { id: uid("call"), startedAt: new Date().toISOString(), lines, durationMs: at + 800, openingOffer: opening, finalRate: final };
+}
+
+/** The call ended: the load is booked at the number the broker agreed to on the phone. */
+export function finishBrokerCall(load: Load, broker: Broker | undefined): StepResult {
+  const live = load.liveCall;
+  if (!live) return { load, events: [] };
+  const b = broker ?? ({ company: load.source, reliability: 70 } as Broker);
+  const now = new Date().toISOString();
+  const gain = live.finalRate - live.openingOffer;
+  const call: VoiceCall = {
+    id: live.id,
+    status: "completed",
+    startedAt: live.startedAt,
+    durationSec: Math.round(live.durationMs / 1000),
+    transcript: live.lines.map(({ speaker, text, offer }) => ({ speaker, text, offer })),
+    outcome: `Booked at $${live.finalRate.toLocaleString()}${gain > 0 ? `, $${gain.toLocaleString()} over their first offer` : ""}`,
+  };
+  const next: Load = { ...load, liveCall: undefined, calls: [...load.calls, call], updatedAt: now, ticksInStage: 0 };
+  if (load.stage !== "negotiating") return { load: next, events: [] };
+  next.stage = "rate_confirmed";
+  next.progressPct = STAGE_PROGRESS.rate_confirmed;
+  next.bookedRate = live.finalRate;
+  applyBookedEconomics(next, load, live.finalRate, b.reliability ?? 70);
+  next.documents = [...load.documents, { id: uid("doc"), type: "rate_confirmation", name: `RateCon_${load.referenceNumber}.pdf`, generatedAt: now, status: "verified" }];
+  return {
+    load: next,
+    events: [
+      mkEvent(load.carrierId, load.id, "call_completed", `AI closed ${b.company} by phone at $${live.finalRate.toLocaleString()}`, gain > 0 ? `$${gain.toLocaleString()} more than the broker's first offer · rate con signed` : "Rate con signed", "success", "voice"),
+    ],
+  };
+}
+
 interface StepResult {
   load: Load;
   events: ActivityEvent[];
@@ -448,6 +531,11 @@ export function confirmLoadStage(load: Load, truck: Truck | undefined): StepResu
 
   const next: Load = { ...load, stage: nextStage, updatedAt: new Date().toISOString(), ticksInStage: 0, progressPct: STAGE_PROGRESS[nextStage] };
   const events: ActivityEvent[] = [];
+
+  if (nextStage === "at_pickup" || nextStage === "at_delivery") {
+    const key = nextStage === "at_pickup" ? "arrivedPickupAt" : "arrivedDeliveryAt";
+    next.tripChecklist = { ...load.tripChecklist, [key]: next.updatedAt };
+  }
 
   if (nextStage === "at_pickup") {
     events.push(mkEvent(load.carrierId, load.id, "check_call", "Driver confirmed arrival at pickup", `${load.lane.origin}, ${load.lane.originState}`, "info"));
@@ -689,31 +777,62 @@ export function resolveOfferAsk(load: Load, broker: Broker | undefined, draft: O
 
 // ---------- Incidents: the AI handling breakdowns, accidents, delays and weather like a real dispatcher would ----------
 
-const INCIDENT_STEPS: Record<IncidentType, string[]> = {
-  breakdown: [
-    "Confirming driver safety and location",
-    "Dispatching mobile roadside repair",
-    "Notifying broker of the delay",
-    "Confirming updated delivery time with receiver",
-  ],
-  accident: [
-    "Confirming driver is safe",
-    "Notifying carrier safety and insurance",
-    "Arranging tow and inspection",
-    "Notifying broker and rebooking delivery window",
-  ],
-  delay: [
-    "Notifying broker of updated ETA",
-    "Confirming receiver can accept late arrival",
-    "Re-sequencing the next load if needed",
-  ],
-  weather: [
-    "Monitoring route conditions",
-    "Rerouting around severe weather",
-    "Notifying broker of possible delay",
-    "Confirming updated ETA with receiver",
-  ],
-};
+const SHOPS = ["Rush Truck Center", "TA Truck Service", "Love's Truck Care", "Speedco", "Freightliner Service"];
+
+export interface IncidentContext {
+  load?: Load;
+  brokerName?: string;
+  truck?: Truck;
+  /** The closest empty truck in the fleet, if any — the fallback plan when a repair runs long. */
+  backupTruck?: Truck;
+  backupMiles?: number;
+}
+
+/** Where the truck is, in words: between the lane's cities while loaded, near the pickup before, or its last city. */
+function incidentWhere(ctx: IncidentContext): string {
+  const { load, truck } = ctx;
+  if (load?.stage === "in_transit") return `between ${load.lane.origin} and ${load.lane.destination}`;
+  if (load && (load.stage === "dispatched" || load.stage === "at_pickup")) return `outside ${load.lane.origin}, ${load.lane.originState}`;
+  return truck ? `near ${truck.currentCity}, ${truck.currentState}` : "on the route";
+}
+
+/** The plan a good dispatcher would work, with the specifics filled in: who to call, what was found, what changed. */
+function incidentPlan(type: IncidentType, ctx: IncidentContext): IncidentStep[] {
+  const broker = ctx.brokerName ?? "the broker";
+  const where = incidentWhere(ctx);
+  const onLoad = !!ctx.load && ctx.load.stage !== "delivered";
+  const steps: Omit<IncidentStep, "status">[] = [];
+
+  if (type === "breakdown") {
+    const shop = pick(SHOPS);
+    const quote = randInt(9, 19) * 100 + randInt(0, 9) * 10;
+    const delayHrs = randInt(3, 5);
+    steps.push({ label: "Driver safe, truck located", detail: `Pulled over ${where} · hazards on, triangles out` });
+    steps.push({ label: "Found roadside repair", detail: `${shop} · mobile mechanic ${randInt(6, 22)} mi away, there in ${randInt(35, 60)} min` });
+    if (onLoad) steps.push({ label: `Told ${broker} and the receiver`, detail: `New ETA +${delayHrs} hrs · receiver moved the appointment, no penalty` });
+    if (onLoad && ctx.backupTruck) {
+      steps.push({ label: "Lined up a backup truck", detail: `${ctx.backupTruck.unitNumber} is empty ${ctx.backupMiles ?? randInt(25, 60)} mi away and can relay the load if the repair runs long` });
+    }
+    steps.push({ label: `Approve the $${quote.toLocaleString()} repair`, detail: `${shop}'s quote is over the $750 the AI can approve on its own`, owner: "human" });
+    steps.push({ label: "Repaired and rolling again", detail: onLoad ? `${broker} and the receiver have the final ETA` : "Truck back in service" });
+  } else if (type === "accident") {
+    steps.push({ label: "Driver checked on", detail: "A Backroute safety specialist is on the line with the driver" });
+    steps.push({ label: "Insurance notified", detail: "Claim opened, photos and the police report number requested from the driver" });
+    steps.push({ label: "Tow and inspection arranged", detail: `Tow ${randInt(20, 50)} min out, inspection booked at ${pick(SHOPS)}` });
+    if (onLoad) steps.push({ label: `Told ${broker}`, detail: "Recovery plan for the freight agreed, delivery window reopened" });
+  } else if (type === "delay") {
+    const late = randInt(1, 3);
+    if (onLoad) steps.push({ label: `Told ${broker} the new ETA`, detail: `Running about ${late} hr${late === 1 ? "" : "s"} late · updated before the appointment, not after` });
+    steps.push({ label: "Receiver can take it late", detail: "Appointment moved, no reschedule fee" });
+    steps.push({ label: "Next load still on plan", detail: "Pickup window for the next load still fits after the new ETA" });
+  } else {
+    const detour = randInt(18, 64);
+    steps.push({ label: "Checked road conditions", detail: `Storm warning and closures ahead ${where}` });
+    steps.push({ label: "Rerouted around the weather", detail: `+${detour} mi, avoids the closure and stays within hours of service` });
+    if (onLoad) steps.push({ label: `Told ${broker} and the receiver`, detail: "Weather delay noted, ETA updated, no penalty" });
+  }
+  return steps.map((s) => ({ ...s, owner: s.owner ?? "ai", status: "pending" as const }));
+}
 
 const INCIDENT_LABEL: Record<IncidentType, string> = {
   breakdown: "Breakdown",
@@ -722,7 +841,7 @@ const INCIDENT_LABEL: Record<IncidentType, string> = {
   weather: "Weather",
 };
 
-export function createIncident(driverId: string, carrierId: string, truckId: string, loadId: string | null, type: IncidentType, note: string): Incident {
+export function createIncident(driverId: string, carrierId: string, truckId: string, loadId: string | null, type: IncidentType, note: string, ctx: IncidentContext = {}): Incident {
   return {
     id: uid("incident"),
     driverId,
@@ -733,7 +852,7 @@ export function createIncident(driverId: string, carrierId: string, truckId: str
     note,
     createdAt: new Date().toISOString(),
     status: "active",
-    steps: INCIDENT_STEPS[type].map((label) => ({ label, status: "pending" as const })),
+    steps: incidentPlan(type, ctx),
     humanNotified: type === "accident",
   };
 }
@@ -762,10 +881,13 @@ export function advanceIncident(incident: Incident): { incident: Incident; event
     };
   }
 
+  // A step only a person can sign off on (a repair bill over the auto-approve limit) waits for that person.
+  if (incident.steps[nextStepIndex].owner === "human") return { incident };
   const steps = incident.steps.map((s, i) => (i === nextStepIndex ? { ...s, status: "done" as const, timestamp: new Date().toISOString() } : s));
   const updated: Incident = { ...incident, steps };
+  const step = steps[nextStepIndex];
   return {
     incident: updated,
-    event: mkEvent(incident.carrierId, incident.loadId ?? undefined, "incident", steps[nextStepIndex].label, `${INCIDENT_LABEL[incident.type]} · in progress`, "info"),
+    event: mkEvent(incident.carrierId, incident.loadId ?? undefined, "incident", `AI: ${step.label}`, step.detail ?? `${INCIDENT_LABEL[incident.type]} · in progress`, "info"),
   };
 }

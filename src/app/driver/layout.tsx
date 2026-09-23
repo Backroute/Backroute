@@ -3,7 +3,7 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MessageCircle, Truck, User } from "lucide-react";
+import { Home, MessageCircle, Truck, User, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/shared/logo";
 import { Avatar } from "@/components/ui/avatar";
@@ -16,6 +16,7 @@ import { useStore } from "@/lib/store";
 const TABS = [
   { href: "/driver", label: "Home", icon: Home },
   { href: "/driver/loads", label: "Loads", icon: Truck },
+  { href: "/driver/earnings", label: "Earnings", icon: Wallet },
   { href: "/driver/messages", label: "Messages", icon: MessageCircle },
   { href: "/driver/profile", label: "Profile", icon: User },
 ];

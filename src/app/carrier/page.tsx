@@ -15,6 +15,8 @@ import type { DriverTripCardProps } from "@/components/shared/driver-trip-card";
 import { Switch } from "@/components/ui/switch";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { TruckDriverChip } from "@/components/shared/truck-driver-chip";
+import { IncidentCard } from "@/components/shared/incident-card";
+import { useNow } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks, useCarrierDrivers, useCarrierEscalations, useDriverMap, useBrokerMap, useTruckMap, truckActiveLoads } from "@/lib/selectors";
 import { isTransitStage } from "@/lib/load-status";
@@ -43,6 +45,11 @@ export default function CarrierOverviewPage() {
   const setAutoChain = useStore((s) => s.actions.setAutoChain);
   const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
   const [openTruckId, setOpenTruckId] = useState<string | null>(null);
+  const now = useNow();
+  const incidents = useStore((s) => s.incidents).filter(
+    (i) => i.carrierId === carrier.id && (i.status === "active" || (now !== null && now - Date.parse(i.steps.at(-1)?.timestamp ?? i.createdAt) < 20_000)),
+  );
+  const liveCalls = loads.filter((l) => l.liveCall).length;
 
   const activeLoads = loads.filter((l) => l.stage !== "delivered");
   const netProfitMonth = loads.reduce((sum, l) => sum + (l.netProfit ?? 0), 0);
@@ -98,7 +105,7 @@ export default function CarrierOverviewPage() {
   // Escalations already handed to Backroute Support are listed but no longer wait on the carrier.
   const waitingEscalations = escalations.filter((e) => e.status !== "with_support");
   const needsYouCount = waitingEscalations.length + pendingTimeOff.length + offerGroups.length;
-  const hasNeedsYouItems = escalations.length + pendingTimeOff.length + offerGroups.length > 0;
+  const hasNeedsYouItems = escalations.filter((e) => !e.incidentId).length + pendingTimeOff.length + offerGroups.length > 0;
 
   return (
     <div>
@@ -120,6 +127,7 @@ export default function CarrierOverviewPage() {
           </p>
           <p className="mt-1 text-sm text-white/60">
             {chainedCount} of {trucks.length} trucks already {chainedCount === 1 ? "has" : "have"} the next load lined up.
+            {liveCalls > 0 && ` AI is on ${liveCalls === 1 ? "a broker call" : `${liveCalls} broker calls`} right now.`}
           </p>
           <div className="mt-5 grid grid-cols-3 gap-2">
             <BannerTile label="On the road" value={onRoad} />
@@ -127,6 +135,25 @@ export default function CarrierOverviewPage() {
             <BannerTile label="Available" value={available} />
           </div>
         </div>
+
+        {incidents.length > 0 && (
+          <section aria-label="Incidents the AI is handling" className="grid gap-3 md:grid-cols-2">
+            {incidents.map((incident) => {
+              const truck = truckMap.get(incident.truckId);
+              const driver = driverMap.get(incident.driverId);
+              const esc = escalations.find((e) => e.id === incident.escalationId && e.status === "open");
+              return (
+                <IncidentCard
+                  key={incident.id}
+                  incident={incident}
+                  viewer="carrier"
+                  label={`${truck?.unitNumber ?? "Truck"} · ${driver?.name ?? "Driver"}`}
+                  onApprove={esc ? () => resolveEscalation(esc.id, true) : undefined}
+                />
+              );
+            })}
+          </section>
+        )}
 
         {hasNeedsYouItems && (
           <section id="needs-you" aria-labelledby="needs-you-title">
@@ -158,7 +185,7 @@ export default function CarrierOverviewPage() {
                 );
               })}
 
-              {escalations.map((e) => {
+              {escalations.filter((e) => !e.incidentId).map((e) => {
                 const load = loads.find((l) => l.id === e.loadId);
                 const truck = load?.truckId ? truckMap.get(load.truckId) : undefined;
                 const driver = truck?.driverId ? driverMap.get(truck.driverId) : undefined;

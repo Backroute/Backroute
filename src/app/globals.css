@@ -133,10 +133,19 @@ body {
   animation: sheet-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+@keyframes wave {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+.animate-wave {
+  animation: wave 0.9s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-sheet-up,
   .animate-indeterminate,
-  .animate-rise-in {
+  .animate-rise-in,
+  .animate-wave {
     animation: none;
   }
 }

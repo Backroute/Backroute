@@ -12,17 +12,21 @@ import {
   createLoadOfferBatch,
   createSourcedLoad,
   draftOfferAsk,
+  finishBrokerCall,
   incidentOpenedEvent,
   pickLaneNear,
   pushForBetterRate,
   resolveLoadOffer,
   resolveOfferAsk,
+  scriptBrokerCall,
   shouldChainNextLoad,
   type InstructionCategory,
   type OfferAskDraft,
 } from "./engine";
 import { computeEconomics, computeLoadScore } from "./scoring";
 import { nextStop } from "./load-status";
+import { dockClock, dockMinutes, detentionFor, formatDockTime } from "./detention";
+import { cityCoords, distanceMiles } from "./trip-geo";
 import { clamp, formatDuration } from "./utils";
 import type {
   ActivityEvent,
@@ -103,6 +107,31 @@ function aiMilestoneEvent(load: Load, brokerName: string): ActivityEvent | null 
       return { ...base, type: "document_captured", channel: "email", message: `AI emailed the POD and invoice to ${brokerName}`, detail: `${load.referenceNumber} · payment tracked until it lands`, severity: "success" };
     default:
       return null;
+  }
+}
+
+/** Puts the AI on the phone with the load's broker; the call plays out live and books the load when it ends. */
+function withLiveCall(load: Load, broker: Broker | undefined): { load: Load; event: ActivityEvent } {
+  const liveCall = scriptBrokerCall(load, broker);
+  return {
+    load: { ...load, liveCall },
+    event: {
+      id: uid("act"), timestamp: liveCall.startedAt, type: "call_started", channel: "voice",
+      message: `AI is on the phone with ${broker?.company ?? "the broker"}`, detail: `${load.lane.origin} → ${load.lane.destination} · asking $${liveCall.lines[2].offer?.toLocaleString()}`,
+      loadId: load.id, carrierId: load.carrierId, severity: "info",
+    },
+  };
+}
+
+/** Each live call hangs up on its own timer, whichever action or tick started it. */
+const scheduledCalls = new Set<string>();
+function scheduleCallEnds(loads: Load[], finish: (loadId: string, callId: string) => void) {
+  for (const l of loads) {
+    const call = l.liveCall;
+    if (!call || scheduledCalls.has(call.id)) continue;
+    scheduledCalls.add(call.id);
+    const remaining = Math.max(0, Date.parse(call.startedAt) + call.durationMs - Date.now());
+    setTimeout(() => finish(l.id, call.id), remaining);
   }
 }
 
@@ -280,6 +309,9 @@ interface StoreState {
     /** Phase two: the broker's actual answer to a non-rate ask. */
     resolveOfferDetail: (loadId: string, draft: OfferAskDraft) => string;
     sendNegotiationInstruction: (loadId: string, actor: "driver" | "carrier", text: string) => void;
+    /** Has the AI pick up the phone and close a load that's stuck in email back-and-forth. */
+    startBrokerCall: (loadId: string) => void;
+    finishBrokerCall: (loadId: string, callId: string) => void;
     /** Persists a driver/carrier voice call about a load once it hangs up, so it shows up in the same call
      *  history as the AI's own calls to brokers — a call is only real if it leaves a record. */
     logLoadVoiceCall: (loadId: string, call: Omit<VoiceCall, "id">) => void;
@@ -463,7 +495,7 @@ export const useStore = create<StoreState>((set, get) => ({
   tickCount: 0,
 
   actions: {
-    tick: () =>
+    tick: () => {
       set((state) => {
         let loads = state.loads;
         let trucks = state.trucks;
@@ -562,7 +594,7 @@ export const useStore = create<StoreState>((set, get) => ({
           (l) =>
             l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "cancelled" && l.stage !== "offered" &&
             l.stage !== "dispatched" && l.stage !== "at_pickup" && l.stage !== "in_transit" && l.stage !== "at_delivery" &&
-            !l.aiPaused && l.carrierId === PRIMARY_CARRIER_ID,
+            !l.aiPaused && !l.liveCall && l.carrierId === PRIMARY_CARRIER_ID,
         );
         // A truck sitting empty while its own current load is still being booked is costing money right now —
         // the AI works those first, the way a dispatcher would, instead of leaving the driver parked on a
@@ -578,7 +610,16 @@ export const useStore = create<StoreState>((set, get) => ({
           }
 
           const workingLoad = effectiveTruck && !target.truckId ? { ...target, truckId: effectiveTruck.id } : target;
-          const result = advanceLoad(workingLoad, broker, effectiveTruck);
+          // A negotiation that's gone a couple of rounds by email without closing: the AI picks up the phone,
+          // the way a good dispatcher would, instead of sending another counter.
+          const emailRounds = target.messages.filter((m) => m.channel !== "voice").length;
+          const callNow = target.stage === "negotiating" && !target.calls.length && emailRounds >= 2 && state.settings.voiceEnabled && Math.random() < 0.5;
+          const result = callNow
+            ? (() => {
+                const started = withLiveCall(workingLoad, broker);
+                return { load: started.load, events: [started.event], truckUpdates: undefined };
+              })()
+            : advanceLoad(workingLoad, broker, effectiveTruck);
           loads = loads.map((l) => (l.id === result.load.id ? result.load : l));
           newEvents.push(...result.events);
 
@@ -639,12 +680,46 @@ export const useStore = create<StoreState>((set, get) => ({
           }
         }
 
-        const activeIncidents = incidents.filter((i) => i.status === "active");
-        if (activeIncidents.length && Math.random() < 0.6) {
-          const target = pick(activeIncidents);
-          const result = advanceIncident(target);
-          incidents = incidents.map((i) => (i.id === result.incident.id ? result.incident : i));
-          if (result.event) newEvents.push(result.event);
+        // Free time just ran out at a dock: tell the broker detention is now running, before it's billed.
+        const tickNow = Date.now();
+        for (const l of loads) {
+          const clock = dockClock(l, tickNow);
+          if (!clock?.running || clock.freeLeft > 0 || l.tripChecklist?.detentionNoticeSent?.includes(clock.stop)) continue;
+          const broker = state.brokers.find((b) => b.id === l.brokerId)?.company ?? "the broker";
+          loads = loads.map((x) =>
+            x.id === l.id ? { ...x, tripChecklist: { ...x.tripChecklist, detentionNoticeSent: [...(x.tripChecklist?.detentionNoticeSent ?? []), clock.stop] } } : x,
+          );
+          newEvents.push({
+            id: uid("act"), timestamp: new Date().toISOString(), type: "check_call", channel: "email",
+            message: `AI told ${broker} detention has started`, detail: `${l.referenceNumber} · 2h free time used at the ${clock.stop === "pickup" ? "shipper" : "receiver"}, $75/hr from here`,
+            loadId: l.id, carrierId: l.carrierId, severity: "warning",
+          });
+        }
+
+        // Every open incident moves along its plan; a step that needs a person raises one approval request and waits.
+        for (const incident of incidents.filter((i) => i.status === "active")) {
+          const nextStep = incident.steps.find((st) => st.status === "pending");
+          if (nextStep?.owner === "human") {
+            if (incident.escalationId) continue;
+            const esc: Escalation = {
+              id: uid("esc"), loadId: incident.loadId ?? "", carrierId: incident.carrierId, incidentId: incident.id,
+              reason: `${nextStep.label.replace(/^Approve the /, "Repair quote: ")}. ${nextStep.detail ?? ""}`.trim(),
+              createdAt: new Date().toISOString(), status: "open", complexity: "routine",
+              recommendedAction: "approve", recommendedLabel: nextStep.label,
+            };
+            escalations = [esc, ...escalations];
+            incidents = incidents.map((i) => (i.id === incident.id ? { ...i, escalationId: esc.id } : i));
+            newEvents.push({
+              id: uid("act"), timestamp: esc.createdAt, type: "escalation",
+              message: "AI needs your OK on a repair", detail: esc.reason, loadId: incident.loadId ?? undefined, carrierId: incident.carrierId, severity: "warning",
+            });
+            continue;
+          }
+          if (Math.random() < 0.75) {
+            const result = advanceIncident(incident);
+            incidents = incidents.map((i) => (i.id === result.incident.id ? result.incident : i));
+            if (result.event) newEvents.push(result.event);
+          }
         }
 
         const step = (v: number, min: number, max: number, jitter = 2) => clamp(v + randInt(-jitter, jitter), min, max);
@@ -664,10 +739,29 @@ export const useStore = create<StoreState>((set, get) => ({
             boardsConnected: 17,
           },
         };
-      }),
+      });
+      const { loads, actions } = get();
+      scheduleCallEnds(loads, actions.finishBrokerCall);
+    },
 
     resolveEscalation: (id, approve, actor = "carrier", note) =>
       set((state) => ({
+        // An approval that's a step in an incident plan unblocks that plan: approved, the repair goes ahead;
+        // declined, the AI falls back to relaying the freight with the backup truck.
+        incidents: state.incidents.map((i) => {
+          if (i.escalationId !== id) return i;
+          const backup = i.steps.find((st) => st.label === "Lined up a backup truck")?.detail?.split(" ")[0];
+          return {
+            ...i,
+            steps: i.steps.map((st) =>
+              st.owner === "human" && st.status === "pending"
+                ? approve
+                  ? { ...st, status: "done" as const, timestamp: new Date().toISOString(), label: st.label.replace(/^Approve/, "Approved"), detail: `Approved by ${actor}. The AI booked the repair.` }
+                  : { ...st, status: "done" as const, timestamp: new Date().toISOString(), label: "Repair declined", detail: backup ? `The AI is relaying the load with ${backup} instead.` : "The AI is towing the truck to the nearest in-network shop instead." }
+                : st,
+            ),
+          };
+        }),
         escalations: state.escalations.map((e) =>
           e.id === id
             ? { ...e, status: "resolved" as const, resolvedBy: actor, resolvedAt: new Date().toISOString(), resolutionNote: note || undefined }
@@ -827,25 +921,75 @@ export const useStore = create<StoreState>((set, get) => ({
         return { trucks, loads, activity: [...events, ...state.activity].slice(0, 80) };
       }),
 
-    confirmTripStep: (loadId, step) =>
+    confirmTripStep: (loadId, step) => {
+      let claimId: string | null = null;
       set((state) => {
         const load = state.loads.find((l) => l.id === loadId);
         if (!load) return {};
         const now = new Date().toISOString();
         const checklist = step === "loaded" ? { ...load.tripChecklist, loadedAt: now } : { ...load.tripChecklist, unloadedAt: now };
         const where = step === "loaded" ? `${load.lane.origin}, ${load.lane.originState}` : `${load.lane.destination}, ${load.lane.destState}`;
+        const stop = step === "loaded" ? "pickup" : "delivery";
+        const updated: Load = { ...load, tripChecklist: checklist };
+        const minutes = dockMinutes(updated, stop, Date.now()) ?? 0;
+        const amount = detentionFor(minutes);
+        const events: ActivityEvent[] = [
+          {
+            id: uid("act"), timestamp: now, type: "check_call",
+            message: step === "loaded" ? "Driver confirmed loaded" : "Driver confirmed unloaded",
+            detail: `${load.referenceNumber} · ${where} · ${formatDockTime(minutes)} at the dock`, loadId, carrierId: load.carrierId, severity: "info",
+          },
+        ];
+        // Past free time: the AI bills the broker for detention itself, with the check-in and out times as proof —
+        // the claim a driver usually never files because nobody has time to chase it.
+        if (amount > 0) {
+          claimId = uid("acc");
+          updated.accessorials = [
+            ...(load.accessorials ?? []),
+            { id: claimId, type: "detention", stop, minutes, amount, status: "claimed", createdAt: now },
+          ];
+          const broker = state.brokers.find((b) => b.id === load.brokerId)?.company ?? "the broker";
+          events.unshift({
+            id: uid("act"), timestamp: now, type: "negotiation_email", channel: "email",
+            message: `AI billed ${broker} $${amount} detention`, detail: `${load.referenceNumber} · ${formatDockTime(minutes)} at ${where}, 2h free · check-in and out times attached`,
+            loadId, carrierId: load.carrierId, severity: "success",
+          });
+        }
         return {
-          loads: state.loads.map((l) => (l.id === loadId ? { ...l, tripChecklist: checklist } : l)),
-          activity: [
-            {
-              id: uid("act"), timestamp: now, type: "check_call" as const,
-              message: step === "loaded" ? "Driver confirmed loaded" : "Driver confirmed unloaded",
-              detail: `${load.referenceNumber} · ${where}`, loadId, carrierId: load.carrierId, severity: "info" as const,
-            },
-            ...state.activity,
-          ].slice(0, 80),
+          loads: state.loads.map((l) => (l.id === loadId ? updated : l)),
+          activity: [...events, ...state.activity].slice(0, 80),
         };
-      }),
+      });
+      if (!claimId) return;
+      const id = claimId;
+      setTimeout(() => {
+        set((state) => {
+          const load = state.loads.find((l) => l.id === loadId);
+          const claim = load?.accessorials?.find((a) => a.id === id);
+          if (!load || !claim || claim.status !== "claimed") return {};
+          const broker = state.brokers.find((b) => b.id === load.brokerId)?.company ?? "The broker";
+          return {
+            loads: state.loads.map((l) =>
+              l.id === loadId
+                ? {
+                    ...l,
+                    netProfit: (l.netProfit ?? 0) + claim.amount,
+                    accessorials: l.accessorials?.map((a) => (a.id === id ? { ...a, status: "approved" as const } : a)),
+                  }
+                : l,
+            ),
+            activity: [
+              {
+                id: uid("act"), timestamp: new Date().toISOString(), type: "rate_confirmed" as const, channel: "email" as const,
+                message: `${broker} approved $${claim.amount} detention`, detail: `${load.referenceNumber} · added to the invoice`,
+                loadId, carrierId: load.carrierId, severity: "success" as const,
+              },
+              ...state.activity,
+            ].slice(0, 80),
+          };
+        });
+      }, 5000);
+    },
 
     setSealNumber: (loadId, sealNumber) =>
       set((state) => ({
@@ -944,7 +1088,22 @@ export const useStore = create<StoreState>((set, get) => ({
     reportIncident: (driverId, truckId, type, note) =>
       set((state) => {
         const truck = state.trucks.find((t) => t.id === truckId);
-        const incident = createIncident(driverId, PRIMARY_CARRIER_ID, truckId, truck?.currentLoadId ?? null, type, note);
+        const load = state.loads.find((l) => l.id === truck?.currentLoadId);
+        const at = truck ? cityCoords(truck.currentCity, truck.currentState) : undefined;
+        const backups = state.trucks
+          .filter((t) => t.id !== truckId && t.status === "available" && !t.currentLoadId && t.equipmentType === truck?.equipmentType)
+          .map((t) => {
+            const c = cityCoords(t.currentCity, t.currentState);
+            return { t, miles: at && c ? Math.max(12, Math.round(distanceMiles(at, c) * 1.18)) : randInt(25, 70) };
+          })
+          .sort((a, b) => a.miles - b.miles);
+        const incident = createIncident(driverId, PRIMARY_CARRIER_ID, truckId, truck?.currentLoadId ?? null, type, note, {
+          load,
+          truck,
+          brokerName: load ? state.brokers.find((b) => b.id === load.brokerId)?.company : undefined,
+          backupTruck: backups[0]?.t,
+          backupMiles: backups[0]?.miles,
+        });
         return {
           incidents: [incident, ...state.incidents],
           activity: [incidentOpenedEvent(incident, truck), ...state.activity].slice(0, 80),
@@ -1347,6 +1506,31 @@ export const useStore = create<StoreState>((set, get) => ({
         return {
           loads: state.loads.map((l) => (l.id === updated.id ? updated : l)),
           activity: [...events, ...state.activity].slice(0, 80),
+        };
+      }),
+
+    startBrokerCall: (loadId) => {
+      set((state) => {
+        const load = state.loads.find((l) => l.id === loadId);
+        if (!load || load.stage !== "negotiating" || load.liveCall) return {};
+        const started = withLiveCall(load, state.brokers.find((b) => b.id === load.brokerId));
+        return {
+          loads: state.loads.map((l) => (l.id === loadId ? started.load : l)),
+          activity: [started.event, ...state.activity].slice(0, 80),
+        };
+      });
+      const { loads, actions } = get();
+      scheduleCallEnds(loads, actions.finishBrokerCall);
+    },
+
+    finishBrokerCall: (loadId, callId) =>
+      set((state) => {
+        const load = state.loads.find((l) => l.id === loadId);
+        if (!load?.liveCall || load.liveCall.id !== callId) return {};
+        const result = finishBrokerCall(load, state.brokers.find((b) => b.id === load.brokerId));
+        return {
+          loads: state.loads.map((l) => (l.id === loadId ? result.load : l)),
+          activity: [...result.events, ...state.activity].slice(0, 80),
         };
       }),
 

@@ -1,11 +1,12 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Lightbulb } from "lucide-react";
+import { Clock, Lightbulb, Sparkles, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
-import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks, useBrokerMap } from "@/lib/selectors";
+import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks, useBrokerMap, useDriverMap } from "@/lib/selectors";
+import { weekEarnings } from "@/lib/earnings";
 import { formatCurrency } from "@/lib/utils";
 
 const MONTHS = ["Apr", "May", "Jun", "Jul", "Aug", "Sep"];
@@ -15,6 +16,11 @@ export default function EarningsPage() {
   const loads = useCarrierLoads();
   const trucks = useCarrierTrucks();
   const brokers = useBrokerMap();
+  const driverMap = useDriverMap();
+  const week = weekEarnings(loads);
+  const perTruck = trucks
+    .map((t) => ({ truck: t, driver: driverMap.get(t.driverId ?? ""), w: weekEarnings(loads.filter((l) => l.truckId === t.id)) }))
+    .sort((a, b) => b.w.net - a.w.net);
 
   const delivered = loads.filter((l) => l.stage === "delivered");
   const netProfitTotal = loads.reduce((s, l) => s + (l.netProfit ?? 0), 0);
@@ -100,6 +106,74 @@ export default function EarningsPage() {
       <PageHeader title="Earnings" />
 
       <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
+        <section className="rounded-3xl bg-ink-950 p-5 text-white sm:p-6" aria-labelledby="week-title">
+          <p id="week-title" className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-white/50">
+            <Sparkles className="h-3.5 w-3.5" /> This week
+          </p>
+          <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-4xl font-semibold tabular tracking-tight">{formatCurrency(week.net)}</p>
+              <p className="mt-1 text-sm text-white/60">net profit on {formatCurrency(week.gross)} revenue · {week.loads.length} loads</p>
+            </div>
+            {week.overMarket > 0 && (
+              <p className="flex items-center gap-1.5 rounded-2xl bg-emerald-400/15 px-3.5 py-2 text-sm font-medium text-emerald-200">
+                <TrendingUp className="h-4 w-4" /> AI earned you {formatCurrency(week.overMarket)} more than market
+              </p>
+            )}
+          </div>
+          <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <WeekTile label="Revenue / mile, all miles" value={`$${week.rpmAll.toFixed(2)}`} />
+            <WeekTile label="Empty miles" value={`${week.emptyPct.toFixed(0)}%`} sub="Industry ~20%" />
+            <WeekTile label="Above posted rates" value={`+${formatCurrency(week.overPosted)}`} />
+            <WeekTile label="Detention billed by AI" value={week.extras ? `+${formatCurrency(week.extras)}` : "$0"} />
+          </div>
+          <p className="mt-4 flex items-center gap-1.5 text-xs text-white/55">
+            <Clock className="h-3.5 w-3.5" /> {week.hoursSaved} hours of dispatcher work done by the AI this week: broker calls, emails, rate cons, check calls and paperwork.
+          </p>
+        </section>
+
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>Profit by truck</CardTitle>
+              <CardDescription>This week. The AI plans each truck&apos;s next loads to lift the weakest ones.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="!pt-3">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] text-sm">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-ink-400">
+                    <th className="pb-2 font-medium">Truck</th>
+                    <th className="pb-2 font-medium">Loads</th>
+                    <th className="pb-2 text-right font-medium">Revenue</th>
+                    <th className="pb-2 text-right font-medium">Net</th>
+                    <th className="pb-2 text-right font-medium">$/mi all miles</th>
+                    <th className="pb-2 text-right font-medium">Empty</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {perTruck.map(({ truck, driver, w }) => (
+                    <tr key={truck.id}>
+                      <td className="py-2.5">
+                        <p className="font-medium text-ink-950">{truck.unitNumber}</p>
+                        <p className="text-xs text-ink-500">{driver?.name ?? "Unassigned"}</p>
+                      </td>
+                      <td className="py-2.5 tabular text-ink-700">{w.loads.length}</td>
+                      <td className="py-2.5 text-right tabular text-ink-700">{formatCurrency(w.gross)}</td>
+                      <td className="py-2.5 text-right font-semibold tabular text-ink-950">{formatCurrency(w.net)}</td>
+                      <td className="py-2.5 text-right tabular text-ink-700">{w.rpmAll ? `$${w.rpmAll.toFixed(2)}` : "—"}</td>
+                      <td className={`py-2.5 text-right tabular ${w.emptyPct > 20 ? "text-[var(--accent-danger)]" : "text-ink-700"}`}>
+                        {w.loads.length ? `${w.emptyPct.toFixed(0)}%` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Card><CardContent><StatTile label="Net profit" value={formatCurrency(netProfitTotal)} sublabel="This cycle" /></CardContent></Card>
           <Card><CardContent><StatTile label="Avg rate / mile" value={`$${avgRpm.toFixed(2)}`} /></CardContent></Card>
@@ -210,6 +284,15 @@ function InsightRow({ label, detail, value, tone }: { label: string; detail: str
       <p className="text-[11px] font-medium uppercase tracking-wider text-ink-400">{label}</p>
       <p className="mt-1 text-sm font-medium text-ink-950">{detail}</p>
       {value && <p className={`mt-0.5 text-xs font-medium tabular ${toneClass}`}>{value}</p>}
+    </div>
+  );
+}
+
+function WeekTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="rounded-2xl bg-white/5 px-3.5 py-3">
+      <p className="text-lg font-semibold tabular">{value}</p>
+      <p className="text-[11px] text-white/50">{label}{sub ? ` · ${sub}` : ""}</p>
     </div>
   );
 }

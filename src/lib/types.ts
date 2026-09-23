@@ -236,6 +236,20 @@ export interface NegotiationMessage {
 export interface CallTranscriptLine {
   speaker: "ai" | "broker" | "driver" | "carrier";
   text: string;
+  /** The dollar figure this line puts on the table, if any — drives the live rate ticker. */
+  offer?: number;
+}
+
+/** A broker call the AI is on right now: the whole script is decided up front and plays out in real time
+ *  (`atMs` after `startedAt`), so everyone listening hears the same call and it closes the deal when it ends. */
+export interface LiveBrokerCall {
+  id: string;
+  startedAt: string;
+  lines: (CallTranscriptLine & { atMs: number })[];
+  durationMs: number;
+  /** The broker's first number on the call, so the outcome can say how much the AI moved them. */
+  openingOffer: number;
+  finalRate: number;
 }
 
 export interface VoiceCall {
@@ -263,9 +277,26 @@ export interface LoadDocument {
 
 /** The driver's on-site checklist for the stop they're at — what they've confirmed and when. */
 export interface TripChecklist {
+  /** When the driver checked in at the shipper / receiver — starts the dock clock for detention. */
+  arrivedPickupAt?: string;
+  arrivedDeliveryAt?: string;
   loadedAt?: string;
   unloadedAt?: string;
   sealNumber?: string;
+  /** Stops where the AI has already told the broker free time ran out. */
+  detentionNoticeSent?: ("pickup" | "delivery")[];
+}
+
+/** Extra pay on top of the linehaul the AI claimed from the broker — detention today; lumper, layover, TONU
+ *  and the rest follow the same path. */
+export interface Accessorial {
+  id: string;
+  type: "detention";
+  stop: "pickup" | "delivery";
+  minutes: number;
+  amount: number;
+  status: "claimed" | "approved";
+  createdAt: string;
 }
 
 export interface Load {
@@ -294,8 +325,11 @@ export interface Load {
   truckId: string | null;
   messages: NegotiationMessage[];
   calls: VoiceCall[];
+  /** Set while the AI is on the phone with the broker about this load. */
+  liveCall?: LiveBrokerCall;
   documents: LoadDocument[];
   tripChecklist?: TripChecklist;
+  accessorials?: Accessorial[];
   createdAt: string;
   updatedAt: string;
   isChained: boolean;
@@ -374,6 +408,8 @@ export interface Escalation {
   /** Why Ops said no — captured on reject so a rejected escalation leaves more of a trail than a
    *  vanished card. Approvals don't ask for one; they're the expected outcome, not a decision to explain. */
   resolutionNote?: string;
+  /** Set when this approval is a step in an incident the AI is working (e.g. a repair quote). */
+  incidentId?: string;
 }
 
 export interface DriverMessage {
@@ -400,6 +436,10 @@ export interface IncidentStep {
   label: string;
   status: "pending" | "done";
   timestamp?: string;
+  /** The specifics the AI found or did: the shop, the new ETA, the backup truck. */
+  detail?: string;
+  /** "human" steps wait for the carrier's OK (an escalation) instead of the AI finishing them itself. */
+  owner?: "ai" | "human";
 }
 
 export interface Incident {
@@ -414,6 +454,8 @@ export interface Incident {
   status: "active" | "resolved";
   steps: IncidentStep[];
   humanNotified: boolean;
+  /** The approval request raised when the plan reached a step only a human can sign off on. */
+  escalationId?: string;
   /** Formal insurance claim, kicked off from Compliance — separate from the automated incident-response
    *  steps above, which just get everyone safe and moving again. */
   claimStartedAt?: string;

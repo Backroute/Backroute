@@ -10,11 +10,13 @@ import { cityCoords, pickupLegStart, type LatLng } from "@/lib/trip-geo";
 import { tripState } from "@/lib/trip-state";
 import { SwipeToConfirm } from "./swipe-to-confirm";
 import { TripMap } from "./trip-map";
+import { BrokerCallRow } from "./broker-call";
 import {
   AutoPickRow,
   CardShell,
   CompletionBar,
   DocumentSlot,
+  DockTimer,
   DriverTripCard,
   InspectionLink,
   LiveDot,
@@ -50,6 +52,7 @@ export function TripCompactCard({
   const progress = s.card === "booking" ? 0 : s.arrived ? 1 : s.legP;
   const docName = s.card === "pickup" ? "BOL" : "POD";
   const action = driver ? s.next.action : null;
+  const contact = useStore((st) => st.brokers.find((b) => b.id === load.brokerId)?.contact);
 
   return (
     <CardShell className="p-0">
@@ -91,6 +94,18 @@ export function TripCompactCard({
             <InspectionLink kind="pre_trip">Start</InspectionLink>
           ) : null}
         </div>
+
+        {s.arrived && (
+          <div className="mt-2.5">
+            <DockTimer load={load} brokerName={props.brokerName} compact />
+          </div>
+        )}
+
+        {load.liveCall && (
+          <div className="mt-3">
+            <BrokerCallRow load={load} brokerName={props.brokerName ?? "the broker"} contactName={contact} onCall={() => {}} compact />
+          </div>
+        )}
 
         {(action === "arrive" || action === "start" || action === "complete") && (
           <div className="mt-3">

@@ -14,6 +14,7 @@ import { CounterOfferButton } from "@/components/shared/counter-offer-button";
 import { NegotiationComposer } from "@/components/shared/negotiation-composer";
 import { NegotiationThread } from "@/components/shared/negotiation-thread";
 import { CallTranscript } from "@/components/shared/call-transcript";
+import { BrokerCallRow } from "@/components/shared/broker-call";
 import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 import { LiveDot } from "@/components/shared/live-dot";
 import { StopsTimeline } from "@/components/shared/stops-timeline";
@@ -55,6 +56,7 @@ export default function LoadDetailPage() {
   const cancelLoad = useStore((s) => s.actions.cancelLoad);
   const declineLoad = useStore((s) => s.actions.declineLoad);
   const reassignTruck = useStore((s) => s.actions.reassignTruck);
+  const startBrokerCall = useStore((s) => s.actions.startBrokerCall);
   const [calling, setCalling] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [declining, setDeclining] = useState(false);
@@ -186,6 +188,11 @@ export default function LoadDetailPage() {
               )}
             </CardHeader>
             <CardContent className="!pt-4">
+              {(load.liveCall || (load.stage === "negotiating" && !load.calls.length)) && (
+                <div className="mb-4 rounded-2xl bg-ink-950 p-3 text-white">
+                  <BrokerCallRow load={load} brokerName={broker?.company ?? "the broker"} contactName={broker?.contact} onCall={() => startBrokerCall(load.id)} />
+                </div>
+              )}
               <NegotiationThread messages={load.messages} />
               {load.calls.length > 0 && (
                 <div className="mt-4 flex flex-col gap-4">
@@ -193,6 +200,7 @@ export default function LoadDetailPage() {
                     <CallTranscript
                       key={call.id}
                       call={call}
+                      brokerName={broker?.company}
                       title={call.transcript.some((l) => l.speaker === "driver" || l.speaker === "carrier") ? "Your call with AI Dispatcher" : "Voice Agent Call"}
                     />
                   ))}

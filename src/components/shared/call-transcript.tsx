@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Phone, PhoneCall } from "lucide-react";
+import { ChevronDown, ChevronUp, Headphones, Phone, PhoneCall } from "lucide-react";
 import { cn, formatDuration } from "@/lib/utils";
 import type { CallTranscriptLine, VoiceCall } from "@/lib/types";
+import { BrokerCallModal } from "./broker-call";
 
 const SPEAKER_LABEL: Record<CallTranscriptLine["speaker"], string> = {
   ai: "AI",
@@ -12,8 +13,21 @@ const SPEAKER_LABEL: Record<CallTranscriptLine["speaker"], string> = {
   carrier: "You",
 };
 
-export function CallTranscript({ call, title = "Voice Agent Call", defaultCollapsed = false }: { call: VoiceCall; title?: string; defaultCollapsed?: boolean }) {
+export function CallTranscript({
+  call,
+  title = "Voice Agent Call",
+  defaultCollapsed = false,
+  brokerName,
+}: {
+  call: VoiceCall;
+  title?: string;
+  defaultCollapsed?: boolean;
+  /** Set for the AI's broker calls, which can be replayed with the live call view. */
+  brokerName?: string;
+}) {
   const [expanded, setExpanded] = useState(!defaultCollapsed);
+  const [replaying, setReplaying] = useState(false);
+  const canReplay = !!brokerName && call.transcript.some((l) => l.speaker === "broker");
 
   return (
     <div className="rounded-2xl border border-line bg-ink-50/60 p-4">
@@ -24,8 +38,16 @@ export function CallTranscript({ call, title = "Voice Agent Call", defaultCollap
           </span>
           {title}
         </div>
-        <span className="text-[11px] tabular text-ink-500">{formatDuration(call.durationSec)}</span>
+        <span className="flex items-center gap-3">
+          {canReplay && (
+            <button type="button" onClick={() => setReplaying(true)} className="flex items-center gap-1 text-xs font-medium text-ink-700 hover:text-ink-950">
+              <Headphones className="h-3.5 w-3.5" /> Replay
+            </button>
+          )}
+          <span className="text-[11px] tabular text-ink-500">{formatDuration(call.durationSec)}</span>
+        </span>
       </div>
+      {replaying && brokerName && <BrokerCallModal recorded={call} brokerName={brokerName} onClose={() => setReplaying(false)} />}
       <div className="mt-3 flex items-end gap-[3px] h-8">
         {Array.from({ length: 36 }).map((_, i) => (
           <span
