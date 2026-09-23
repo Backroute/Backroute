@@ -42,6 +42,70 @@ export function nextStop(load: Load): { label: string; window: string } {
   return { label: "Pickup", window: load.pickupWindow };
 }
 
+/** Carrier-facing version of the same status: who is actually working the load right now, so a fleet
+ *  row reads as "AI is negotiating" vs. "driver is loading" at a glance. */
+export const LOAD_STATUS_CARRIER: Partial<Record<LoadStage, { owner: "ai" | "driver"; text: string }>> = {
+  negotiating: { owner: "ai", text: "AI negotiating rate" },
+  rate_confirmed: { owner: "ai", text: "AI dispatching driver" },
+  booked: { owner: "ai", text: "AI dispatching driver" },
+  dispatched: { owner: "driver", text: "Heading to pickup" },
+  at_pickup: { owner: "driver", text: "Loading at pickup" },
+  in_transit: { owner: "driver", text: "En route to delivery" },
+  at_delivery: { owner: "driver", text: "Unloading at delivery" },
+  delivered: { owner: "ai", text: "Invoicing broker" },
+};
+
+/** When the driver has nothing to tap, say so and say what the AI is doing instead — an empty action
+ *  slot otherwise reads like something is broken or waiting on them. */
+export const DRIVER_IDLE_NOTE: Partial<Record<LoadStage, string>> = {
+  negotiating: "Nothing for you yet. AI is getting the best rate from the broker.",
+  rate_confirmed: "Nothing for you yet. AI is sending the rate con and will dispatch you.",
+  booked: "Nothing for you yet. AI is sending the rate con and will dispatch you.",
+};
+
+export type JourneyStepKey = "book" | "pickup" | "deliver" | "paid" | "next";
+export type JourneyStepState = "done" | "current" | "upcoming";
+
+/** The full job, start to finish, and who owns each step — the AI books, invoices and lines up the
+ *  next load; the driver only has to physically pick up and deliver. */
+export const JOURNEY_STEPS: { key: JourneyStepKey; label: string; owner: "ai" | "driver" }[] = [
+  { key: "book", label: "Book", owner: "ai" },
+  { key: "pickup", label: "Pickup", owner: "driver" },
+  { key: "deliver", label: "Deliver", owner: "driver" },
+  { key: "paid", label: "Get paid", owner: "ai" },
+  { key: "next", label: "Next load", owner: "ai" },
+];
+
+/** Where the truck's following load stands — the last journey step runs in parallel with the trip. */
+export type NextLoadStatus = "none" | "choose" | "negotiating" | "locked";
+
+export function nextLoadStatus(next: Load | undefined, hasOffers: boolean): NextLoadStatus {
+  if (next) return next.stage === "negotiating" ? "negotiating" : "locked";
+  return hasOffers ? "choose" : "none";
+}
+
+function journeyIndex(stage: LoadStage): number {
+  if (stage === "dispatched" || stage === "at_pickup") return 1;
+  if (stage === "in_transit" || stage === "at_delivery") return 2;
+  if (stage === "delivered") return 3;
+  return 0;
+}
+
+export function journeyStates(stage: LoadStage, next: NextLoadStatus): { state: JourneyStepState; needsYou: boolean }[] {
+  const idx = journeyIndex(stage);
+  return JOURNEY_STEPS.map((step, i) => {
+    if (step.key === "next") {
+      if (next === "locked") return { state: "done", needsYou: false };
+      if (next === "choose") return { state: "current", needsYou: true };
+      // The AI starts hunting for the follow-on load once the truck is rolling to delivery.
+      if (next === "negotiating" || idx >= 2) return { state: "current", needsYou: false };
+      return { state: "upcoming", needsYou: false };
+    }
+    const state: JourneyStepState = i < idx ? "done" : i === idx ? "current" : "upcoming";
+    return { state, needsYou: state === "current" && step.owner === "driver" };
+  });
+}
+
 /** What the AI dispatcher is doing on this load right now — the load detail page surfaces this as a
  *  small live badge so it reads as an actively-managed AI dispatch, not just a static record. */
 export function aiDispatcherNote(stage: LoadStage): string {
