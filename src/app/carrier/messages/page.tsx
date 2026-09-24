@@ -9,6 +9,8 @@ import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 import { usePrimaryCarrier } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { AiTyping, LiveAiMark } from "@/components/shared/ai-typing";
+import { useAiTyping } from "@/lib/ai/client";
 
 /** The carrier's counterpart to the driver Messages tab — a fleet-level channel to the AI dispatcher
  *  that isn't tied to any one load, for "how's my week going" instead of "push this rate." */
@@ -20,9 +22,10 @@ export default function CarrierMessagesPage() {
   const [calling, setCalling] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
+  const typing = useAiTyping((s) => !!s.threads[`owner:${carrier.id}`]);
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
+  }, [messages.length, typing]);
 
   function handleSend() {
     if (!value.trim()) return;
@@ -63,12 +66,14 @@ export default function CarrierMessagesPage() {
                 )}
               >
                 <p className="leading-relaxed">{m.content}</p>
-                <p className={cn("mt-1 text-[10px]", m.from === "carrier" ? "text-white/50" : "text-ink-400")}>
+                <p className={cn("mt-1 flex items-center gap-1.5 text-[10px]", m.from === "carrier" ? "text-white/50" : "text-ink-400")}>
                   <TimeAgo iso={m.timestamp} />
+                  {m.ai && <LiveAiMark label="Live AI" />}
                 </p>
               </div>
             </div>
           ))}
+          <AiTyping thread={`owner:${carrier.id}`} />
           <div ref={endRef} />
         </div>
 

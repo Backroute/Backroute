@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
 import { usePrimaryDriver } from "@/lib/selectors";
 import { TimeAgo } from "@/components/shared/time-ago";
+import { AiTyping, LiveAiMark } from "@/components/shared/ai-typing";
+import { useAiTyping } from "@/lib/ai/client";
 
 export default function DriverMessagesPage() {
   const driver = usePrimaryDriver();
@@ -15,9 +17,10 @@ export default function DriverMessagesPage() {
   const startInboundCall = useStore((s) => s.actions.startInboundCall);
   const endRef = useRef<HTMLDivElement>(null);
 
+  const typing = useAiTyping((s) => !!s.threads[`driver:${driver.id}`]);
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
+  }, [messages.length, typing]);
 
   function handleSend() {
     if (!value.trim()) return;
@@ -46,12 +49,14 @@ export default function DriverMessagesPage() {
           <div key={m.id} className={cn("flex", m.from === "driver" ? "justify-end" : "justify-start")}>
             <div className={cn("max-w-[80%] rounded-2xl px-4 py-2.5 text-sm", m.from === "driver" ? "bg-ink-950 text-white rounded-br-sm" : "bg-ink-100 text-ink-900 rounded-bl-sm")}>
               <p className="leading-relaxed">{m.content}</p>
-              <p className={cn("mt-1 text-[10px]", m.from === "driver" ? "text-white/50" : "text-ink-400")}>
+              <p className={cn("mt-1 flex items-center gap-1.5 text-[10px]", m.from === "driver" ? "text-white/50" : "text-ink-400")}>
                 <TimeAgo iso={m.timestamp} />
+                {m.ai && <LiveAiMark />}
               </p>
             </div>
           </div>
         ))}
+        <AiTyping thread={`driver:${driver.id}`} />
         <div ref={endRef} />
       </div>
 

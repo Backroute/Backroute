@@ -88,6 +88,35 @@ For real MC-number lookups at sign-up:
 
 Without it, sign-up shows the demo carrier and says so.
 
+## Real AI (Claude)
+
+The AI's answers can come from Claude instead of the scripted demo replies. This is separate from accounts, and you can turn it on first.
+
+**What it does now:**
+- **Ask the AI** (owner dashboard) and driver **Messages** answer from that person's own fleet data. Drivers are answered in their own language. A company driver's data never includes the broker's rate or the company's profit. Real answers are marked "Live AI".
+- **Check the broker's rate con** on a load page. Upload the PDF and the AI reads the rate, broker and MC, dates, equipment, detention, payment terms and fees. It flags anything that doesn't match what was agreed on the load, and the rate is also compared in code as a double check.
+
+**What it doesn't do yet:**
+- It doesn't act from chat. It can't book, negotiate, approve or call anyone. It says where to do it in the app.
+- Telling the AI what to do on a rate it's negotiating still goes through the scripted negotiation flow.
+
+**Turning it on:**
+
+1. At console.anthropic.com, create an API key and add a payment method.
+2. Set `ANTHROPIC_API_KEY` in Vercel (and in `.env.local` locally). It's used only on the server; never put it in a `NEXT_PUBLIC_` variable.
+3. Redeploy.
+
+**Who gets it:**
+- Anyone signed in to a real account.
+- Demo visitors get the scripted replies, unless you set `AI_IN_DEMO=on`. Then they get real answers too, up to 15 an hour each.
+- That limit is per server instance, not a hard spending cap. Set a monthly spend limit in the Anthropic console as well.
+
+**Cost:**
+- The app uses Claude Opus 5, at $5 per million input tokens and $25 per million output tokens. A chat answer, which sends the fleet snapshot, typically costs a few cents. Reading a rate con costs a bit more.
+- If Claude declines a request on safety grounds, the API retries it on a fallback model automatically (server-side fallback).
+
+The AI has been tested here against a local stand-in for the Claude API (requests, fallbacks, PDF upload, structured reading, access rules), not against the live API. Try a few questions and one real rate con after you add the key.
+
 ## Adding people
 
 The owner does this in **Settings → Billing & Team → Who can sign in**:

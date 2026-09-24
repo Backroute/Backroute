@@ -34,6 +34,8 @@ import { computeDriverPay, payLabel } from "./settlements";
 import { brokerCorrects, RATE_CON_FIX_MS, RATE_CON_READ_MS, refusedSummary, reviewRateCon, savedBy } from "./rate-con";
 import { pack, type QuickPhrase } from "./lang";
 import { weekEarnings } from "./earnings";
+import { askAi, setTyping } from "./ai/client";
+import { driverSnapshot, ownerSnapshot } from "./ai/snapshot";
 import {
   briefCall,
   CALL_GAP_MS,
@@ -59,6 +61,7 @@ import {
 } from "./dispatch-calls";
 import { clamp, formatDuration } from "./utils";
 import type {
+  RateConPdfReading,
   ActivityEvent,
   Broker,
   Carrier,
@@ -823,6 +826,8 @@ interface StoreState {
     /** Local, regional or long haul. Changing it drops any waiting offers that no longer fit so the AI re-sources. */
     setRunType: (driverId: string, runType: RunType) => void;
     requestBetterRate: (loadId: string, actor: "driver" | "carrier", amount?: number) => void;
+    /** Keeps the real AI's reading of an uploaded rate con on the load, and logs what it found. */
+    saveRateConReading: (loadId: string, reading: RateConPdfReading) => void;
     /** Cancels a booked load that's fallen through (broker pulled it, detention refused, etc.). A truck
      *  already dispatched or at pickup earns the broker's TONU fee; earlier than that, no fee applies. */
     cancelLoad: (loadId: string, reason: string) => void;
@@ -1407,66 +1412,109 @@ export const useStore = create<StoreState>((set, get) => ({
     sendDriverMessage: (driverId, content) => {
       const msg: DriverMessage = { id: uid("dm"), driverId, from: "driver", content, timestamp: new Date().toISOString() };
       set((state) => ({ driverMessages: [...state.driverMessages, msg] }));
+      const thread = `driver:${driverId}`;
+      setTyping(thread, true);
 
-      setTimeout(() => {
-        set((state) => {
-          const target = findNegotiatingLoadForDriver(state, driverId);
-          const category = classifyInstruction(content);
+      // Telling the AI what to do on a rate it's negotiating is an action, handled here. Everything else is a
+      // question: the real AI answers when it's available, and the scripted reply covers when it isn't.
+      const before = get();
+      const negotiating = findNegotiatingLoadForDriver(before, driverId) && classifyInstruction(content) !== "general";
+      const history = before.driverMessages.filter((m) => m.driverId === driverId && m.id !== msg.id).slice(-12);
+      const asked = negotiating
+        ? Promise.resolve(null)
+        : askAi({
+            role: "driver",
+            question: content,
+            history: history.map((m) => ({ from: m.from === "driver" ? "user" : "ai", text: m.content })),
+            snapshot: driverSnapshot(before, driverId),
+          });
 
-          if (target && category !== "general") {
-            const broker = state.brokers.find((b) => b.id === target.brokerId);
-            const { load: updated, events } = applyNegotiationInstruction(target, broker, "driver", content);
+      void asked.then((answer) => {
+        if (answer) {
+          const reply: DriverMessage = { id: uid("dm"), driverId, from: "ai", content: answer, timestamp: new Date().toISOString(), ai: true };
+          set((state) => ({ driverMessages: [...state.driverMessages, reply] }));
+          setTyping(thread, false);
+          return;
+        }
+        setTimeout(() => {
+          setTyping(thread, false);
+          set((state) => {
+            const target = findNegotiatingLoadForDriver(state, driverId);
+            const category = classifyInstruction(content);
+
+            if (target && category !== "general") {
+              const broker = state.brokers.find((b) => b.id === target.brokerId);
+              const { load: updated, events } = applyNegotiationInstruction(target, broker, "driver", content);
+              const reply: DriverMessage = {
+                id: uid("dm"), driverId, from: "ai",
+                content: NEGOTIATION_REPLY[category](broker?.company ?? "the broker", target.lane.origin, target.lane.destination),
+                timestamp: new Date().toISOString(),
+              };
+              return {
+                loads: state.loads.map((l) => (l.id === updated.id ? updated : l)),
+                activity: [...events, ...state.activity].slice(0, 80),
+                driverMessages: [...state.driverMessages, reply],
+              };
+            }
+
+            if (!target && category === "rate") {
+              const reply: DriverMessage = {
+                id: uid("dm"), driverId, from: "ai",
+                content: "Nothing open to negotiate on right now. I'll push for the best number the moment I'm working a rate for you.",
+                timestamp: new Date().toISOString(),
+              };
+              return { driverMessages: [...state.driverMessages, reply] };
+            }
+
+            const driver = state.drivers.find((d) => d.id === driverId);
+            const truck = driver ? state.trucks.find((t) => t.id === driver.truckId) : undefined;
+            const currentLoad = truck?.currentLoadId ? state.loads.find((l) => l.id === truck.currentLoadId) : undefined;
             const reply: DriverMessage = {
               id: uid("dm"), driverId, from: "ai",
-              content: NEGOTIATION_REPLY[category](broker?.company ?? "the broker", target.lane.origin, target.lane.destination),
-              timestamp: new Date().toISOString(),
-            };
-            return {
-              loads: state.loads.map((l) => (l.id === updated.id ? updated : l)),
-              activity: [...events, ...state.activity].slice(0, 80),
-              driverMessages: [...state.driverMessages, reply],
-            };
-          }
-
-          if (!target && category === "rate") {
-            const reply: DriverMessage = {
-              id: uid("dm"), driverId, from: "ai",
-              content: "Nothing open to negotiate on right now. I'll push for the best number the moment I'm working a rate for you.",
+              content: craftDriverReply(content, { driver, currentLoad }),
               timestamp: new Date().toISOString(),
             };
             return { driverMessages: [...state.driverMessages, reply] };
-          }
-
-          const driver = state.drivers.find((d) => d.id === driverId);
-          const truck = driver ? state.trucks.find((t) => t.id === driver.truckId) : undefined;
-          const currentLoad = truck?.currentLoadId ? state.loads.find((l) => l.id === truck.currentLoadId) : undefined;
-          const reply: DriverMessage = {
-            id: uid("dm"), driverId, from: "ai",
-            content: craftDriverReply(content, { driver, currentLoad }),
-            timestamp: new Date().toISOString(),
-          };
-          return { driverMessages: [...state.driverMessages, reply] };
-        });
-      }, 1100 + Math.random() * 1000);
+          });
+        }, 700 + Math.random() * 800);
+      });
     },
 
     sendCarrierMessage: (carrierId, content) => {
       const msg: CarrierMessage = { id: uid("cm"), carrierId, from: "carrier", content, timestamp: new Date().toISOString() };
       set((state) => ({ carrierMessages: [...state.carrierMessages, msg] }));
+      const thread = `owner:${carrierId}`;
+      setTyping(thread, true);
 
-      setTimeout(() => {
-        set((state) => {
-          const loads = state.loads.filter((l) => l.carrierId === carrierId);
-          const trucks = state.trucks.filter((t) => t.carrierId === carrierId);
-          const escalations = state.escalations.filter((e) => e.carrierId === carrierId);
-          const reply: CarrierMessage = {
-            id: uid("cm"), carrierId, from: "ai",
-            content: craftCarrierReply(content, { loads, trucks, escalations }),
-            timestamp: new Date().toISOString(),
-          };
-          return { carrierMessages: [...state.carrierMessages, reply] };
-        });
-      }, 1100 + Math.random() * 1000);
+      const before = get();
+      const history = before.carrierMessages.filter((m) => m.carrierId === carrierId && m.id !== msg.id).slice(-12);
+      void askAi({
+        role: "owner",
+        question: content,
+        history: history.map((m) => ({ from: m.from === "carrier" ? "user" : "ai", text: m.content })),
+        snapshot: ownerSnapshot(before, AUTONOMY_LABEL),
+      }).then((answer) => {
+        if (answer) {
+          const reply: CarrierMessage = { id: uid("cm"), carrierId, from: "ai", content: answer, timestamp: new Date().toISOString(), ai: true };
+          set((state) => ({ carrierMessages: [...state.carrierMessages, reply] }));
+          setTyping(thread, false);
+          return;
+        }
+        setTimeout(() => {
+          setTyping(thread, false);
+          set((state) => {
+            const loads = state.loads.filter((l) => l.carrierId === carrierId);
+            const trucks = state.trucks.filter((t) => t.carrierId === carrierId);
+            const escalations = state.escalations.filter((e) => e.carrierId === carrierId);
+            const reply: CarrierMessage = {
+              id: uid("cm"), carrierId, from: "ai",
+              content: craftCarrierReply(content, { loads, trucks, escalations }),
+              timestamp: new Date().toISOString(),
+            };
+            return { carrierMessages: [...state.carrierMessages, reply] };
+          });
+        }, 700 + Math.random() * 800);
+      });
     },
 
     updateSettings: (partial) => set((state) => ({ settings: { ...state.settings, ...partial } })),
@@ -2066,6 +2114,23 @@ export const useStore = create<StoreState>((set, get) => ({
             },
             ...state.activity,
           ].slice(0, 80),
+        };
+      }),
+
+    saveRateConReading: (loadId, reading) =>
+      set((state) => {
+        const load = state.loads.find((l) => l.id === loadId);
+        if (!load) return {};
+        const serious = reading.mismatches.filter((m) => m.serious).length;
+        const event: ActivityEvent = {
+          id: uid("act"), timestamp: reading.readAt, type: "document_captured", loadId, carrierId: load.carrierId,
+          message: !reading.isRateCon ? "Uploaded file isn't a rate con" : serious ? `Rate con doesn't match: ${serious} thing${serious === 1 ? "" : "s"} to fix` : "Rate con matches what was agreed",
+          detail: `${reading.fileName} · read by AI`,
+          severity: !reading.isRateCon || serious ? "warning" : "success",
+        };
+        return {
+          loads: state.loads.map((l) => (l.id === loadId ? { ...l, rateConReading: reading, updatedAt: new Date().toISOString() } : l)),
+          activity: [event, ...state.activity].slice(0, 80),
         };
       }),
 

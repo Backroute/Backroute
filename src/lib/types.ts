@@ -432,6 +432,8 @@ export interface Load {
   surchargePct?: number;
   /** The AI's check of the rate confirmation against what was negotiated. Loads wait here until it's signed. */
   rateCon?: RateConReview;
+  /** The real AI's reading of a rate con PDF the owner uploaded, checked against what was agreed on this load. */
+  rateConReading?: RateConPdfReading;
   /** Intermediate stops beyond the lane's origin/destination — absent or empty means a normal single-pickup,
    *  single-delivery load, which is most of them. */
   stops?: LoadStop[];
@@ -505,6 +507,8 @@ export interface DriverMessage {
   from: "driver" | "ai";
   content: string;
   timestamp: string;
+  /** Answered by the real AI (Claude) rather than the scripted demo replies. */
+  ai?: boolean;
 }
 
 /** Fleet-level chat — not tied to any one load, unlike negotiation messages. The carrier's equivalent
@@ -515,6 +519,8 @@ export interface CarrierMessage {
   from: "carrier" | "ai";
   content: string;
   timestamp: string;
+  /** Answered by the real AI (Claude) rather than the scripted demo replies. */
+  ai?: boolean;
 }
 
 export type IncidentType = "breakdown" | "accident" | "delay" | "weather";
@@ -628,4 +634,24 @@ export interface DispatchCall {
   heldReason?: string;
   /** Set once the text copy has gone to the driver's Messages. */
   textedAt?: string;
+}
+
+/** What the real AI read on an uploaded rate con, and where it differs from the agreed terms. */
+export interface RateConPdfReading {
+  fileName: string;
+  readAt: string;
+  isRateCon: boolean;
+  broker: string | null;
+  brokerMc: string | null;
+  loadNumber: string | null;
+  totalRate: number | null;
+  pickup: string | null;
+  delivery: string | null;
+  equipment: string | null;
+  detention: string | null;
+  paymentTerms: string | null;
+  finesAndFees: string[];
+  mismatches: { item: string; agreed: string; onDoc: string; serious: boolean }[];
+  otherConcerns: string[];
+  summary: string;
 }
