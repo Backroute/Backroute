@@ -348,6 +348,32 @@ export interface Accessorial {
   createdAt: string;
 }
 
+/** One thing on a rate confirmation that doesn't match what was agreed. */
+export interface RateConIssue {
+  id: string;
+  field: "rate" | "detention" | "fines" | "payment" | "pickup" | "mc";
+  label: string;
+  agreed: string;
+  onDoc: string;
+  /** Dollars it would cost the carrier if signed as is, when that can be counted. */
+  cost: number;
+  /** Must be fixed or decided before the load can move; otherwise worth fixing but not a stopper. */
+  block: boolean;
+  /** open → asked the broker; fixed on a corrected rate con; refused by the broker; accepted by the owner anyway. */
+  status: "open" | "fixed" | "refused" | "accepted";
+}
+
+/** The AI's read of a load's rate confirmation before it's signed. */
+export interface RateConReview {
+  /** checking → clean/signed, or fixing (asked the broker) → signed, or needs_you (broker refused / MC mismatch). */
+  status: "checking" | "fixing" | "needs_you" | "signed" | "walked";
+  startedAt: string;
+  askedAt?: string;
+  signedAt?: string;
+  issues: RateConIssue[];
+  escalationId?: string;
+}
+
 export interface Load {
   id: string;
   referenceNumber: string;
@@ -404,6 +430,8 @@ export interface Load {
   reloadMarket?: "strong" | "fair" | "weak";
   /** Extra percentage the AI added to its ask because this broker pays slowly or disputes detention. */
   surchargePct?: number;
+  /** The AI's check of the rate confirmation against what was negotiated. Loads wait here until it's signed. */
+  rateCon?: RateConReview;
   /** Intermediate stops beyond the lane's origin/destination — absent or empty means a normal single-pickup,
    *  single-delivery load, which is most of them. */
   stops?: LoadStop[];
@@ -467,6 +495,8 @@ export interface Escalation {
   resolutionNote?: string;
   /** Set when this approval is a step in an incident the AI is working (e.g. a repair quote). */
   incidentId?: string;
+  /** Set when this is a rate con the broker wouldn't correct: approve signs it anyway, reject walks away. */
+  rateConLoadId?: string;
 }
 
 export interface DriverMessage {

@@ -40,6 +40,12 @@ const BOOKING_NEXT: Partial<Record<LoadStage, string>> = {
   booked: "Dispatching the driver",
 };
 
+/** Where the rate con check is, when that's what the load is waiting on. */
+function rateConStep(load: Load): string | undefined {
+  if (load.stage !== "rate_confirmed" || !load.rateCon) return undefined;
+  return { checking: "Checking the rate con", fixing: "Getting the broker to fix the rate con", needs_you: "Rate con needs the owner's OK", signed: undefined, walked: undefined }[load.rateCon.status];
+}
+
 export function tripCardFor(stage: LoadStage): TripCard {
   if (BOOKING_STAGES.includes(stage)) return "booking";
   return stage === "dispatched" || stage === "at_pickup" ? "pickup" : "delivery";
@@ -54,7 +60,7 @@ export function tripState(load: Load, now: number | null, needsPreTrip: boolean)
     return {
       card, arrived: false, legP: 0, milesLeft: 0, drive: "", handled: false, docDone: false,
       done: BOOKING_PROGRESS[load.stage] ?? 0.2, total: 1, ready: false,
-      next: { title: load.liveCall ? "On the phone with the broker" : BOOKING_NEXT[load.stage] ?? "Booking the load", owner: "ai", action: null },
+      next: { title: load.liveCall ? "On the phone with the broker" : (rateConStep(load) ?? BOOKING_NEXT[load.stage] ?? "Booking the load"), owner: "ai", action: null },
     };
   }
 

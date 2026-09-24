@@ -17,6 +17,7 @@ import { CallTranscript } from "@/components/shared/call-transcript";
 import { BrokerCallRow } from "@/components/shared/broker-call";
 import { PaymentCard } from "@/components/shared/payment-card";
 import { VoiceCallModal } from "@/components/shared/voice-call-modal";
+import { RateConCard } from "@/components/shared/rate-con-card";
 import { LiveDot } from "@/components/shared/live-dot";
 import { StopsTimeline } from "@/components/shared/stops-timeline";
 import { TripStepper } from "@/components/shared/trip-stepper";
@@ -214,6 +215,8 @@ export default function LoadDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          <RateConCard load={load} />
 
           <Card>
             <CardHeader>

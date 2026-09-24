@@ -31,6 +31,7 @@ import { bookableBrokers, type BrokerPolicy } from "./broker-policy";
 import { homeTimeStatus } from "./home";
 import { HOME_TIME_OPTIONS, laneFits, RUN_TYPE_DETAIL, RUN_TYPE_LABEL } from "./run-types";
 import { computeDriverPay, payLabel } from "./settlements";
+import { brokerCorrects, RATE_CON_FIX_MS, RATE_CON_READ_MS, refusedSummary, reviewRateCon, savedBy } from "./rate-con";
 import { pack, type QuickPhrase } from "./lang";
 import { weekEarnings } from "./earnings";
 import {
@@ -69,6 +70,7 @@ import type {
   DriverPrefs,
   HosStatus,
   Lang,
+  RateConReview,
   Translations,
   DvirInspection,
   DvirItem,
@@ -231,6 +233,97 @@ function openIncident(
     backupMiles: backups[0]?.miles,
   });
   return { incident, event: incidentOpenedEvent(incident, truck) };
+}
+
+// ——— Rate confirmations ———
+
+/** Every rate con the AI reads before it's signed: checked, sent back to the broker when it's wrong, and only put
+ *  in front of the owner when the broker won't fix it. A load doesn't move past "rate confirmed" until it's signed. */
+function runRateCons(loads: Load[], brokers: Broker[], escalations: Escalation[], events: ActivityEvent[]) {
+  const now = Date.now();
+  const iso = new Date(now).toISOString();
+  for (const load of loads) {
+    if (load.stage !== "rate_confirmed" || load.carrierId !== PRIMARY_CARRIER_ID) continue;
+    const broker = brokers.find((b) => b.id === load.brokerId);
+    const name = broker?.company ?? "the broker";
+    const base = { timestamp: iso, loadId: load.id, carrierId: load.carrierId };
+    let review = load.rateCon;
+
+    if (!review) {
+      review = reviewRateCon(load, broker);
+    } else if (review.status === "checking" && now - Date.parse(review.startedAt) > RATE_CON_READ_MS) {
+      const mc = review.issues.find((i) => i.field === "mc");
+      if (!review.issues.length) {
+        review = { ...review, status: "signed", signedAt: iso };
+        events.push({ ...base, id: uid("act"), type: "document_captured", message: `AI checked the rate con from ${name}: matches what was agreed`, detail: `${load.referenceNumber} · rate, detention, pickup and terms all match. Signed.`, severity: "success" });
+      } else if (mc) {
+        // Not a typo to fix: someone other than the broker the AI negotiated with sent this. Nothing moves until a person looks.
+        const esc: Escalation = {
+          id: uid("esc"), loadId: load.id, carrierId: load.carrierId, rateConLoadId: load.id, createdAt: iso, status: "open", complexity: "routine",
+          reason: `Possible double-brokering on ${load.lane.origin} → ${load.lane.destination}: the rate con came from ${mc.onDoc}, not ${name}. The AI hasn't signed it. Approve only if you've confirmed it with ${name} by phone.`,
+          recommendedAction: "reject", recommendedLabel: "Walk away from this load",
+        };
+        escalations.unshift(esc);
+        review = { ...review, status: "needs_you", escalationId: esc.id };
+        events.push({ ...base, id: uid("act"), type: "escalation", message: `Rate con from ${name} has a different MC on it`, detail: esc.reason, severity: "warning" });
+      } else {
+        review = { ...review, status: "fixing", askedAt: iso };
+        events.push({
+          ...base, id: uid("act"), type: "negotiation_email", channel: "email",
+          message: `AI found ${review.issues.length} problem${review.issues.length === 1 ? "" : "s"} on the rate con from ${name}`,
+          detail: `${review.issues.map((i) => `${i.label}: says ${i.onDoc}, agreed ${i.agreed}`).join("; ")}. Asked for a corrected rate con.`,
+          severity: "warning",
+        });
+      }
+    } else if (review.status === "fixing" && now - Date.parse(review.askedAt ?? review.startedAt) > RATE_CON_FIX_MS) {
+      review = brokerCorrects(review, load.id);
+      const saved = savedBy(review);
+      if (review.issues.every((i) => i.status === "fixed")) {
+        review = { ...review, status: "signed", signedAt: iso };
+        events.push({ ...base, id: uid("act"), type: "document_captured", message: `${name} sent a corrected rate con. AI signed it`, detail: `${load.referenceNumber}${saved ? ` · kept $${saved.toLocaleString()} that would have been lost` : " · terms now match what was agreed"}`, severity: "success" });
+      } else {
+        const esc: Escalation = {
+          id: uid("esc"), loadId: load.id, carrierId: load.carrierId, rateConLoadId: load.id, createdAt: iso, status: "open", complexity: "routine",
+          reason: `${name} won't change the rate con on ${load.lane.origin} → ${load.lane.destination}. ${refusedSummary(review)}.${saved ? ` They did fix the rest ($${saved.toLocaleString()} kept).` : ""} Sign it anyway, or walk away before a truck is sent?`,
+          recommendedAction: "approve", recommendedLabel: "Accept and sign",
+        };
+        escalations.unshift(esc);
+        review = { ...review, status: "needs_you", escalationId: esc.id };
+        events.push({ ...base, id: uid("act"), type: "escalation", message: `${name} won't fix the rate con. Needs your call`, detail: esc.reason, severity: "warning" });
+      }
+    } else continue;
+
+    const next = review;
+    loads.splice(loads.indexOf(load), 1, { ...load, rateCon: next });
+  }
+}
+
+/** The owner's answer on a rate con the broker wouldn't fix: sign it as is, or walk away before any truck rolls. */
+function rateConDecision(state: StoreState, escalationId: string, approve: boolean) {
+  const esc = state.escalations.find((e) => e.id === escalationId);
+  const load = esc?.rateConLoadId ? state.loads.find((l) => l.id === esc.rateConLoadId) : undefined;
+  if (!esc || !load?.rateCon || load.rateCon.status !== "needs_you") return null;
+  const iso = new Date().toISOString();
+  const name = state.brokers.find((b) => b.id === load.brokerId)?.company ?? "the broker";
+  const base = { id: uid("act"), timestamp: iso, loadId: load.id, carrierId: load.carrierId };
+  if (approve) {
+    const rateCon: RateConReview = { ...load.rateCon, status: "signed", signedAt: iso, issues: load.rateCon.issues.map((i) => (i.status === "fixed" ? i : { ...i, status: "accepted" as const })) };
+    return {
+      loads: state.loads.map((l) => (l.id === load.id ? { ...l, rateCon } : l)),
+      trucks: state.trucks,
+      events: [{ ...base, type: "document_captured" as const, message: `Rate con from ${name} accepted as is. AI signed it`, detail: load.referenceNumber, severity: "info" as const }],
+    };
+  }
+  return {
+    loads: state.loads.map((l) =>
+      l.id === load.id ? { ...l, stage: "declined" as const, cancellationReason: "Walked away: the broker wouldn't fix the rate con", updatedAt: iso, progressPct: 100, rateCon: { ...load.rateCon!, status: "walked" as const } } : l,
+    ),
+    // Nothing was dispatched yet, so no TONU either way; the truck just goes back to getting offers.
+    trucks: state.trucks.map((t) =>
+      t.nextLoadId === load.id ? { ...t, nextLoadId: null } : t.currentLoadId === load.id ? { ...t, currentLoadId: null, status: "available" as const } : t,
+    ),
+    events: [{ ...base, type: "load_cancelled" as const, message: `Walked away from ${name}'s load over the rate con`, detail: `${load.lane.origin} → ${load.lane.destination} · nothing dispatched, the AI is finding another load`, severity: "info" as const }],
+  };
 }
 
 // ——— AI dispatch calls ———
@@ -1056,6 +1149,11 @@ export const useStore = create<StoreState>((set, get) => ({
           }
         }
 
+        // Rate cons the AI is reading or fixing; a load waits at "rate confirmed" until its rate con is signed.
+        loads = [...loads];
+        escalations = [...escalations];
+        runRateCons(loads, state.brokers, escalations, newEvents);
+
         // Once a load is dispatched, the physical milestones (pickup, transit, delivery, docs) belong to the
         // driver's own confirm actions only — the automatic tick must not touch those stages, or the card
         // the driver is looking at can silently jump out from under them, racing their own taps.
@@ -1063,7 +1161,8 @@ export const useStore = create<StoreState>((set, get) => ({
           (l) =>
             l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "cancelled" && l.stage !== "offered" &&
             l.stage !== "dispatched" && l.stage !== "at_pickup" && l.stage !== "in_transit" && l.stage !== "at_delivery" &&
-            !l.aiPaused && !l.liveCall && l.carrierId === PRIMARY_CARRIER_ID,
+            !l.aiPaused && !l.liveCall && l.carrierId === PRIMARY_CARRIER_ID &&
+            !(l.stage === "rate_confirmed" && l.rateCon?.status !== "signed"),
         );
         // A truck sitting empty while its own current load is still being booked is costing money right now —
         // the AI works those first, the way a dispatcher would, instead of leaving the driver parked on a
@@ -1233,7 +1332,10 @@ export const useStore = create<StoreState>((set, get) => ({
     },
 
     resolveEscalation: (id, approve, actor = "carrier", note) =>
-      set((state) => ({
+      set((state) => {
+        const rc = rateConDecision(state, id, approve);
+        return {
+        ...(rc ? { loads: rc.loads, trucks: rc.trucks } : {}),
         // An approval that's a step in an incident plan unblocks that plan: approved, the repair goes ahead;
         // declined, the AI falls back to relaying the freight with the backup truck.
         incidents: state.incidents.map((i) => {
@@ -1256,6 +1358,7 @@ export const useStore = create<StoreState>((set, get) => ({
             : e,
         ),
         activity: [
+          ...(rc?.events ?? []),
           {
             id: uid("act"), timestamp: new Date().toISOString(), type: "escalation" as const,
             message: approve ? `Escalation approved by ${actor}` : `Escalation rejected by ${actor}, AI re-sourcing`,
@@ -1265,7 +1368,8 @@ export const useStore = create<StoreState>((set, get) => ({
           },
           ...state.activity,
         ].slice(0, 80),
-      })),
+        };
+      }),
 
     routeEscalationToSupport: (id) =>
       set((state) => ({

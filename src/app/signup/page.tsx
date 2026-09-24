@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, Loader2, ShieldCheck, Truck } from "lucide-react";
+import { ArrowRight, Check, Loader2, ShieldAlert, ShieldCheck, Truck } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import { AutopilotControl } from "@/components/shared/autopilot-control";
@@ -11,6 +11,7 @@ import { PRIMARY_DRIVER_ID, usePrimaryCarrier } from "@/lib/selectors";
 import { RUN_TYPE_DETAIL, RUN_TYPE_LABEL, RUN_TYPES } from "@/lib/run-types";
 import { cn } from "@/lib/utils";
 import type { RunType } from "@/lib/types";
+import type { FmcsaResult } from "@/lib/fmcsa";
 
 type Step = "mc" | "eld" | "rules" | "autopilot" | "done";
 const STEPS: Step[] = ["mc", "eld", "rules", "autopilot"];
@@ -41,6 +42,8 @@ export default function SignupPage() {
   const [mc, setMc] = useState("");
   const [looking, setLooking] = useState(false);
   const [found, setFound] = useState(false);
+  const [fmcsa, setFmcsa] = useState<FmcsaResult | null>(null);
+  const [lookupError, setLookupError] = useState<string | null>(null);
   const [eld, setEld] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [floor, setFloor] = useState(96);
@@ -53,13 +56,26 @@ export default function SignupPage() {
   const mcValid = /^\d{5,8}$/.test(mc.replace(/^MC-?/i, ""));
   const stepIndex = STEPS.indexOf(step);
 
-  function lookUp() {
+  /** Real FMCSA lookup when the server has a web key; otherwise the demo fleet, labelled as such. */
+  async function lookUp() {
     if (!mcValid) return;
     setLooking(true);
-    setTimeout(() => {
+    setFound(false);
+    setLookupError(null);
+    try {
+      const res = await fetch(`/api/fmcsa/${mc.replace(/^MC-?/i, "")}`);
+      const data = (await res.json()) as FmcsaResult;
+      if (data.source === "error") setLookupError(data.message ?? "Lookup failed. Try again.");
+      else if (data.source === "fmcsa" && !data.found) setLookupError(data.message ?? "FMCSA has no carrier with that MC number.");
+      else {
+        setFmcsa(data.source === "fmcsa" ? data : null);
+        setFound(true);
+      }
+    } catch {
+      setLookupError("Couldn't reach the lookup. Check your connection and try again.");
+    } finally {
       setLooking(false);
-      setFound(true);
-    }, 1200);
+    }
   }
 
   function connect(name: string) {
@@ -112,15 +128,42 @@ export default function SignupPage() {
                 </Button>
               </div>
               {mc && !mcValid && <p className="mt-2 text-xs text-ink-500">An MC number is 5 to 8 digits.</p>}
-              {found && (
+              {lookupError && <p className="mt-3 text-sm text-[var(--accent-danger)]">{lookupError}</p>}
+              {found && fmcsa && (
                 <div className="mt-5 rounded-2xl bg-ink-50 p-4 text-sm">
-                  <p className="font-semibold text-ink-950">{carrier.name}</p>
+                  <p className="font-semibold text-ink-950">{fmcsa.legalName}{fmcsa.dbaName ? ` (${fmcsa.dbaName})` : ""}</p>
                   <ul className="mt-2 flex flex-col gap-1.5 text-ink-700">
-                    <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[var(--accent-live)]" /> Authority active · {carrier.mc} · {carrier.dot}</li>
-                    <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[var(--accent-live)]" /> Insurance on file: $1M liability, $100K cargo</li>
-                    <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[var(--accent-live)]" /> {carrier.city}, {carrier.state}</li>
+                    <li className="flex items-center gap-2">
+                      {fmcsa.allowedToOperate ? <ShieldCheck className="h-4 w-4 text-[var(--accent-live)]" /> : <ShieldAlert className="h-4 w-4 text-[var(--accent-danger)]" />}
+                      {fmcsa.allowedToOperate ? "Allowed to operate" : "Not allowed to operate"} · MC {mc.replace(/^MC-?/i, "")}{fmcsa.dotNumber ? ` · DOT ${fmcsa.dotNumber}` : ""}
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-[var(--accent-live)]" />
+                      {fmcsa.liabilityOnFile ? `Liability insurance on file: $${fmcsa.liabilityOnFile.toLocaleString()}` : "No liability insurance on file with FMCSA"}
+                    </li>
+                    {fmcsa.city && <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[var(--accent-live)]" /> {fmcsa.city}, {fmcsa.state}</li>}
                   </ul>
-                  <p className="mt-3 text-[11px] text-ink-400">Demo: every MC number shows the demo fleet.</p>
+                  <p className="mt-3 text-[11px] text-ink-400">From FMCSA, just now. The trucks and drivers below are still the demo fleet.</p>
+                  {!fmcsa.allowedToOperate && (
+                    <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-[var(--accent-danger)]">
+                      FMCSA shows this authority isn&apos;t active. Brokers won&apos;t book you and Backroute can&apos;t dispatch until it is.
+                    </p>
+                  )}
+                </div>
+              )}
+              {found && (
+                <div className={cn("text-sm", fmcsa ? "mt-3" : "mt-5 rounded-2xl bg-ink-50 p-4")}>
+                  {!fmcsa && (
+                    <>
+                      <p className="font-semibold text-ink-950">{carrier.name}</p>
+                      <ul className="mt-2 flex flex-col gap-1.5 text-ink-700">
+                        <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[var(--accent-live)]" /> Authority active · {carrier.mc} · {carrier.dot}</li>
+                        <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[var(--accent-live)]" /> Insurance on file: $1M liability, $100K cargo</li>
+                        <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[var(--accent-live)]" /> {carrier.city}, {carrier.state}</li>
+                      </ul>
+                      <p className="mt-3 text-[11px] text-ink-400">Demo: FMCSA isn&apos;t connected (no web key), so every MC number shows the demo fleet.</p>
+                    </>
+                  )}
                   <p className="mt-4 text-sm font-medium text-ink-950">Who drives?</p>
                   <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Who drives">
                     {[
@@ -140,7 +183,7 @@ export default function SignupPage() {
                       </button>
                     ))}
                   </div>
-                  <Button className="mt-4 w-full" disabled={solo === null} onClick={() => setStep("eld")}>
+                  <Button className="mt-4 w-full" disabled={solo === null || fmcsa?.allowedToOperate === false} onClick={() => setStep("eld")}>
                     That&apos;s us <ArrowRight className="h-4 w-4" />
                   </Button>
                 </div>

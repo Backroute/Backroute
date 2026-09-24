@@ -434,7 +434,7 @@ export function finishBrokerCall(load: Load, broker: Broker | undefined): StepRe
   return {
     load: next,
     events: [
-      mkEvent(load.carrierId, load.id, "call_completed", `AI closed ${b.company} by phone at $${live.finalRate.toLocaleString()}`, gain > 0 ? `$${gain.toLocaleString()} more than the broker's first offer · rate con signed` : "Rate con signed", "success", "voice"),
+      mkEvent(load.carrierId, load.id, "call_completed", `AI closed ${b.company} by phone at $${live.finalRate.toLocaleString()}`, gain > 0 ? `$${gain.toLocaleString()} more than the broker's first offer · checking the rate con` : "Checking the rate con", "success", "voice"),
     ],
   };
 }
@@ -533,7 +533,7 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
           next.stage = "rate_confirmed";
           applyBookedEconomics(next, load, finalAmt, b.reliability ?? 70);
           next.documents = [...load.documents, { id: uid("doc"), type: "rate_confirmation", name: `RateCon_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" }];
-          events.push(mkEvent(load.carrierId, load.id, "rate_confirmed", "Rate confirmed and validated", `${b.company} · $${finalAmt.toLocaleString()} all-in`, "success", "sms"));
+          events.push(mkEvent(load.carrierId, load.id, "rate_confirmed", "Rate agreed. AI is checking the rate con", `${b.company} · $${finalAmt.toLocaleString()} all-in`, "success", "sms"));
         }
       } else {
         const isAiTurn = rounds % 2 === 0;
