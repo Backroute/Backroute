@@ -1,6 +1,7 @@
 import { createRng } from "./utils";
 import { computeEconomics, computeLoadScore } from "./scoring";
 import { assessBroker } from "./broker-policy";
+import { transitWindow } from "./trip-geo";
 import type {
   ActivityEvent,
   Broker,
@@ -71,6 +72,17 @@ export const LANES: Lane[] = [
   { origin: "Orlando", originState: "FL", destination: "Charlotte", destState: "NC", miles: 583, marketRpm: 2.29 },
   { origin: "Salt Lake City", originState: "UT", destination: "Denver", destState: "CO", miles: 525, marketRpm: 2.44 },
   { origin: "Oklahoma City", originState: "OK", destination: "Houston", destState: "TX", miles: 419, marketRpm: 2.15 },
+  // Short hauls: fewer miles at a higher rate per mile (the dock time is the same), and often home the same night.
+  { origin: "Dallas", originState: "TX", destination: "Austin", destState: "TX", miles: 195, marketRpm: 3.05 },
+  { origin: "Austin", originState: "TX", destination: "Dallas", destState: "TX", miles: 195, marketRpm: 2.95 },
+  { origin: "Dallas", originState: "TX", destination: "Houston", destState: "TX", miles: 239, marketRpm: 2.9 },
+  { origin: "Houston", originState: "TX", destination: "Dallas", destState: "TX", miles: 239, marketRpm: 2.85 },
+  { origin: "Dallas", originState: "TX", destination: "Oklahoma City", destState: "OK", miles: 206, marketRpm: 2.85 },
+  { origin: "Oklahoma City", originState: "OK", destination: "Dallas", destState: "TX", miles: 206, marketRpm: 2.8 },
+  { origin: "Houston", originState: "TX", destination: "San Antonio", destState: "TX", miles: 197, marketRpm: 3.0 },
+  { origin: "Atlanta", originState: "GA", destination: "Charlotte", destState: "NC", miles: 245, marketRpm: 2.9 },
+  { origin: "Chicago", originState: "IL", destination: "Indianapolis", destState: "IN", miles: 183, marketRpm: 3.05 },
+  { origin: "Los Angeles", originState: "CA", destination: "San Diego", destState: "CA", miles: 120, marketRpm: 3.4 },
 ];
 
 export const EQUIPMENT: EquipmentType[] = ["Dry Van", "Reefer", "Flatbed"];
@@ -525,7 +537,7 @@ function buildLoad(
     equipmentType,
     weight: rng.int(22000, 44500),
     pickupWindow: `${pickupLabel}, ${rng.int(6, 14)}:00–${rng.int(15, 19)}:00`,
-    deliveryWindow: `${rng.int(1, 3)} day transit`,
+    deliveryWindow: transitWindow(lane.miles),
     listedRate,
     targetRate,
     bookedRate,
@@ -605,8 +617,7 @@ export function generateWorld(seed = 20260916): World {
       carrierId: PRIMARY_CARRIER_ID,
       equipmentType: rng.pick(EQUIPMENT),
       status: "available",
-      currentCity: rng.pick(US_CITY_PAIRS)[0],
-      currentState: "TX",
+      ...(([currentCity, currentState]) => ({ currentCity, currentState }))(rng.pick(US_CITY_PAIRS)),
       homeBase: "Dallas, TX",
       currentLoadId: null,
       nextLoadId: null,

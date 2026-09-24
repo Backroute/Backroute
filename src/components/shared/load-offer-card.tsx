@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Home, MessageCircle, Repeat, Send, Sparkles, Truck as TruckIcon, X, Zap } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { formatHours } from "@/lib/home";
 import { loadHighlight } from "@/lib/scoring";
 import type { OfferAskDraft } from "@/lib/engine";
 import type { Broker, Driver, Load, Truck } from "@/lib/types";
@@ -122,9 +123,19 @@ export function LoadOfferCard({
                 <Sparkles className="h-3 w-3" /> AI pick
               </Badge>
             )}
-            {load.homeTimeFit && (
+            {load.homeTimeFit && !load.homeTonight && (
               <Badge tone={dark ? "dark" : "info"} className={dark ? "!bg-white/15 !text-white gap-1" : "gap-1"}>
-                <Home className="h-3 w-3" /> Home-time fit
+                <Home className="h-3 w-3" /> Heads toward home
+              </Badge>
+            )}
+            {load.homeTonight && (
+              <Badge tone={dark ? "dark" : "success"} className={dark ? "!bg-white/15 !text-white gap-1" : "gap-1"}>
+                <Home className="h-3 w-3" /> Home tonight
+              </Badge>
+            )}
+            {load.lane.miles <= 250 && (
+              <Badge tone={dark ? "dark" : "neutral"} className={dark ? "!bg-white/15 !text-white" : ""}>
+                Short haul
               </Badge>
             )}
           </div>
@@ -142,26 +153,22 @@ export function LoadOfferCard({
         <Stat label="Pickup" value={load.pickupWindow.split(",")[0]} dark={dark} />
       </div>
 
-      {(load.loadHome || load.endsNearHome) && (
-        <div className={cn("rounded-xl px-2.5 py-2 text-xs", dark ? "bg-white/10 text-white/80" : "bg-ink-50 text-ink-600")}>
-          {load.loadHome ? (
-            <>
-              <p className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 font-medium">
-                  <Repeat className="h-3 w-3 shrink-0" /> Whole trip, est. net
-                </span>
-                <span className={cn("font-semibold tabular", dark ? "text-white" : "text-ink-950")}>
-                  {formatCurrency((load.netProfit ?? 0) + load.loadHome.estNet)}
-                </span>
-              </p>
-              <p className={cn("mt-0.5 text-[11px]", dark ? "text-white/55" : "text-ink-500")}>
-                Likely load home: {load.loadHome.origin} → {load.loadHome.destination}, about {formatCurrency(load.loadHome.estNet)} net
-                {load.loadHome.deadheadMiles > 30 ? ` after ${load.loadHome.deadheadMiles} empty mi` : ""}. An estimate, not booked yet.
-              </p>
-            </>
-          ) : (
-            <p className="flex items-center gap-1.5 font-medium">
-              <Home className="h-3 w-3 shrink-0" /> Delivers near the driver&apos;s home, so no load home is needed.
+      {(load.hoursHomeAfter !== undefined || load.reloadMarket) && (
+        <div className={cn("flex flex-col gap-1 rounded-xl px-2.5 py-2 text-xs", dark ? "bg-white/10 text-white/80" : "bg-ink-50 text-ink-600")}>
+          {load.hoursHomeAfter !== undefined && (
+            <p className="flex items-center gap-1.5">
+              <Home className="h-3 w-3 shrink-0" />
+              {load.homeTonight
+                ? "Home tonight: pickup, delivery and the drive home fit in one shift"
+                : load.hoursHomeAfter < 1
+                  ? "Delivers near home"
+                  : `Leaves the driver about ${formatHours(load.hoursHomeAfter)} from home`}
+            </p>
+          )}
+          {load.reloadMarket && !load.homeTonight && (
+            <p className="flex items-center gap-1.5">
+              <Repeat className="h-3 w-3 shrink-0" />
+              {load.reloadMarket === "strong" ? "Easy to reload there" : load.reloadMarket === "fair" ? "Some loads out of there" : "Few loads out of there, so the next one may take longer"}
             </p>
           )}
         </div>

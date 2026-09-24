@@ -357,11 +357,12 @@ export interface Load {
   cancellationReason?: string;
   /** Truck-Ordered-Not-Used fee owed by the broker when a truck was already dispatched or at pickup. */
   tonuFee?: number;
-  /** On an offer: the AI's estimate of the best load home from where this one delivers. Not booked — loads home
-   *  usually post a day or two before pickup, so it's a plan, priced from this week's lane rates. */
-  loadHome?: { origin: string; originState: string; destination: string; destState: string; miles: number; deadheadMiles: number; estNet: number };
-  /** On an offer: it delivers near the driver's home, so there's no load home to plan. */
-  endsNearHome?: boolean;
+  /** On an offer: hours of driving from where it delivers back to the driver's home. */
+  hoursHomeAfter?: number;
+  /** On an offer: the whole day — pickup, delivery and the drive home — fits one shift. */
+  homeTonight?: boolean;
+  /** On an offer: how easy it is to find the next load where this one delivers. */
+  reloadMarket?: "strong" | "fair" | "weak";
   /** Extra percentage the AI added to its ask because this broker pays slowly or disputes detention. */
   surchargePct?: number;
   /** Intermediate stops beyond the lane's origin/destination — absent or empty means a normal single-pickup,

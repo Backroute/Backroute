@@ -39,13 +39,13 @@ export function retentionFor(
   driver: Driver,
   expenses: Expense[],
   timeOff: TimeOffRequest[],
-  homeOnTime: boolean | null,
+  homeLate: boolean,
   now: number,
 ): RetentionView {
   const past = history(driver);
   const signals: RetentionSignal[] = [];
 
-  if (homeOnTime === false) signals.push({ kind: "home", text: `This week's plan misses their target (${driver.homeTimeTarget.replace(/^Home/, "home")})`, weight: 2 });
+  if (homeLate) signals.push({ kind: "home", text: `Won't make their target (${driver.homeTimeTarget.replace(/^Home/, "home")}) from where the truck empties next`, weight: 2 });
   if (past.missedHomeTimes > 0) {
     signals.push({ kind: "home", text: `Missed home time ${past.missedHomeTimes === 1 ? "once" : "twice"} in the last four weeks`, weight: past.missedHomeTimes * 1.5 });
   }

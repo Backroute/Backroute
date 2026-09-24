@@ -1,7 +1,7 @@
 import { EQUIPMENT, LANES } from "./mock-data";
 import { computeEconomics, computeLoadScore } from "./scoring";
-import { cityCoords, distanceMiles } from "./trip-geo";
-import { estimateLoadHome, legHours } from "./planner";
+import { cityCoords, distanceMiles, transitWindow } from "./trip-geo";
+import { homeTonight, hoursToHome, legHours, reloadMarket } from "./home";
 import type {
   ActivityEvent,
   ActivityType,
@@ -108,7 +108,7 @@ export function createSourcedLoad(
     equipmentType: equipmentType ?? pick(EQUIPMENT),
     weight: randInt(22000, 44500),
     pickupWindow: `${pick(["today", "tomorrow"])}, ${randInt(6, 14)}:00–${randInt(15, 19)}:00`,
-    deliveryWindow: `${randInt(1, 3)} day transit`,
+    deliveryWindow: transitWindow(lane.miles),
     listedRate,
     targetRate,
     bookedRate: null,
@@ -139,13 +139,12 @@ export interface OfferOptions {
   excludeTiers?: Broker["tier"][];
   /** Where the truck will be free — offers are sourced from the lanes loading nearest to it. */
   from?: TruckOrigin;
-  homeTimeTarget?: string;
   equipmentType?: EquipmentType;
   surcharges?: Record<string, number>;
-  /** The driver's home base: the AI weighs each option by the whole trip, including the likely load home. */
+  /** The driver's home base, so every option says how far from home it leaves them. */
   homeBase?: string;
-  /** The carrier asked the AI to get this driver home first: a load that delivers near home wins. */
-  homePriority?: boolean;
+  /** Home time is getting tight (or the carrier said home first): only loads that bring the driver closer count. */
+  headHome?: boolean;
 }
 
 /** AI has scanned the boards and scored several candidates for one truck — driver/carrier picks one. */
@@ -158,53 +157,55 @@ export function createLoadOfferBatch(
   count = 3,
   opts: OfferOptions = {},
 ): Load[] {
-  const wantsHomeTime = !!opts.homeTimeTarget && opts.homeTimeTarget !== "No preference set";
-  const homeFitIndex = wantsHomeTime ? randInt(0, count - 1) : -1;
+  const home = opts.homeBase;
+  const hoursHomeFrom = (city: string, state: string) => (home ? hoursToHome(city, state, home) : null);
+  const startHoursHome = opts.from ? hoursHomeFrom(opts.from.city, opts.from.state) : null;
 
-  const nearest = lanesNear(opts.from)?.slice(0, count);
+  // What's loading near the truck; when it's time to head home, of those, the ones delivering closest to home.
+  const near = lanesNear(opts.from);
+  const placements = near
+    ? opts.headHome && home
+      ? near.slice(0, count * 2).sort((a, b) => (hoursHomeFrom(a.lane.destination, a.lane.destState) ?? 99) - (hoursHomeFrom(b.lane.destination, b.lane.destState) ?? 99)).slice(0, count)
+      : near.slice(0, count)
+    : undefined;
+
   const candidates = Array.from({ length: count }, (_, i) => {
-    const base = createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType, nearest?.[i], opts.surcharges);
+    const base = createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType, placements?.[i], opts.surcharges);
     const { netProfit, rpm } = computeEconomics(base.targetRate, base.lane.miles, base.deadheadMiles, base.fuelCost, base.tollCost);
-    const home = opts.homeBase ? estimateLoadHome(base.lane.destination, base.lane.destState, opts.homeBase) : null;
+    const hoursHomeAfter = hoursHomeFrom(base.lane.destination, base.lane.destState) ?? undefined;
     return {
       ...base,
       stage: "offered" as const,
       netProfit,
       rpm,
       progressPct: 16,
-      homeTimeFit: i === homeFitIndex,
-      endsNearHome: !!opts.homeBase && !home,
-      loadHome: home
-        ? { origin: home.lane.origin, originState: home.lane.originState, destination: home.lane.destination, destState: home.lane.destState, miles: home.lane.miles, deadheadMiles: home.deadheadMiles, estNet: home.net }
-        : undefined,
+      hoursHomeAfter,
+      homeTonight: hoursHomeAfter !== undefined && homeTonight(base.lane.miles, base.deadheadMiles, hoursHomeAfter),
+      // Brings the driver meaningfully closer to home than where the truck empties out now.
+      homeTimeFit: hoursHomeAfter !== undefined && startHoursHome !== null && hoursHomeAfter < startHoursHome - 3,
+      reloadMarket: reloadMarket(base.lane.destination, base.lane.destState),
     };
   });
 
   const offerGroupId = uid("offer");
-  // The score itself only carries broker *reliability* (how well they've historically paid/performed),
-  // not the separate fraud-risk flag Broker Shield surfaces on the card — so without this, "AI pick" could
-  // land on a flagged broker purely because its rate/deadhead numbers edged out a clean one, contradicting
-  // the platform's own pitch that Broker Shield screens brokers before the AI will deal with them. Prefer a
-  // clean-broker candidate when the batch has one; only recommend a flagged one if every option is flagged.
+  // The score itself only carries broker *reliability*, not the fraud-risk flag Broker Shield shows on the card.
   const brokerById = new Map(brokers.map((b) => [b.id, b]));
   const isLowRisk = (c: (typeof candidates)[number]) => (brokerById.get(c.brokerId)?.fraudRisk ?? "low") === "low";
-  // With a home base known, options are weighed by the whole trip — this load plus the likely load home — per hour
-  // of work, the way a dispatcher weighs a great load into a dead market against a decent one with a good way back.
-  const tripValue = (c: (typeof candidates)[number]) => {
-    if (!opts.homeBase) return c.score;
-    const h = c.loadHome;
-    const hours = legHours(c.lane.miles, c.deadheadMiles) + (h ? legHours(h.miles, h.deadheadMiles) : 0);
-    return ((c.netProfit ?? 0) + (h?.estNet ?? 0)) / hours;
+  // A dispatcher's call on each load: what it nets per hour of the driver's time, marked down when it strands the truck
+  // somewhere nothing ships back out of. When it's time to head home, getting closer to home comes first.
+  const value = (c: (typeof candidates)[number]) => {
+    if (opts.headHome && c.hoursHomeAfter !== undefined) return -c.hoursHomeAfter * 1000 + (c.netProfit ?? 0);
+    const perHour = (c.netProfit ?? 0) / legHours(c.lane.miles, c.deadheadMiles);
+    return c.reloadMarket === "weak" ? perHour * 0.85 : perHour;
   };
-  const top = (pool: typeof candidates) => pool.reduce((a, b) => (tripValue(b) > tripValue(a) ? b : a));
-  // Never pick a load that loses money when one that doesn't is on the table; get the driver home first when asked.
+  const top = (pool: typeof candidates) => pool.reduce((a, b) => (value(b) > value(a) ? b : a));
+  // Never pick a load that loses money when one that doesn't is on the table.
   const profitable = candidates.filter((c) => (c.netProfit ?? 0) > 0);
-  let pool = profitable.length ? profitable : candidates;
-  if (opts.homePriority && pool.some((c) => c.endsNearHome)) pool = pool.filter((c) => c.endsNearHome);
+  const pool = profitable.length ? profitable : candidates;
   // Broker Shield: a clean broker wins unless a flagged one is clearly better. Those get extra checks, not a pass.
   const best = top(pool);
   const clean = pool.filter(isLowRisk);
-  const pick = clean.length && tripValue(top(clean)) >= tripValue(best) * 0.8 ? top(clean) : best;
+  const pick = clean.length && !opts.headHome && value(top(clean)) >= value(best) * 0.8 ? top(clean) : best;
 
   return candidates.map((c) => ({ ...c, offerGroupId, recommended: c.id === pick.id }));
 }

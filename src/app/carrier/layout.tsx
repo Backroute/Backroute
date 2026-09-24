@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, Building2, CalendarRange, LayoutGrid, MessageCircle, MessageSquareText, Receipt, Settings, ShieldCheck, Truck, Wrench } from "lucide-react";
+import { BarChart3, Building2, LayoutGrid, MessageCircle, MessageSquareText, Receipt, Settings, ShieldCheck, Truck, Wrench } from "lucide-react";
 import { PortalShell, type NavItem } from "@/components/shared/portal-shell";
 import { TopBar } from "@/components/shared/top-bar";
 import { CommandPalette, type CommandGroup } from "@/components/shared/command-palette";
@@ -17,7 +17,6 @@ const NAV: NavItem[] = [
   { href: "/carrier/negotiations", label: "Negotiations", icon: MessageSquareText },
   { href: "/carrier/brokers", label: "Brokers", icon: Building2 },
   { href: "/carrier/fleet", label: "Fleet", icon: Truck },
-  { href: "/carrier/planner", label: "Planner", icon: CalendarRange },
   { href: "/carrier/earnings", label: "Earnings", icon: BarChart3 },
   { href: "/carrier/settlements", label: "Settlements", icon: Receipt },
   { href: "/carrier/maintenance", label: "Maintenance", icon: Wrench },

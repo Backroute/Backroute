@@ -5,6 +5,7 @@ export type LatLng = [number, number];
 /** Every city a lane or truck can sit in (see LANES and US_CITY_PAIRS in mock-data). */
 const CITY_COORDS: Record<string, LatLng> = {
   "Atlanta, GA": [33.749, -84.388],
+  "Austin, TX": [30.2672, -97.7431],
   "Charlotte, NC": [35.2271, -80.8431],
   "Chicago, IL": [41.8781, -87.6298],
   "Columbus, OH": [39.9612, -82.9988],
@@ -22,6 +23,8 @@ const CITY_COORDS: Record<string, LatLng> = {
   "Phoenix, AZ": [33.4484, -112.074],
   "Portland, OR": [45.5152, -122.6784],
   "Salt Lake City, UT": [40.7608, -111.891],
+  "San Antonio, TX": [29.4241, -98.4936],
+  "San Diego, CA": [32.7157, -117.1611],
   "Seattle, WA": [47.6062, -122.3321],
 };
 
@@ -91,4 +94,11 @@ export function pickupLegStart(load: Load, truckCity: string | undefined, truckS
   const latPerMile = 1 / 69;
   const lngPerMile = 1 / (69 * Math.cos((origin[0] * Math.PI) / 180));
   return [origin[0] + (away[0] / len) * miles * latPerMile, origin[1] + (away[1] / len) * miles * lngPerMile];
+}
+
+/** Delivery timing a broker would post for a run this long: short hauls deliver the same day, a day's drive the next. */
+export function transitWindow(miles: number): string {
+  if (miles <= 300) return "Same day";
+  if (miles <= 600) return "Next day";
+  return `${Math.ceil(miles / 500)} day transit`;
 }

@@ -34,6 +34,16 @@ const ROUTE_STATES: Record<string, string[]> = {
   "Orlando|Charlotte": ["FL", "GA", "SC", "NC"],
   "Salt Lake City|Denver": ["UT", "WY", "CO"],
   "Oklahoma City|Houston": ["OK", "TX"],
+  "Dallas|Austin": ["TX"],
+  "Austin|Dallas": ["TX"],
+  "Dallas|Houston": ["TX"],
+  "Houston|Dallas": ["TX"],
+  "Dallas|Oklahoma City": ["TX", "OK"],
+  "Oklahoma City|Dallas": ["OK", "TX"],
+  "Houston|San Antonio": ["TX"],
+  "Atlanta|Charlotte": ["GA", "SC", "NC"],
+  "Chicago|Indianapolis": ["IL", "IN"],
+  "Los Angeles|San Diego": ["CA"],
 };
 
 /** Two 100-gallon saddle tanks; the plan never lets the truck run below a quarter tank. */

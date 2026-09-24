@@ -35,12 +35,12 @@ export function NextLoadOffers({
         <p className="text-sm font-semibold text-ink-950">Choose your next load</p>
       </div>
       <p className="mb-3 text-xs text-ink-500">
-        AI checked every connected board and scored {totalCount} option{totalCount === 1 ? "" : "s"} for you. Its pick counts the likely load home too, not just
-        this one load.
+        AI checked every connected board and scored {totalCount} option{totalCount === 1 ? "" : "s"} for you. Its pick weighs pay per hour, how far each
+        load leaves the driver from home, and whether there&apos;s freight to reload after.
       </p>
       <div className="flex flex-col gap-6">
         {offerGroups.map(([groupId, groupLoads]) => {
-          // The AI pick leads: it can beat a higher single-load score once the load home is counted.
+          // The AI pick leads: it can beat a higher score once home time and the next reload are counted.
           const loads = [...groupLoads].sort((a, b) => Number(!!b.recommended) - Number(!!a.recommended) || b.score - a.score);
           const truck = trucks && loads[0].truckId ? trucks.get(loads[0].truckId) : undefined;
           const driver = drivers && truck?.driverId ? drivers.get(truck.driverId) : undefined;

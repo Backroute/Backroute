@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowDown, ArrowUpRight, CalendarRange, ClipboardCheck, Link2, MapPin, Phone } from "lucide-react";
-import { planWeek } from "@/lib/planner";
-import { Badge } from "@/components/ui/badge";
+import { ArrowDown, ArrowUpRight, ClipboardCheck, Link2, MapPin, Phone } from "lucide-react";
+import { HomeTimeCard, useHomeTime } from "@/components/shared/home-time";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
 import { DriverTripCompleteCard, type DriverTripCardProps } from "@/components/shared/driver-trip-card";
@@ -90,7 +89,7 @@ export default function DriverHomePage() {
       }
     : null;
 
-  const plan = truck && now !== null ? planWeek(truck, driver, currentLoad, nextLoad, new Date(now)) : null;
+  const homeTime = useHomeTime(driver, truck, currentLoad);
   const weekLoads = loads.filter((l) => l.truckId === truck?.id);
   const weekMiles = weekLoads.reduce((s, l) => s + l.lane.miles, 0);
 
@@ -144,6 +143,8 @@ export default function DriverHomePage() {
           </button>
         </div>
       )}
+
+      {homeTime && <HomeTimeCard status={homeTime} />}
 
       {nextLoad && !completedLoad && (
         <div className="rounded-3xl border border-line p-5">
@@ -200,28 +201,6 @@ export default function DriverHomePage() {
         <Stat label="Loads" value={weekLoads.length} />
         <Stat label="HOS left" value={`${driver.hoursRemaining.toFixed(1)}h`} />
       </div>
-
-      {plan && (
-        <Link href="/driver/plan" className="flex items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3.5">
-          <span className="flex min-w-0 items-center gap-3">
-            <CalendarRange className="h-4 w-4 shrink-0 text-ink-400" />
-            <span className="min-w-0">
-              <span className="block text-sm font-medium text-ink-950">Your next few days, planned by AI</span>
-              <span className="block truncate text-xs text-ink-500">
-                Home in {plan.homeCity} {plan.homeAt} · est. net {formatCurrency(plan.net)}
-              </span>
-            </span>
-          </span>
-          <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-ink-950" />
-        </Link>
-      )}
-
-      {driver.homeTimeTarget !== "No preference set" && (
-        <div className="flex items-center justify-between rounded-2xl border border-line px-4 py-3 text-sm">
-          <span className="text-ink-600">Home-time preference</span>
-          <Badge tone="info">{driver.homeTimeTarget}</Badge>
-        </div>
-      )}
 
       {truck && (
         <Link href="/driver/loads" className="flex items-center justify-between rounded-2xl border border-line px-4 py-3.5 text-sm text-ink-700">

@@ -28,6 +28,7 @@ import { nextStop } from "./load-status";
 import { dockClock, dockMinutes, detentionFor, formatDockTime } from "./detention";
 import { cityCoords, distanceMiles } from "./trip-geo";
 import { bookableBrokers, type BrokerPolicy } from "./broker-policy";
+import { homeTimeStatus } from "./home";
 import { clamp, formatDuration } from "./utils";
 import type {
   ActivityEvent,
@@ -134,6 +135,14 @@ function scheduleCallEnds(loads: Load[], finish: (loadId: string, callId: string
     const remaining = Math.max(0, Date.parse(call.startedAt) + call.durationMs - Date.now());
     setTimeout(() => finish(l.id, call.id), remaining);
   }
+}
+
+/** Where home time stands for the truck's next load — a dispatcher checks this before booking anything. When it's
+ *  tight, or the carrier said home first, the AI only books loads that bring the driver closer to home. */
+function homeOptions(driver: Driver | undefined, from: { city: string; state: string } | undefined): { homeBase?: string; headHome?: boolean } {
+  if (!driver) return {};
+  const status = from ? homeTimeStatus(driver, from.city, from.state, new Date()).state : "no_target";
+  return { homeBase: driver.homeBase, headHome: !!driver.homePriority || status === "head_home" || status === "late" };
 }
 
 export type DriverDocType = "bol" | "pod" | "lumper_receipt";
@@ -540,9 +549,7 @@ export const useStore = create<StoreState>((set, get) => ({
           const offers = createLoadOfferBatch(bookable, PRIMARY_CARRIER_ID, truck.id, state.tickCount, false, state.settings.offersPerTruck, {
             excludeTiers,
             surcharges,
-            homeTimeTarget: driver?.homeTimeTarget,
-            homeBase: driver?.homeBase,
-            homePriority: driver?.homePriority,
+            ...homeOptions(driver, { city: truck.currentCity, state: truck.currentState }),
             equipmentType: truck.equipmentType,
             from: { city: truck.currentCity, state: truck.currentState },
           });
@@ -570,9 +577,7 @@ export const useStore = create<StoreState>((set, get) => ({
             const offers = createLoadOfferBatch(bookable, PRIMARY_CARRIER_ID, truck.id, state.tickCount + 1, true, state.settings.offersPerTruck, {
               excludeTiers,
               surcharges,
-              homeTimeTarget: driver?.homeTimeTarget,
-              homeBase: driver?.homeBase,
-              homePriority: driver?.homePriority,
+              ...homeOptions(driver, { city: currentLoad.lane.destination, state: currentLoad.lane.destState }),
               equipmentType: truck.equipmentType,
               from: { city: currentLoad.lane.destination, state: currentLoad.lane.destState },
             });
@@ -892,7 +897,7 @@ export const useStore = create<StoreState>((set, get) => ({
             {
               id: uid("act"), timestamp: new Date().toISOString(), type: "time_off" as const,
               message: on ? `AI will get ${driver?.name.split(" ")[0] ?? "the driver"} home first` : `AI is back to best-paying loads for ${driver?.name.split(" ")[0] ?? "the driver"}`,
-              detail: on ? "Next-load picks favor loads that deliver near home, even at a lower rate." : "Home time is still weighed, just not first.",
+              detail: on ? "The AI only books loads that bring them closer to home, even at a lower rate." : "Home time is still checked before every load.",
               carrierId: PRIMARY_CARRIER_ID, severity: "info" as const,
             },
             ...state.activity,
@@ -1395,9 +1400,7 @@ export const useStore = create<StoreState>((set, get) => ({
         const { brokers: bookable, surcharges } = bookableBrokers(state.brokers, state.settings.brokerOverrides);
         const offers = createLoadOfferBatch(bookable, PRIMARY_CARRIER_ID, truck.id, state.tickCount, true, state.settings.offersPerTruck, {
           surcharges,
-          homeTimeTarget: driver?.homeTimeTarget,
-          homeBase: driver?.homeBase,
-          homePriority: driver?.homePriority,
+          ...homeOptions(driver, currentLoad ? { city: currentLoad.lane.destination, state: currentLoad.lane.destState } : undefined),
           equipmentType: truck.equipmentType,
           from: currentLoad ? { city: currentLoad.lane.destination, state: currentLoad.lane.destState } : undefined,
         });

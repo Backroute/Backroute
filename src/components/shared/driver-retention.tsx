@@ -8,7 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { useStore } from "@/lib/store";
 import { useNow } from "@/lib/hooks";
 import { useCarrierLoads, truckActiveLoads } from "@/lib/selectors";
-import { planWeek } from "@/lib/planner";
+import { homeTimeStatus } from "@/lib/home";
+import { emptiesAt } from "./home-time";
 import { retentionFor, type RetentionView, type SignalKind } from "@/lib/retention";
 import { formatCurrency } from "@/lib/utils";
 import type { Driver } from "@/lib/types";
@@ -30,9 +31,10 @@ export function useDriverRetention(): { driver: Driver; view: RetentionView }[] 
   return drivers
     .map((driver) => {
       const truck = trucks.find((t) => t.driverId === driver.id || t.secondDriverId === driver.id);
-      const { current, next } = truckActiveLoads(loads, truck);
-      const plan = truck ? planWeek(truck, driver, current, next, new Date(now)) : null;
-      return { driver, view: retentionFor(driver, expenses, timeOff, plan?.homeOnTime ?? null, now) };
+      const { current } = truckActiveLoads(loads, truck);
+      const at = truck ? emptiesAt(truck, current) : null;
+      const late = at ? homeTimeStatus(driver, at.city, at.state, new Date(now)).state === "late" : false;
+      return { driver, view: retentionFor(driver, expenses, timeOff, late, now) };
     })
     .sort((a, b) => rank[a.view.level] - rank[b.view.level]);
 }
@@ -77,7 +79,7 @@ export function DriverCheckInCard({ driver, view }: { driver: Driver; view: Rete
         <div className="flex items-center justify-between gap-3 rounded-xl bg-ink-50 px-3 py-2.5">
           <div>
             <p className="text-xs font-medium text-ink-900">Get {first} home first</p>
-            <p className="text-[11px] text-ink-500">The AI picks loads that deliver near home, even at a lower rate.</p>
+            <p className="text-[11px] text-ink-500">The AI only books loads that bring them closer to home, even at a lower rate.</p>
           </div>
           <Switch checked={!!driver.homePriority} onChange={(on) => setHomePriority(driver.id, on)} label={`Get ${first} home first`} />
         </div>

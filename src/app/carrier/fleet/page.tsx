@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Link2, MapPin, Phone, Sparkles, Users } from "lucide-react";
+import { Home, Link2, MapPin, Phone, Sparkles, Users } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,8 @@ import { Avatar } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { DriverCheckInCard, useDriverRetention } from "@/components/shared/driver-retention";
+import { emptiesAt, homeTimeLine } from "@/components/shared/home-time";
+import { homeTimeStatus, type HomeTimeState } from "@/lib/home";
 import { useCarrierTrucks, useDriverMap, useCarrierLoads, truckActiveLoads } from "@/lib/selectors";
 import { useNow } from "@/lib/hooks";
 import { formatNumber } from "@/lib/utils";
@@ -26,6 +28,14 @@ const HOS_TONE: Record<HosStatus, "success" | "neutral" | "info" | "warning"> = 
   on_duty: "info",
   off_duty: "neutral",
   sleeper: "warning",
+};
+
+const HOME_LABEL: Record<HomeTimeState, (target: string) => string> = {
+  home: () => "Near home",
+  on_track: (t) => `${t}, on track`,
+  head_home: (t) => `${t}, heading home`,
+  late: (t) => `${t}, at risk`,
+  no_target: () => "No home-time day set",
 };
 
 export default function FleetPage() {
@@ -63,6 +73,8 @@ export default function FleetPage() {
           const { current: currentLoad, next: nextLoad } = truckActiveLoads(loads, truck);
           const pendingOffers = loads.filter((l) => l.truckId === truck.id && l.stage === "offered");
           const hosPct = driver ? Math.min(100, (driver.hoursRemaining / 11) * 100) : 0;
+          const at = emptiesAt(truck, currentLoad);
+          const home = driver && now !== null ? homeTimeStatus(driver, at.city, at.state, new Date(now)) : null;
 
           return (
             <Card key={truck.id}>
@@ -118,6 +130,14 @@ export default function FleetPage() {
                       <span className="tabular">{driver.hoursRemaining.toFixed(1)}h left</span>
                     </div>
                     <Progress value={hosPct} className="mt-2" />
+                    {home && (
+                      <p className={`mt-2.5 flex items-start gap-1.5 text-xs ${home.state === "late" ? "text-[var(--accent-warn)]" : "text-ink-500"}`}>
+                        <Home className="mt-0.5 h-3 w-3 shrink-0" />
+                        <span>
+                          <span className="font-medium text-ink-800">{HOME_LABEL[home.state](home.target ?? "")}</span> · {homeTimeLine(home, "carrier")}
+                        </span>
+                      </p>
+                    )}
                   </div>
                 )}
                 {secondDriver && (
