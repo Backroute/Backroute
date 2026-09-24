@@ -24,6 +24,10 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). Visit `/carrier`, `/ops`, or `/driver` directly, or start from the landing page.
 
+## Accounts and saved data
+
+Off by default. Set the two Supabase keys in `.env.local` to switch on sign-in by phone number, roles (owner, dispatcher, driver) and a saved fleet. `DEPLOY.md` covers setting up Supabase and Vercel, and lists what isn't live yet. The database schema and access rules are in `supabase/migrations/`.
+
 ## Stack
 
-Next.js (App Router, Turbopack) · TypeScript · Tailwind CSS v4 · Zustand · Recharts · Framer Motion · lucide-react
+Next.js (App Router, Turbopack) · TypeScript · Tailwind CSS v4 · Zustand · Supabase (optional) · Recharts · Framer Motion · lucide-react

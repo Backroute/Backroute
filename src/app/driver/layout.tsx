@@ -1,5 +1,6 @@
 "use client";
 
+import { CloudGate } from "@/components/cloud/cloud-gate";
 import "maplibre-gl/dist/maplibre-gl.css";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -25,6 +26,14 @@ const TABS = [
 ] as const;
 
 export default function DriverLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <CloudGate area="driver">
+      <DriverShell>{children}</DriverShell>
+    </CloudGate>
+  );
+}
+
+function DriverShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { t, lang } = useDriverUi();
   const driver = usePrimaryDriver();

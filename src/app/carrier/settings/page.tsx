@@ -18,6 +18,8 @@ import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { DailyTextPreview } from "@/components/shared/daily-text";
 import { DispatchLineCard } from "@/components/shared/dispatch-line-card";
 import { OwnerLanguageCard } from "@/components/shared/owner-language-card";
+import { AppAccessCard } from "@/components/cloud/app-access";
+import { cloudEnabled } from "@/lib/cloud/client";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Aggressiveness } from "@/lib/store";
 
@@ -376,6 +378,9 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
 
+              {cloudEnabled ? (
+                <AppAccessCard />
+              ) : (
               <Card>
                 <CardHeader>
                   <CardTitle>Team</CardTitle>
@@ -421,6 +426,7 @@ export default function SettingsPage() {
                   </div>
                 </CardContent>
               </Card>
+              )}
             </>
           )}
         </div>

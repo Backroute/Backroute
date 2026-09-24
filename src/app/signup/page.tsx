@@ -1,5 +1,6 @@
 "use client";
 
+import { CloudGate } from "@/components/cloud/cloud-gate";
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Loader2, ShieldAlert, ShieldCheck, Truck } from "lucide-react";
@@ -12,6 +13,9 @@ import { RUN_TYPE_DETAIL, RUN_TYPE_LABEL, RUN_TYPES } from "@/lib/run-types";
 import { cn } from "@/lib/utils";
 import type { RunType } from "@/lib/types";
 import type { FmcsaResult } from "@/lib/fmcsa";
+import { cloudEnabled } from "@/lib/cloud/client";
+import { createCarrierAccount } from "@/lib/cloud/account";
+import { connect as connectCarrier } from "@/lib/cloud/sync";
 
 type Step = "mc" | "eld" | "rules" | "autopilot" | "done";
 const STEPS: Step[] = ["mc", "eld", "rules", "autopilot"];
@@ -34,6 +38,14 @@ const RUN_EVIDENCE: Record<RunType, string> = {
 /** Five minutes from MC number to trucks being dispatched: the AI looks up the authority and insurance, reads the
  *  fleet off the ELD, and asks the three things only the owner can answer. */
 export default function SignupPage() {
+  return (
+    <CloudGate area="signup">
+      <Signup />
+    </CloudGate>
+  );
+}
+
+function Signup() {
   const carrier = usePrimaryCarrier();
   const drivers = useStore((s) => s.drivers);
   const trucks = useStore((s) => s.trucks);
@@ -50,6 +62,8 @@ export default function SignupPage() {
   const [otrHome, setOtrHome] = useState("Home in 2 weeks");
   // Owner-operator: one truck, and the person signing up drives it. They get one app instead of a dashboard.
   const [solo, setSolo] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const primary = drivers.find((d) => d.id === PRIMARY_DRIVER_ID);
   const shownDrivers = solo && primary ? [primary] : drivers;
 
@@ -82,6 +96,30 @@ export default function SignupPage() {
     setEld(name);
     setImporting(true);
     setTimeout(() => setImporting(false), 1400);
+  }
+
+  /** With accounts on, this is where the carrier is created and its fleet first saved. */
+  async function finish() {
+    updateSettings({ ownerOperator: !!solo });
+    if (cloudEnabled) {
+      setSaving(true);
+      setSaveError(null);
+      try {
+        const m = await createCarrierAccount({
+          name: fmcsa?.legalName ?? carrier.name,
+          mc: mc.replace(/^MC-?/i, ""),
+          dot: fmcsa?.dotNumber ?? carrier.dot.replace(/^DOT-?/i, ""),
+          ownerOperator: !!solo,
+          driverId: solo ? PRIMARY_DRIVER_ID : null,
+        });
+        await connectCarrier(m, { fresh: true });
+      } catch {
+        setSaving(false);
+        return setSaveError("Couldn't create your account. Check your connection and try again.");
+      }
+      setSaving(false);
+    }
+    setStep("done");
   }
 
   function finishRules() {
@@ -297,14 +335,9 @@ export default function SignupPage() {
               <div className="mt-5">
                 <AutopilotControl />
               </div>
-              <Button
-                className="mt-6 w-full"
-                onClick={() => {
-                  updateSettings({ ownerOperator: !!solo });
-                  setStep("done");
-                }}
-              >
-                Finish <ArrowRight className="h-4 w-4" />
+              {saveError && <p className="mt-4 text-sm text-[var(--accent-danger)]">{saveError}</p>}
+              <Button className="mt-6 w-full" disabled={saving} onClick={finish}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Finish <ArrowRight className="h-4 w-4" /></>}
               </Button>
             </>
           )}
@@ -327,7 +360,7 @@ export default function SignupPage() {
 
         {step === "mc" && (
           <p className="text-center text-xs text-ink-500">
-            Already have an account? <Link href="/carrier" className="font-medium text-ink-950 underline">Log in</Link>
+            Already have an account? <Link href={cloudEnabled ? "/login" : "/carrier"} className="font-medium text-ink-950 underline">Log in</Link>
           </p>
         )}
       </div>

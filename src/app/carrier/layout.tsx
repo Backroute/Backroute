@@ -1,5 +1,6 @@
 "use client";
 
+import { CloudGate } from "@/components/cloud/cloud-gate";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutGrid, Settings, Truck, Users, Wallet } from "lucide-react";
@@ -59,6 +60,14 @@ function SectionTabs() {
 }
 
 export default function CarrierLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <CloudGate area="carrier">
+      <CarrierShell>{children}</CarrierShell>
+    </CloudGate>
+  );
+}
+
+function CarrierShell({ children }: { children: React.ReactNode }) {
   const carrier = usePrimaryCarrier();
   const loads = useCarrierLoads();
   const trucks = useStore((s) => s.trucks);

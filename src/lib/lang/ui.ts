@@ -71,6 +71,7 @@ export interface UiText {
   yourBusiness: string;
   ownTruck: string;
   ownTruckNote: string;
+  signOut: string;
   settingsTitle: string;
   setupOnCall: string;
   settingsIntro: string;
@@ -182,6 +183,7 @@ const en: UiText = {
   yourBusiness: "Your business",
   ownTruck: "I own this truck",
   ownTruckNote: "Owner-operator: the app shows your profit, lets you approve repairs and loads yourself, and \"get me a person\" goes to Backroute Support.",
+  signOut: "Sign out",
   settingsTitle: "How the AI calls you",
   setupOnCall: "Set up on a call",
   settingsIntro: "It calls like a dispatcher: new loads, pickup numbers, late appointments, parking. Never while you're in the sleeper or off duty. Anything with a number also comes by text.",
@@ -291,6 +293,7 @@ const es: UiText = {
   yourBusiness: "Tu negocio",
   ownTruck: "El camión es mío",
   ownTruckNote: "Dueño-operador: la app muestra tu ganancia, apruebas tú mismo reparaciones y cargas, y \"quiero una persona\" va a soporte de Backroute.",
+  signOut: "Cerrar sesión",
   settingsTitle: "Cómo te llama la IA",
   setupOnCall: "Configurar por llamada",
   settingsIntro: "Llama como un despachador: cargas nuevas, números de recogida, citas atrasadas, estacionamiento. Nunca cuando estás en la litera o fuera de servicio. Todo lo que tenga un número también llega por mensaje.",
@@ -400,6 +403,7 @@ const pa: UiText = {
   yourBusiness: "ਤੁਹਾਡਾ ਕਾਰੋਬਾਰ",
   ownTruck: "ਇਹ ਟਰੱਕ ਮੇਰਾ ਹੈ",
   ownTruckNote: "ਓਨਰ-ਆਪਰੇਟਰ: ਐਪ ਤੁਹਾਡਾ ਮੁਨਾਫ਼ਾ ਦਿਖਾਉਂਦੀ ਹੈ, ਰਿਪੇਅਰ ਅਤੇ ਲੋਡ ਤੁਸੀਂ ਆਪ ਮਨਜ਼ੂਰ ਕਰਦੇ ਹੋ, ਅਤੇ \"ਕਿਸੇ ਬੰਦੇ ਨਾਲ ਗੱਲ\" Backroute ਸਪੋਰਟ ਕੋਲ ਜਾਂਦੀ ਹੈ।",
+  signOut: "ਸਾਈਨ ਆਊਟ",
   settingsTitle: "AI ਤੁਹਾਨੂੰ ਕਿਵੇਂ ਫ਼ੋਨ ਕਰੇ",
   setupOnCall: "ਫ਼ੋਨ ਤੇ ਸੈੱਟ ਕਰੋ",
   settingsIntro: "ਡਿਸਪੈਚਰ ਵਾਂਗ ਫ਼ੋਨ ਕਰਦਾ ਹੈ: ਨਵੇਂ ਲੋਡ, ਪਿਕਅੱਪ ਨੰਬਰ, ਲੇਟ ਅਪੌਇੰਟਮੈਂਟ, ਪਾਰਕਿੰਗ। ਸਲੀਪਰ ਜਾਂ ਔਫ਼ ਡਿਊਟੀ ਵਿੱਚ ਕਦੇ ਨਹੀਂ। ਨੰਬਰ ਵਾਲੀ ਹਰ ਗੱਲ ਮੈਸੇਜ ਰਾਹੀਂ ਵੀ ਆਉਂਦੀ ਹੈ।",
@@ -509,6 +513,7 @@ const hi: UiText = {
   yourBusiness: "आपका कारोबार",
   ownTruck: "यह ट्रक मेरा है",
   ownTruckNote: "ओनर-ऑपरेटर: ऐप आपका मुनाफ़ा दिखाता है, रिपेयर और लोड आप ख़ुद मंज़ूर करते हैं, और \"किसी इंसान से बात\" Backroute सपोर्ट के पास जाती है।",
+  signOut: "साइन आउट",
   settingsTitle: "AI आपको कैसे फ़ोन करे",
   setupOnCall: "फ़ोन पर सेट करें",
   settingsIntro: "डिस्पैचर की तरह फ़ोन करता है: नए लोड, पिकअप नंबर, लेट अपॉइंटमेंट, पार्किंग। स्लीपर या ऑफ़ ड्यूटी में कभी नहीं। नंबर वाली हर बात मैसेज से भी आती है।",
@@ -618,6 +623,7 @@ const ru: UiText = {
   yourBusiness: "Твой бизнес",
   ownTruck: "Это мой трак",
   ownTruckNote: "Овнер-оператор: приложение показывает твою прибыль, ремонты и грузы одобряешь сам, а «нужен человек» идёт в поддержку Backroute.",
+  signOut: "Выйти",
   settingsTitle: "Как AI тебе звонит",
   setupOnCall: "Настроить по звонку",
   settingsIntro: "Звонит как диспетчер: новые грузы, номера погрузки, перенос времени, парковка. Никогда, когда ты в слипере или офф-дьюти. Всё с номерами приходит и сообщением.",
@@ -727,6 +733,7 @@ const uk: UiText = {
   yourBusiness: "Твій бізнес",
   ownTruck: "Це мій трак",
   ownTruckNote: "Овнер-оператор: застосунок показує твій прибуток, ремонти й вантажі схвалюєш сам, а «потрібна людина» йде в підтримку Backroute.",
+  signOut: "Вийти",
   settingsTitle: "Як AI тобі дзвонить",
   setupOnCall: "Налаштувати дзвінком",
   settingsIntro: "Дзвонить як диспетчер: нові вантажі, номери завантаження, перенесення часу, парковка. Ніколи, коли ти в слипері чи офф-д'юті. Усе з номерами приходить і повідомленням.",
@@ -836,6 +843,7 @@ const fr: UiText = {
   yourBusiness: "Ton entreprise",
   ownTruck: "Le camion est à moi",
   ownTruckNote: "Propriétaire-exploitant : l'appli montre ton profit, tu approuves toi-même les réparations et les voyages, et « je veux parler à quelqu'un » va au soutien Backroute.",
+  signOut: "Se déconnecter",
   settingsTitle: "Comment l'IA t'appelle",
   setupOnCall: "Régler par appel",
   settingsIntro: "Elle appelle comme un répartiteur : nouveaux voyages, numéros de ramassage, rendez-vous déplacés, stationnement. Jamais quand t'es dans la couchette ou hors service. Tout ce qui a un numéro arrive aussi par texto.",

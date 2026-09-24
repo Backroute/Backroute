@@ -4,6 +4,8 @@ import { useState } from "react";
 import { CalendarClock, DollarSign, Home, Phone, Star, Users } from "lucide-react";
 import { CallSettingsCard, LanguageCard } from "@/components/shared/call-settings";
 import { BusinessCard } from "@/components/shared/owner-operator";
+import { SignOutButton } from "@/components/cloud/app-access";
+import { useDriverUi } from "@/lib/lang/use-driver-ui";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +38,7 @@ const HOS_TONE: Record<HosStatus, "success" | "neutral" | "info" | "warning"> = 
 
 
 export default function DriverProfilePage() {
+  const { t } = useDriverUi();
   const driver = usePrimaryDriver();
   const carrier = usePrimaryCarrier();
   const trucks = useCarrierTrucks();
@@ -265,6 +268,7 @@ export default function DriverProfilePage() {
       >
         <Phone className="h-4 w-4" /> Call dispatch support
       </a>
+      <SignOutButton label={t.signOut} />
     </div>
   );
 }

@@ -48,8 +48,12 @@ export function useDriverMap() {
   return useMemo(() => new Map(drivers.map((d) => [d.id, d])), [drivers]);
 }
 
+/** The driver using the driver app: the signed-in driver, or the demo's driver. */
 export function usePrimaryDriver() {
-  return useStore((s) => s.drivers.find((d) => d.id === PRIMARY_DRIVER_ID)!);
+  return useStore((s) => {
+    const id = s.session.driverId ?? PRIMARY_DRIVER_ID;
+    return (s.drivers.find((d) => d.id === id) ?? s.drivers[0])!;
+  });
 }
 
 /**

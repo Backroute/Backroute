@@ -343,11 +343,13 @@ interface CallDraft {
   readLang: Lang;
   /** Owner-operator: there's no office to call back, so a driver asking for a person gets Backroute Support. */
   solo: boolean;
+  /** Signed in to a real account: every driver is a real person, so nobody picks up a call on their own. */
+  live: boolean;
 }
 
 function draftFrom(state: StoreState): CallDraft {
   const { brokers, incidents, loads, trucks, drivers, escalations, driverMessages, dispatchCalls } = state;
-  return { brokers, incidents, loads, trucks, drivers, escalations, driverMessages, dispatchCalls, events: [], readLang: readLangOf(state.settings), solo: state.settings.ownerOperator };
+  return { brokers, incidents, loads, trucks, drivers, escalations, driverMessages, dispatchCalls, events: [], readLang: readLangOf(state.settings), solo: state.settings.ownerOperator, live: state.session.mode !== "demo" };
 }
 
 function callDraftResult(d: CallDraft) {
@@ -446,7 +448,7 @@ function replyToCall(d: CallDraft, callId: string, reply: string, heard?: string
   }
 
   let turn = translated(readers, respond(call, reply), (l) => respond(call, reply, l));
-  const toSupport = d.solo && call.driverId === PRIMARY_DRIVER_ID && !!turn.report?.person;
+  const toSupport = d.solo && (d.live || call.driverId === PRIMARY_DRIVER_ID) && !!turn.report?.person;
   if (toSupport && reply === "person") turn = { ...turn, say: L.personSupport, tr: trFor(readers, (l) => pack(l).personSupport) };
   patchCall(d, callId, {
     lines: [...call.lines, { speaker: "driver", text: said, at: now, tr: saidTr }, { speaker: "ai", text: turn.say, at: now, tr: turn.tr }],
@@ -582,7 +584,7 @@ function runDispatchCalls(d: CallDraft, newOfferBatches: { truckId: string; offe
   for (const driver of d.drivers) {
     const mine = d.dispatchCalls.filter((c) => c.driverId === driver.id);
     const active = mine.find((c) => c.status === "ringing" || c.status === "live");
-    const primary = driver.id === PRIMARY_DRIVER_ID;
+    const primary = d.live || driver.id === PRIMARY_DRIVER_ID;
 
     if (active?.status === "ringing") {
       const ringingFor = nowMs - Date.parse(active.ringingAt ?? active.createdAt);
@@ -736,6 +738,19 @@ const ESCALATION_TEMPLATES: EscalationTemplate[] = [
   },
 ];
 
+/**
+ * Who this browser is signed in as. "demo" is the built-in sample fleet with nothing saved. "office" is an owner or
+ * dispatcher: this browser runs the AI and saves the fleet. "driver" sees and answers only their own things.
+ * `driverId` is the driver this person is (drivers and owner-operators).
+ */
+export interface CloudSession {
+  mode: "demo" | "office" | "driver";
+  carrierId?: string;
+  driverId?: string | null;
+  /** A carrier with nothing saved yet: starts from the fleet read at sign-up, and the AI sources its first offers. */
+  fresh?: boolean;
+}
+
 interface StoreState {
   carriers: Carrier[];
   brokers: Broker[];
@@ -756,6 +771,8 @@ interface StoreState {
   settings: AgentSettings;
   liveMetrics: LiveMetrics;
   tickCount: number;
+  /** Demo, or signed in to a real account (see lib/cloud). */
+  session: CloudSession;
   actions: {
     tick: () => void;
     resolveEscalation: (id: string, approve: boolean, actor?: "carrier" | "ops", note?: string) => void;
@@ -1040,6 +1057,7 @@ export const useStore = create<StoreState>((set, get) => ({
     boardsConnected: 17,
   },
   tickCount: 0,
+  session: { mode: "demo" },
 
   actions: {
     tick: () => {
