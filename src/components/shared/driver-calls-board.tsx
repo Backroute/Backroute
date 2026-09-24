@@ -7,7 +7,7 @@ import { ChevronDown, ChevronUp, PhoneCall } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { TimeAgo } from "@/components/shared/time-ago";
-import { useStore } from "@/lib/store";
+import { readLangOf, useStore } from "@/lib/store";
 import { KIND_LABEL, OWNER_NAME } from "@/lib/dispatch-calls";
 import { LANG_INFO, pack, type QuickPhrase } from "@/lib/lang";
 import { PRIMARY_CARRIER_ID } from "@/lib/selectors";
@@ -44,7 +44,7 @@ export function DriverCallsBoard({ limit = 6 }: { limit?: number }) {
   const [open, setOpen] = useState<string | null>(null);
   // Which call, if any, is showing the words as the driver heard them rather than in the owner's language.
   const [originalFor, setOriginalFor] = useState<string | null>(null);
-  const ownerLang = useStore((s) => s.settings.ownerLanguage);
+  const readLang = useStore((s) => readLangOf(s.settings));
 
   const mine = calls
     .filter((c) => c.carrierId === PRIMARY_CARRIER_ID && c.status !== "dropped")
@@ -86,7 +86,7 @@ export function DriverCallsBoard({ limit = 6 }: { limit?: number }) {
               call.status === "held"
                 ? `${call.heldReason}. Texted, will call if it still matters`
                 : call.status === "live"
-                  ? (showOriginal ? call.lines.at(-1)?.text : (call.lines.at(-1)?.alt ?? call.lines.at(-1)?.text))
+                  ? (showOriginal ? call.lines.at(-1)?.text : (call.lines.at(-1)?.tr?.[readLang] ?? call.lines.at(-1)?.text))
                   : call.status === "ringing"
                     ? "Calling now"
                     : call.outcome;
@@ -129,16 +129,16 @@ export function DriverCallsBoard({ limit = 6 }: { limit?: number }) {
                         {call.lines.map((l, i) => (
                           <li key={i} className="text-xs leading-relaxed">
                             <span className="font-semibold text-ink-950">{l.speaker === "ai" ? "AI" : l.speaker === "owner" ? "You" : driver?.name.split(" ")[0] ?? "Driver"}: </span>
-                            <span className="text-ink-700" lang={showOriginal || !l.alt ? call.lang : ownerLang}>
-                              {showOriginal ? l.text : (l.alt ?? l.text)}
+                            <span className="text-ink-700" lang={showOriginal || !l.tr?.[readLang] ? call.lang : readLang}>
+                              {showOriginal ? l.text : (l.tr?.[readLang] ?? l.text)}
                             </span>
                           </li>
                         ))}
                       </ul>
                     )}
-                    {call.lang !== ownerLang && call.lines.length > 0 && (
+                    {call.lang !== readLang && call.lines.length > 0 && (
                       <button type="button" onClick={() => setOriginalFor(showOriginal ? null : call.id)} className="mt-2 text-[11px] font-medium text-ink-500 underline underline-offset-2">
-                        {showOriginal ? `Show in ${LANG_INFO[ownerLang].english}` : `Show what was said (${LANG_INFO[call.lang].native})`}
+                        {showOriginal ? `Show in ${LANG_INFO[readLang].english}` : `Show what was said (${LANG_INFO[call.lang].native})`}
                       </button>
                     )}
                     {call.status === "live" && <OwnerControls call={call} driverFirst={driver?.name.split(" ")[0] ?? "the driver"} />}
@@ -162,7 +162,7 @@ export function DriverCallsBoard({ limit = 6 }: { limit?: number }) {
  *  In the demo the owner types; on a real phone line they'd talk. */
 function OwnerControls({ call, driverFirst }: { call: DispatchCall; driverFirst: string }) {
   const { takeOverDispatchCall, ownerSayOnCall, hangUpDispatchCall } = useStore((s) => s.actions);
-  const ownerLang = useStore((s) => s.settings.ownerLanguage);
+  const readLang = useStore((s) => readLangOf(s.settings));
   const [text, setText] = useState("");
   const send = () => {
     if (!text.trim()) return;
@@ -190,7 +190,7 @@ function OwnerControls({ call, driverFirst }: { call: DispatchCall; driverFirst:
             onClick={() => ownerSayOnCall(call.id, "", q)}
             className="rounded-full border border-line bg-white px-3 py-1 text-[11px] font-medium text-ink-700 hover:border-ink-300"
           >
-            {pack(ownerLang).quick[q]}
+            {pack(readLang).quick[q]}
           </button>
         ))}
       </div>
@@ -212,7 +212,7 @@ function OwnerControls({ call, driverFirst }: { call: DispatchCall; driverFirst:
       </div>
       <p className="text-[11px] text-ink-500">
         {driverFirst} hears you as {OWNER_NAME}
-        {call.lang !== ownerLang ? `, in ${LANG_INFO[call.lang].english}: the quick phrases above are translated for you. Typed words go as typed in the demo; on a real line the AI translates as you talk.` : ". The AI keeps notes and logs the call. Demo: you type here; on a real line you'd talk."}
+        {call.lang !== readLang ? `, in ${LANG_INFO[call.lang].english}: the quick phrases above are translated for you. Typed words go as typed in the demo; on a real line the AI translates as you talk.` : ". The AI keeps notes and logs the call. Demo: you type here; on a real line you'd talk."}
       </p>
     </div>
   );

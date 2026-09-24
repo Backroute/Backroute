@@ -44,6 +44,7 @@ import {
   inboundCall,
   lateOnThisLoad,
   type EmptyAt,
+  type Turn,
   nextLoadCall,
   OWNER_NAME,
   openCall,
@@ -62,13 +63,13 @@ import type {
   Carrier,
   CarrierMessage,
   DispatchCall,
-  DispatchCallChoice,
   DispatchCallKind,
   Driver,
   DriverMessage,
   DriverPrefs,
   HosStatus,
   Lang,
+  Translations,
   DvirInspection,
   DvirItem,
   Escalation,
@@ -245,13 +246,13 @@ interface CallDraft {
   driverMessages: DriverMessage[];
   dispatchCalls: DispatchCall[];
   events: ActivityEvent[];
-  /** The owner's language, for the second copy of every line they read on the board. */
-  ownerLang: Lang;
+  /** The language the owner reads calls in on the dashboard. */
+  readLang: Lang;
 }
 
 function draftFrom(state: StoreState): CallDraft {
   const { brokers, incidents, loads, trucks, drivers, escalations, driverMessages, dispatchCalls } = state;
-  return { brokers, incidents, loads, trucks, drivers, escalations, driverMessages, dispatchCalls, events: [], ownerLang: state.settings.ownerLanguage };
+  return { brokers, incidents, loads, trucks, drivers, escalations, driverMessages, dispatchCalls, events: [], readLang: readLangOf(state.settings) };
 }
 
 function callDraftResult(d: CallDraft) {
@@ -283,27 +284,48 @@ function ringCall(d: CallDraft, call: DispatchCall) {
   patchCall(d, call.id, { status: "ringing", ringingAt: new Date().toISOString(), channel: reach });
 }
 
-/** The owner's copy of a line, when the owner reads a different language than the driver speaks. */
-function ownerCopy(d: CallDraft, call: DispatchCall, inOwnerLang: () => string): string | undefined {
-  return d.ownerLang === call.lang ? undefined : inOwnerLang();
+/** The language the owner reads driver calls in on the dashboard. */
+export function readLangOf(settings: Pick<AgentSettings, "ownerLanguage" | "transcriptsIn">): Lang {
+  return settings.transcriptsIn === "mine" ? settings.ownerLanguage : "en";
 }
 
-/** Choices in the driver's language, each carrying the owner's version for the transcript. */
-function withAlt(choices: DispatchCallChoice[], ownerChoices: DispatchCallChoice[] | undefined): DispatchCallChoice[] {
-  return ownerChoices ? choices.map((ch, i) => ({ ...ch, alt: ownerChoices[i]?.label })) : choices;
+/** Who reads this call in a language other than the one it's spoken in: the owner on the dashboard, and the driver
+ *  when their app is in a different language than they talk in. */
+function readersOf(d: CallDraft, call: DispatchCall): Lang[] {
+  const appLang = d.drivers.find((x) => x.id === call.driverId)?.prefs?.appLanguage ?? "en";
+  return Array.from(new Set([d.readLang, appLang])).filter((l) => l !== call.lang);
 }
 
-/** The AI's opening line, said in the driver's language and kept in the owner's. */
+/** The same words in each reader's language, or undefined when everyone reads the spoken language. */
+function trFor(langs: Lang[], words: (lang: Lang) => string | undefined): Translations | undefined {
+  if (!langs.length) return undefined;
+  const tr: Translations = {};
+  for (const l of langs) {
+    const w = words(l);
+    if (w) tr[l] = w;
+  }
+  return tr;
+}
+
+/** A turn said in the call's language, carrying each reader's version of the line and of every button. */
+function translated(langs: Lang[], turn: Turn, inLang: (lang: Lang) => Turn) {
+  const others = new Map(langs.map((l) => [l, inLang(l)] as const));
+  return {
+    ...turn,
+    tr: trFor(langs, (l) => others.get(l)?.say),
+    choices: turn.choices.map((ch, i) => ({ ...ch, tr: trFor(langs, (l) => others.get(l)?.choices[i]?.label) })),
+  };
+}
+
+/** The AI's opening line, said in the driver's language and kept in every reader's. */
 function openingFor(d: CallDraft, call: DispatchCall) {
-  const turn = openCall(call);
-  const owner = d.ownerLang === call.lang ? undefined : openCall(call, d.ownerLang);
-  return { ...turn, alt: owner?.say, choices: withAlt(turn.choices, owner?.choices) };
+  return translated(readersOf(d, call), openCall(call), (l) => openCall(call, l));
 }
 
 function answerCall(d: CallDraft, call: DispatchCall) {
   const turn = openingFor(d, call);
   const now = new Date().toISOString();
-  patchCall(d, call.id, { status: "live", answeredAt: now, lines: [{ speaker: "ai", text: turn.say, at: now, alt: turn.alt }], choices: turn.choices, step: turn.step });
+  patchCall(d, call.id, { status: "live", answeredAt: now, lines: [{ speaker: "ai", text: turn.say, at: now, tr: turn.tr }], choices: turn.choices, step: turn.step });
 }
 
 /** One back-and-forth on a live call. `heard` is what the driver actually said, when they spoke instead of tapping. */
@@ -311,24 +333,26 @@ function replyToCall(d: CallDraft, callId: string, reply: string, heard?: string
   const call = d.dispatchCalls.find((c) => c.id === callId);
   if (!call || call.status !== "live") return;
   const L = pack(call.lang);
-  const O = pack(d.ownerLang);
+  const readers = readersOf(d, call);
   const choice = call.choices.find((ch) => ch.reply === reply);
   const said = heard ?? (reply === "again" ? L.saidAgain : reply === "person" ? L.saidPerson : choice?.say ?? reply);
-  // What the driver said, for an owner who reads another language: the button's own translation when there is one.
-  const saidAlt = ownerCopy(d, call, () => (reply === "again" ? O.saidAgain : reply === "person" ? O.saidPerson : choice?.alt ?? said));
+  // What the driver said, for readers of other languages: the button's own translation when there is one. Words
+  // the driver actually spoke stay as spoken; translating free speech needs the real voice AI.
+  const saidTr = heard
+    ? undefined
+    : trFor(readers, (l) => (reply === "again" ? pack(l).saidAgain : reply === "person" ? pack(l).saidPerson : choice?.tr?.[l]));
   const now = new Date().toISOString();
 
   // The owner has the call now: the AI only listens and keeps the record.
   if (call.ownerTookOver) {
-    patchCall(d, callId, { lines: [...call.lines, { speaker: "driver", text: said, at: now, alt: saidAlt }] });
+    patchCall(d, callId, { lines: [...call.lines, { speaker: "driver", text: said, at: now, tr: saidTr }] });
     return;
   }
 
-  const turn = respond(call, reply);
-  const ownerTurn = d.ownerLang === call.lang ? undefined : respond(call, reply, d.ownerLang);
+  const turn = translated(readers, respond(call, reply), (l) => respond(call, reply, l));
   patchCall(d, callId, {
-    lines: [...call.lines, { speaker: "driver", text: said, at: now, alt: saidAlt }, { speaker: "ai", text: turn.say, at: now, alt: ownerTurn?.say }],
-    choices: withAlt(turn.choices, ownerTurn?.choices),
+    lines: [...call.lines, { speaker: "driver", text: said, at: now, tr: saidTr }, { speaker: "ai", text: turn.say, at: now, tr: turn.tr }],
+    choices: turn.choices,
     step: turn.step,
     ...(turn.effects ? { effects: turn.effects } : {}),
     ...(turn.outcome !== undefined ? { outcome: turn.outcome } : {}),
@@ -539,8 +563,10 @@ export interface AgentSettings {
   notifySms: boolean;
   /** The owner's end-of-day summary text. */
   dailyText: boolean;
-  /** The owner's language: their end-of-day text and the call transcripts on their dashboard. */
+  /** The language the owner is texted and talked to in: the end-of-day text. */
   ownerLanguage: Lang;
+  /** Driver call transcripts on the dashboard: in the dashboard's language (English), or in the owner's own. */
+  transcriptsIn: "dashboard" | "mine";
   rateFloorPct: number;
   avoidWatchBrokers: boolean;
   offersPerTruck: number;
@@ -896,6 +922,7 @@ export const useStore = create<StoreState>((set, get) => ({
     notifySms: false,
     dailyText: true,
     ownerLanguage: "en",
+    transcriptsIn: "dashboard",
     rateFloorPct: 96,
     avoidWatchBrokers: false,
     offersPerTruck: 3,
@@ -2256,7 +2283,7 @@ export const useStore = create<StoreState>((set, get) => ({
         const opening = openingFor(draftFrom(state), base);
         const call: DispatchCall = {
           ...base, loadId: current?.id, status: "live", channel: driver.prefs?.reach ?? "app", ringingAt: now, answeredAt: now,
-          lines: [{ speaker: "ai", text: opening.say, at: now, alt: opening.alt }], choices: opening.choices, step: opening.step,
+          lines: [{ speaker: "ai", text: opening.say, at: now, tr: opening.tr }], choices: opening.choices, step: opening.step,
         };
         return { dispatchCalls: [call, ...state.dispatchCalls].slice(0, 60) };
       }),
@@ -2269,14 +2296,13 @@ export const useStore = create<StoreState>((set, get) => ({
         const now = new Date().toISOString();
         const first = d.drivers.find((x) => x.id === call.driverId)?.name.split(" ")[0] ?? "there";
         const L = pack(call.lang);
-        const O = pack(d.ownerLang);
-        const other = d.ownerLang !== call.lang;
+        const readers = readersOf(d, call);
         patchCall(d, callId, {
           ownerTookOver: true,
-          lines: [...call.lines, { speaker: "ai", text: L.ownerJoined(first, OWNER_NAME), at: now, alt: other ? O.ownerJoined(first, OWNER_NAME) : undefined }],
+          lines: [...call.lines, { speaker: "ai", text: L.ownerJoined(first, OWNER_NAME), at: now, tr: trFor(readers, (l) => pack(l).ownerJoined(first, OWNER_NAME)) }],
           choices: [
-            { label: L.ch.soundsGood, reply: "ack", say: L.ch.soundsGood, match: "good|ok|okay|yes|yeah|sure|will do", alt: other ? O.ch.soundsGood : undefined },
-            { label: L.ch.holdOn, reply: "hold", say: L.ch.holdOn, match: "hold|wait|second|sec", alt: other ? O.ch.holdOn : undefined },
+            { label: L.ch.soundsGood, reply: "ack", say: L.ch.soundsGood, match: "good|ok|okay|yes|yeah|sure|will do", tr: trFor(readers, (l) => pack(l).ch.soundsGood) },
+            { label: L.ch.holdOn, reply: "hold", say: L.ch.holdOn, match: "hold|wait|second|sec", tr: trFor(readers, (l) => pack(l).ch.holdOn) },
           ],
           outcome: `${OWNER_NAME} took the call over`,
         });
@@ -2290,9 +2316,9 @@ export const useStore = create<StoreState>((set, get) => ({
         if (call?.status !== "live" || !call.ownerTookOver || (!quick && !text.trim())) return {};
         // A quick phrase reaches the driver in their language. Typed words go as typed: live translation of free
         // speech needs the real voice AI connected.
-        const ownerLang = state.settings.ownerLanguage;
+        const readers = readersOf(draftFrom(state), call);
         const line = quick
-          ? { speaker: "owner" as const, text: pack(call.lang).quick[quick], at: new Date().toISOString(), alt: ownerLang !== call.lang ? pack(ownerLang).quick[quick] : undefined }
+          ? { speaker: "owner" as const, text: pack(call.lang).quick[quick], at: new Date().toISOString(), tr: trFor(readers, (l) => pack(l).quick[quick]) }
           : { speaker: "owner" as const, text: text.trim(), at: new Date().toISOString() };
         return { dispatchCalls: state.dispatchCalls.map((c) => (c.id === callId ? { ...c, lines: [...c.lines, line] } : c)) };
       }),

@@ -426,7 +426,7 @@ export function respond(call: DispatchCall, reply: string, lang: Lang = call.lan
   const L = pack(lang);
   const f = call.facts;
   const lastAi = [...call.lines].reverse().find((l) => l.speaker === "ai");
-  const lastAiText = (lang === call.lang ? lastAi?.text : (lastAi?.alt ?? lastAi?.text)) ?? "";
+  const lastAiText = (lang === call.lang ? lastAi?.text : (lastAi?.tr?.[lang] ?? lastAi?.text)) ?? "";
 
   if (reply === "again") return { say: lastAiText, choices: call.choices, step: call.step };
   if (reply === "person") {

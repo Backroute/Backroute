@@ -8,7 +8,7 @@ import { tripState } from "@/lib/trip-state";
 import { makeRecognizer, say, type Recognizer } from "@/lib/speech";
 import { useDriverUi } from "@/lib/lang/use-driver-ui";
 import type { DriveCommand, UiText } from "@/lib/lang/ui";
-import type { Load } from "@/lib/types";
+import type { Lang, Load } from "@/lib/types";
 
 /** Commands in the driver's language, checked in this order so "unloaded" wins over "loaded". English also keeps
  *  its looser patterns ("I'm loaded up", "at the dock"). */
@@ -50,7 +50,7 @@ export function DrivingMode({
 }) {
   const now = useNow();
   const s = tripState(load, now, needsPreTrip);
-  const { t, lang, info } = useDriverUi();
+  const { t, lang, tt, talk, talkInfo } = useDriverUi();
   const [reply, setReply] = useState(t.driveHint);
   const [listening, setListening] = useState(false);
   const recognizer = useRef<Recognizer | null>(null);
@@ -60,31 +60,39 @@ export function DrivingMode({
 
   const place = s.card === "pickup" ? `${load.lane.origin}, ${load.lane.originState}` : `${load.lane.destination}, ${load.lane.destState}`;
 
+  // What the app says back: shown in the app's language, said out loud in the one the driver talks in.
+  function respondWith(words: (u: UiText, l: Lang) => string) {
+    const shown = words(t, lang);
+    setReply(shown);
+    say(talk === lang ? shown : words(tt, talk), undefined, { lang: talkInfo.speech });
+  }
+
   function run(cmd: DriveCommand) {
-    let text: string;
+    let words: (u: UiText, l: Lang) => string;
     if (cmd === "arrived") {
       if (s.next.action === "arrive") {
         onArrive();
-        text = t.checkedIn(place);
-      } else text = s.arrived ? t.alreadyIn : t.finishSteps;
+        words = (u) => u.checkedIn(place);
+      } else words = (u) => (s.arrived ? u.alreadyIn : u.finishSteps);
     } else if (cmd === "loaded" || cmd === "unloaded") {
       if (s.arrived && !s.handled && s.next.action === cmd) {
         onTripStep(cmd);
-        text = cmd === "loaded" ? t.gotLoaded : t.gotUnloaded;
-      } else text = s.arrived ? t.alreadyDone : t.notThere;
+        words = (u) => (cmd === "loaded" ? u.gotLoaded : u.gotUnloaded);
+      } else words = (u) => (s.arrived ? u.alreadyDone : u.notThere);
     } else if (cmd === "late") {
       onLate();
-      text = t.toldLate;
+      words = (u) => u.toldLate;
     } else if (cmd === "call") {
       onCall();
       return;
     } else {
       // The step names come from the trip screens, which are English in the demo; other languages get the place.
-      const stop = s.card === "pickup" ? t.pickup : s.card === "delivery" ? t.delivery : t.nextLoad;
-      text = lang === "en" ? `Next: ${s.next.title}. ${s.card === "booking" ? "" : `${place}, ${s.drive}.`}` : `${stop}: ${place}${s.card === "booking" ? "" : `, ${s.drive}`}.`;
+      words = (u, l) => {
+        const stop = s.card === "pickup" ? u.pickup : s.card === "delivery" ? u.delivery : u.nextLoad;
+        return l === "en" ? `Next: ${s.next.title}. ${s.card === "booking" ? "" : `${place}, ${s.drive}.`}` : `${stop}: ${place}${s.card === "booking" ? "" : `, ${s.drive}`}.`;
+      };
     }
-    setReply(text);
-    say(text, undefined, { lang: info.speech });
+    respondWith(words);
   }
 
   function listen() {
@@ -92,19 +100,16 @@ export function DrivingMode({
       recognizer.current?.stop();
       return;
     }
-    const r = makeRecognizer(info.speech);
+    const r = makeRecognizer(talkInfo.speech);
     if (!r) return;
     recognizer.current = r;
     r.interimResults = false;
     r.onresult = (e) => {
       const heard = e.results[0][0].transcript.toLowerCase();
-      const cmd = commandFor(heard, t, lang === "en");
+      // Spoken in the talk language, but words from the app's language work too.
+      const cmd = commandFor(heard, tt, talk === "en") ?? (lang !== talk ? commandFor(heard, t, lang === "en") : null);
       if (cmd) run(cmd);
-      else {
-        const text = t.heard(heard);
-        setReply(text);
-        say(text, undefined, { lang: info.speech });
-      }
+      else respondWith((u) => u.heard(heard));
     };
     r.onend = () => setListening(false);
     r.onerror = () => setListening(false);

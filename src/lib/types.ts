@@ -137,9 +137,14 @@ export interface Driver {
 /** Languages the AI dispatcher speaks with drivers and owners. Brokers are always worked in English. */
 export type Lang = "en" | "es" | "pa" | "hi" | "ru" | "uk" | "fr";
 
+/** The same words in other languages, for whoever reads a call in a language other than the one spoken. */
+export type Translations = Partial<Record<Lang, string>>;
+
 export interface DriverPrefs {
-  /** The language the AI calls, texts and shows the app in. */
+  /** The language the AI talks and texts in. Many people read an app in English but talk in another language. */
   language?: Lang;
+  /** The language the app's screens are in. English unless the driver picks another. */
+  appLanguage?: Lang;
   /** Hour of the day (0–23) before which the AI doesn't call; it texts instead. */
   noCallsBefore?: number;
   /** States the driver won't take loads into (e.g. NJ for the NYC area). */
@@ -523,8 +528,8 @@ export interface DispatchCallChoice {
   say: string;
   /** Loose words that pick this choice when the driver says it out loud (English). */
   match?: string;
-  /** The same choice in the owner's language, for the carrier's transcript. */
-  alt?: string;
+  /** The button in other languages: the driver's app language, the owner's reading language. */
+  tr?: Translations;
 }
 
 /** A load the AI reads out on a call, kept as facts so it can be said in any language. */
@@ -575,8 +580,8 @@ export interface DispatchCall {
   endedAt?: string;
   /** The driver's language, which the whole call is in. */
   lang: Lang;
-  /** `alt` is the line in the owner's language when it differs from the driver's. */
-  lines: { speaker: "ai" | "driver" | "owner"; text: string; at: string; alt?: string }[];
+  /** `text` is what was said, in the call's language; `tr` is the same line for readers of other languages. */
+  lines: { speaker: "ai" | "driver" | "owner"; text: string; at: string; tr?: Translations }[];
   /** Where it rang: the app, or the driver's regular phone. */
   channel?: "app" | "phone";
   /** The carrier's owner took the call over from the AI (listening in is silent and needs no flag). */

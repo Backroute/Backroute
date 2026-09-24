@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Mic, MicOff, MessageSquareText, Phone, PhoneOff, RotateCcw, UserRound } from "lucide-react";
+import { Mic, MicOff, MessageSquareText, Phone, PhoneOff, RotateCcw, UserRound, Volume2 } from "lucide-react";
 import { cn, formatDuration } from "@/lib/utils";
 import { useNow } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { DISPATCH_LINE, matchSpoken, OWNER_NAME } from "@/lib/dispatch-calls";
 import { canSpeak, makeRecognizer, say, stopSpeaking, type Recognizer } from "@/lib/speech";
 import { useDriverUi } from "@/lib/lang/use-driver-ui";
-import type { DispatchCall } from "@/lib/types";
+import { LANG_INFO } from "@/lib/lang";
+import type { DispatchCall, Translations } from "@/lib/types";
 
 /**
  * The AI dispatcher calling the driver: a real incoming-call screen, then a call the driver can run without looking —
@@ -88,7 +89,10 @@ function Ringing({ call }: { call: DispatchCall }) {
 
 function LiveCall({ call }: { call: DispatchCall }) {
   const { replyDispatchCall, hangUpDispatchCall } = useStore((s) => s.actions);
-  const { t, info } = useDriverUi();
+  const { t, lang: appLang } = useDriverUi();
+  // The call is spoken, heard and listened for in its own language; the screen reads in the app's.
+  const voice = LANG_INFO[call.lang];
+  const readable = (words: string, tr?: Translations) => (appLang !== call.lang ? (tr?.[appLang] ?? words) : words);
   const now = useNow();
   const [listening, setListening] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
@@ -103,7 +107,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
 
   function listen() {
     recognizer.current?.stop();
-    const r = makeRecognizer(info.speech);
+    const r = makeRecognizer(voice.speech);
     if (!r) return;
     recognizer.current = r;
     r.interimResults = false;
@@ -143,7 +147,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
         if (autoListen.current && canListen && callRef.current.status === "live") listen();
       },
       // The owner sounds like a different person than the AI.
-      last.speaker === "owner" ? { pitch: 0.8, rate: 1, lang: info.speech } : { lang: info.speech },
+      last.speaker === "owner" ? { pitch: 0.8, rate: 1, lang: voice.speech } : { lang: voice.speech },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [call.lines.length]);
@@ -157,7 +161,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
   );
 
   // Voices load late on some phones, so this is asked again on every render rather than once.
-  const voiceMissing = canSpeak(info.speech) === false;
+  const voiceMissing = canSpeak(voice.speech) === false;
   const secs = now && call.answeredAt ? Math.max(0, Math.round((now - Date.parse(call.answeredAt)) / 1000)) : 0;
   const lines = call.lines.slice(-4);
   const bookedSomething = call.effects.some((e) => e.type === "book" || e.type === "reserve_parking");
@@ -194,11 +198,16 @@ function LiveCall({ call }: { call: DispatchCall }) {
             )}
           >
             {l.speaker === "owner" && <span className="mb-0.5 block text-[11px] font-semibold uppercase tracking-wider text-emerald-300">{OWNER_NAME}</span>}
-            {l.text}
+            {readable(l.text, l.tr)}
+            {i === lines.length - 1 && l.speaker !== "driver" && readable(l.text, l.tr) !== l.text && (
+              <span lang={call.lang} className="mt-1.5 flex items-start gap-1.5 text-sm font-normal text-white/40">
+                <Volume2 className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {l.text}
+              </span>
+            )}
           </p>
         ))}
         {hint && <p className="text-xs text-amber-200">{hint}</p>}
-        {voiceMissing && <p className="text-xs text-white/40">{t.noVoice(info.native)}</p>}
+        {voiceMissing && <p className="text-xs text-white/40">{t.noVoice(voice.native)}</p>}
       </div>
 
       {call.choices.length > 0 && (
@@ -214,7 +223,12 @@ function LiveCall({ call }: { call: DispatchCall }) {
               )}
             >
               <span aria-hidden className="mr-2 text-sm font-medium opacity-50">{i + 1}</span>
-              {ch.label}
+              {readable(ch.label, ch.tr)}
+              {readable(ch.label, ch.tr) !== ch.label && (
+                <span lang={call.lang} className="ml-2 text-sm font-normal opacity-50">
+                  {ch.label}
+                </span>
+              )}
             </button>
           ))}
         </div>

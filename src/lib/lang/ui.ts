@@ -66,6 +66,10 @@ export interface UiText {
   setupOnCall: string;
   settingsIntro: string;
   language: string;
+  /** Picker for the screens' language. */
+  appLang: string;
+  /** Picker for the language the AI talks and texts in. */
+  talkLang: string;
   languageNote: string;
   reachTitle: string;
   thisApp: string;
@@ -165,7 +169,9 @@ const en: UiText = {
   setupOnCall: "Set up on a call",
   settingsIntro: "It calls like a dispatcher: new loads, pickup numbers, late appointments, parking. Never while you're in the sleeper or off duty. Anything with a number also comes by text.",
   language: "Language",
-  languageNote: "The AI calls, texts and shows this app in your language. Brokers are always handled in English.",
+  appLang: "App screens",
+  talkLang: "Calls and texts",
+  languageNote: "They can be different: plenty of drivers read the app in English and talk in another language. Brokers are always handled in English.",
   reachTitle: "Where the AI reaches you",
   thisApp: "This app",
   myPhone: "My phone number",
@@ -264,7 +270,9 @@ const es: UiText = {
   setupOnCall: "Configurar por llamada",
   settingsIntro: "Llama como un despachador: cargas nuevas, números de recogida, citas atrasadas, estacionamiento. Nunca cuando estás en la litera o fuera de servicio. Todo lo que tenga un número también llega por mensaje.",
   language: "Idioma",
-  languageNote: "La IA te llama, te escribe y muestra esta app en tu idioma. Con los brókers siempre trata en inglés.",
+  appLang: "Pantallas de la app",
+  talkLang: "Llamadas y mensajes",
+  languageNote: "Pueden ser distintos: muchos choferes leen la app en inglés y hablan en otro idioma. Con los brókers siempre se trata en inglés.",
   reachTitle: "Dónde te contacta la IA",
   thisApp: "Esta app",
   myPhone: "Mi número de teléfono",
@@ -363,7 +371,9 @@ const pa: UiText = {
   setupOnCall: "ਫ਼ੋਨ ਤੇ ਸੈੱਟ ਕਰੋ",
   settingsIntro: "ਡਿਸਪੈਚਰ ਵਾਂਗ ਫ਼ੋਨ ਕਰਦਾ ਹੈ: ਨਵੇਂ ਲੋਡ, ਪਿਕਅੱਪ ਨੰਬਰ, ਲੇਟ ਅਪੌਇੰਟਮੈਂਟ, ਪਾਰਕਿੰਗ। ਸਲੀਪਰ ਜਾਂ ਔਫ਼ ਡਿਊਟੀ ਵਿੱਚ ਕਦੇ ਨਹੀਂ। ਨੰਬਰ ਵਾਲੀ ਹਰ ਗੱਲ ਮੈਸੇਜ ਰਾਹੀਂ ਵੀ ਆਉਂਦੀ ਹੈ।",
   language: "ਭਾਸ਼ਾ",
-  languageNote: "AI ਤੁਹਾਡੀ ਭਾਸ਼ਾ ਵਿੱਚ ਫ਼ੋਨ, ਮੈਸੇਜ ਕਰਦਾ ਹੈ ਅਤੇ ਐਪ ਦਿਖਾਉਂਦਾ ਹੈ। ਬ੍ਰੋਕਰਾਂ ਨਾਲ ਹਮੇਸ਼ਾ ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ।",
+  appLang: "ਐਪ ਦੀਆਂ ਸਕਰੀਨਾਂ",
+  talkLang: "ਕਾਲਾਂ ਅਤੇ ਮੈਸੇਜ",
+  languageNote: "ਇਹ ਵੱਖਰੇ ਹੋ ਸਕਦੇ ਹਨ: ਬਹੁਤ ਡਰਾਈਵਰ ਐਪ ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਪੜ੍ਹਦੇ ਹਨ ਅਤੇ ਗੱਲ ਹੋਰ ਭਾਸ਼ਾ ਵਿੱਚ ਕਰਦੇ ਹਨ। ਬ੍ਰੋਕਰਾਂ ਨਾਲ ਹਮੇਸ਼ਾ ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ।",
   reachTitle: "AI ਤੁਹਾਡੇ ਤੱਕ ਕਿੱਥੇ ਪਹੁੰਚੇ",
   thisApp: "ਇਹ ਐਪ",
   myPhone: "ਮੇਰਾ ਫ਼ੋਨ ਨੰਬਰ",
@@ -462,7 +472,9 @@ const hi: UiText = {
   setupOnCall: "फ़ोन पर सेट करें",
   settingsIntro: "डिस्पैचर की तरह फ़ोन करता है: नए लोड, पिकअप नंबर, लेट अपॉइंटमेंट, पार्किंग। स्लीपर या ऑफ़ ड्यूटी में कभी नहीं। नंबर वाली हर बात मैसेज से भी आती है।",
   language: "भाषा",
-  languageNote: "AI आपकी भाषा में फ़ोन, मैसेज करता है और ऐप दिखाता है। ब्रोकर से हमेशा अंग्रेज़ी में।",
+  appLang: "ऐप की स्क्रीन",
+  talkLang: "कॉल और मैसेज",
+  languageNote: "ये अलग हो सकते हैं: बहुत ड्राइवर ऐप अंग्रेज़ी में पढ़ते हैं और बात दूसरी भाषा में करते हैं। ब्रोकर से हमेशा अंग्रेज़ी में।",
   reachTitle: "AI आप तक कहाँ पहुँचे",
   thisApp: "यह ऐप",
   myPhone: "मेरा फ़ोन नंबर",
@@ -561,7 +573,9 @@ const ru: UiText = {
   setupOnCall: "Настроить по звонку",
   settingsIntro: "Звонит как диспетчер: новые грузы, номера погрузки, перенос времени, парковка. Никогда, когда ты в слипере или офф-дьюти. Всё с номерами приходит и сообщением.",
   language: "Язык",
-  languageNote: "AI звонит, пишет и показывает приложение на твоём языке. С брокерами — всегда по-английски.",
+  appLang: "Экраны приложения",
+  talkLang: "Звонки и сообщения",
+  languageNote: "Они могут отличаться: многие водители читают приложение по-английски, а говорят на другом языке. С брокерами — всегда по-английски.",
   reachTitle: "Как AI с тобой связывается",
   thisApp: "Это приложение",
   myPhone: "Мой номер телефона",
@@ -660,7 +674,9 @@ const uk: UiText = {
   setupOnCall: "Налаштувати дзвінком",
   settingsIntro: "Дзвонить як диспетчер: нові вантажі, номери завантаження, перенесення часу, парковка. Ніколи, коли ти в слипері чи офф-д'юті. Усе з номерами приходить і повідомленням.",
   language: "Мова",
-  languageNote: "AI дзвонить, пише й показує застосунок твоєю мовою. З брокерами — завжди англійською.",
+  appLang: "Екрани застосунку",
+  talkLang: "Дзвінки й повідомлення",
+  languageNote: "Вони можуть відрізнятися: багато водіїв читають застосунок англійською, а говорять іншою мовою. З брокерами — завжди англійською.",
   reachTitle: "Як AI з тобою зв'язується",
   thisApp: "Цей застосунок",
   myPhone: "Мій номер телефону",
@@ -759,7 +775,9 @@ const fr: UiText = {
   setupOnCall: "Régler par appel",
   settingsIntro: "Elle appelle comme un répartiteur : nouveaux voyages, numéros de ramassage, rendez-vous déplacés, stationnement. Jamais quand t'es dans la couchette ou hors service. Tout ce qui a un numéro arrive aussi par texto.",
   language: "Langue",
-  languageNote: "L'IA t'appelle, t'écrit et affiche l'appli dans ta langue. Avec les courtiers, c'est toujours en anglais.",
+  appLang: "Écrans de l'appli",
+  talkLang: "Appels et textos",
+  languageNote: "Ça peut être différent : bien des chauffeurs lisent l'appli en anglais et parlent une autre langue. Avec les courtiers, c'est toujours en anglais.",
   reachTitle: "Où l'IA te joint",
   thisApp: "Cette appli",
   myPhone: "Mon numéro de téléphone",

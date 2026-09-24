@@ -4,9 +4,14 @@ import { usePrimaryDriver } from "../selectors";
 import { LANG_INFO } from "./pack";
 import { UI } from "./ui";
 
-/** The signed-in driver's language and the app's words in it. */
+/**
+ * The signed-in driver's two languages, which are often different: the app's screens (`lang`, `t`) and the
+ * language they talk and get texts in (`talk`, `tt`) — plenty of drivers read an app in English but want their
+ * calls in Punjabi or Spanish.
+ */
 export function useDriverUi() {
   const driver = usePrimaryDriver();
-  const lang = driver.prefs?.language ?? "en";
-  return { t: UI[lang], lang, info: LANG_INFO[lang] };
+  const lang = driver.prefs?.appLanguage ?? "en";
+  const talk = driver.prefs?.language ?? "en";
+  return { t: UI[lang], lang, info: LANG_INFO[lang], talk, tt: UI[talk], talkInfo: LANG_INFO[talk] };
 }

@@ -7,18 +7,20 @@ import { useStore } from "@/lib/store";
 import { DISPATCH_LINE, quietState } from "@/lib/dispatch-calls";
 import { LANGS, pack } from "@/lib/lang";
 import { UI, type UiText } from "@/lib/lang/ui";
-import type { Driver, HosStatus } from "@/lib/types";
+import type { Driver, HosStatus, Lang } from "@/lib/types";
 
 const DUTIES: HosStatus[] = ["driving", "on_duty", "off_duty", "sleeper"];
 const EARLIEST = [undefined, 5, 6, 7, 8];
 
-const uiFor = (driver: Driver) => UI[driver.prefs?.language ?? "en"];
+/** Screens follow the driver's app language, which can differ from the language the AI talks to them in. */
+const appLangOf = (driver: Driver): Lang => driver.prefs?.appLanguage ?? "en";
+const uiFor = (driver: Driver) => UI[appLangOf(driver)];
 
 /** Why calls are held right now, in the driver's words, or null when they ring through. */
 function quietText(driver: Driver, t: UiText): string | null {
   const q = quietState(driver, new Date());
   if (!q) return null;
-  return q.kind === "early" ? t.quiet.early(pack(driver.prefs?.language).hour(q.hour)) : t.quiet[q.kind];
+  return q.kind === "early" ? t.quiet.early(pack(appLangOf(driver)).hour(q.hour)) : t.quiet[q.kind];
 }
 
 /** Duty status as the ELD reports it — the one switch that decides whether the AI's calls ring or wait. */
@@ -58,31 +60,38 @@ export function CallStatusLine({ driver }: { driver: Driver }) {
   );
 }
 
-/** The driver's language: the AI calls and texts in it and the app's main screens switch to it. */
+/** The driver's two languages: what the app's screens are in, and what the AI talks and texts in. They're often
+ *  different — plenty of drivers read an app in English but want their calls in Punjabi or Spanish. */
 export function LanguageCard({ driver }: { driver: Driver }) {
   const setDriverPrefs = useStore((s) => s.actions.setDriverPrefs);
   const t = uiFor(driver);
-  const lang = driver.prefs?.language ?? "en";
-  return (
-    <section id="language" className="rounded-2xl border border-line p-4">
-      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-400">
-        <Languages className="h-3.5 w-3.5" /> {t.language}
-      </p>
-      <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3" role="radiogroup" aria-label="Language">
+  const picker = (label: string, value: Lang, set: (l: Lang) => void) => (
+    <div className="mt-3">
+      <p className="text-xs font-medium text-ink-800">{label}</p>
+      <div className="mt-1.5 grid grid-cols-3 gap-1.5 sm:grid-cols-4" role="radiogroup" aria-label={label}>
         {LANGS.map((l) => (
           <button
             key={l.code}
             type="button"
             role="radio"
-            aria-checked={lang === l.code}
+            aria-checked={value === l.code}
             lang={l.code}
-            onClick={() => setDriverPrefs(driver.id, { language: l.code })}
-            className={cn("rounded-full border px-3 py-1.5 text-xs font-medium", lang === l.code ? "border-ink-950 bg-ink-950 text-white" : "border-line text-ink-600")}
+            onClick={() => set(l.code)}
+            className={cn("rounded-full border px-2 py-1.5 text-xs font-medium", value === l.code ? "border-ink-950 bg-ink-950 text-white" : "border-line text-ink-600")}
           >
             {l.native}
           </button>
         ))}
       </div>
+    </div>
+  );
+  return (
+    <section id="language" className="rounded-2xl border border-line p-4">
+      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-400">
+        <Languages className="h-3.5 w-3.5" /> {t.language}
+      </p>
+      {picker(t.talkLang, driver.prefs?.language ?? "en", (l) => setDriverPrefs(driver.id, { language: l }))}
+      {picker(t.appLang, appLangOf(driver), (l) => setDriverPrefs(driver.id, { appLanguage: l }))}
       <p className="mt-2 text-[11px] text-ink-500">{t.languageNote}</p>
     </section>
   );
@@ -92,7 +101,7 @@ export function LanguageCard({ driver }: { driver: Driver }) {
 export function CallSettingsCard({ driver }: { driver: Driver }) {
   const { setDriverPrefs, startSetupCall } = useStore((s) => s.actions);
   const t = uiFor(driver);
-  const L = pack(driver.prefs?.language);
+  const L = pack(appLangOf(driver));
   const prefs = driver.prefs ?? {};
   const avoid = prefs.avoidStates ?? [];
   const quiet = quietText(driver, t);

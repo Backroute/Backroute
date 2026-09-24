@@ -119,8 +119,8 @@ export default function FleetPage() {
                     <select
                       value={driver.prefs?.language ?? "en"}
                       onChange={(e) => setDriverPrefs(driver.id, { language: e.target.value as Lang })}
-                      aria-label={`${driver.name}'s language`}
-                      title="The language the AI calls and texts this driver in"
+                      aria-label={`Language ${driver.name} talks in`}
+                      title="The language the AI calls and texts this driver in. Their app screens are set separately in the driver app."
                       className="rounded-full border border-line bg-white px-2.5 py-1 text-[11px] font-medium text-ink-800 outline-none focus:border-ink-400"
                     >
                       {LANGS.map((l) => (
