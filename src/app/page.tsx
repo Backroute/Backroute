@@ -44,10 +44,11 @@ export default function Home() {
           <nav className="hidden items-center gap-8 text-sm font-medium text-ink-600 sm:flex">
             <a href="#product" className="hover:text-ink-950">Product</a>
             <a href="#pricing" className="hover:text-ink-950">Pricing</a>
+            <Link href="/demo" className="hover:text-ink-950">Demo</Link>
             <Link href="/driver" className="hover:text-ink-950">Drivers</Link>
           </nav>
           <div className="flex items-center gap-2">
-            <Button href="/carrier" variant="ghost" size="sm">Log in</Button>
+            <Button href="/login" variant="ghost" size="sm">Log in</Button>
             <Button href="/signup" variant="primary" size="sm">Get started</Button>
           </div>
         </div>
@@ -69,8 +70,8 @@ export default function Home() {
               <Button href="/signup" size="lg" variant="secondary" className="!bg-white !text-ink-950 hover:!bg-white/90">
                 Get started <ArrowUpRight className="h-4 w-4" />
               </Button>
-              <Button href="/driver" size="lg" variant="outline" className="!border-white/25 !text-white hover:!border-white">
-                For drivers
+              <Button href="/demo" size="lg" variant="outline" className="!border-white/25 !text-white hover:!border-white">
+                See the demo
               </Button>
             </div>
           </div>
@@ -196,8 +197,8 @@ export default function Home() {
             <Button href="/signup" size="lg" variant="secondary" className="!bg-white !text-ink-950 hover:!bg-white/90">
               Get started <ArrowUpRight className="h-4 w-4" />
             </Button>
-            <Button href="/driver" size="lg" variant="outline" className="!border-white/25 !text-white hover:!border-white">
-              For drivers
+            <Button href="/demo" size="lg" variant="outline" className="!border-white/25 !text-white hover:!border-white">
+              See the demo
             </Button>
           </div>
         </div>

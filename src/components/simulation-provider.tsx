@@ -2,11 +2,12 @@
 
 import { useEffect } from "react";
 import { useStore } from "@/lib/store";
-import { cloudEnabled } from "@/lib/cloud/client";
+import { inDemo } from "@/lib/cloud/demo";
 
 /**
- * Runs the AI dispatcher in the browser. In the demo it always runs. With accounts on it runs only in the office's
- * session (owner or dispatcher) once their carrier has loaded; a driver's phone just shows and answers.
+ * Runs the AI dispatcher in the browser. In the demo (no keys, or a tab opened from /demo) it always runs on the
+ * sample fleet. For a real account it runs only in the office's session (owner or dispatcher) once their carrier
+ * has loaded; a driver's phone just shows and answers.
  */
 export function SimulationProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -23,7 +24,7 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
       interval = undefined;
     };
 
-    if (!cloudEnabled) {
+    if (inDemo()) {
       start(true);
       return stop;
     }

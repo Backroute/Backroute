@@ -24,6 +24,10 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). Visit `/carrier`, `/ops`, or `/driver` directly, or start from the landing page.
 
+## Demo and real version
+
+`/demo` is the link to share: the whole product on a sample fleet, no account, nothing saved or sent. A yellow bar on every demo screen says so and switches between the owner's dashboard and the driver app. It works whether or not accounts are switched on, so one deployment serves both the demo and real carriers.
+
 ## Accounts and saved data
 
 Off by default. Set the two Supabase keys in `.env.local` to switch on sign-in by phone number, roles (owner, dispatcher, driver) and a saved fleet. `DEPLOY.md` covers setting up Supabase and Vercel, and lists what isn't live yet. The database schema and access rules are in `supabase/migrations/`.

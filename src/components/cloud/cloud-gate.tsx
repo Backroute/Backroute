@@ -8,29 +8,38 @@ import { Logo } from "@/components/shared/logo";
 import { cloudEnabled, supabase } from "@/lib/cloud/client";
 import { claimInvites, homeFor, myMemberships } from "@/lib/cloud/account";
 import { connect, NotSetUpError, signOut, useSyncStatus } from "@/lib/cloud/sync";
+import { inDemo } from "@/lib/cloud/demo";
+import { DemoBanner } from "./demo-banner";
 import { useStore } from "@/lib/store";
 
 type Area = "carrier" | "driver" | "signup";
 
 /**
  * Real accounts, when they're switched on: sends signed-out visitors to /login, sends each person to the side of
- * the app that's theirs, and loads their carrier before showing anything. With no Supabase keys it does nothing
- * and the demo runs as always.
+ * the app that's theirs, and loads their carrier before showing anything. A tab opened from /demo skips all of it
+ * and shows the sample fleet. With no Supabase keys everything is the demo.
  */
 export function CloudGate({ area, children }: { area: Area; children: React.ReactNode }) {
-  if (!cloudEnabled) return <>{children}</>;
+  if (!cloudEnabled)
+    return (
+      <>
+        <DemoBanner />
+        {children}
+      </>
+    );
   return <LiveGate area={area}>{children}</LiveGate>;
 }
 
 function LiveGate({ area, children }: { area: Area; children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [state, setState] = useState<"checking" | "ready" | "not_set_up" | "error">("checking");
+  const [state, setState] = useState<"checking" | "demo" | "ready" | "not_set_up" | "error">("checking");
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      if (inDemo()) return setState("demo");
       const { data } = await supabase().auth.getSession();
       if (!data.session) return router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       await claimInvites();
@@ -58,6 +67,13 @@ function LiveGate({ area, children }: { area: Area; children: React.ReactNode })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [area, attempt]);
 
+  if (state === "demo")
+    return (
+      <>
+        <DemoBanner />
+        {children}
+      </>
+    );
   if (state === "ready")
     return (
       <>

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { cloudEnabled, supabase } from "@/lib/cloud/client";
 import { claimInvites, homeFor, myMemberships } from "@/lib/cloud/account";
 import { formatPhone, toE164 } from "@/lib/cloud/phone";
+import { leaveDemo } from "@/lib/cloud/demo";
 
 /** Sign in with a phone number and a texted code: no passwords for drivers to forget. */
 export default function LoginPage() {
@@ -38,11 +39,8 @@ function DemoNotice() {
       <h1 className="font-display text-2xl text-ink-950">Sign in</h1>
       <p className="mt-1 text-sm text-ink-500">Accounts aren&apos;t switched on in this demo yet, so there&apos;s nothing to sign in to. You can look around with the sample fleet.</p>
       <div className="mt-5 flex flex-col gap-2">
-        <Button href="/carrier">
-          Owner dashboard <ArrowRight className="h-4 w-4" />
-        </Button>
-        <Button href="/driver" variant="outline">
-          Driver app
+        <Button href="/demo">
+          See the demo <ArrowRight className="h-4 w-4" />
         </Button>
       </div>
     </>
@@ -59,6 +57,9 @@ function PhoneSignIn() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resendIn, setResendIn] = useState(0);
+
+  // Signing in is the real app: this tab stops being a demo tab.
+  useEffect(() => leaveDemo(), []);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -135,6 +136,12 @@ function PhoneSignIn() {
           New to Backroute?{" "}
           <Link href="/signup" className="font-medium text-ink-950 underline">
             Set up your fleet
+          </Link>
+        </p>
+        <p className="mt-2 text-center text-xs text-ink-500">
+          Just looking?{" "}
+          <Link href="/demo" className="font-medium text-ink-950 underline">
+            See the demo
           </Link>
         </p>
       </form>

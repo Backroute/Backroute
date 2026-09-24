@@ -30,6 +30,10 @@ accounts (sign-in by phone number) and saved data with [Supabase](https://supaba
 - **One carrier per person:** someone who belongs to two carriers sees the first one.
 - **Ops portal:** `/ops` still shows demo data.
 
+## The demo stays
+
+Turning on accounts doesn't remove the demo. `your-site/demo` still opens the sample fleet for anyone, with no account, and nothing is saved. A yellow bar on every demo screen says so, switches between the owner and driver side, and has **Exit demo**. Everywhere else the app is the real version: the dashboard and driver app ask people to sign in. Share `/demo` with prospects and send real users to `/login`.
+
 ## 1. Create the Supabase project
 
 1. Sign up at supabase.com and create a project. Pick the region closest to your drivers (for example, US East).

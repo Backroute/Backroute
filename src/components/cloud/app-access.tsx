@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
-import { cloudEnabled } from "@/lib/cloud/client";
 import { invite, team, type Role } from "@/lib/cloud/account";
 import { formatPhone, toE164 } from "@/lib/cloud/phone";
 import { signOut } from "@/lib/cloud/sync";
@@ -59,7 +58,7 @@ export function AppAccessCard() {
     }
   }
 
-  if (!cloudEnabled || !carrierId) return null;
+  if (!carrierId) return null;
   const loginUrl = typeof window === "undefined" ? "/login" : `${window.location.origin}/login`;
   const statusOf = (driverId: string) =>
     data?.members.some((m) => m.driver_id === driverId) ? "in" : data?.invites.some((i) => i.driver_id === driverId) ? "invited" : "none";
@@ -147,10 +146,11 @@ export function AppAccessCard() {
   );
 }
 
-/** Only exists when accounts are on. */
+/** Only shows when signed in to a real account. */
 export function SignOutButton({ label, className }: { label: string; className?: string }) {
   const [busy, setBusy] = useState(false);
-  if (!cloudEnabled) return null;
+  const signedIn = useStore((s) => s.session.mode !== "demo");
+  if (!signedIn) return null;
   return (
     <button
       type="button"

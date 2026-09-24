@@ -19,7 +19,6 @@ import { DailyTextPreview } from "@/components/shared/daily-text";
 import { DispatchLineCard } from "@/components/shared/dispatch-line-card";
 import { OwnerLanguageCard } from "@/components/shared/owner-language-card";
 import { AppAccessCard } from "@/components/cloud/app-access";
-import { cloudEnabled } from "@/lib/cloud/client";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Aggressiveness } from "@/lib/store";
 
@@ -57,6 +56,8 @@ export default function SettingsPage() {
   const includedAddons = ADDONS.filter((a) => a.model === "included");
   const commissionAddons = ADDONS.filter((a) => a.model === "commission");
   const [team, setTeam] = useState(INITIAL_TEAM);
+  // A real account manages who can sign in; the demo keeps its sample team.
+  const signedIn = useStore((s) => s.session.mode !== "demo");
   const [inviteEmail, setInviteEmail] = useState("");
   const [connections, setConnections] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(INTEGRATION_CATEGORIES.flatMap((c) => c.items).map((i) => [i.id, i.connected])),
@@ -378,7 +379,7 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
 
-              {cloudEnabled ? (
+              {signedIn ? (
                 <AppAccessCard />
               ) : (
               <Card>

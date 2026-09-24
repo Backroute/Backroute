@@ -16,6 +16,7 @@ import type { FmcsaResult } from "@/lib/fmcsa";
 import { cloudEnabled } from "@/lib/cloud/client";
 import { createCarrierAccount } from "@/lib/cloud/account";
 import { connect as connectCarrier } from "@/lib/cloud/sync";
+import { inDemo } from "@/lib/cloud/demo";
 
 type Step = "mc" | "eld" | "rules" | "autopilot" | "done";
 const STEPS: Step[] = ["mc", "eld", "rules", "autopilot"];
@@ -101,7 +102,7 @@ function Signup() {
   /** With accounts on, this is where the carrier is created and its fleet first saved. */
   async function finish() {
     updateSettings({ ownerOperator: !!solo });
-    if (cloudEnabled) {
+    if (cloudEnabled && !inDemo()) {
       setSaving(true);
       setSaveError(null);
       try {
