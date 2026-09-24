@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { DEFAULT_ENABLED_ADDONS } from "./addons";
-import { generateWorld, PRIMARY_CARRIER_ID } from "./mock-data";
+import { generateWorld, PRIMARY_CARRIER_ID, PRIMARY_DRIVER_ID } from "./mock-data";
 import {
   advanceIncident,
   advanceLoad,
@@ -26,19 +26,40 @@ import {
 import { computeEconomics, computeLoadScore } from "./scoring";
 import { nextStop } from "./load-status";
 import { dockClock, dockMinutes, detentionFor, formatDockTime } from "./detention";
-import { cityCoords, distanceMiles } from "./trip-geo";
+import { cityCoords, distanceMiles, legMiles, legProgress } from "./trip-geo";
 import { bookableBrokers, type BrokerPolicy } from "./broker-policy";
 import { homeTimeStatus } from "./home";
 import { HOME_TIME_OPTIONS, laneFits, RUN_TYPE_DETAIL, RUN_TYPE_LABEL } from "./run-types";
 import { payLabel } from "./settlements";
+import {
+  briefCall,
+  CALL_GAP_MS,
+  driverTakes,
+  KIND_LABEL,
+  lateCall,
+  lateOnThisLoad,
+  nextLoadCall,
+  openCall,
+  parkingCall,
+  quietReason,
+  respond,
+  RING_MS,
+  setupCall,
+  stillRelevant,
+  textCopyFor,
+} from "./dispatch-calls";
 import { clamp, formatDuration } from "./utils";
 import type {
   ActivityEvent,
   Broker,
   Carrier,
   CarrierMessage,
+  DispatchCall,
+  DispatchCallKind,
   Driver,
   DriverMessage,
+  DriverPrefs,
+  HosStatus,
   DvirInspection,
   DvirItem,
   Escalation,
@@ -150,10 +171,15 @@ export const AUTONOMY_DETAIL: Record<Autonomy, string> = {
 
 /** Where home time stands for the truck's next load — a dispatcher checks this before booking anything. When it's
  *  tight, or the carrier said home first, the AI only books loads that bring the driver closer to home. */
-function homeOptions(driver: Driver | undefined, from: { city: string; state: string } | undefined): { homeBase?: string; headHome?: boolean; runType?: RunType } {
+function homeOptions(driver: Driver | undefined, from: { city: string; state: string } | undefined): { homeBase?: string; headHome?: boolean; runType?: RunType; avoidStates?: string[] } {
   if (!driver) return {};
   const status = from ? homeTimeStatus(driver, from.city, from.state, new Date()).state : "no_target";
-  return { homeBase: driver.homeBase, runType: driver.runType, headHome: !!driver.homePriority || status === "head_home" || status === "late" };
+  return {
+    homeBase: driver.homeBase,
+    runType: driver.runType,
+    headHome: !!driver.homePriority || status === "head_home" || status === "late",
+    avoidStates: driver.prefs?.avoidStates,
+  };
 }
 
 /** How a driver is usually paid for each kind of run: local by the hour, in town by the move, over the road by the
@@ -166,7 +192,235 @@ function payFor(runType: RunType, d: Driver): Pick<Driver, "payType" | "payRate"
 
 /** Lanes this truck's driver actually runs, for the AI's own chaining. */
 function fitsDriver(driver: Driver | undefined): ((lane: Lane) => boolean) | undefined {
-  return driver ? (lane) => laneFits(lane, driver.runType, driver.homeBase) : undefined;
+  return driver ? (lane) => laneFits(lane, driver.runType, driver.homeBase) && driverTakes(driver.prefs, { lane }) : undefined;
+}
+
+// ——— AI dispatch calls ———
+
+/** Everything a call can touch, gathered so the tick and the driver's own taps change it the same way. */
+interface CallDraft {
+  loads: Load[];
+  trucks: Truck[];
+  drivers: Driver[];
+  escalations: Escalation[];
+  driverMessages: DriverMessage[];
+  dispatchCalls: DispatchCall[];
+  events: ActivityEvent[];
+}
+
+function draftFrom(state: StoreState): CallDraft {
+  const { loads, trucks, drivers, escalations, driverMessages, dispatchCalls } = state;
+  return { loads, trucks, drivers, escalations, driverMessages, dispatchCalls, events: [] };
+}
+
+function callDraftResult(d: CallDraft) {
+  const { loads, trucks, drivers, escalations, driverMessages, dispatchCalls } = d;
+  return { loads, trucks, drivers, escalations, driverMessages, dispatchCalls };
+}
+
+function patchCall(d: CallDraft, id: string, patch: Partial<DispatchCall>) {
+  d.dispatchCalls = d.dispatchCalls.map((c) => (c.id === id ? { ...c, ...patch } : c));
+}
+
+function textDriver(d: CallDraft, driverId: string, content: string) {
+  d.driverMessages = [...d.driverMessages, { id: uid("dm"), driverId, from: "ai", content, timestamp: new Date().toISOString() }];
+}
+
+function callEvent(d: CallDraft, call: DispatchCall, message: string, detail: string, severity: ActivityEvent["severity"] = "info") {
+  d.events.push({ id: uid("act"), timestamp: new Date().toISOString(), type: "check_call", channel: "voice", message, detail, loadId: call.loadId, carrierId: call.carrierId, severity });
+}
+
+/** The call can't happen (held, missed, declined): the driver gets the same information by text, once. */
+function textInstead(d: CallDraft, call: DispatchCall) {
+  if (call.textedAt) return;
+  textDriver(d, call.driverId, textCopyFor(call));
+  patchCall(d, call.id, { textedAt: new Date().toISOString() });
+}
+
+function ringCall(d: CallDraft, call: DispatchCall) {
+  patchCall(d, call.id, { status: "ringing", ringingAt: new Date().toISOString() });
+}
+
+function answerCall(d: CallDraft, call: DispatchCall) {
+  const turn = openCall(call);
+  const now = new Date().toISOString();
+  patchCall(d, call.id, { status: "live", answeredAt: now, lines: [{ speaker: "ai", text: turn.say, at: now }], choices: turn.choices, step: turn.step });
+}
+
+/** One back-and-forth on a live call. `heard` is what the driver actually said, when they spoke instead of tapping. */
+function replyToCall(d: CallDraft, callId: string, reply: string, heard?: string) {
+  const call = d.dispatchCalls.find((c) => c.id === callId);
+  if (!call || call.status !== "live") return;
+  const said =
+    heard ??
+    (reply === "again" ? "Say that again?" : reply === "person" ? "Can I talk to a person?" : call.choices.find((ch) => ch.reply === reply)?.say ?? reply);
+  const turn = respond(call, reply);
+  const now = new Date().toISOString();
+  const lines = [...call.lines, { speaker: "driver" as const, text: said, at: now }, { speaker: "ai" as const, text: turn.say, at: now }];
+  patchCall(d, callId, {
+    lines,
+    choices: turn.choices,
+    step: turn.step,
+    ...(turn.effects ? { effects: turn.effects } : {}),
+    ...(turn.outcome !== undefined ? { outcome: turn.outcome } : {}),
+  });
+  if (turn.person) {
+    const driver = d.drivers.find((x) => x.id === call.driverId);
+    const esc: Escalation = {
+      id: uid("esc"), loadId: call.loadId ?? "", carrierId: call.carrierId,
+      reason: `${driver?.name ?? "A driver"} asked for a person during an AI call (${KIND_LABEL[call.kind].toLowerCase()}). Call them back at ${driver?.phone ?? "their number"}.`,
+      createdAt: now, status: "open", complexity: "routine",
+      recommendedAction: "approve", recommendedLabel: `Called ${driver?.name.split(" ")[0] ?? "them"} back`,
+    };
+    d.escalations = [esc, ...d.escalations];
+    d.events.push({ id: uid("act"), timestamp: now, type: "escalation", message: `${driver?.name.split(" ")[0] ?? "Driver"} wants a person on the phone`, detail: esc.reason, loadId: call.loadId, carrierId: call.carrierId, severity: "warning" });
+  }
+  if (turn.end) endCall(d, callId);
+}
+
+/** Hang up: whatever was agreed happens now, the load keeps a recording, and the driver gets a text copy. */
+function endCall(d: CallDraft, callId: string) {
+  const call = d.dispatchCalls.find((c) => c.id === callId);
+  if (!call || (call.status !== "live" && call.status !== "ringing")) return;
+  const now = new Date().toISOString();
+  const driver = d.drivers.find((x) => x.id === call.driverId);
+  const first = driver?.name.split(" ")[0] ?? "the driver";
+
+  for (const effect of call.effects) {
+    if (effect.type === "book") {
+      if (!d.loads.some((l) => l.id === effect.loadId && l.stage === "offered")) continue;
+      const resolved = resolveLoadOffer(d.loads, effect.groupId, effect.loadId, "driver");
+      d.loads = resolved.loads;
+      const chosen = d.loads.find((l) => l.id === effect.loadId);
+      if (chosen?.truckId) d.trucks = d.trucks.map((t) => (t.id === chosen.truckId && t.currentLoadId ? { ...t, nextLoadId: chosen.id } : t));
+      d.events.push(...resolved.events);
+    } else if (effect.type === "reserve_parking") {
+      callEvent(d, call, `AI reserved parking for ${first}`, `${effect.place} · $${effect.cost} on the fleet card`, "success");
+    } else if (effect.type === "prefs") {
+      d.drivers = d.drivers.map((x) => (x.id === call.driverId ? { ...x, prefs: { ...x.prefs, ...effect.prefs } } : x));
+    }
+  }
+
+  const answered = call.status === "live";
+  const outcome = call.outcome ?? (answered ? "Driver hung up" : undefined);
+  patchCall(d, callId, { status: "done", endedAt: now, choices: [], outcome });
+  // A copy of anything with a number in it — unless the same text already went out while the call was held.
+  if (answered && (!call.textedAt || call.effects.length)) {
+    textDriver(d, call.driverId, textCopyFor(call));
+    patchCall(d, callId, { textedAt: now });
+  }
+
+  // A load call is kept on the load that got booked; the others on the load they were about.
+  const booked = call.effects.find((e) => e.type === "book");
+  const recordOn = call.kind === "next_load" ? (booked?.type === "book" ? booked.loadId : undefined) : call.loadId;
+  if (answered && recordOn && call.lines.length) {
+    const startedAt = call.answeredAt ?? call.createdAt;
+    const record: VoiceCall = {
+      id: uid("call"), title: `AI dispatch call with ${first} · ${KIND_LABEL[call.kind]}`, status: "completed", startedAt,
+      durationSec: Math.max(12, Math.round((Date.now() - Date.parse(startedAt)) / 1000)),
+      transcript: call.lines.map((l) => ({ speaker: l.speaker, text: l.text })), outcome,
+    };
+    d.loads = d.loads.map((l) => (l.id === recordOn ? { ...l, calls: [...l.calls, record] } : l));
+  }
+  if (answered) callEvent(d, call, `AI called ${first}: ${KIND_LABEL[call.kind].toLowerCase()}`, outcome ?? "Call ended");
+}
+
+/** The calls the AI decides to make this tick, then who's ringing, held, missed or talking. */
+function runDispatchCalls(d: CallDraft, newOfferBatches: { truckId: string; offers: Load[]; emptyAt: string }[]) {
+  const now = new Date();
+  const nowMs = now.getTime();
+  const has = (driverId: string, kind: DispatchCallKind, loadId?: string) => d.dispatchCalls.some((c) => c.driverId === driverId && c.kind === kind && c.loadId === loadId);
+  const queue = (call: DispatchCall | null) => {
+    if (call) d.dispatchCalls = [call, ...d.dispatchCalls].slice(0, 60);
+  };
+
+  // New options for a truck the driver picks for: a call, or a text if that's what the driver asked for.
+  for (const batch of newOfferBatches) {
+    const truck = d.trucks.find((t) => t.id === batch.truckId);
+    const driver = d.drivers.find((x) => x.id === truck?.driverId);
+    if (!truck || !driver) continue;
+    const call = nextLoadCall(driver, batch.offers, batch.emptyAt, !!truck.secondDriverId);
+    if (!call) continue;
+    if (driver.prefs?.newLoads === "text") textDriver(d, driver.id, textCopyFor(call));
+    else queue(call);
+  }
+
+  // The calls a dispatcher makes while a load is moving.
+  for (const truck of d.trucks) {
+    const driver = d.drivers.find((x) => x.id === truck.driverId);
+    const load = d.loads.find((l) => l.id === truck.currentLoadId);
+    if (!driver || !load || driver.carrierId !== PRIMARY_CARRIER_ID) continue;
+    const p = legProgress(load, nowMs);
+    // Briefs come about an hour out, the way a dispatcher calls before the gate — not at the start of a long run.
+    const near = (leg: "pickup" | "delivery") => legMiles(load, leg) * (1 - p) <= 60 || p >= 0.9;
+    if (load.stage === "dispatched" && (p >= 0.45 || near("pickup")) && !has(driver.id, "pickup_brief", load.id)) queue(briefCall(driver, load, "pickup", p));
+    if (load.stage !== "in_transit") continue;
+    const milesLeft = load.lane.miles * (1 - p);
+    const longRun = driver.runType === "otr" || driver.runType === "regional";
+    if (longRun && p >= 0.12 && p < 0.6 && milesLeft / 50 > driver.hoursRemaining && !has(driver.id, "hours_parking", load.id)) {
+      const { call, newWindow } = parkingCall(driver, load, milesLeft);
+      d.loads = d.loads.map((l) => (l.id === load.id ? { ...l, deliveryWindow: newWindow } : l));
+      callEvent(d, call, `AI moved ${driver.name.split(" ")[0]}'s delivery to tomorrow`, `${load.lane.destination} · out of drive hours before the receiver, broker told`, "warning");
+      queue(call);
+    } else if (p >= 0.25 && p < 0.55 && lateOnThisLoad(load.id) && !has(driver.id, "late_eta", load.id) && !has(driver.id, "hours_parking", load.id)) {
+      const { call, newWindow } = lateCall(driver, load);
+      d.loads = d.loads.map((l) => (l.id === load.id ? { ...l, deliveryWindow: newWindow } : l));
+      callEvent(d, call, "AI moved a delivery appointment", `${load.lane.destination} · ${call.facts.road} wreck, ${newWindow.toLowerCase()}, receiver and broker told`, "warning");
+      queue(call);
+    }
+    if (near("delivery") && !has(driver.id, "delivery_brief", load.id)) queue(briefCall(driver, load, "delivery", p));
+  }
+
+  // Calls that stopped mattering (the stop was reached, the load was picked in the app) never ring.
+  for (const call of d.dispatchCalls) {
+    if ((call.status === "queued" || call.status === "held" || call.status === "ringing") && !stillRelevant(call, d.loads)) {
+      patchCall(d, call.id, { status: "dropped", endedAt: now.toISOString(), outcome: "Not needed anymore", choices: [] });
+    }
+  }
+
+  for (const driver of d.drivers) {
+    const mine = d.dispatchCalls.filter((c) => c.driverId === driver.id);
+    const active = mine.find((c) => c.status === "ringing" || c.status === "live");
+    const primary = driver.id === PRIMARY_DRIVER_ID;
+
+    if (active?.status === "ringing") {
+      const ringingFor = nowMs - Date.parse(active.ringingAt ?? active.createdAt);
+      // Other drivers in the demo pick up on their own, so the carrier sees calls play out across the fleet.
+      if (!primary && ringingFor > 6000) answerCall(d, active);
+      else if (ringingFor > RING_MS) {
+        patchCall(d, active.id, { status: "missed", endedAt: now.toISOString(), outcome: "No answer. Texted instead", choices: [] });
+        textInstead(d, active);
+        callEvent(d, active, `${driver.name.split(" ")[0]} missed an AI call`, `${KIND_LABEL[active.kind]} · sent by text instead`);
+      }
+      continue;
+    }
+    if (active?.status === "live") {
+      if (primary) continue;
+      const last = active.lines.at(-1);
+      if (last && nowMs - Date.parse(last.at) > 4000) {
+        // A driver who takes the call the ordinary way: yes to the load or the parking spot, then "got it".
+        const choice = ["book:0", "reserve", "bye"].map((r) => active.choices.find((ch) => ch.reply === r)).find(Boolean) ?? active.choices.at(-1);
+        if (choice) replyToCall(d, active.id, choice.reply);
+        else endCall(d, active.id);
+      }
+      continue;
+    }
+
+    const waiting = mine.filter((c) => c.status === "queued" || c.status === "held").sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+    if (!waiting.length) continue;
+    const lastEnded = Math.max(0, ...mine.filter((c) => c.endedAt && c.status !== "dropped").map((c) => Date.parse(c.endedAt!)));
+    const quiet = quietReason(driver, now);
+    for (const call of waiting) {
+      if (quiet) {
+        if (call.status !== "held") {
+          patchCall(d, call.id, { status: "held", heldReason: quiet });
+          textInstead(d, call);
+          callEvent(d, call, `AI held a call to ${driver.name.split(" ")[0]}`, `${quiet}. Texted instead, will call if it still matters later`);
+        }
+      } else if (call.status === "held") patchCall(d, call.id, { status: "queued", heldReason: undefined });
+    }
+    if (!quiet && nowMs - lastEnded > CALL_GAP_MS) ringCall(d, waiting[0]);
+  }
 }
 
 export type DriverDocType = "bol" | "pod" | "lumper_receipt";
@@ -285,6 +539,8 @@ interface StoreState {
   dvirInspections: DvirInspection[];
   timeOffRequests: TimeOffRequest[];
   expenses: Expense[];
+  /** The AI's phone calls to drivers: ringing, live, held for quiet hours, or done. */
+  dispatchCalls: DispatchCall[];
   settings: AgentSettings;
   liveMetrics: LiveMetrics;
   tickCount: number;
@@ -379,6 +635,18 @@ interface StoreState {
     logDriverCheckIn: (driverId: string) => void;
     /** Tells the AI to pick loads that get this driver home before chasing the best rate. */
     setHomePriority: (driverId: string, on: boolean) => void;
+    /** The driver picks up an AI dispatch call. */
+    answerDispatchCall: (callId: string) => void;
+    /** "Later" on a ringing call: nothing is lost, the AI texts the same information. */
+    declineDispatchCall: (callId: string) => void;
+    /** The driver answers on a live call, by tapping a choice or saying it (`heard`). */
+    replyDispatchCall: (callId: string, reply: string, heard?: string) => void;
+    hangUpDispatchCall: (callId: string) => void;
+    /** Duty status from the ELD (tappable in the demo). Sleeper and off duty hold every AI call. */
+    setDutyStatus: (driverId: string, status: HosStatus) => void;
+    setDriverPrefs: (driverId: string, prefs: DriverPrefs) => void;
+    /** The driver asked the AI to call them and set up how it reaches them. */
+    startSetupCall: (driverId: string) => void;
   };
 }
 
@@ -523,6 +791,7 @@ function findNegotiatingLoadForDriver(state: StoreState, driverId: string): Load
 
 export const useStore = create<StoreState>((set, get) => ({
   ...world,
+  dispatchCalls: [],
   settings: {
     autonomy: "ask",
     aggressiveness: "balanced",
@@ -563,6 +832,9 @@ export const useStore = create<StoreState>((set, get) => ({
         // Brokers the AI won't book are never sourced from; slow payers get a premium on the AI's ask.
         const { brokers: bookable, surcharges } = bookableBrokers(state.brokers, state.settings.brokerOverrides);
 
+        const offerBatches: { truckId: string; offers: Load[]; emptyAt: string }[] = [];
+        const autoBooked: { truckId: string; loadId?: string }[] = [];
+
         const activeLoads = loads.filter((l) => l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "cancelled" && l.carrierId === PRIMARY_CARRIER_ID);
 
         // Background market activity: loads the AI is working speculatively, not yet tied to a truck.
@@ -596,11 +868,15 @@ export const useStore = create<StoreState>((set, get) => ({
             loads = picked.loads;
             trucks = picked.trucks;
             newEvents.push(...picked.events);
-          } else newEvents.push({
+            autoBooked.push({ truckId: truck.id, loadId: picked.events.find((e) => e.loadId)?.loadId });
+          } else {
+            offerBatches.push({ truckId: truck.id, offers, emptyAt: `in ${truck.currentCity}` });
+            newEvents.push({
             id: uid("act"), timestamp: new Date().toISOString(), type: "load_offered",
             message: `AI found ${offers.length} ${truck.equipmentType.toLowerCase()} loads for ${truck.unitNumber}`, detail: `Scanned every connected board, awaiting ${driver ? driver.name.split(" ")[0] : "driver"}'s pick`,
             loadId: offers[0]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info",
-          });
+            });
+          }
         }
 
         // Trucks running a load with nothing chained yet: offer a shortlist for the next leg before this one delivers.
@@ -624,11 +900,15 @@ export const useStore = create<StoreState>((set, get) => ({
               loads = picked.loads;
               trucks = picked.trucks;
               newEvents.push(...picked.events);
-            } else newEvents.push({
-              id: uid("act"), timestamp: new Date().toISOString(), type: "load_offered",
-              message: `Next-load options ready for ${truck.unitNumber}`, detail: `Pre-negotiating before delivery, ${offers.length} options found`,
-              loadId: offers[0]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info",
-            });
+              autoBooked.push({ truckId: truck.id, loadId: picked.events.find((e) => e.loadId)?.loadId });
+            } else {
+              offerBatches.push({ truckId: truck.id, offers, emptyAt: `after you deliver in ${currentLoad.lane.destination}` });
+              newEvents.push({
+                id: uid("act"), timestamp: new Date().toISOString(), type: "load_offered",
+                message: `Next-load options ready for ${truck.unitNumber}`, detail: `Pre-negotiating before delivery, ${offers.length} options found`,
+                loadId: offers[0]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info",
+              });
+            }
           }
         }
 
@@ -789,12 +1069,25 @@ export const useStore = create<StoreState>((set, get) => ({
           }
         }
 
+        // The AI's phone calls to drivers: new ones it decides to make, then who's ringing, held or talking.
+        const draft: CallDraft = { ...draftFrom(state), loads, trucks, escalations, events: [] };
+        for (const { truckId, loadId } of autoBooked) {
+          const booked = draft.loads.find((l) => l.id === loadId);
+          const driverId = trucks.find((t) => t.id === truckId)?.driverId;
+          if (booked && driverId) textDriver(draft, driverId, `Booked your next load: ${booked.lane.origin} → ${booked.lane.destination}, ${booked.lane.miles} mi, picks up ${booked.pickupWindow}. Details in the app.`);
+        }
+        runDispatchCalls(draft, offerBatches);
+        newEvents.push(...draft.events);
+
         const step = (v: number, min: number, max: number, jitter = 2) => clamp(v + randInt(-jitter, jitter), min, max);
 
         return {
-          loads,
-          trucks,
-          escalations,
+          loads: draft.loads,
+          trucks: draft.trucks,
+          drivers: draft.drivers,
+          escalations: draft.escalations,
+          driverMessages: draft.driverMessages,
+          dispatchCalls: draft.dispatchCalls,
           incidents,
           activity: [...newEvents, ...state.activity].slice(0, 80),
           tickCount: state.tickCount + 1,
@@ -1819,6 +2112,54 @@ export const useStore = create<StoreState>((set, get) => ({
       set((state) => ({
         carriers: state.carriers.map((c) => (c.id === carrierId ? { ...c, flaggedForReview: !c.flaggedForReview } : c)),
       })),
+
+    answerDispatchCall: (callId) =>
+      set((state) => {
+        const d = draftFrom(state);
+        const call = d.dispatchCalls.find((c) => c.id === callId);
+        if (call?.status !== "ringing") return {};
+        answerCall(d, call);
+        return { dispatchCalls: d.dispatchCalls };
+      }),
+
+    declineDispatchCall: (callId) =>
+      set((state) => {
+        const d = draftFrom(state);
+        const call = d.dispatchCalls.find((c) => c.id === callId);
+        if (call?.status !== "ringing") return {};
+        patchCall(d, callId, { status: "missed", endedAt: new Date().toISOString(), outcome: "Driver said later. Texted instead", choices: [] });
+        textInstead(d, call);
+        return { dispatchCalls: d.dispatchCalls, driverMessages: d.driverMessages };
+      }),
+
+    replyDispatchCall: (callId, reply, heard) =>
+      set((state) => {
+        const d = draftFrom(state);
+        replyToCall(d, callId, reply, heard);
+        return { ...callDraftResult(d), activity: [...d.events, ...state.activity].slice(0, 80) };
+      }),
+
+    hangUpDispatchCall: (callId) =>
+      set((state) => {
+        const d = draftFrom(state);
+        endCall(d, callId);
+        return { ...callDraftResult(d), activity: [...d.events, ...state.activity].slice(0, 80) };
+      }),
+
+    setDutyStatus: (driverId, status) =>
+      set((state) => ({ drivers: state.drivers.map((x) => (x.id === driverId ? { ...x, hosStatus: status } : x)) })),
+
+    setDriverPrefs: (driverId, prefs) =>
+      set((state) => ({ drivers: state.drivers.map((x) => (x.id === driverId ? { ...x, prefs: { ...x.prefs, ...prefs } } : x)) })),
+
+    startSetupCall: (driverId) =>
+      set((state) => {
+        const driver = state.drivers.find((x) => x.id === driverId);
+        if (!driver || state.dispatchCalls.some((c) => c.driverId === driverId && (c.status === "ringing" || c.status === "live"))) return {};
+        // The driver asked for this one, so it rings right away instead of waiting its turn.
+        const call: DispatchCall = { ...setupCall(driver), status: "ringing", ringingAt: new Date().toISOString() };
+        return { dispatchCalls: [call, ...state.dispatchCalls].slice(0, 60) };
+      }),
   },
 }));
 

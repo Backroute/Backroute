@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Logo } from "@/components/shared/logo";
 import { Avatar } from "@/components/ui/avatar";
 import { NotificationToastHost } from "@/components/shared/notification-toast";
+import { IncomingCallHost } from "@/components/shared/dispatch-call-screen";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, truckActiveLoads } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { isAlert } from "@/lib/alerts";
@@ -65,6 +66,7 @@ export default function DriverLayout({ children }: { children: React.ReactNode }
           })}
         </nav>
       </div>
+      <IncomingCallHost driverId={driver.id} />
       <NotificationToastHost events={driverActivity} hrefFor={(e) => (e.loadId ? `/driver/loads/${e.loadId}` : undefined)} />
     </div>
   );

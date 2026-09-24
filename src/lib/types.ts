@@ -130,6 +130,17 @@ export interface Driver {
   lastCheckInAt?: string;
   /** Carrier told the AI to put getting this driver home ahead of the best-paying load. */
   homePriority?: boolean;
+  /** How the driver wants the AI dispatcher to reach them, set on a setup call or in Profile. */
+  prefs?: DriverPrefs;
+}
+
+export interface DriverPrefs {
+  /** Hour of the day (0–23) before which the AI doesn't call; it texts instead. */
+  noCallsBefore?: number;
+  /** States the driver won't take loads into (e.g. NJ for the NYC area). */
+  avoidStates?: string[];
+  /** New-load options by phone call, or just a text. */
+  newLoads?: "call" | "text";
 }
 
 export interface Truck {
@@ -278,6 +289,8 @@ export interface LiveBrokerCall {
 
 export interface VoiceCall {
   id: string;
+  /** Overrides the default heading in call history, e.g. "AI dispatch call with Marcus". */
+  title?: string;
   status: "ringing" | "in_progress" | "completed" | "voicemail" | "no_answer";
   startedAt: string;
   durationSec: number;
@@ -491,4 +504,54 @@ export interface Incident {
   /** Formal insurance claim, kicked off from Compliance — separate from the automated incident-response
    *  steps above, which just get everyone safe and moving again. */
   claimStartedAt?: string;
+}
+
+/** Why the AI dispatcher is calling a driver — the calls a human dispatcher makes all day. */
+export type DispatchCallKind = "next_load" | "pickup_brief" | "delivery_brief" | "late_eta" | "hours_parking" | "setup";
+
+export interface DispatchCallChoice {
+  label: string;
+  /** What the store does with it; `say` is what the driver is heard saying. */
+  reply: string;
+  say: string;
+  /** Loose words that pick this choice when the driver says it out loud. */
+  match?: string;
+}
+
+/** Something the driver agreed to on the call. It happens when the call ends, so "cancel that" can still undo it. */
+export type DispatchCallEffect =
+  | { type: "book"; groupId: string; loadId: string }
+  | { type: "reserve_parking"; place: string; cost: number }
+  | { type: "prefs"; prefs: DriverPrefs };
+
+/**
+ * One AI-to-driver phone call, shared by everyone: the driver's phone rings, the carrier watches it live on the
+ * dashboard, and whatever gets agreed updates the load, the offers and both apps when it hangs up. A text copy of
+ * anything with a number in it lands in the driver's Messages so nothing has to be written down while driving.
+ */
+export interface DispatchCall {
+  id: string;
+  driverId: string;
+  carrierId: string;
+  loadId?: string;
+  kind: DispatchCallKind;
+  /** held = the driver is in the sleeper, off duty or inside their no-calls hours; it rings when that ends. */
+  status: "queued" | "held" | "ringing" | "live" | "done" | "missed" | "dropped";
+  createdAt: string;
+  ringingAt?: string;
+  answeredAt?: string;
+  endedAt?: string;
+  lines: { speaker: "ai" | "driver"; text: string; at: string }[];
+  choices: DispatchCallChoice[];
+  /** Where the script is. */
+  step: string;
+  /** Facts frozen when the call was created: pickup number, door, the options on offer. */
+  facts: Record<string, string>;
+  options?: { loadId: string; say: string; short: string }[];
+  effects: DispatchCallEffect[];
+  /** The one-line result shown on the carrier board and in call history. */
+  outcome?: string;
+  heldReason?: string;
+  /** Set once the text copy has gone to the driver's Messages. */
+  textedAt?: string;
 }

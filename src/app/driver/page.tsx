@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ArrowDown, ArrowUpRight, ClipboardCheck, Link2, MapPin, Navigation, Phone } from "lucide-react";
 import { DrivingMode } from "@/components/shared/driving-mode";
+import { CallStatusLine } from "@/components/shared/call-settings";
 import { HomeTimeCard, useHomeTime } from "@/components/shared/home-time";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
@@ -181,6 +182,8 @@ export default function DriverHomePage() {
       )}
 
       {homeTime && <HomeTimeCard status={homeTime} />}
+
+      <CallStatusLine driver={driver} />
 
       {nextLoad && !completedLoad && (
         <div className="rounded-3xl border border-line p-5">

@@ -18,6 +18,7 @@ import { TruckDriverChip } from "@/components/shared/truck-driver-chip";
 import { IncidentCard } from "@/components/shared/incident-card";
 import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { DailyTextPreview } from "@/components/shared/daily-text";
+import { DriverCallsBoard } from "@/components/shared/driver-calls-board";
 import { useDriverRetention } from "@/components/shared/driver-retention";
 import { RUN_TYPE_LABEL } from "@/lib/run-types";
 import { weekEarnings } from "@/lib/earnings";
@@ -340,6 +341,8 @@ export default function CarrierOverviewPage() {
             })}
           </div>
         </section>
+
+        <DriverCallsBoard />
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Card>

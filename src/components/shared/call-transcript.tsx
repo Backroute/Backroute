@@ -36,7 +36,7 @@ export function CallTranscript({
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-ink-950 text-white">
             {call.status === "completed" ? <PhoneCall className="h-3.5 w-3.5" /> : <Phone className="h-3.5 w-3.5" />}
           </span>
-          {title}
+          {call.title ?? title}
         </div>
         <span className="flex items-center gap-3">
           {canReplay && (

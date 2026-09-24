@@ -5,6 +5,7 @@ import { Clock, Mic, MicOff, Navigation, Package, Phone, X } from "lucide-react"
 import { cn } from "@/lib/utils";
 import { useEscapeKey, useNow } from "@/lib/hooks";
 import { tripState } from "@/lib/trip-state";
+import { makeRecognizer, say, type Recognizer } from "@/lib/speech";
 import type { Load } from "@/lib/types";
 
 type Command = "arrived" | "loaded" | "unloaded" | "late" | "call" | "next";
@@ -18,23 +19,6 @@ const PHRASES: [Command, RegExp][] = [
   ["call", /\bcall\b|\bdispatch\b|\btalk\b/],
   ["next", /\bnext\b|\bwhat now\b|\bwhere\b|\beta\b/],
 ];
-
-// The browser's speech recognizer (Chrome and Safari prefix it); absent in some browsers, where the buttons still work.
-type Recognizer = { lang: string; interimResults: boolean; onresult: ((e: { results: { 0: { transcript: string } }[] }) => void) | null; onend: (() => void) | null; onerror: (() => void) | null; start: () => void; stop: () => void };
-function makeRecognizer(): Recognizer | null {
-  if (typeof window === "undefined") return null;
-  const w = window as unknown as { SpeechRecognition?: new () => Recognizer; webkitSpeechRecognition?: new () => Recognizer };
-  const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
-  return Ctor ? new Ctor() : null;
-}
-
-function say(text: string) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = 1.05;
-  window.speechSynthesis.speak(u);
-}
 
 /**
  * Hands-free while the truck is moving: no reading, no typing — the next stop in big type, four big buttons, and voice

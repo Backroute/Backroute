@@ -682,6 +682,8 @@ export function generateWorld(seed = 20260916): World {
     };
   });
   trucks[0].secondDriverId = "driver-team-1";
+  // The demo driver is behind the wheel, so the AI's calls ring through instead of waiting out a sleeper break.
+  drivers[0].hosStatus = "driving";
 
   const specs: LoadSpec[] = [
     { stage: "sourced", truckId: null, createdOffset: -8 },

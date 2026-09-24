@@ -160,6 +160,8 @@ export interface OfferOptions {
   headHome?: boolean;
   /** Local, regional or long haul: only lanes that fit how this driver runs are sourced. */
   runType?: RunType;
+  /** States the driver won't go into, from their call settings. */
+  avoidStates?: string[];
 }
 
 /** AI has scanned the boards and scored several candidates for one truck — driver/carrier picks one. */
@@ -178,7 +180,11 @@ export function createLoadOfferBatch(
 
   // What's loading near the truck; when it's time to head home, of those, the ones delivering closest to home.
   const runType = opts.runType;
-  const near = lanesNear(opts.from, runType && home ? (lane) => laneFits(lane, runType, home) : undefined);
+  const avoid = opts.avoidStates ?? [];
+  const near = lanesNear(
+    opts.from,
+    runType && home ? (lane) => laneFits(lane, runType, home) && !avoid.includes(lane.destState) && !avoid.includes(lane.originState) : undefined,
+  );
   const placements = near
     ? opts.headHome && home
       ? near.slice(0, count * 2).sort((a, b) => (hoursHomeFrom(a.lane.destination, a.lane.destState) ?? 99) - (hoursHomeFrom(b.lane.destination, b.lane.destState) ?? 99)).slice(0, count)
