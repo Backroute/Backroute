@@ -18,14 +18,15 @@ export function makeRecognizer(): Recognizer | null {
 
 /** Reads a line out loud, cutting off whatever was still being said. `onEnd` fires when it's done (or right away
  *  when the browser can't speak). */
-export function say(text: string, onEnd?: () => void) {
+export function say(text: string, onEnd?: () => void, voice: { pitch?: number; rate?: number } = {}) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     onEnd?.();
     return;
   }
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
-  u.rate = 1.05;
+  u.rate = voice.rate ?? 1.05;
+  if (voice.pitch) u.pitch = voice.pitch;
   if (onEnd) {
     u.onend = onEnd;
     u.onerror = onEnd;

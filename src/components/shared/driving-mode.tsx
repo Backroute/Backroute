@@ -69,7 +69,7 @@ export function DrivingMode({
       text = "Told the broker and the receiver you're running late. The AI will send your new time.";
     } else if (cmd === "call") {
       onCall();
-      text = "Calling your AI dispatcher.";
+      return;
     } else {
       text = `Next: ${s.next.title}. ${s.card === "booking" ? "" : `${place}, ${s.drive}.`}`;
     }

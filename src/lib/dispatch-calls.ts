@@ -1,6 +1,6 @@
 import { computeDriverPay } from "./settlements";
 import { formatEta, legMiles } from "./trip-geo";
-import type { DispatchCall, DispatchCallChoice, DispatchCallEffect, DispatchCallKind, Driver, DriverPrefs, Load } from "./types";
+import type { DispatchCall, DispatchCallChoice, DispatchCallEffect, DispatchCallKind, DispatchCallReport, Driver, DriverPrefs, Load } from "./types";
 
 /**
  * The calls a human dispatcher makes all day, scripted: a load to offer, the pickup number before the gate, the
@@ -16,7 +16,13 @@ export const KIND_LABEL: Record<DispatchCallKind, string> = {
   late_eta: "Running late",
   hours_parking: "Hours and parking",
   setup: "Call setup",
+  inbound: "Driver called in",
 };
+
+/** The carrier's number the AI answers and calls from. Demo: not connected to a phone provider. */
+export const DISPATCH_LINE = "(469) 555-0199";
+/** Who "someone from the office" is when the owner joins a call. */
+export const OWNER_NAME = "Alicia";
 
 /** How long the phone rings before it counts as missed and the AI texts instead. */
 export const RING_MS = 25_000;
@@ -215,6 +221,28 @@ export function parkingCall(driver: Driver, load: Load, milesLeft: number): { ca
   };
 }
 
+/** The driver calls dispatch. The AI already knows what they'll likely ask about: their next load, their pay this week. */
+export function inboundCall(
+  driver: Driver,
+  ctx: { weekPay: number; weekLoads: number; nextBooked?: Load; offers: Load[]; emptyAt: string; team: boolean },
+): DispatchCall {
+  const offer = ctx.offers.length ? nextLoadCall(driver, ctx.offers, ctx.emptyAt, ctx.team) : null;
+  const booked = ctx.nextBooked;
+  return newDispatchCall({
+    kind: "inbound",
+    driver,
+    options: offer?.options,
+    facts: {
+      ...(offer ? { groupId: offer.facts.groupId, count: offer.facts.count, emptyAt: ctx.emptyAt } : {}),
+      ...(booked
+        ? { booked: `${booked.lane.origin} to ${booked.lane.destination}, ${booked.lane.miles} miles, picks up ${booked.pickupWindow.split(",")[0].toLowerCase()}` }
+        : {}),
+      weekPay: String(Math.round(ctx.weekPay)),
+      weekLoads: String(ctx.weekLoads),
+    },
+  });
+}
+
 export function setupCall(driver: Driver): DispatchCall {
   return newDispatchCall({ kind: "setup", driver });
 }
@@ -229,8 +257,10 @@ export interface Turn {
   effects?: DispatchCallEffect[];
   end?: boolean;
   outcome?: string;
-  /** The driver asked for a person — the store raises it for the carrier. */
-  person?: boolean;
+  /** Something the store starts on right away: an incident, or a person at the carrier. */
+  report?: DispatchCallReport;
+  /** Facts learned on the call, merged into the call's own. */
+  facts?: Record<string, string>;
 }
 
 const c = (label: string, reply: string, match?: string, say = label): DispatchCallChoice => ({ label, reply, say, match });
@@ -274,6 +304,12 @@ export function openCall(call: DispatchCall): Turn {
         say: `${f.name}, you've got ${f.hours} of driving left and ${f.miles} miles to go, so you won't make the receiver today. I already moved your delivery to tomorrow at 7 AM and told the broker. ${cap(f.stop)}, ${f.ahead} miles ahead, takes reservations, $${f.cost} for the night. Want me to book you a spot? Lots around there fill up by 7.`,
         choices: [c("Book the spot", "reserve", "book|reserve|yes|yeah|sure"), c("I'll find my own", "own", "own|no|myself|nah")],
         step: "parking",
+      };
+    case "inbound":
+      return {
+        say: `Hey ${f.name}, it's dispatch. What do you need?`,
+        choices: INBOUND_MENU,
+        step: "menu",
       };
     case "setup":
       return {
@@ -339,49 +375,19 @@ export function respond(call: DispatchCall, reply: string): Turn {
       choices: [],
       step: "person",
       end: true,
-      person: true,
+      report: { person: `${f.name} asked for a person` },
       outcome: `${f.name} asked for a person. Call back`,
     };
   }
 
   if (call.kind === "next_load") {
-    const opts = call.options ?? [];
-    if (reply.startsWith("book:")) {
-      const i = Number(reply.slice(5));
-      const opt = opts[i];
-      if (!opt || !f.groupId) return { say: "That one's gone. Let me look again and call you back.", choices: [], step: "end", end: true };
-      return {
-        say: `Done. Booking ${opt.short.split(",")[0].replace(" → ", " to ")}. I'll text you the pickup details once the rate con's signed. Changed your mind? Say cancel in the next few seconds.`,
-        choices: [c("Cancel that", "cancel", "cancel|wait|stop|undo"), c("Thanks, bye", "bye", "thank|bye|ok|okay|good")],
-        step: "booked",
-        effects: [{ type: "book", groupId: f.groupId, loadId: opt.loadId }],
-        outcome: `Booked ${opt.short}`,
-      };
-    }
-    if (reply.startsWith("next:")) {
-      const i = Number(reply.slice(5));
-      return { say: `Next one: ${opts[i]?.say ?? ""}`, choices: offerChoices(i, call), step: `offer:${i}` };
-    }
-    if (reply === "cancel") {
-      return {
-        say: "Cancelled, nothing's booked. The options are still on your Home screen, and I'll check back in about 30 minutes. Loads go fast, so don't wait too long.",
-        choices: [],
-        step: "end",
-        end: true,
-        effects: [],
-        outcome: "Driver cancelled on the call. Nothing booked",
-      };
-    }
-    if (reply === "later") {
-      return {
-        say: "No problem. They're on your Home screen whenever you're ready. Loads go fast, so I'll check back in about 30 minutes.",
-        choices: [],
-        step: "end",
-        end: true,
-        outcome: "Driver will pick in the app",
-      };
-    }
-    if (reply === "bye") return { say: "You got it. Drive safe.", choices: [], step: "end", end: true };
+    const turn = nextLoadTurn(call, reply);
+    if (turn) return turn;
+  }
+
+  if (call.kind === "inbound") {
+    const turn = inboundTurn(call, reply);
+    if (turn) return turn;
   }
 
   if (call.kind === "pickup_brief" || call.kind === "delivery_brief") {
@@ -462,6 +468,144 @@ export function respond(call: DispatchCall, reply: string): Turn {
   return { say: "Sorry, I didn't catch that.", choices: call.choices, step: call.step };
 }
 
+/** Offering loads: the same whether the AI called about them or the driver called and asked. */
+function nextLoadTurn(call: DispatchCall, reply: string): Turn | null {
+  const f = call.facts;
+  const opts = call.options ?? [];
+  if (reply.startsWith("book:")) {
+    const i = Number(reply.slice(5));
+    const opt = opts[i];
+    if (!opt || !f.groupId) return { say: "That one's gone. Let me look again and call you back.", choices: [], step: "end", end: true };
+    return {
+      say: `Done. Booking ${opt.short.split(",")[0].replace(" → ", " to ")}. I'll text you the pickup details once the rate con's signed. Changed your mind? Say cancel in the next few seconds.`,
+      choices: [c("Cancel that", "cancel", "cancel|wait|stop|undo"), c("Thanks, bye", "bye", "thank|bye|ok|okay|good")],
+      step: "booked",
+      effects: [{ type: "book", groupId: f.groupId, loadId: opt.loadId }],
+      outcome: `Booked ${opt.short}`,
+    };
+  }
+  if (reply.startsWith("next:")) {
+    const i = Number(reply.slice(5));
+    return { say: `Next one: ${opts[i]?.say ?? ""}`, choices: offerChoices(i, call), step: `offer:${i}` };
+  }
+  if (reply === "cancel") {
+    return {
+      say: "Cancelled, nothing's booked. The options are still on your Home screen, and I'll check back in about 30 minutes. Loads go fast, so don't wait too long.",
+      choices: [],
+      step: "end",
+      end: true,
+      effects: [],
+      outcome: "Driver cancelled on the call. Nothing booked",
+    };
+  }
+  if (reply === "later") {
+    return {
+      say: "No problem. They're on your Home screen whenever you're ready. Loads go fast, so I'll check back in about 30 minutes.",
+      choices: [],
+      step: "end",
+      end: true,
+      outcome: "Driver will pick in the app",
+    };
+  }
+  if (reply === "bye") return { say: "You got it. Drive safe.", choices: [], step: "end", end: true };
+  return null;
+}
+
+const INBOUND_MENU: DispatchCallChoice[] = [
+  c("My next load", "next_q", "next|load|where am i going"),
+  c("I broke down", "breakdown", "broke|breakdown|won't start|flat|tire|engine|smoke"),
+  c("I'm running late", "late", "late|traffic|behind|delay"),
+  c("My pay", "pay", "pay|check|money|settlement|paid"),
+];
+
+const money = (n: string | number) => `$${Number(n).toLocaleString()}`;
+
+/** A driver calling in: the handful of reasons drivers actually call dispatch, each handled on the spot. */
+function inboundTurn(call: DispatchCall, reply: string): Turn | null {
+  const f = call.facts;
+  if (call.step.startsWith("offer") || call.step === "booked") {
+    const turn = nextLoadTurn(call, reply);
+    if (turn) return turn;
+  }
+  const THANKS = c("Thanks", "bye", "thank|ok|okay|bye|good|got it");
+  switch (reply) {
+    case "next_q": {
+      if (f.booked) return { say: `Your next load's already booked: ${f.booked}. Details are on your Home screen.`, choices: [THANKS], step: "answered", facts: { topic: "next" } };
+      const first = call.options?.[0];
+      if (first && f.groupId) {
+        return {
+          say: `I've got ${Number(f.count) > 1 ? `${f.count} options` : "one"} for you ${f.emptyAt}. Best one: ${first.say} Want it?`,
+          choices: offerChoices(0, call),
+          step: "offer:0",
+          facts: { topic: "next" },
+        };
+      }
+      return { say: "Nothing booked yet. I'm working the boards now and I'll call you the moment I have something good.", choices: [THANKS], step: "answered", facts: { topic: "next" } };
+    }
+    case "breakdown":
+      return {
+        say: "OK. First, are you off the road and safe?",
+        choices: [c("Yes, I'm safe", "safe", "yes|safe|shoulder|fine|parked"), c("No, I need help now", "danger", "no|help|hurt|accident|fire")],
+        step: "breakdown",
+      };
+    case "safe":
+      return {
+        say: "Good. I'm on it: finding the nearest shop that can come to you, and telling the broker the load's delayed. Flashers on, triangles out. I'll call you back with the ETA.",
+        choices: [],
+        step: "end",
+        end: true,
+        report: { incident: { type: "breakdown", note: `${f.name} called in a breakdown. Off the road and safe` } },
+        outcome: "Breakdown reported. AI finding a shop",
+        facts: { topic: "breakdown" },
+      };
+    case "danger":
+      return {
+        say: "If anyone's hurt, hang up and call 911 first. I'm getting someone from the office on it right now, and I've started on a tow and a shop.",
+        choices: [],
+        step: "end",
+        end: true,
+        report: { incident: { type: "breakdown", note: `${f.name} called in a breakdown and needs help now` }, person: `${f.name} broke down and says they need help now` },
+        outcome: "Breakdown, driver needs help. Office alerted",
+        facts: { topic: "breakdown" },
+      };
+    case "late":
+      return {
+        say: "How late are you going to be?",
+        choices: [c("About 30 minutes", "late:30", "thirty|30|half"), c("About an hour", "late:60", "hour|one|60"), c("Two hours or more", "late:120", "two|more|2")],
+        step: "late",
+      };
+    case "late:30":
+    case "late:60":
+    case "late:120": {
+      const mins = Number(reply.slice(5));
+      const said = mins === 30 ? "about 30 minutes" : mins === 60 ? "about an hour" : "two hours or more";
+      return {
+        say: `Got it, ${said}. I'm telling the receiver and the broker now and asking to move your appointment. I'll text you the new time. Drive safe.`,
+        choices: [],
+        step: "end",
+        end: true,
+        report: { incident: { type: "delay", note: `${f.name} called in running ${said} late` } },
+        outcome: `Running ${said} late. AI moving the appointment`,
+        facts: { topic: "late", late: said },
+      };
+    }
+    case "pay":
+      return {
+        say:
+          Number(f.weekLoads) > 0
+            ? `So far this week you've made ${money(f.weekPay)} on ${f.weekLoads} load${f.weekLoads === "1" ? "" : "s"}. It's paid on your company's normal settlement day. I texted you the breakdown.`
+            : "Nothing's settled for this week yet. Your pay shows up in Earnings as soon as a load delivers.",
+        choices: [THANKS],
+        step: "answered",
+        outcome: "Pay question answered",
+        facts: { topic: "pay" },
+      };
+    case "bye":
+      return { say: "Anytime. Drive safe.", choices: [], step: "end", end: true, outcome: call.outcome ?? "Question answered" };
+  }
+  return null;
+}
+
 /** The text that lands in the driver's Messages when the call ends, or instead of a call that couldn't happen. */
 export function textCopyFor(call: DispatchCall): string {
   const f = call.facts;
@@ -487,6 +631,14 @@ export function textCopyFor(call: DispatchCall): string {
     }
     case "setup":
       return "Your call settings are saved. Change them any time in Profile.";
+    case "inbound": {
+      const booked = call.effects.find((e) => e.type === "book");
+      if (booked) return `Booked from our call: ${call.options?.find((o) => o.loadId === booked.loadId)?.short ?? "your next load"}. Pickup details come once the rate con is signed.`;
+      if (f.topic === "pay") return `Your pay this week so far: ${money(f.weekPay)} on ${f.weekLoads} load${f.weekLoads === "1" ? "" : "s"}. Full breakdown in Earnings.`;
+      if (f.topic === "breakdown") return "Breakdown logged. The AI is finding a shop and has told the broker. Stay with the truck; the ETA comes by call and text.";
+      if (f.topic === "late") return `Logged: running ${f.late} late. The receiver and broker are being told; your new appointment time comes by text.`;
+      return `From your call with dispatch: ${call.outcome ?? "question answered"}.`;
+    }
   }
 }
 
@@ -503,6 +655,7 @@ export function stillRelevant(call: DispatchCall, loads: Load[]): boolean {
     case "hours_parking":
       return load?.stage === "in_transit";
     case "setup":
+    case "inbound":
       return true;
   }
 }

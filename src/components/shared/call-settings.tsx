@@ -4,7 +4,7 @@ import Link from "next/link";
 import { PhoneCall, PhoneOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
-import { quietReason } from "@/lib/dispatch-calls";
+import { DISPATCH_LINE, quietReason } from "@/lib/dispatch-calls";
 import type { Driver, HosStatus } from "@/lib/types";
 
 export const DUTY_LABEL: Record<HosStatus, string> = { driving: "Driving", on_duty: "On duty", off_duty: "Off duty", sleeper: "Sleeper" };
@@ -67,6 +67,31 @@ export function CallSettingsCard({ driver }: { driver: Driver }) {
       </div>
       <p className="mt-1 text-xs text-ink-500">
         It calls like a dispatcher: new loads, pickup numbers, late appointments, parking. Never while you&apos;re in the sleeper or off duty. Anything with a number also comes by text.
+      </p>
+
+      <p className="mt-4 text-xs font-medium text-ink-800">Where the AI reaches you</p>
+      <div className="mt-1.5 grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Where the AI reaches you">
+        {(["app", "phone"] as const).map((v) => {
+          const on = (prefs.reach ?? "app") === v;
+          return (
+            <button
+              key={v}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => setDriverPrefs(driver.id, { reach: v })}
+              className={cn("rounded-full border py-1.5 text-xs font-medium", on ? "border-ink-950 bg-ink-950 text-white" : "border-line text-ink-600")}
+            >
+              {v === "app" ? "This app" : "My phone number"}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-1.5 text-[11px] text-ink-500">
+        {(prefs.reach ?? "app") === "phone"
+          ? `Regular calls and texts to ${driver.phone} from ${DISPATCH_LINE}. No app needed. You can call or text that number any time too.`
+          : "Calls ring in the app, even over driving mode."}{" "}
+        <span className="text-ink-400">Demo: both ring in the app.</span>
       </p>
 
       <p className="mt-4 text-xs font-medium text-ink-800">Duty status</p>

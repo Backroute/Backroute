@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { PhoneOff, Send, UserRound } from "lucide-react";
 import Link from "next/link";
 import { ChevronDown, ChevronUp, PhoneCall } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { useStore } from "@/lib/store";
-import { KIND_LABEL } from "@/lib/dispatch-calls";
+import { KIND_LABEL, OWNER_NAME } from "@/lib/dispatch-calls";
 import { PRIMARY_CARRIER_ID } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 import type { DispatchCall } from "@/lib/types";
@@ -95,7 +96,12 @@ export function DriverCallsBoard({ limit = 6 }: { limit?: number }) {
                     {summary && <p className={cn("mt-0.5 text-xs text-ink-500", call.status !== "live" && "truncate")}>{summary}</p>}
                   </div>
                   <span className="flex shrink-0 flex-col items-end gap-1">
-                    <Badge tone={st.tone} dot={call.status === "live" || call.status === "ringing"}>{st.label}</Badge>
+                    <span className="flex items-center gap-1">
+                      {call.channel === "phone" && <Badge tone="neutral">Phone</Badge>}
+                      <Badge tone={st.tone} dot={call.status === "live" || call.status === "ringing"}>
+                        {call.status === "live" && call.ownerTookOver ? "You're on" : st.label}
+                      </Badge>
+                    </span>
                     <span className="flex items-center gap-1 text-[11px] text-ink-400">
                       <TimeAgo iso={call.endedAt ?? call.answeredAt ?? call.createdAt} />
                       {call.lines.length > 0 && (expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
@@ -116,12 +122,13 @@ export function DriverCallsBoard({ limit = 6 }: { limit?: number }) {
                       <ul className="flex flex-col gap-2">
                         {call.lines.map((l, i) => (
                           <li key={i} className="text-xs leading-relaxed">
-                            <span className="font-semibold text-ink-950">{l.speaker === "ai" ? "AI" : driver?.name.split(" ")[0] ?? "Driver"}: </span>
+                            <span className="font-semibold text-ink-950">{l.speaker === "ai" ? "AI" : l.speaker === "owner" ? "You" : driver?.name.split(" ")[0] ?? "Driver"}: </span>
                             <span className="text-ink-700">{l.text}</span>
                           </li>
                         ))}
                       </ul>
                     )}
+                    {call.status === "live" && <OwnerControls call={call} driverFirst={driver?.name.split(" ")[0] ?? "the driver"} />}
                     {loadLink(call) && (
                       <Link href={`/carrier/loads/${loadLink(call)}`} className="mt-3 inline-block text-xs font-medium text-ink-950 underline underline-offset-2">
                         Open the load
@@ -135,5 +142,50 @@ export function DriverCallsBoard({ limit = 6 }: { limit?: number }) {
         </ul>
       )}
     </section>
+  );
+}
+
+/** The owner on a live call: listening is just reading along; taking over hands the call from the AI to them.
+ *  In the demo the owner types; on a real phone line they'd talk. */
+function OwnerControls({ call, driverFirst }: { call: DispatchCall; driverFirst: string }) {
+  const { takeOverDispatchCall, ownerSayOnCall, hangUpDispatchCall } = useStore((s) => s.actions);
+  const [text, setText] = useState("");
+  const send = () => {
+    if (!text.trim()) return;
+    ownerSayOnCall(call.id, text);
+    setText("");
+  };
+  if (!call.ownerTookOver) {
+    return (
+      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
+        <button type="button" onClick={() => takeOverDispatchCall(call.id)} className="flex items-center gap-1.5 rounded-full bg-ink-950 px-3.5 py-1.5 text-xs font-semibold text-white">
+          <UserRound className="h-3.5 w-3.5" /> Take over the call
+        </button>
+        <span className="text-[11px] text-ink-500">You&apos;re listening. {driverFirst} can&apos;t hear you until you take over.</span>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-3 flex flex-col gap-2 border-t border-line pt-3">
+      <div className="flex gap-2">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && send()}
+          placeholder={`Say something to ${driverFirst}…`}
+          aria-label={`Say something to ${driverFirst}`}
+          className="min-w-0 flex-1 rounded-full border border-line bg-white px-3.5 py-1.5 text-xs outline-none focus:border-ink-400"
+        />
+        <button type="button" onClick={send} aria-label="Send" className="rounded-full bg-ink-950 p-2 text-white">
+          <Send className="h-3.5 w-3.5" />
+        </button>
+        <button type="button" onClick={() => hangUpDispatchCall(call.id)} className="flex items-center gap-1 rounded-full bg-red-500 px-3 py-1.5 text-xs font-semibold text-white">
+          <PhoneOff className="h-3.5 w-3.5" /> End call
+        </button>
+      </div>
+      <p className="text-[11px] text-ink-500">
+        {driverFirst} hears you as {OWNER_NAME}. The AI keeps notes and logs the call. Demo: you type here; on a real line you&apos;d talk.
+      </p>
+    </div>
   );
 }

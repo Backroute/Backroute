@@ -141,6 +141,8 @@ export interface DriverPrefs {
   avoidStates?: string[];
   /** New-load options by phone call, or just a text. */
   newLoads?: "call" | "text";
+  /** Where calls and texts go: the app, or a regular phone call and SMS for drivers who won't use an app. */
+  reach?: "app" | "phone";
 }
 
 export interface Truck {
@@ -507,7 +509,7 @@ export interface Incident {
 }
 
 /** Why the AI dispatcher is calling a driver — the calls a human dispatcher makes all day. */
-export type DispatchCallKind = "next_load" | "pickup_brief" | "delivery_brief" | "late_eta" | "hours_parking" | "setup";
+export type DispatchCallKind = "next_load" | "pickup_brief" | "delivery_brief" | "late_eta" | "hours_parking" | "setup" | "inbound";
 
 export interface DispatchCallChoice {
   label: string;
@@ -523,6 +525,13 @@ export type DispatchCallEffect =
   | { type: "book"; groupId: string; loadId: string }
   | { type: "reserve_parking"; place: string; cost: number }
   | { type: "prefs"; prefs: DriverPrefs };
+
+/** Something a driver reported on a call that the AI starts working the moment it's said, not at hang-up. */
+export interface DispatchCallReport {
+  incident?: { type: "breakdown" | "delay"; note: string };
+  /** Raise it to a person at the carrier, with why. */
+  person?: string;
+}
 
 /**
  * One AI-to-driver phone call, shared by everyone: the driver's phone rings, the carrier watches it live on the
@@ -541,7 +550,11 @@ export interface DispatchCall {
   ringingAt?: string;
   answeredAt?: string;
   endedAt?: string;
-  lines: { speaker: "ai" | "driver"; text: string; at: string }[];
+  lines: { speaker: "ai" | "driver" | "owner"; text: string; at: string }[];
+  /** Where it rang: the app, or the driver's regular phone. */
+  channel?: "app" | "phone";
+  /** The carrier's owner took the call over from the AI (listening in is silent and needs no flag). */
+  ownerTookOver?: boolean;
   choices: DispatchCallChoice[];
   /** Where the script is. */
   step: string;

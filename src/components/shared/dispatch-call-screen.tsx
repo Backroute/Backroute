@@ -5,7 +5,7 @@ import { Mic, MicOff, MessageSquareText, Phone, PhoneOff, RotateCcw, UserRound }
 import { cn, formatDuration } from "@/lib/utils";
 import { useNow } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
-import { KIND_LABEL } from "@/lib/dispatch-calls";
+import { DISPATCH_LINE, KIND_LABEL, OWNER_NAME } from "@/lib/dispatch-calls";
 import { makeRecognizer, say, stopSpeaking, type Recognizer } from "@/lib/speech";
 import type { DispatchCall } from "@/lib/types";
 
@@ -16,6 +16,7 @@ const RING_SUBTITLE: Record<DispatchCall["kind"], string> = {
   late_eta: "Your delivery appointment",
   hours_parking: "Your hours and parking",
   setup: "Setting up your calls",
+  inbound: "Calling dispatch",
 };
 
 /** Words that always work on a call, whatever the AI just asked. */
@@ -82,8 +83,13 @@ function Ringing({ call }: { call: DispatchCall }) {
         <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/25" />
         <span className="relative flex h-24 w-24 items-center justify-center rounded-full bg-white text-2xl font-semibold text-ink-950">AI</span>
       </span>
-      <p className="mt-6 text-3xl font-semibold tracking-tight">AI Dispatch</p>
-      <p className="mt-2 text-base text-white/60">{RING_SUBTITLE[call.kind]}</p>
+      <p className="mt-6 text-3xl font-semibold tracking-tight">{call.channel === "phone" ? "Titan Dispatch" : "AI Dispatch"}</p>
+      <p className="mt-2 text-base text-white/60">{call.channel === "phone" ? `${DISPATCH_LINE} · phone call` : RING_SUBTITLE[call.kind]}</p>
+      {call.channel === "phone" && (
+        <p className="mt-6 max-w-xs text-center text-xs text-white/40">
+          Demo: this is how it rings on a regular phone, no app needed. A real line needs a phone provider connected.
+        </p>
+      )}
       <div className="mt-auto grid w-full max-w-xs grid-cols-2 gap-10">
         <button type="button" onClick={() => declineDispatchCall(call.id)} className="flex flex-col items-center gap-2 text-sm text-white/70">
           <span className="flex h-18 w-18 items-center justify-center rounded-full bg-white/15 p-5">
@@ -150,12 +156,17 @@ function LiveCall({ call }: { call: DispatchCall }) {
   // Every new AI line is read out loud; when it finishes, the phone listens for the answer.
   useEffect(() => {
     const last = call.lines.at(-1);
-    if (call.lines.length === spoken.current || last?.speaker !== "ai") return;
+    if (call.lines.length === spoken.current || !last || last.speaker === "driver") return;
     spoken.current = call.lines.length;
     recognizer.current?.stop();
-    say(last.text, () => {
-      if (autoListen.current && canListen && callRef.current.status === "live") listen();
-    });
+    say(
+      last.text,
+      () => {
+        if (autoListen.current && canListen && callRef.current.status === "live") listen();
+      },
+      // The owner sounds like a different person than the AI.
+      last.speaker === "owner" ? { pitch: 0.8, rate: 1 } : {},
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [call.lines.length]);
 
@@ -175,9 +186,9 @@ function LiveCall({ call }: { call: DispatchCall }) {
     <div role="dialog" aria-modal="true" aria-label="Call with AI Dispatch" className="fixed inset-0 z-[80] flex flex-col bg-ink-950 px-5 pb-6 pt-8 text-white">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-lg font-semibold">AI Dispatch</p>
+          <p className="text-lg font-semibold">{call.ownerTookOver ? `${OWNER_NAME} · Titan Freight` : "AI Dispatch"}</p>
           <p className="text-xs text-white/50">
-            {KIND_LABEL[call.kind]} · <span className="tabular">{formatDuration(secs)}</span>
+            {call.ownerTookOver ? "AI is taking notes" : KIND_LABEL[call.kind]} · <span className="tabular">{formatDuration(secs)}</span>
           </p>
         </div>
         {canListen && (
@@ -202,6 +213,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
               l.speaker === "driver" ? "self-end rounded-2xl bg-white/10 px-3.5 py-2 text-sm text-white/80" : i === lines.length - 1 ? "text-xl font-medium" : "text-sm text-white/45",
             )}
           >
+            {l.speaker === "owner" && <span className="mb-0.5 block text-[11px] font-semibold uppercase tracking-wider text-emerald-300">{OWNER_NAME}</span>}
             {l.text}
           </p>
         ))}
@@ -227,7 +239,11 @@ function LiveCall({ call }: { call: DispatchCall }) {
       )}
 
       <div className="mt-5 grid grid-cols-3 items-center gap-3">
-        <button type="button" onClick={() => replyDispatchCall(call.id, "again")} className="flex flex-col items-center gap-1 text-[11px] text-white/60">
+        <button
+          type="button"
+          onClick={() => (call.ownerTookOver ? replyDispatchCall(call.id, "again", "Sorry, say that again?") : replyDispatchCall(call.id, "again"))}
+          className="flex flex-col items-center gap-1 text-[11px] text-white/60"
+        >
           <span className="rounded-full bg-white/10 p-3">
             <RotateCcw className="h-5 w-5" />
           </span>
@@ -236,12 +252,16 @@ function LiveCall({ call }: { call: DispatchCall }) {
         <button type="button" onClick={() => hangUpDispatchCall(call.id)} aria-label="Hang up" className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-500">
           <PhoneOff className="h-7 w-7" />
         </button>
-        <button type="button" onClick={() => replyDispatchCall(call.id, "person")} className="flex flex-col items-center gap-1 text-[11px] text-white/60">
-          <span className="rounded-full bg-white/10 p-3">
-            <UserRound className="h-5 w-5" />
-          </span>
-          Get me a person
-        </button>
+        {call.ownerTookOver ? (
+          <span />
+        ) : (
+          <button type="button" onClick={() => replyDispatchCall(call.id, "person")} className="flex flex-col items-center gap-1 text-[11px] text-white/60">
+            <span className="rounded-full bg-white/10 p-3">
+              <UserRound className="h-5 w-5" />
+            </span>
+            Get me a person
+          </button>
+        )}
       </div>
     </div>
   );

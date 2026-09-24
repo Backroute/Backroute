@@ -50,4 +50,11 @@ export const INTEGRATION_CATEGORIES: IntegrationCategory[] = [
       { id: "highway", name: "Highway", connected: false, detail: "Automated broker fraud screening" },
     ],
   },
+  {
+    name: "Phone & text",
+    items: [
+      { id: "twilio", name: "Twilio", connected: false, detail: "Real calls and texts to drivers on the dispatch line" },
+      { id: "telnyx", name: "Telnyx", connected: false, detail: "Carrier-grade voice and SMS for the dispatch line" },
+    ],
+  },
 ];

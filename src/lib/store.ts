@@ -30,15 +30,18 @@ import { cityCoords, distanceMiles, legMiles, legProgress } from "./trip-geo";
 import { bookableBrokers, type BrokerPolicy } from "./broker-policy";
 import { homeTimeStatus } from "./home";
 import { HOME_TIME_OPTIONS, laneFits, RUN_TYPE_DETAIL, RUN_TYPE_LABEL } from "./run-types";
-import { payLabel } from "./settlements";
+import { computeDriverPay, payLabel } from "./settlements";
+import { weekEarnings } from "./earnings";
 import {
   briefCall,
   CALL_GAP_MS,
   driverTakes,
   KIND_LABEL,
   lateCall,
+  inboundCall,
   lateOnThisLoad,
   nextLoadCall,
+  OWNER_NAME,
   openCall,
   parkingCall,
   quietReason,
@@ -195,10 +198,40 @@ function fitsDriver(driver: Driver | undefined): ((lane: Lane) => boolean) | und
   return driver ? (lane) => laneFits(lane, driver.runType, driver.homeBase) && driverTakes(driver.prefs, { lane }) : undefined;
 }
 
+/** Starts the AI's incident plan for a truck: nearest backup truck lined up, broker told, the steps it will work. */
+function openIncident(
+  state: Pick<StoreState, "trucks" | "loads" | "brokers">,
+  driverId: string,
+  truckId: string,
+  type: IncidentType,
+  note: string,
+): { incident: Incident; event: ActivityEvent } {
+  const truck = state.trucks.find((t) => t.id === truckId);
+  const load = state.loads.find((l) => l.id === truck?.currentLoadId);
+  const at = truck ? cityCoords(truck.currentCity, truck.currentState) : undefined;
+  const backups = state.trucks
+    .filter((t) => t.id !== truckId && t.status === "available" && !t.currentLoadId && t.equipmentType === truck?.equipmentType)
+    .map((t) => {
+      const c = cityCoords(t.currentCity, t.currentState);
+      return { t, miles: at && c ? Math.max(12, Math.round(distanceMiles(at, c) * 1.18)) : randInt(25, 70) };
+    })
+    .sort((a, b) => a.miles - b.miles);
+  const incident = createIncident(driverId, PRIMARY_CARRIER_ID, truckId, truck?.currentLoadId ?? null, type, note, {
+    load,
+    truck,
+    brokerName: load ? state.brokers.find((b) => b.id === load.brokerId)?.company : undefined,
+    backupTruck: backups[0]?.t,
+    backupMiles: backups[0]?.miles,
+  });
+  return { incident, event: incidentOpenedEvent(incident, truck) };
+}
+
 // ——— AI dispatch calls ———
 
 /** Everything a call can touch, gathered so the tick and the driver's own taps change it the same way. */
 interface CallDraft {
+  brokers: Broker[];
+  incidents: Incident[];
   loads: Load[];
   trucks: Truck[];
   drivers: Driver[];
@@ -209,13 +242,13 @@ interface CallDraft {
 }
 
 function draftFrom(state: StoreState): CallDraft {
-  const { loads, trucks, drivers, escalations, driverMessages, dispatchCalls } = state;
-  return { loads, trucks, drivers, escalations, driverMessages, dispatchCalls, events: [] };
+  const { brokers, incidents, loads, trucks, drivers, escalations, driverMessages, dispatchCalls } = state;
+  return { brokers, incidents, loads, trucks, drivers, escalations, driverMessages, dispatchCalls, events: [] };
 }
 
 function callDraftResult(d: CallDraft) {
-  const { loads, trucks, drivers, escalations, driverMessages, dispatchCalls } = d;
-  return { loads, trucks, drivers, escalations, driverMessages, dispatchCalls };
+  const { incidents, loads, trucks, drivers, escalations, driverMessages, dispatchCalls } = d;
+  return { incidents, loads, trucks, drivers, escalations, driverMessages, dispatchCalls };
 }
 
 function patchCall(d: CallDraft, id: string, patch: Partial<DispatchCall>) {
@@ -238,7 +271,8 @@ function textInstead(d: CallDraft, call: DispatchCall) {
 }
 
 function ringCall(d: CallDraft, call: DispatchCall) {
-  patchCall(d, call.id, { status: "ringing", ringingAt: new Date().toISOString() });
+  const reach = d.drivers.find((x) => x.id === call.driverId)?.prefs?.reach ?? "app";
+  patchCall(d, call.id, { status: "ringing", ringingAt: new Date().toISOString(), channel: reach });
 }
 
 function answerCall(d: CallDraft, call: DispatchCall) {
@@ -254,26 +288,40 @@ function replyToCall(d: CallDraft, callId: string, reply: string, heard?: string
   const said =
     heard ??
     (reply === "again" ? "Say that again?" : reply === "person" ? "Can I talk to a person?" : call.choices.find((ch) => ch.reply === reply)?.say ?? reply);
-  const turn = respond(call, reply);
   const now = new Date().toISOString();
-  const lines = [...call.lines, { speaker: "driver" as const, text: said, at: now }, { speaker: "ai" as const, text: turn.say, at: now }];
+
+  // The owner has the call now: the AI only listens and keeps the record.
+  if (call.ownerTookOver) {
+    patchCall(d, callId, { lines: [...call.lines, { speaker: "driver", text: said, at: now }] });
+    return;
+  }
+
+  const turn = respond(call, reply);
   patchCall(d, callId, {
-    lines,
+    lines: [...call.lines, { speaker: "driver", text: said, at: now }, { speaker: "ai", text: turn.say, at: now }],
     choices: turn.choices,
     step: turn.step,
     ...(turn.effects ? { effects: turn.effects } : {}),
     ...(turn.outcome !== undefined ? { outcome: turn.outcome } : {}),
+    ...(turn.facts ? { facts: { ...call.facts, ...turn.facts } } : {}),
   });
-  if (turn.person) {
-    const driver = d.drivers.find((x) => x.id === call.driverId);
+  const driver = d.drivers.find((x) => x.id === call.driverId);
+  const first = driver?.name.split(" ")[0] ?? "Driver";
+  // A breakdown or a late truck is worked the moment it's said, not when the driver hangs up.
+  if (turn.report?.incident && driver) {
+    const { incident, event } = openIncident(d, driver.id, driver.truckId, turn.report.incident.type, turn.report.incident.note);
+    d.incidents = [incident, ...d.incidents];
+    d.events.push(event);
+  }
+  if (turn.report?.person) {
     const esc: Escalation = {
       id: uid("esc"), loadId: call.loadId ?? "", carrierId: call.carrierId,
-      reason: `${driver?.name ?? "A driver"} asked for a person during an AI call (${KIND_LABEL[call.kind].toLowerCase()}). Call them back at ${driver?.phone ?? "their number"}.`,
+      reason: `${turn.report.person} on an AI call (${KIND_LABEL[call.kind].toLowerCase()}). Call them back at ${driver?.phone ?? "their number"}.`,
       createdAt: now, status: "open", complexity: "routine",
-      recommendedAction: "approve", recommendedLabel: `Called ${driver?.name.split(" ")[0] ?? "them"} back`,
+      recommendedAction: "approve", recommendedLabel: `Called ${first} back`,
     };
     d.escalations = [esc, ...d.escalations];
-    d.events.push({ id: uid("act"), timestamp: now, type: "escalation", message: `${driver?.name.split(" ")[0] ?? "Driver"} wants a person on the phone`, detail: esc.reason, loadId: call.loadId, carrierId: call.carrierId, severity: "warning" });
+    d.events.push({ id: uid("act"), timestamp: now, type: "escalation", message: `${first} wants a person on the phone`, detail: esc.reason, loadId: call.loadId, carrierId: call.carrierId, severity: "warning" });
   }
   if (turn.end) endCall(d, callId);
 }
@@ -318,7 +366,7 @@ function endCall(d: CallDraft, callId: string) {
     const record: VoiceCall = {
       id: uid("call"), title: `AI dispatch call with ${first} · ${KIND_LABEL[call.kind]}`, status: "completed", startedAt,
       durationSec: Math.max(12, Math.round((Date.now() - Date.parse(startedAt)) / 1000)),
-      transcript: call.lines.map((l) => ({ speaker: l.speaker, text: l.text })), outcome,
+      transcript: call.lines.map((l) => ({ speaker: l.speaker === "owner" ? "carrier" : l.speaker, text: l.text })), outcome,
     };
     d.loads = d.loads.map((l) => (l.id === recordOn ? { ...l, calls: [...l.calls, record] } : l));
   }
@@ -397,6 +445,11 @@ function runDispatchCalls(d: CallDraft, newOfferBatches: { truckId: string; offe
     if (active?.status === "live") {
       if (primary) continue;
       const last = active.lines.at(-1);
+      if (active.ownerTookOver) {
+        // Talking with the owner now: the driver answers them, and the owner hangs up when they're done.
+        if (last?.speaker === "owner" && nowMs - Date.parse(last.at) > 3000) replyToCall(d, active.id, "ack", pick(["Sounds good.", "Yep, will do.", "Got it, thanks."]));
+        continue;
+      }
       if (last && nowMs - Date.parse(last.at) > 4000) {
         // A driver who takes the call the ordinary way: yes to the load or the parking spot, then "got it".
         const choice = ["book:0", "reserve", "bye"].map((r) => active.choices.find((ch) => ch.reply === r)).find(Boolean) ?? active.choices.at(-1);
@@ -647,6 +700,12 @@ interface StoreState {
     setDriverPrefs: (driverId: string, prefs: DriverPrefs) => void;
     /** The driver asked the AI to call them and set up how it reaches them. */
     startSetupCall: (driverId: string) => void;
+    /** The driver calls dispatch; the AI picks up straight away. */
+    startInboundCall: (driverId: string) => void;
+    /** The owner steps into a live call: the AI says so and hands over, then just keeps the record. */
+    takeOverDispatchCall: (callId: string) => void;
+    /** The owner talking on a call they took over. */
+    ownerSayOnCall: (callId: string, text: string) => void;
   };
 }
 
@@ -1528,26 +1587,10 @@ export const useStore = create<StoreState>((set, get) => ({
 
     reportIncident: (driverId, truckId, type, note) =>
       set((state) => {
-        const truck = state.trucks.find((t) => t.id === truckId);
-        const load = state.loads.find((l) => l.id === truck?.currentLoadId);
-        const at = truck ? cityCoords(truck.currentCity, truck.currentState) : undefined;
-        const backups = state.trucks
-          .filter((t) => t.id !== truckId && t.status === "available" && !t.currentLoadId && t.equipmentType === truck?.equipmentType)
-          .map((t) => {
-            const c = cityCoords(t.currentCity, t.currentState);
-            return { t, miles: at && c ? Math.max(12, Math.round(distanceMiles(at, c) * 1.18)) : randInt(25, 70) };
-          })
-          .sort((a, b) => a.miles - b.miles);
-        const incident = createIncident(driverId, PRIMARY_CARRIER_ID, truckId, truck?.currentLoadId ?? null, type, note, {
-          load,
-          truck,
-          brokerName: load ? state.brokers.find((b) => b.id === load.brokerId)?.company : undefined,
-          backupTruck: backups[0]?.t,
-          backupMiles: backups[0]?.miles,
-        });
+        const { incident, event } = openIncident(state, driverId, truckId, type, note);
         return {
           incidents: [incident, ...state.incidents],
-          activity: [incidentOpenedEvent(incident, truck), ...state.activity].slice(0, 80),
+          activity: [event, ...state.activity].slice(0, 80),
         };
       }),
 
@@ -2157,8 +2200,61 @@ export const useStore = create<StoreState>((set, get) => ({
         const driver = state.drivers.find((x) => x.id === driverId);
         if (!driver || state.dispatchCalls.some((c) => c.driverId === driverId && (c.status === "ringing" || c.status === "live"))) return {};
         // The driver asked for this one, so it rings right away instead of waiting its turn.
-        const call: DispatchCall = { ...setupCall(driver), status: "ringing", ringingAt: new Date().toISOString() };
+        const call: DispatchCall = { ...setupCall(driver), status: "ringing", ringingAt: new Date().toISOString(), channel: driver.prefs?.reach ?? "app" };
         return { dispatchCalls: [call, ...state.dispatchCalls].slice(0, 60) };
+      }),
+
+    startInboundCall: (driverId) =>
+      set((state) => {
+        const driver = state.drivers.find((x) => x.id === driverId);
+        const truck = state.trucks.find((t) => t.id === driver?.truckId);
+        if (!driver || state.dispatchCalls.some((c) => c.driverId === driverId && (c.status === "ringing" || c.status === "live"))) return {};
+        const team = !!truck?.secondDriverId;
+        const week = weekEarnings(state.loads.filter((l) => l.truckId === truck?.id));
+        const current = state.loads.find((l) => l.id === truck?.currentLoadId);
+        const now = new Date().toISOString();
+        const base = inboundCall(driver, {
+          weekPay: week.loads.reduce((sum, l) => sum + computeDriverPay(l, driver, team), 0),
+          weekLoads: week.loads.length,
+          nextBooked: state.loads.find((l) => l.id === truck?.nextLoadId),
+          offers: state.loads.filter((l) => l.truckId === truck?.id && l.stage === "offered"),
+          emptyAt: current ? `after you deliver in ${current.lane.destination}` : `in ${truck?.currentCity ?? "town"}`,
+          team,
+        });
+        const opening = openCall(base);
+        const call: DispatchCall = {
+          ...base, loadId: current?.id, status: "live", channel: driver.prefs?.reach ?? "app", ringingAt: now, answeredAt: now,
+          lines: [{ speaker: "ai", text: opening.say, at: now }], choices: opening.choices, step: opening.step,
+        };
+        return { dispatchCalls: [call, ...state.dispatchCalls].slice(0, 60) };
+      }),
+
+    takeOverDispatchCall: (callId) =>
+      set((state) => {
+        const d = draftFrom(state);
+        const call = d.dispatchCalls.find((c) => c.id === callId);
+        if (call?.status !== "live" || call.ownerTookOver) return {};
+        const now = new Date().toISOString();
+        const first = d.drivers.find((x) => x.id === call.driverId)?.name.split(" ")[0] ?? "there";
+        patchCall(d, callId, {
+          ownerTookOver: true,
+          lines: [...call.lines, { speaker: "ai", text: `${first}, ${OWNER_NAME} from the office just joined. I'll let you two talk and keep notes.`, at: now }],
+          choices: [
+            { label: "Sounds good", reply: "ack", say: "Sounds good.", match: "good|ok|okay|yes|yeah|sure|will do" },
+            { label: "Hold on a sec", reply: "hold", say: "Hold on a sec.", match: "hold|wait|second|sec" },
+          ],
+          outcome: `${OWNER_NAME} took the call over`,
+        });
+        callEvent(d, call, `${OWNER_NAME} took over an AI call with ${first}`, KIND_LABEL[call.kind]);
+        return { dispatchCalls: d.dispatchCalls, activity: [...d.events, ...state.activity].slice(0, 80) };
+      }),
+
+    ownerSayOnCall: (callId, text) =>
+      set((state) => {
+        const call = state.dispatchCalls.find((c) => c.id === callId);
+        if (call?.status !== "live" || !call.ownerTookOver || !text.trim()) return {};
+        const line = { speaker: "owner" as const, text: text.trim(), at: new Date().toISOString() };
+        return { dispatchCalls: state.dispatchCalls.map((c) => (c.id === callId ? { ...c, lines: [...c.lines, line] } : c)) };
       }),
   },
 }));

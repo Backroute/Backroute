@@ -12,7 +12,6 @@ import { DriverTripCompleteCard, type DriverTripCardProps } from "@/components/s
 import { TripCompactCard, TripDetails, TripSheet } from "@/components/shared/trip-compact";
 import { Switch } from "@/components/ui/switch";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
-import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 import { IncidentCard } from "@/components/shared/incident-card";
 import { useNow } from "@/lib/hooks";
 import { weekEarnings } from "@/lib/earnings";
@@ -45,7 +44,8 @@ export default function DriverHomePage() {
   const setSealNumber = useStore((s) => s.actions.setSealNumber);
   const uploadLoadDocument = useStore((s) => s.actions.uploadLoadDocument);
   const setAutoChain = useStore((s) => s.actions.setAutoChain);
-  const [calling, setCalling] = useState(false);
+  const startInboundCall = useStore((s) => s.actions.startInboundCall);
+  const callDispatch = () => startInboundCall(driver.id);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [driving, setDriving] = useState(false);
   const reportIncident = useStore((s) => s.actions.reportIncident);
@@ -82,7 +82,7 @@ export default function DriverHomePage() {
         truckState: truck?.currentState,
         needsPreTrip,
         upNext: nextLoad ? "chained" : hasOffers ? "choose" : "searching",
-        onCall: () => setCalling(true),
+        onCall: callDispatch,
         onConfirm: (loadId) => {
           // Completing the delivery swaps in the "load complete" card — close the sheet so it's seen.
           if (currentLoad.stage === "at_delivery") setSheetOpen(false);
@@ -175,7 +175,7 @@ export default function DriverHomePage() {
           ) : (
             <p className="text-sm text-ink-500">No active load. The AI is sourcing your next one now.</p>
           )}
-          <button onClick={() => setCalling(true)} className="flex items-center gap-1.5 rounded-full border border-line px-4 py-2 text-xs font-medium text-ink-700">
+          <button onClick={callDispatch} className="flex items-center gap-1.5 rounded-full border border-line px-4 py-2 text-xs font-medium text-ink-700">
             <Phone className="h-3.5 w-3.5" /> Call AI Dispatcher
           </button>
         </div>
@@ -265,14 +265,10 @@ export default function DriverHomePage() {
           onArrive={() => driverConfirmStage(currentLoad.id)}
           onTripStep={(step) => confirmTripStep(currentLoad.id, step)}
           onLate={() => reportIncident(driver.id, truck.id, "delay", "Reported hands-free while driving")}
-          onCall={() => {
-            setDriving(false);
-            setCalling(true);
-          }}
+          onCall={callDispatch}
         />
       )}
 
-      {calling && <VoiceCallModal spec={{ kind: "checkin", driverId: driver.id, driverFirstName: driver.name }} onClose={() => setCalling(false)} />}
     </div>
   );
 }

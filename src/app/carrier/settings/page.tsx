@@ -16,6 +16,7 @@ import { usePrimaryCarrier, useCarrierTrucks } from "@/lib/selectors";
 import { downloadCsv } from "@/lib/csv-export";
 import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { DailyTextPreview } from "@/components/shared/daily-text";
+import { DispatchLineCard } from "@/components/shared/dispatch-line-card";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Aggressiveness } from "@/lib/store";
 
@@ -92,6 +93,8 @@ export default function SettingsPage() {
                   <Field label="Fleet size" value={`${trucks.length} trucks`} />
                 </CardContent>
               </Card>
+
+              <DispatchLineCard />
 
               <Card>
                 <CardHeader>
