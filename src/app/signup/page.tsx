@@ -7,7 +7,7 @@ import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { useStore } from "@/lib/store";
-import { usePrimaryCarrier } from "@/lib/selectors";
+import { PRIMARY_DRIVER_ID, usePrimaryCarrier } from "@/lib/selectors";
 import { RUN_TYPE_DETAIL, RUN_TYPE_LABEL, RUN_TYPES } from "@/lib/run-types";
 import { cn } from "@/lib/utils";
 import type { RunType } from "@/lib/types";
@@ -45,6 +45,10 @@ export default function SignupPage() {
   const [importing, setImporting] = useState(false);
   const [floor, setFloor] = useState(96);
   const [otrHome, setOtrHome] = useState("Home in 2 weeks");
+  // Owner-operator: one truck, and the person signing up drives it. They get one app instead of a dashboard.
+  const [solo, setSolo] = useState<boolean | null>(null);
+  const primary = drivers.find((d) => d.id === PRIMARY_DRIVER_ID);
+  const shownDrivers = solo && primary ? [primary] : drivers;
 
   const mcValid = /^\d{5,8}$/.test(mc.replace(/^MC-?/i, ""));
   const stepIndex = STEPS.indexOf(step);
@@ -66,7 +70,7 @@ export default function SignupPage() {
 
   function finishRules() {
     updateSettings({ rateFloorPct: floor });
-    for (const d of drivers) if (d.runType === "otr") updateHomeTimeTarget(d.id, otrHome);
+    for (const d of shownDrivers) if (d.runType === "otr") updateHomeTimeTarget(d.id, otrHome);
     setStep("autopilot");
   }
 
@@ -117,7 +121,26 @@ export default function SignupPage() {
                     <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[var(--accent-live)]" /> {carrier.city}, {carrier.state}</li>
                   </ul>
                   <p className="mt-3 text-[11px] text-ink-400">Demo: every MC number shows the demo fleet.</p>
-                  <Button className="mt-4 w-full" onClick={() => setStep("eld")}>
+                  <p className="mt-4 text-sm font-medium text-ink-950">Who drives?</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Who drives">
+                    {[
+                      { v: true, label: "Just me", desc: "I drive my own truck" },
+                      { v: false, label: "I have drivers", desc: "Two trucks or more" },
+                    ].map((o) => (
+                      <button
+                        key={o.label}
+                        type="button"
+                        role="radio"
+                        aria-checked={solo === o.v}
+                        onClick={() => setSolo(o.v)}
+                        className={cn("rounded-2xl border px-3 py-2.5 text-left", solo === o.v ? "border-ink-950 bg-ink-950 text-white" : "border-line bg-white hover:border-ink-300")}
+                      >
+                        <span className="block text-sm font-medium">{o.label}</span>
+                        <span className={cn("block text-xs", solo === o.v ? "text-white/60" : "text-ink-500")}>{o.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <Button className="mt-4 w-full" disabled={solo === null} onClick={() => setStep("eld")}>
                     That&apos;s us <ArrowRight className="h-4 w-4" />
                   </Button>
                 </div>
@@ -151,10 +174,11 @@ export default function SignupPage() {
               {eld && !importing && (
                 <div className="mt-5">
                   <p className="flex items-center gap-2 text-sm font-medium text-ink-950">
-                    <Truck className="h-4 w-4" /> Found {trucks.length} trucks and {drivers.length} drivers. Check how each one runs:
+                    <Truck className="h-4 w-4" />{" "}
+                    {solo ? "Found your truck. Check how you run:" : `Found ${trucks.length} trucks and ${drivers.length} drivers. Check how each one runs:`}
                   </p>
                   <ul className="mt-3 flex flex-col divide-y divide-line rounded-2xl border border-line">
-                    {drivers.map((d) => (
+                    {shownDrivers.map((d) => (
                       <li key={d.id} className="flex items-center justify-between gap-3 px-4 py-3">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium text-ink-950">{d.name}</p>
@@ -199,9 +223,9 @@ export default function SignupPage() {
                   </button>
                 ))}
               </div>
-              {drivers.some((d) => d.runType === "otr") && (
+              {shownDrivers.some((d) => d.runType === "otr") && (
                 <>
-                  <p className="mt-6 text-sm font-medium text-ink-950">How long are long-haul drivers out?</p>
+                  <p className="mt-6 text-sm font-medium text-ink-950">{solo ? "How long are you out at a time?" : "How long are long-haul drivers out?"}</p>
                   <div className="mt-2 grid grid-cols-3 gap-2">
                     {OTR_HOME.map((o) => (
                       <button
@@ -230,7 +254,13 @@ export default function SignupPage() {
               <div className="mt-5">
                 <AutopilotControl />
               </div>
-              <Button className="mt-6 w-full" onClick={() => setStep("done")}>
+              <Button
+                className="mt-6 w-full"
+                onClick={() => {
+                  updateSettings({ ownerOperator: !!solo });
+                  setStep("done");
+                }}
+              >
                 Finish <ArrowRight className="h-4 w-4" />
               </Button>
             </>
@@ -242,9 +272,11 @@ export default function SignupPage() {
                 <Check className="h-6 w-6" />
               </span>
               <h1 className="mt-4 font-display text-2xl text-ink-950">You&apos;re set up</h1>
-              <p className="mt-1 text-sm text-ink-500">The AI is already looking for loads for your {trucks.length} trucks.</p>
-              <Button href="/carrier" className="mt-6 w-full">
-                Go to your dashboard <ArrowRight className="h-4 w-4" />
+              <p className="mt-1 text-sm text-ink-500">
+                {solo ? "The AI is already looking for your next load. Everything is in one app on your phone." : `The AI is already looking for loads for your ${trucks.length} trucks.`}
+              </p>
+              <Button href={solo ? "/driver" : "/carrier"} className="mt-6 w-full">
+                {solo ? "Open your app" : "Go to your dashboard"} <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
           )}

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { usePrimaryDriver, useCarrierTrucks } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
-import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 import type { IncidentType } from "@/lib/types";
 
 const TYPES: { key: IncidentType; label: string; icon: typeof Wrench; desc: string }[] = [
@@ -27,17 +26,14 @@ export default function ReportIncidentPage() {
   const [type, setType] = useState<IncidentType | null>(null);
   const [note, setNote] = useState("");
   const [sent, setSent] = useState(false);
-  const [calling, setCalling] = useState(false);
+  // "Call instead" reaches the same AI dispatch line as everywhere else, in the language the driver talks in.
+  const startInboundCall = useStore((s) => s.actions.startInboundCall);
 
   function handleSubmit() {
     if (!type || !truck) return;
     reportIncident(driver.id, truck.id, type, note.trim());
     setSent(true);
     setTimeout(() => router.push("/driver"), 1400);
-  }
-
-  function handleCallComplete() {
-    router.push("/driver");
   }
 
   if (sent) {
@@ -68,7 +64,7 @@ export default function ReportIncidentPage() {
       </div>
 
       <button
-        onClick={() => setCalling(true)}
+        onClick={() => startInboundCall(driver.id)}
         className="flex items-center justify-center gap-2 rounded-2xl border border-line py-3 text-sm font-medium text-ink-700"
       >
         <Phone className="h-4 w-4" /> Call AI Dispatcher instead
@@ -111,9 +107,6 @@ export default function ReportIncidentPage() {
         Send to AI dispatcher
       </Button>
 
-      {calling && truck && (
-        <VoiceCallModal spec={{ kind: "incident", driverId: driver.id, truckId: truck.id, onComplete: handleCallComplete }} onClose={() => setCalling(false)} />
-      )}
     </div>
   );
 }

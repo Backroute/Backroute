@@ -6,6 +6,8 @@ import { cn, formatDuration } from "@/lib/utils";
 import { useEscapeKey } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { classifyInstruction } from "@/lib/engine";
+import { LANG_INFO, pack } from "@/lib/lang";
+import { say as speak, stopSpeaking } from "@/lib/speech";
 import type { CallTranscriptLine, IncidentType } from "@/lib/types";
 
 type CheckinSpec = { kind: "checkin"; driverId: string; driverFirstName: string };
@@ -90,13 +92,32 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
   const seenMessageIds = useRef<Set<string>>(new Set());
   const startedAt = useRef(new Date().toISOString());
 
+  // The owner's own calls with the AI are in the language they talk in, not the dashboard's.
+  const ownerLang = useStore((s) => s.settings.ownerLanguage);
+  const owner = spec.kind === "fleet" || (spec.kind === "negotiation" && spec.actor === "carrier");
+  const O = pack(owner ? ownerLang : "en").owner;
+  const ownerGreeting = spec.kind === "negotiation" ? O.greetLoad(spec.origin, spec.dest, spec.brokerName) : O.greetFleet;
+  const ownerQuick = owner && ownerLang !== "en" ? (spec.kind === "fleet" ? O.quickFleet : O.quickLoad) : undefined;
+  // Fleet answers come from the chat engine, which is English in the demo.
+  const englishAnswers = spec.kind === "fleet" && ownerLang !== "en";
+
+  // Every AI line is read out in the caller's language.
+  const spokenCount = useRef(0);
+  useEffect(() => {
+    const last = transcript.at(-1);
+    if (transcript.length === spokenCount.current || last?.speaker !== "ai") return;
+    spokenCount.current = transcript.length;
+    speak(last.text, undefined, { lang: LANG_INFO[owner ? ownerLang : "en"].speech });
+  }, [transcript, owner, ownerLang]);
+  useEffect(() => () => stopSpeaking(), []);
+
   const youSpeaker: CallTranscriptLine["speaker"] = spec.kind === "negotiation" ? spec.actor : spec.kind === "fleet" ? "carrier" : "driver";
 
   // Ring, then connect and speak the opening line.
   useEffect(() => {
     const t = setTimeout(() => {
       setPhase("live");
-      setTranscript([{ speaker: "ai", text: greeting(spec) }]);
+      setTranscript([{ speaker: "ai", text: owner ? ownerGreeting : greeting(spec) }]);
     }, 1300);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -132,7 +153,9 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
     }
   }, [driverMessages, carrierMessages, spec]);
 
-  function say(spoken: string) {
+  /** `instruction` is what the engine acts on when it differs from what was shown and said: a quick ask tapped in
+   *  another language still sends the English instruction behind it. */
+  function say(spoken: string, instruction?: string) {
     const value = spoken.trim();
     if (!value || pending) return;
     setSaidSomething(true);
@@ -140,17 +163,24 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
     setText("");
     setPending(true);
 
+    const acted = instruction ?? value;
     if (spec.kind === "checkin") {
       sendDriverMessage(spec.driverId, value);
       // reply arrives via the driverMessages watcher above
     } else if (spec.kind === "fleet") {
-      sendCarrierMessage(spec.carrierId, value);
+      sendCarrierMessage(spec.carrierId, acted);
       // reply arrives via the carrierMessages watcher above
     } else if (spec.kind === "negotiation") {
-      const category = classifyInstruction(value);
-      sendNegotiationInstruction(spec.loadId, spec.actor, value);
+      const category = classifyInstruction(acted);
+      sendNegotiationInstruction(spec.loadId, spec.actor, acted);
       setTimeout(() => {
-        const reply = category === "general" ? "Got it. I'll flag that with the broker now." : NEGOTIATION_CALL_REPLY[category](spec.brokerName);
+        const reply = owner
+          ? category === "general"
+            ? O.ack.general
+            : O.ack[category](spec.brokerName)
+          : category === "general"
+            ? "Got it. I'll flag that with the broker now."
+            : NEGOTIATION_CALL_REPLY[category](spec.brokerName);
         setTranscript((prev) => [...prev, { speaker: "ai", text: reply }]);
         setPending(false);
       }, 900);
@@ -267,17 +297,20 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
             <>
               {quickLines.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
-                  {quickLines.map((q) => (
+                  {quickLines.map((q, i) => (
                     <button
                       key={q}
-                      onClick={() => say(q)}
+                      onClick={() => say(ownerQuick?.[i] ?? q, q)}
                       disabled={pending}
                       className="rounded-full border border-white/15 px-3 py-1.5 text-[11px] font-medium text-white/80 hover:bg-white/10 disabled:opacity-40"
                     >
-                      {q}
+                      {ownerQuick?.[i] ?? q}
                     </button>
                   ))}
                 </div>
+              )}
+              {englishAnswers && (
+                <p className="text-[11px] text-white/40">Fleet answers are in English in the demo. The live AI answers in your language.</p>
               )}
               <div className="flex items-center gap-2">
                 <input

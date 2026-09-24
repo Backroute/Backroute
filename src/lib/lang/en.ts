@@ -105,6 +105,7 @@ export const en: CallPack = {
   inBye: "Anytime. Drive safe.",
 
   person: "Sure. I'm getting someone from the office to call you back, usually within 10 minutes. Anything we already set up stays as is.",
+  personSupport: "Sure. I'm getting a Backroute support specialist to call you back, usually within 10 minutes. Anything we already set up stays as is.",
   sorry: "Sorry, I didn't catch that.",
   saidAgain: "Say that again?",
   saidPerson: "Can I talk to a person?",
@@ -147,6 +148,20 @@ export const en: CallPack = {
     callWhenParked: "Call me when you're parked, no rush.",
     callBack: "Let me check on that and call you back in 10 minutes.",
     thanks: "Thanks, you're doing great. Drive safe.",
+  },
+
+  owner: {
+    greetFleet: "AI Dispatcher. What do you need on your fleet?",
+    greetLoad: (o, d, b) => `Calling about the ${o} → ${d} load with ${b}. What do you need me to push on?`,
+    ack: {
+      rate: (b) => `On it. Taking that back to ${b} right now, I'll confirm the second they answer.`,
+      detention: (b) => `Got it. I'm asking ${b} to confirm detention and lumper terms on this one.`,
+      schedule: (b) => `Understood. Checking with ${b} on flexibility for the pickup window.`,
+      payment: (b) => `On it. Asking ${b} about quick pay on this load.`,
+      general: "Got it. I'll flag that with the broker now.",
+    },
+    quickFleet: ["What needs my attention?", "How's net profit looking?", "How many trucks are available?", "Any DOT inspections due?"],
+    quickLoad: ["Push for a better rate", "Ask about detention pay", "Ask about the pickup window", "Ask about quick pay terms"],
   },
 
   daily: (p) =>

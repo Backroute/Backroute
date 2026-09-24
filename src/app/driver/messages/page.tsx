@@ -6,14 +6,13 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
 import { usePrimaryDriver } from "@/lib/selectors";
 import { TimeAgo } from "@/components/shared/time-ago";
-import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 
 export default function DriverMessagesPage() {
   const driver = usePrimaryDriver();
   const messages = useStore((s) => s.driverMessages).filter((m) => m.driverId === driver.id);
   const sendMessage = useStore((s) => s.actions.sendDriverMessage);
   const [value, setValue] = useState("");
-  const [calling, setCalling] = useState(false);
+  const startInboundCall = useStore((s) => s.actions.startInboundCall);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,7 +33,7 @@ export default function DriverMessagesPage() {
           <p className="text-xs text-ink-500">Available 24/7 · responds in seconds</p>
         </div>
         <button
-          onClick={() => setCalling(true)}
+          onClick={() => startInboundCall(driver.id)}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink-100 text-ink-700"
           aria-label="Call AI Dispatcher"
         >
@@ -72,8 +71,6 @@ export default function DriverMessagesPage() {
           <Send className="h-4 w-4" />
         </button>
       </div>
-
-      {calling && <VoiceCallModal spec={{ kind: "checkin", driverId: driver.id, driverFirstName: driver.name }} onClose={() => setCalling(false)} />}
     </div>
   );
 }

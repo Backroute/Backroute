@@ -95,6 +95,8 @@ export interface CallPack {
 
   // Always
   person: string;
+  /** "Get me a person" for an owner-operator: no office, so Backroute Support calls back. */
+  personSupport: string;
   sorry: string;
   saidAgain: string;
   saidPerson: string;
@@ -128,6 +130,16 @@ export interface CallPack {
 
   /** What the owner can say on a call they took over, said to the driver in the driver's language. */
   quick: Record<QuickPhrase, string>;
+
+  /** The owner calling the AI: about the fleet, or about one load's negotiation. The quick asks line up with the
+   *  English instructions the engine acts on, so a tapped ask works in any language. */
+  owner: {
+    greetFleet: string;
+    greetLoad(origin: string, dest: string, broker: string): string;
+    ack: { rate(broker: string): string; detention(broker: string): string; schedule(broker: string): string; payment(broker: string): string; general: string };
+    quickFleet: [string, string, string, string];
+    quickLoad: [string, string, string, string];
+  };
 
   /** The owner's end-of-day text. */
   daily(p: { carrier: string; weekday: number; delivered: number; profit: string; rolling: number; asks: number; firstAsk?: string }): string;

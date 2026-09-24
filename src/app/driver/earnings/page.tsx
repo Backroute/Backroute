@@ -5,6 +5,8 @@ import { ArrowUpRight, Clock, Gauge, Sparkles, Timer, TrendingUp } from "lucide-
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads } from "@/lib/selectors";
 import { computeDriverPay, payLabel } from "@/lib/settlements";
 import { weekEarnings } from "@/lib/earnings";
+import { useStore } from "@/lib/store";
+import { OwnerMoney } from "@/components/shared/owner-operator";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 
 const INDUSTRY_EMPTY_PCT = 20;
@@ -14,9 +16,11 @@ export default function DriverEarningsPage() {
   const trucks = useCarrierTrucks();
   const loads = useCarrierLoads();
   const truck = trucks.find((t) => t.id === driver.truckId);
+  const solo = useStore((s) => s.settings.ownerOperator);
   const team = !!truck?.secondDriverId;
   const week = weekEarnings(loads.filter((l) => l.truckId === truck?.id));
-  const payFor = (l: (typeof week.loads)[number]) => computeDriverPay(l, driver, team);
+  // An owner-operator keeps the truck's profit on each load; a company driver gets their pay.
+  const payFor = (l: (typeof week.loads)[number]) => (solo ? (l.netProfit ?? 0) : computeDriverPay(l, driver, team));
   const pay = week.loads.reduce((s, l) => s + payFor(l), 0);
   const payByDay = week.byDay.map((d) => ({ ...d, pay: 0 }));
   for (const l of week.loads) payByDay[(new Date(l.createdAt).getDay() + 6) % 7].pay += payFor(l);
@@ -31,34 +35,39 @@ export default function DriverEarningsPage() {
         <p className="mt-1 text-sm text-ink-500">This week, from every load the AI booked for you.</p>
       </div>
 
-      <section className="rounded-3xl bg-ink-950 p-5 text-white">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Your pay this week</p>
-        <p className="mt-1 text-4xl font-semibold tabular tracking-tight">{formatCurrency(pay)}</p>
-        <p className="mt-1 text-xs text-white/55">
-          {payLabel(driver)}
-          {team ? " · split with your team partner" : ""}
-        </p>
-        {week.overMarket > 0 && (
-          <p className="mt-3 flex items-center gap-1.5 rounded-2xl bg-emerald-400/15 px-3 py-2 text-xs font-medium text-emerald-200">
-            <TrendingUp className="h-3.5 w-3.5 shrink-0" /> AI booked your loads {formatCurrency(week.overMarket)} above market rate
+      {/* An owner-operator sees the truck's profit and their invoices; a company driver sees their pay. */}
+      {solo ? (
+        <OwnerMoney truck={truck} />
+      ) : (
+        <section className="rounded-3xl bg-ink-950 p-5 text-white">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Your pay this week</p>
+          <p className="mt-1 text-4xl font-semibold tabular tracking-tight">{formatCurrency(pay)}</p>
+          <p className="mt-1 text-xs text-white/55">
+            {payLabel(driver)}
+            {team ? " · split with your team partner" : ""}
           </p>
-        )}
+          {week.overMarket > 0 && (
+            <p className="mt-3 flex items-center gap-1.5 rounded-2xl bg-emerald-400/15 px-3 py-2 text-xs font-medium text-emerald-200">
+              <TrendingUp className="h-3.5 w-3.5 shrink-0" /> AI booked your loads {formatCurrency(week.overMarket)} above market rate
+            </p>
+          )}
 
-        <div className="mt-5 flex h-28 gap-2" role="img" aria-label="Pay by day this week">
-          {payByDay.map((d, i) => (
-            <div key={d.day} className="flex flex-1 flex-col items-center gap-1.5">
-              <div className="flex w-full flex-1 items-end">
-                <div
-                  className={cn("w-full rounded-t-md transition-[height] duration-700", i === today ? "bg-white" : "bg-white/25")}
-                  style={{ height: `${Math.max(4, (d.pay / maxDay) * 100)}%` }}
-                  title={formatCurrency(d.pay)}
-                />
+          <div className="mt-5 flex h-28 gap-2" role="img" aria-label="Pay by day this week">
+            {payByDay.map((d, i) => (
+              <div key={d.day} className="flex flex-1 flex-col items-center gap-1.5">
+                <div className="flex w-full flex-1 items-end">
+                  <div
+                    className={cn("w-full rounded-t-md transition-[height] duration-700", i === today ? "bg-white" : "bg-white/25")}
+                    style={{ height: `${Math.max(4, (d.pay / maxDay) * 100)}%` }}
+                    title={formatCurrency(d.pay)}
+                  />
+                </div>
+                <span className={cn("text-[10px]", i === today ? "font-semibold text-white" : "text-white/45")}>{d.day}</span>
               </div>
-              <span className={cn("text-[10px]", i === today ? "font-semibold text-white" : "text-white/45")}>{d.day}</span>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="grid grid-cols-3 gap-3">
         <Stat label="Loads" value={week.loads.length} />

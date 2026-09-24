@@ -107,6 +107,7 @@ export const fr: CallPack = {
   inBye: "Quand tu veux. Bonne route.",
 
   person: "Bien sûr. Je demande à quelqu'un du bureau de te rappeler, d'habitude en moins de 10 minutes. Ce qu'on a réglé reste pareil.",
+  personSupport: "Bien sûr. Je demande à un spécialiste du soutien Backroute de te rappeler, d'habitude en moins de 10 minutes. Ce qu'on a réglé reste pareil.",
   sorry: "Désolé, j'ai pas compris.",
   saidAgain: "Peux-tu répéter?",
   saidPerson: "Je peux parler à quelqu'un?",
@@ -149,6 +150,20 @@ export const fr: CallPack = {
     callWhenParked: "Appelle-moi quand t'es stationné, pas de presse.",
     callBack: "Je vérifie ça et je te rappelle dans 10 minutes.",
     thanks: "Merci, tu fais du bon travail. Bonne route.",
+  },
+
+  owner: {
+    greetFleet: "Répartiteur IA. De quoi as-tu besoin pour ta flotte?",
+    greetLoad: (o, d, b) => `J'appelle pour le voyage ${o} → ${d} avec ${b}. Sur quoi je pousse?`,
+    ack: {
+      rate: (b) => `Je m'en occupe. Je retourne voir ${b} tout de suite et je confirme dès qu'ils répondent.`,
+      detention: (b) => `Compris. Je demande à ${b} de confirmer les conditions de temps d'attente et de lumper.`,
+      schedule: (b) => `Compris. Je vérifie avec ${b} s'il y a de la flexibilité sur la plage de ramassage.`,
+      payment: (b) => `Je m'en occupe. Je demande à ${b} pour le paiement rapide sur ce voyage.`,
+      general: "Compris. Je le signale au courtier tout de suite.",
+    },
+    quickFleet: ["Qu'est-ce qui a besoin de moi?", "Comment va le profit net?", "Combien de camions sont libres?", "Des inspections DOT à venir?"],
+    quickLoad: ["Pousse pour un meilleur tarif", "Demande pour le temps d'attente", "Demande pour la plage de ramassage", "Demande pour le paiement rapide"],
   },
 
   daily: (p) =>

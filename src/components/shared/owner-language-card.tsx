@@ -33,7 +33,7 @@ export function OwnerLanguageCard() {
       <CardContent className="!pt-3 flex flex-col gap-4">
         <div>
           <p className="text-xs font-medium text-ink-800">Texts and calls to you</p>
-          <p className="text-[11px] text-ink-500">Your end-of-day text, and anything else the AI sends you directly.</p>
+          <p className="text-[11px] text-ink-500">Your end-of-day text, and your own calls with the AI about the fleet or a load.</p>
           <div className="mt-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Texts and calls to you">
             {LANGS.map((l) => (
               <button key={l.code} type="button" role="radio" aria-checked={lang === l.code} lang={l.code} onClick={() => updateSettings({ ownerLanguage: l.code })} className={pill(lang === l.code)}>

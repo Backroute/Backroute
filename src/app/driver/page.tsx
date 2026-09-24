@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUpRight, ClipboardCheck, Link2, MapPin, Navigation, Pho
 import { DrivingMode } from "@/components/shared/driving-mode";
 import { CallStatusLine } from "@/components/shared/call-settings";
 import { useDriverUi } from "@/lib/lang/use-driver-ui";
+import { OwnerNeedsYou, useOwnerProfit } from "@/components/shared/owner-operator";
 import { HomeTimeCard, useHomeTime } from "@/components/shared/home-time";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
@@ -26,7 +27,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 
 export default function DriverHomePage() {
   const driver = usePrimaryDriver();
-  const { t } = useDriverUi();
+  const { t, solo } = useDriverUi();
   const trucks = useCarrierTrucks();
   const loads = useCarrierLoads();
   const brokers = useBrokerMap();
@@ -98,6 +99,7 @@ export default function DriverHomePage() {
     : null;
 
   const homeTime = useHomeTime(driver, truck, currentLoad);
+  const ownerWeek = useOwnerProfit(truck);
   const weekPay = weekEarnings(loads.filter((l) => l.truckId === truck?.id)).loads.reduce((s, l) => s + computeDriverPay(l, driver, !!truck?.secondDriverId), 0);
   // The one thing every driver wants to know besides pay: when they're home.
   const homeWhen =
@@ -136,8 +138,9 @@ export default function DriverHomePage() {
         </p>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <Link href="/driver/earnings" className="rounded-2xl border border-line px-4 py-3">
-            <p className="font-display text-2xl tabular text-ink-950">{formatCurrency(weekPay)}</p>
-            <p className="text-xs text-ink-500">{t.payWeek}</p>
+            {/* An owner-operator keeps what the truck makes, so the number that matters is profit, not driver pay. */}
+            <p className="font-display text-2xl tabular text-ink-950">{formatCurrency(solo ? ownerWeek.net : weekPay)}</p>
+            <p className="text-xs text-ink-500">{solo ? t.profitWeek : t.payWeek}</p>
           </Link>
           <div className="rounded-2xl border border-line px-4 py-3">
             <p className="font-display text-2xl text-ink-950">{homeWhen}</p>
@@ -145,6 +148,8 @@ export default function DriverHomePage() {
           </div>
         </div>
       </div>
+
+      {solo && <OwnerNeedsYou driver={driver} truck={truck} />}
 
       {incidents.map((incident) => (
         <IncidentCard key={incident.id} incident={incident} viewer="driver" />

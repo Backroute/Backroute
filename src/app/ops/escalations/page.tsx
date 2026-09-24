@@ -9,14 +9,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { useStore } from "@/lib/store";
+import { useNow } from "@/lib/hooks";
 import { usePrimaryCarrier } from "@/lib/selectors";
 import { downloadCsv } from "@/lib/csv-export";
 import type { Escalation } from "@/lib/types";
 
 /** Hours an escalation has sat open, for the urgency badge — a plain "3d ago" reads as a log entry,
  *  not an SLA signal, so this makes the wait time itself the thing you look at. */
-function ageBadge(createdAt: string) {
-  const hours = (Date.now() - new Date(createdAt).getTime()) / 3_600_000;
+function ageBadge(createdAt: string, now: number | null) {
+  // No clock during server render, so the server and the browser's first render agree; the age fills in right after.
+  if (now === null) return { label: "open", tone: "neutral" } as const;
+  const hours = (now - new Date(createdAt).getTime()) / 3_600_000;
   const label = hours < 1 ? "<1h open" : hours < 24 ? `${Math.floor(hours)}h open` : `${Math.floor(hours / 24)}d open`;
   const tone = hours >= 24 ? "danger" : hours >= 8 ? "warning" : "neutral";
   return { label, tone } as const;
@@ -65,6 +68,7 @@ function EscalationActions({ onResolve }: { onResolve: (approve: boolean, note?:
 }
 
 export default function EscalationsPage() {
+  const now = useNow();
   const escalations = useStore((s) => s.escalations);
   const resolve = useStore((s) => s.actions.resolveEscalation);
   const carrier = usePrimaryCarrier();
@@ -96,7 +100,7 @@ export default function EscalationsPage() {
                           <Badge tone={e.complexity === "critical" ? "danger" : "neutral"}>
                             {e.complexity === "critical" ? "Needs judgment call" : "AI has a recommendation"}
                           </Badge>
-                          <Badge tone={ageBadge(e.createdAt).tone}>{ageBadge(e.createdAt).label}</Badge>
+                          <Badge tone={ageBadge(e.createdAt, now).tone}>{ageBadge(e.createdAt, now).label}</Badge>
                         </div>
                         <p className="mt-1 text-sm text-ink-900">{e.reason}</p>
                         {e.complexity === "routine" && e.recommendedLabel && (
@@ -136,7 +140,7 @@ export default function EscalationsPage() {
                       </span>
                       <div>
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <Badge tone={ageBadge(e.createdAt).tone}>{ageBadge(e.createdAt).label}</Badge>
+                          <Badge tone={ageBadge(e.createdAt, now).tone}>{ageBadge(e.createdAt, now).label}</Badge>
                         </div>
                         <p className="mt-1 text-sm text-ink-900">{e.reason}</p>
                         <p className="mt-1 text-xs text-ink-400">

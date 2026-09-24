@@ -248,11 +248,13 @@ interface CallDraft {
   events: ActivityEvent[];
   /** The language the owner reads calls in on the dashboard. */
   readLang: Lang;
+  /** Owner-operator: there's no office to call back, so a driver asking for a person gets Backroute Support. */
+  solo: boolean;
 }
 
 function draftFrom(state: StoreState): CallDraft {
   const { brokers, incidents, loads, trucks, drivers, escalations, driverMessages, dispatchCalls } = state;
-  return { brokers, incidents, loads, trucks, drivers, escalations, driverMessages, dispatchCalls, events: [], readLang: readLangOf(state.settings) };
+  return { brokers, incidents, loads, trucks, drivers, escalations, driverMessages, dispatchCalls, events: [], readLang: readLangOf(state.settings), solo: state.settings.ownerOperator };
 }
 
 function callDraftResult(d: CallDraft) {
@@ -280,8 +282,9 @@ function textInstead(d: CallDraft, call: DispatchCall) {
 }
 
 function ringCall(d: CallDraft, call: DispatchCall) {
-  const reach = d.drivers.find((x) => x.id === call.driverId)?.prefs?.reach ?? "app";
-  patchCall(d, call.id, { status: "ringing", ringingAt: new Date().toISOString(), channel: reach });
+  const driver = d.drivers.find((x) => x.id === call.driverId);
+  // A call that waited (sleeper, quiet hours) rings in the language the driver talks in now, not when it was queued.
+  patchCall(d, call.id, { status: "ringing", ringingAt: new Date().toISOString(), channel: driver?.prefs?.reach ?? "app", lang: driverLang(driver) });
 }
 
 /** The language the owner reads driver calls in on the dashboard. */
@@ -349,7 +352,9 @@ function replyToCall(d: CallDraft, callId: string, reply: string, heard?: string
     return;
   }
 
-  const turn = translated(readers, respond(call, reply), (l) => respond(call, reply, l));
+  let turn = translated(readers, respond(call, reply), (l) => respond(call, reply, l));
+  const toSupport = d.solo && call.driverId === PRIMARY_DRIVER_ID && !!turn.report?.person;
+  if (toSupport && reply === "person") turn = { ...turn, say: L.personSupport, tr: trFor(readers, (l) => pack(l).personSupport) };
   patchCall(d, callId, {
     lines: [...call.lines, { speaker: "driver", text: said, at: now, tr: saidTr }, { speaker: "ai", text: turn.say, at: now, tr: turn.tr }],
     choices: turn.choices,
@@ -369,8 +374,10 @@ function replyToCall(d: CallDraft, callId: string, reply: string, heard?: string
   if (turn.report?.person) {
     const esc: Escalation = {
       id: uid("esc"), loadId: call.loadId ?? "", carrierId: call.carrierId,
-      reason: `${turn.report.person} on an AI call (${KIND_LABEL[call.kind].toLowerCase()}). Call them back at ${driver?.phone ?? "their number"}.`,
-      createdAt: now, status: "open", complexity: "routine",
+      reason: toSupport
+        ? `${turn.report.person} on an AI call (${KIND_LABEL[call.kind].toLowerCase()}). Backroute Support is calling back.`
+        : `${turn.report.person} on an AI call (${KIND_LABEL[call.kind].toLowerCase()}). Call them back at ${driver?.phone ?? "their number"}.`,
+      createdAt: now, status: toSupport ? "with_support" : "open", complexity: "routine",
       recommendedAction: "approve", recommendedLabel: `Called ${first} back`,
     };
     d.escalations = [esc, ...d.escalations];
@@ -567,6 +574,8 @@ export interface AgentSettings {
   ownerLanguage: Lang;
   /** Driver call transcripts on the dashboard: in the dashboard's language (English), or in the owner's own. */
   transcriptsIn: "dashboard" | "mine";
+  /** One truck, and the owner drives it: the driver app becomes the whole business — loads, money, approvals. */
+  ownerOperator: boolean;
   rateFloorPct: number;
   avoidWatchBrokers: boolean;
   offersPerTruck: number;
@@ -923,6 +932,7 @@ export const useStore = create<StoreState>((set, get) => ({
     dailyText: true,
     ownerLanguage: "en",
     transcriptsIn: "dashboard",
+    ownerOperator: false,
     rateFloorPct: 96,
     avoidWatchBrokers: false,
     offersPerTruck: 3,
