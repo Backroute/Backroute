@@ -48,7 +48,7 @@ export default function Home() {
           </nav>
           <div className="flex items-center gap-2">
             <Button href="/carrier" variant="ghost" size="sm">Log in</Button>
-            <Button href="/carrier" variant="primary" size="sm">Get started</Button>
+            <Button href="/signup" variant="primary" size="sm">Get started</Button>
           </div>
         </div>
       </header>
@@ -66,7 +66,7 @@ export default function Home() {
               Sources loads, negotiates rate, and books the next one automatically. A full-time dispatcher, without the headcount.
             </p>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-              <Button href="/carrier" size="lg" variant="secondary" className="!bg-white !text-ink-950 hover:!bg-white/90">
+              <Button href="/signup" size="lg" variant="secondary" className="!bg-white !text-ink-950 hover:!bg-white/90">
                 Get started <ArrowUpRight className="h-4 w-4" />
               </Button>
               <Button href="/driver" size="lg" variant="outline" className="!border-white/25 !text-white hover:!border-white">
@@ -193,7 +193,7 @@ export default function Home() {
         <div className="relative mx-auto flex max-w-6xl flex-col items-center px-6 py-24 text-center sm:py-32">
           <h2 className="font-display text-4xl tracking-tighter text-white sm:text-5xl">Stop dispatching by hand.</h2>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <Button href="/carrier" size="lg" variant="secondary" className="!bg-white !text-ink-950 hover:!bg-white/90">
+            <Button href="/signup" size="lg" variant="secondary" className="!bg-white !text-ink-950 hover:!bg-white/90">
               Get started <ArrowUpRight className="h-4 w-4" />
             </Button>
             <Button href="/driver" size="lg" variant="outline" className="!border-white/25 !text-white hover:!border-white">

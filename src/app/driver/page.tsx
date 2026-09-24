@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowDown, ArrowUpRight, ClipboardCheck, Link2, MapPin, Phone } from "lucide-react";
+import { ArrowDown, ArrowUpRight, ClipboardCheck, Link2, MapPin, Navigation, Phone } from "lucide-react";
+import { DrivingMode } from "@/components/shared/driving-mode";
 import { HomeTimeCard, useHomeTime } from "@/components/shared/home-time";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
@@ -45,6 +46,8 @@ export default function DriverHomePage() {
   const setAutoChain = useStore((s) => s.actions.setAutoChain);
   const [calling, setCalling] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [driving, setDriving] = useState(false);
+  const reportIncident = useStore((s) => s.actions.reportIncident);
 
   const truck = trucks.find((t) => t.id === driver.truckId);
   const { current: currentLoad, next: nextLoad } = truckActiveLoads(loads, truck);
@@ -108,7 +111,18 @@ export default function DriverHomePage() {
   return (
     <div className="flex flex-col gap-5 px-5">
       <div>
-        <h1 className="font-display text-2xl text-ink-950">Hi {driver.name.split(" ")[0]}</h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="font-display text-2xl text-ink-950">Hi {driver.name.split(" ")[0]}</h1>
+          {currentLoad && !completedLoad && (
+            <button
+              type="button"
+              onClick={() => setDriving(true)}
+              className="flex items-center gap-1.5 rounded-full bg-ink-950 px-3.5 py-2 text-xs font-semibold text-white"
+            >
+              <Navigation className="h-3.5 w-3.5" /> Driving mode
+            </button>
+          )}
+        </div>
         <p className="mt-1 flex items-center gap-2 text-sm text-ink-500">
           <span className={cn("h-2 w-2 shrink-0 rounded-full", todoCount ? "bg-[var(--accent-warn)]" : "bg-[var(--accent-live)]")} />
           {completedLoad
@@ -238,6 +252,21 @@ export default function DriverHomePage() {
             Pre-trip {dvirDoneToday ? "✓" : "due"} · Post-trip {postTripDoneToday ? "✓" : "end of day"} <ArrowUpRight className="h-3.5 w-3.5" />
           </span>
         </Link>
+      )}
+
+      {driving && currentLoad && truck && (
+        <DrivingMode
+          load={currentLoad}
+          needsPreTrip={needsPreTrip}
+          onClose={() => setDriving(false)}
+          onArrive={() => driverConfirmStage(currentLoad.id)}
+          onTripStep={(step) => confirmTripStep(currentLoad.id, step)}
+          onLate={() => reportIncident(driver.id, truck.id, "delay", "Reported hands-free while driving")}
+          onCall={() => {
+            setDriving(false);
+            setCalling(true);
+          }}
+        />
       )}
 
       {calling && <VoiceCallModal spec={{ kind: "checkin", driverId: driver.id, driverFirstName: driver.name }} onClose={() => setCalling(false)} />}
