@@ -64,7 +64,7 @@ export function homeTimeStatus(driver: Driver, fromCity: string, fromState: stri
   const hoursHome = hoursToHome(fromCity, fromState, driver.homeBase);
   const base = { runType: driver.runType, homeCity, hoursHome };
 
-  if (driver.runType === "local") {
+  if (driver.runType === "local" || driver.runType === "intown") {
     const left = driver.hoursRemaining;
     const target = "Home every night";
     if (hoursHome === null) return { ...base, state: "no_target", hoursLeftToday: left, target };

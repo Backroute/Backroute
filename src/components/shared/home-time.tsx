@@ -21,7 +21,7 @@ export function useHomeTime(driver: Driver | undefined, truck: Truck | undefined
 
 function title(status: HomeTimeStatus): string {
   const t = status.target ?? "Home time";
-  if (status.runType === "local") {
+  if (status.runType === "local" || status.runType === "intown") {
     return { home: "Home tonight: this load ends near home", on_track: "Home tonight: on track", head_home: "Home tonight: last load of the day", late: "Home tonight: at risk", no_target: "Home tonight" }[status.state];
   }
   return { home: "You'll empty out near home", on_track: `${t}: on track`, head_home: `${t}: time to head home`, late: `${t}: at risk`, no_target: "Home time" }[status.state];
@@ -36,14 +36,14 @@ export function homeTimeLine(status: HomeTimeStatus, viewer: "driver" | "carrier
         : `about ${formatHours(status.hoursHome)} of driving from ${status.homeCity}`;
   const you = viewer === "driver" ? "you're" : "they're";
   const yours = viewer === "driver" ? "you have" : "they have";
-  if (status.runType === "local") {
+  if (status.runType === "local" || status.runType === "intown") {
     const left = status.hoursLeftToday !== undefined ? `${formatHours(status.hoursLeftToday)} of driving left today` : "";
     switch (status.state) {
       case "home":
       case "on_track":
-        return `After this load ${you} ${away}, and ${yours} ${left}. Room for another local run.`;
+        return `After this load ${you} ${away}, and ${yours} ${left}. Room for another ${status.runType === "intown" ? "move" : "local run"}.`;
       case "head_home":
-        return `After this load ${you} ${away} with ${left}. The AI only books a run that ends near home.`;
+        return `After this load ${you} ${away} with ${left}. The AI only books a ${status.runType === "intown" ? "move" : "run"} that ends near home.`;
       case "late":
         return `Not enough hours left today to get home: ${away}, ${left}.${viewer === "driver" ? " Your carrier can see this." : ""}`;
       case "no_target":

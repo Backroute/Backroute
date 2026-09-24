@@ -11,10 +11,15 @@ const CITY_COORDS: Record<string, LatLng> = {
   "Columbus, OH": [39.9612, -82.9988],
   "Dallas, TX": [32.7767, -96.797],
   "Fort Worth, TX": [32.7555, -97.3308],
+  "Garland, TX": [32.9126, -96.6389],
+  "Grand Prairie, TX": [32.7459, -96.9978],
+  "Haslet, TX": [32.9746, -97.3478],
+  "Coppell, TX": [32.9546, -97.015],
   "Denver, CO": [39.7392, -104.9903],
   "Houston, TX": [29.7604, -95.3698],
   "Indianapolis, IN": [39.7684, -86.1581],
   "Kansas City, MO": [39.0997, -94.5786],
+  "Lancaster, TX": [32.5921, -96.7561],
   "Los Angeles, CA": [34.0522, -118.2437],
   "Memphis, TN": [35.1495, -90.049],
   "Nashville, TN": [36.1627, -86.7816],
@@ -29,6 +34,7 @@ const CITY_COORDS: Record<string, LatLng> = {
   "Seattle, WA": [47.6062, -122.3321],
   "Tyler, TX": [32.3513, -95.3011],
   "Waco, TX": [31.5493, -97.1467],
+  "Wilmer, TX": [32.5893, -96.6853],
 };
 
 export function cityCoords(city: string, state: string): LatLng | undefined {
@@ -116,6 +122,7 @@ export function pickupLegStart(load: Load, truckCity: string | undefined, truckS
 
 /** Delivery timing a broker would post for a run this long: short hauls deliver the same day, a day's drive the next. */
 export function transitWindow(miles: number): string {
+  if (miles <= 60) return "Same day, by appointment";
   if (miles <= 300) return "Same day";
   if (miles <= 600) return "Next day";
   return `${Math.ceil(miles / 500)} day transit`;

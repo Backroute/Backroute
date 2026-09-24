@@ -29,13 +29,21 @@ const chance = (p: number) => Math.random() < p;
 
 function costsForLane(miles: number, deadheadMiles: number) {
   const fuelCost = Math.round(((miles + deadheadMiles) / 6.4) * 3.89);
-  const tollCost = randInt(0, 145);
+  // Tolls scale with the run: a cross-country load can hit $100+, an in-town move a few dollars at most.
+  const tollCost = miles < 60 ? randInt(0, 12) : randInt(0, 145);
   return { fuelCost, tollCost };
 }
 
 function pickBroker(brokers: Broker[], excludeTiers: Broker["tier"][] = []): Broker {
   const pool = excludeTiers.length ? brokers.filter((b) => !excludeTiers.includes(b.tier)) : brokers;
   return pick(pool.length ? pool : brokers);
+}
+
+/** In-town moves run on terminal and dock appointments, an hour wide. */
+function appointmentWindow(): string {
+  const h = randInt(7, 16);
+  const hour = (x: number) => `${x > 12 ? x - 12 : x}:00 ${x >= 12 ? "PM" : "AM"}`;
+  return `today, appointment ${hour(h)}–${hour(h + 1)}`;
 }
 
 /** Where a truck will be empty and ready for its next pickup. */
@@ -82,7 +90,8 @@ export function createSourcedLoad(
   surcharges: Record<string, number> = {},
 ): Load {
   const broker = pickBroker(brokers, excludeTiers);
-  const lane = placement?.lane ?? pick(LANES);
+  // Loads the AI works without a truck in mind are over-the-road freight; in-town moves are sourced per truck.
+  const lane = placement?.lane ?? pick(LANES.filter((l) => !l.moveKind));
   const marketRate = lane.miles * lane.marketRpm;
   const listedRate = Math.round(marketRate * (0.86 + Math.random() * 0.1));
   const surchargePct = surcharges[broker.id];
@@ -111,7 +120,7 @@ export function createSourcedLoad(
     lane,
     equipmentType: equipmentType ?? pick(EQUIPMENT),
     weight: randInt(22000, 44500),
-    pickupWindow: `${pick(["today", "tomorrow"])}, ${randInt(6, 14)}:00–${randInt(15, 19)}:00`,
+    pickupWindow: lane.moveKind ? appointmentWindow() : `${pick(["today", "tomorrow"])}, ${randInt(6, 14)}:00–${randInt(15, 19)}:00`,
     deliveryWindow: transitWindow(lane.miles),
     listedRate,
     targetRate,

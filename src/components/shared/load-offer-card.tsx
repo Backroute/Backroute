@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Home, MessageCircle, Repeat, Send, Sparkles, Truck as TruckIcon, X, Zap } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { formatHours } from "@/lib/home";
+import { MOVE_LABEL } from "@/lib/run-types";
 import { loadHighlight } from "@/lib/scoring";
 import type { OfferAskDraft } from "@/lib/engine";
 import type { Broker, Driver, Load, Truck } from "@/lib/types";
@@ -128,12 +129,12 @@ export function LoadOfferCard({
                 <Home className="h-3 w-3" /> Heads toward home
               </Badge>
             )}
-            {load.homeTonight && (
+            {load.homeTonight && !load.lane.moveKind && (
               <Badge tone={dark ? "dark" : "success"} className={dark ? "!bg-white/15 !text-white gap-1" : "gap-1"}>
                 <Home className="h-3 w-3" /> Home tonight
               </Badge>
             )}
-            {load.lane.miles <= 250 && (
+            {load.lane.miles <= 250 && !load.lane.moveKind && (
               <Badge tone={dark ? "dark" : "neutral"} className={dark ? "!bg-white/15 !text-white" : ""}>
                 Short haul
               </Badge>
@@ -147,13 +148,17 @@ export function LoadOfferCard({
       </p>
 
       <div className="grid grid-cols-2 gap-2">
-        <Stat label="Total offer" value={formatCurrency(load.targetRate)} dark={dark} pulse={askState === "pending"} />
+        <Stat label={load.lane.moveKind ? "Flat per move" : "Total offer"} value={formatCurrency(load.targetRate)} dark={dark} pulse={askState === "pending"} />
         <Stat label="Est. net" value={formatCurrency(load.netProfit ?? 0)} dark={dark} pulse={askState === "pending"} emphasize />
-        <Stat label="Rate / mi" value={`$${(load.rpm ?? 0).toFixed(2)}`} dark={dark} pulse={askState === "pending"} />
+        {load.lane.moveKind ? (
+          <Stat label="Move" value={MOVE_LABEL[load.lane.moveKind]} dark={dark} />
+        ) : (
+          <Stat label="Per mile" value={`$${(load.rpm ?? 0).toFixed(2)}`} dark={dark} pulse={askState === "pending"} />
+        )}
         <Stat label="Pickup" value={load.pickupWindow.split(",")[0]} dark={dark} />
       </div>
 
-      {(load.hoursHomeAfter !== undefined || load.reloadMarket) && (
+      {!load.lane.moveKind && (load.hoursHomeAfter !== undefined || load.reloadMarket) && (
         <div className={cn("flex flex-col gap-1 rounded-xl px-2.5 py-2 text-xs", dark ? "bg-white/10 text-white/80" : "bg-ink-50 text-ink-600")}>
           {load.hoursHomeAfter !== undefined && (
             <p className="flex items-center gap-1.5">

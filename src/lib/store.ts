@@ -149,6 +149,14 @@ function homeOptions(driver: Driver | undefined, from: { city: string; state: st
   return { homeBase: driver.homeBase, runType: driver.runType, headHome: !!driver.homePriority || status === "head_home" || status === "late" };
 }
 
+/** How a driver is usually paid for each kind of run: local by the hour, in town by the move, over the road by the
+ *  mile or a share of the load. Keeps their rate when the kind of pay doesn't change. */
+function payFor(runType: RunType, d: Driver): Pick<Driver, "payType" | "payRate"> {
+  const want: Driver["payType"] | null = runType === "local" ? "hourly" : runType === "intown" ? "per_move" : null;
+  if (want) return d.payType === want ? { payType: d.payType, payRate: d.payRate } : { payType: want, payRate: want === "hourly" ? 28 : 75 };
+  return d.payType === "hourly" || d.payType === "per_move" ? { payType: "per_mile", payRate: 0.62 } : { payType: d.payType, payRate: d.payRate };
+}
+
 /** Lanes this truck's driver actually runs, for the AI's own chaining. */
 function fitsDriver(driver: Driver | undefined): ((lane: Lane) => boolean) | undefined {
   return driver ? (lane) => laneFits(lane, driver.runType, driver.homeBase) : undefined;
@@ -1467,8 +1475,7 @@ export const useStore = create<StoreState>((set, get) => ({
                   runType,
                   homeTimeTarget: target,
                   homeDueAt: weeks ? new Date(Date.now() + Number(weeks) * 7 * 24 * 60 * 60 * 1000).toISOString() : d.homeDueAt,
-                  payType: runType === "local" ? "hourly" : d.payType === "hourly" ? "per_mile" : d.payType,
-                  payRate: runType === "local" && d.payType !== "hourly" ? 28 : runType !== "local" && d.payType === "hourly" ? 0.62 : d.payRate,
+                  ...payFor(runType, d),
                 }
               : d,
           ),

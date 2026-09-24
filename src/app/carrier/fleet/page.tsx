@@ -11,8 +11,9 @@ import { LoadStagePill } from "@/components/shared/load-stage";
 import { DriverCheckInCard, useDriverRetention } from "@/components/shared/driver-retention";
 import { emptiesAt, homeTimeLine, homeTimeTitle } from "@/components/shared/home-time";
 import { homeTimeStatus } from "@/lib/home";
-import { RUN_TYPE_DETAIL, RUN_TYPE_LABEL } from "@/lib/run-types";
+import { RUN_TYPE_DETAIL, RUN_TYPE_LABEL, RUN_TYPES } from "@/lib/run-types";
 import { useStore } from "@/lib/store";
+import { payLabel } from "@/lib/settlements";
 import type { RunType } from "@/lib/types";
 import { useCarrierTrucks, useDriverMap, useCarrierLoads, truckActiveLoads } from "@/lib/selectors";
 import { useNow } from "@/lib/hooks";
@@ -70,6 +71,8 @@ export default function FleetPage() {
           const pendingOffers = loads.filter((l) => l.truckId === truck.id && l.stage === "offered");
           const hosPct = driver ? Math.min(100, (driver.hoursRemaining / 11) * 100) : 0;
           const at = emptiesAt(truck, currentLoad);
+          const today = new Date().toDateString();
+          const movesToday = loads.filter((l) => l.truckId === truck.id && l.stage === "delivered" && l.lane.moveKind && new Date(l.updatedAt).toDateString() === today).length;
           const home = driver && now !== null ? homeTimeStatus(driver, at.city, at.state, new Date(now)) : null;
 
           return (
@@ -107,7 +110,7 @@ export default function FleetPage() {
                       title={RUN_TYPE_DETAIL[driver.runType]}
                       className="rounded-full border border-line bg-white px-2.5 py-1 text-[11px] font-medium text-ink-800 outline-none focus:border-ink-400"
                     >
-                      {(["local", "regional", "otr"] as const).map((t) => (
+                      {RUN_TYPES.map((t) => (
                         <option key={t} value={t}>{RUN_TYPE_LABEL[t]}</option>
                       ))}
                     </select>
@@ -137,6 +140,11 @@ export default function FleetPage() {
                       <span className="tabular">{driver.hoursRemaining.toFixed(1)}h left</span>
                     </div>
                     <Progress value={hosPct} className="mt-2" />
+                    {driver.runType === "intown" && (
+                      <p className="mt-2.5 text-xs text-ink-500">
+                        <span className="font-medium text-ink-800">{movesToday} move{movesToday === 1 ? "" : "s"} done today</span> · paid {payLabel(driver)}
+                      </p>
+                    )}
                     {home && (
                       <p className={`mt-2.5 flex items-start gap-1.5 text-xs ${home.state === "late" ? "text-[var(--accent-warn)]" : "text-ink-500"}`}>
                         <Home className="mt-0.5 h-3 w-3 shrink-0" />

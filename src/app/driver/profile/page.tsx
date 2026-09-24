@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, usePrimaryCarrier } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { computeDriverPay, payLabel } from "@/lib/settlements";
-import { HOME_TIME_OPTIONS, RUN_TYPE_DETAIL, RUN_TYPE_LABEL } from "@/lib/run-types";
+import { HOME_TIME_OPTIONS, RUN_TYPE_DETAIL, RUN_TYPE_LABEL, RUN_TYPES } from "@/lib/run-types";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { HosStatus, TimeOffRequest } from "@/lib/types";
 
@@ -102,8 +102,8 @@ export default function DriverProfilePage() {
           <Home className="h-3.5 w-3.5 text-ink-400" />
           <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">How you run</p>
         </div>
-        <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="How you run">
-          {(["local", "regional", "otr"] as const).map((type) => (
+        <div className="mt-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label="How you run">
+          {RUN_TYPES.map((type) => (
             <button
               key={type}
               role="radio"

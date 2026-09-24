@@ -9,6 +9,7 @@ import { useStore } from "@/lib/store";
 import { cityCoords, pickupLegStart, type LatLng } from "@/lib/trip-geo";
 import { tripState } from "@/lib/trip-state";
 import { CARD_DISCOUNT, planFuel } from "@/lib/fuel";
+import { MOVE_LABEL } from "@/lib/run-types";
 import { SwipeToConfirm } from "./swipe-to-confirm";
 import { TripMap } from "./trip-map";
 import { BrokerCallRow } from "./broker-call";
@@ -44,7 +45,14 @@ export function TripCompactCard({
   const originPt = cityCoords(load.lane.origin, load.lane.originState);
   const destPt = cityCoords(load.lane.destination, load.lane.destState);
 
-  const kicker = s.card === "booking" ? "Booking" : s.card === "pickup" ? "Pickup" : "Delivery";
+  // In town, the driver counts the day in moves, not loads.
+  const movesToday = useStore((st) => {
+    if (!load.lane.moveKind) return 0;
+    const today = new Date().toDateString();
+    return st.loads.filter((l) => l.truckId === load.truckId && l.stage === "delivered" && l.lane.moveKind && new Date(l.updatedAt).toDateString() === today).length;
+  });
+  const phase = s.card === "booking" ? "Booking" : s.card === "pickup" ? "Pickup" : "Delivery";
+  const kicker = load.lane.moveKind ? `Move ${movesToday + 1} today · ${MOVE_LABEL[load.lane.moveKind]}` : phase;
   const place = s.card === "booking" ? `${load.lane.origin} → ${load.lane.destination}` : s.card === "pickup" ? origin : destination;
   const status =
     s.card === "booking" ? "AI is booking" : s.arrived ? (s.card === "pickup" ? "At the shipper" : "At the receiver") : s.card === "pickup" ? "Heading to pickup" : "Heading to delivery";
@@ -71,7 +79,7 @@ export function TripCompactCard({
         <button type="button" onClick={onOpen} className="block w-full text-left">
           <div className="flex items-center justify-between gap-3">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50">
-              {kicker} · {load.referenceNumber}
+              {kicker}{load.lane.moveKind ? ` · ${phase}` : ` · ${load.referenceNumber}`}
             </p>
             <p className="shrink-0 text-sm font-semibold tabular">{s.card === "booking" ? formatCurrency(load.bookedRate ?? load.targetRate) : s.drive}</p>
           </div>

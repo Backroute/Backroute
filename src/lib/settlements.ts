@@ -13,7 +13,9 @@ export function computeDriverPay(load: Load, driver: Driver, teamSplit = false):
       ? rate * driver.payRate
       : driver.payType === "hourly"
         ? legHours(load.lane.miles, load.deadheadMiles) * driver.payRate
-        : load.lane.miles * driver.payRate;
+        : driver.payType === "per_move"
+          ? driver.payRate
+          : load.lane.miles * driver.payRate;
   return Math.round(teamSplit ? full / 2 : full);
 }
 
@@ -21,5 +23,6 @@ export function computeDriverPay(load: Load, driver: Driver, teamSplit = false):
 export function payLabel(driver: Driver): string {
   if (driver.payType === "percentage") return `${Math.round(driver.payRate * 100)}% of the load`;
   if (driver.payType === "hourly") return `$${driver.payRate.toFixed(2)} an hour`;
+  if (driver.payType === "per_move") return `$${Math.round(driver.payRate)} per move`;
   return `$${driver.payRate.toFixed(2)} per loaded mile`;
 }
