@@ -201,6 +201,8 @@ export interface AgentSettings {
   tmsConnected: boolean;
   notifyEmail: boolean;
   notifySms: boolean;
+  /** The owner's end-of-day summary text. */
+  dailyText: boolean;
   rateFloorPct: number;
   avoidWatchBrokers: boolean;
   offersPerTruck: number;
@@ -533,6 +535,7 @@ export const useStore = create<StoreState>((set, get) => ({
     tmsConnected: true,
     notifyEmail: true,
     notifySms: false,
+    dailyText: true,
     rateFloorPct: 96,
     avoidWatchBrokers: false,
     offersPerTruck: 3,

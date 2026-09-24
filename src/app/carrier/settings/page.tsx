@@ -15,6 +15,7 @@ import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierTrucks } from "@/lib/selectors";
 import { downloadCsv } from "@/lib/csv-export";
 import { AutopilotControl } from "@/components/shared/autopilot-control";
+import { DailyTextPreview } from "@/components/shared/daily-text";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Aggressiveness } from "@/lib/store";
 
@@ -135,8 +136,13 @@ export default function SettingsPage() {
                     <CardTitle>Notifications</CardTitle>
                   </CardHeader>
                   <CardContent className="!pt-3 flex flex-col gap-4">
-                    <ToggleRow label="Email me on escalations" desc="Only when the AI needs your approval" checked={settings.notifyEmail} onChange={(v) => updateSettings({ notifyEmail: v })} />
-                    <ToggleRow label="Text me on escalations" desc="High-priority exceptions only" checked={settings.notifySms} onChange={(v) => updateSettings({ notifySms: v })} />
+                    <p className="text-xs text-ink-500">
+                      Only three kinds of alerts reach you: something that needs you, money moving, and safety. Everything else the AI does stays in its log.
+                    </p>
+                    <ToggleRow label="Text me when something needs me" desc="Approvals, loads to pick, drivers' requests" checked={settings.notifySms} onChange={(v) => updateSettings({ notifySms: v })} />
+                    <ToggleRow label="Email me a copy of every alert" desc="Needs you, money and safety" checked={settings.notifyEmail} onChange={(v) => updateSettings({ notifyEmail: v })} />
+                    <ToggleRow label="End-of-day text at 6 PM" desc="Loads delivered, profit, and anything that needs you tomorrow" checked={settings.dailyText} onChange={(v) => updateSettings({ dailyText: v })} />
+                    {settings.dailyText && <DailyTextPreview />}
                   </CardContent>
                 </Card>
               </div>

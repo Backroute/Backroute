@@ -17,6 +17,7 @@ import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { TruckDriverChip } from "@/components/shared/truck-driver-chip";
 import { IncidentCard } from "@/components/shared/incident-card";
 import { AutopilotControl } from "@/components/shared/autopilot-control";
+import { DailyTextPreview } from "@/components/shared/daily-text";
 import { useDriverRetention } from "@/components/shared/driver-retention";
 import { RUN_TYPE_LABEL } from "@/lib/run-types";
 import { weekEarnings } from "@/lib/earnings";
@@ -55,6 +56,7 @@ export default function CarrierOverviewPage() {
   );
   const liveCalls = loads.filter((l) => l.liveCall).length;
   const weekProfit = weekEarnings(loads).net;
+  const dailyText = useStore((s) => s.settings.dailyText);
   const driversAtRisk = useDriverRetention().filter((r) => r.view.level === "at_risk");
 
   const activeLoads = loads.filter((l) => l.stage !== "delivered");
@@ -367,10 +369,12 @@ export default function CarrierOverviewPage() {
           </Card>
         </div>
 
+        {dailyText && <DailyTextPreview />}
+
         <div className="grid gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Live activity</CardTitle>
+              <CardTitle>AI log</CardTitle>
               <Button href="/carrier/negotiations" variant="ghost" size="sm">
                 All negotiations <ArrowUpRight className="h-3.5 w-3.5" />
               </Button>

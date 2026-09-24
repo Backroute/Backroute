@@ -9,6 +9,7 @@ import { openCommandPalette } from "./command-palette";
 import { ActivityFeed } from "./activity-feed";
 import { Avatar } from "@/components/ui/avatar";
 import type { ActivityEvent } from "@/lib/types";
+import { ALERT_LABEL, alertKind } from "@/lib/alerts";
 
 function useClickOutside(ref: React.RefObject<HTMLElement | null>, onOutside: () => void) {
   useEffect(() => {
@@ -28,9 +29,12 @@ export function TopBar({
   settingsHref,
   exitHref,
   onMenuClick,
+  alertsOnly,
 }: {
   dark?: boolean;
   notifications: ActivityEvent[];
+  /** The bell only carries the three alert kinds (needs you, money, safety); the rest stays in the AI log. */
+  alertsOnly?: boolean;
   accountName: string;
   accountSubtitle: string;
   settingsHref?: string;
@@ -103,7 +107,12 @@ export function TopBar({
           {notifOpen && (
             <div className="absolute right-0 z-40 mt-2 w-80 overflow-hidden rounded-2xl border border-line bg-white shadow-xl">
               <div className="border-b border-line px-4 py-3">
-                <p className="text-sm font-semibold text-ink-950">Notifications</p>
+                <p className="text-sm font-semibold text-ink-950">{alertsOnly ? "Alerts" : "Notifications"}</p>
+                {alertsOnly && (
+                  <p className="mt-0.5 text-[11px] text-ink-500">
+                    {(["needs_you", "money", "safety"] as const).map((k) => `${notifications.filter((n) => alertKind(n) === k).length} ${ALERT_LABEL[k].toLowerCase()}`).join(" · ")}. Everything else is in the AI log.
+                  </p>
+                )}
               </div>
               <div className="max-h-96 overflow-y-auto px-4">
                 <ActivityFeed events={notifications.slice(0, 8)} dense />

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutGrid, Settings, Truck, Users, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isAlert } from "@/lib/alerts";
 import { PortalShell, type NavItem } from "@/components/shared/portal-shell";
 import { TopBar } from "@/components/shared/top-bar";
 import { CommandPalette, type CommandGroup } from "@/components/shared/command-palette";
@@ -63,6 +64,8 @@ export default function CarrierLayout({ children }: { children: React.ReactNode 
   const trucks = useStore((s) => s.trucks);
   const drivers = useStore((s) => s.drivers);
   const activity = useStore((s) => s.activity).filter((e) => e.carrierId === carrier.id);
+  // Only three kinds of things interrupt the owner: needs you, money, safety.
+  const alerts = activity.filter(isAlert);
   const pendingOffers = loads.filter((l) => l.stage === "offered").length;
   // Matches exactly what the Negotiations page itself lists, so the badge never disagrees with the page it labels.
   const activeNegotiations = loads.filter((l) => l.stage === "negotiating" || l.stage === "rate_confirmed").length;
@@ -96,7 +99,8 @@ export default function CarrierLayout({ children }: { children: React.ReactNode 
       switchTo={{ href: "/", label: "Back to home" }}
       topBar={
         <TopBar
-          notifications={activity}
+          notifications={alerts}
+          alertsOnly
           accountName={carrier.name}
           accountSubtitle={carrier.mc}
           settingsHref="/carrier/settings"
@@ -117,7 +121,7 @@ export default function CarrierLayout({ children }: { children: React.ReactNode 
       <CommandPalette groups={commandGroups} />
       <SectionTabs />
       {children}
-      <NotificationToastHost events={activity} hrefFor={(e) => (e.loadId ? `/carrier/loads/${e.loadId}` : undefined)} />
+      <NotificationToastHost events={alerts} hrefFor={(e) => (e.loadId ? `/carrier/loads/${e.loadId}` : undefined)} />
     </PortalShell>
   );
 }
