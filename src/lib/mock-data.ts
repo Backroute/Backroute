@@ -2,6 +2,7 @@ import { createRng } from "./utils";
 import { computeEconomics, computeLoadScore } from "./scoring";
 import { assessBroker } from "./broker-policy";
 import { transitWindow } from "./trip-geo";
+import { laneFits } from "./run-types";
 import type {
   ActivityEvent,
   Broker,
@@ -14,6 +15,7 @@ import type {
   Expense,
   Incident,
   Lane,
+  RunType,
   DvirInspection,
   Load,
   LoadDocument,
@@ -83,18 +85,30 @@ export const LANES: Lane[] = [
   { origin: "Atlanta", originState: "GA", destination: "Charlotte", destState: "NC", miles: 245, marketRpm: 2.9 },
   { origin: "Chicago", originState: "IL", destination: "Indianapolis", destState: "IN", miles: 183, marketRpm: 3.05 },
   { origin: "Los Angeles", originState: "CA", destination: "San Diego", destState: "CA", miles: 120, marketRpm: 3.4 },
+  { origin: "San Antonio", originState: "TX", destination: "Dallas", destState: "TX", miles: 275, marketRpm: 2.7 },
+  // Regional: a day's drive out of Dallas–Fort Worth and back.
+  { origin: "Dallas", originState: "TX", destination: "Memphis", destState: "TN", miles: 452, marketRpm: 2.45 },
+  { origin: "Memphis", originState: "TN", destination: "Dallas", destState: "TX", miles: 452, marketRpm: 2.3 },
+  { origin: "Dallas", originState: "TX", destination: "Kansas City", destState: "MO", miles: 505, marketRpm: 2.4 },
+  { origin: "Kansas City", originState: "MO", destination: "Dallas", destState: "TX", miles: 505, marketRpm: 2.25 },
+  // Local: warehouse and store runs around Dallas–Fort Worth, often more than one a day.
+  { origin: "Dallas", originState: "TX", destination: "Waco", destState: "TX", miles: 96, marketRpm: 4.1 },
+  { origin: "Waco", originState: "TX", destination: "Fort Worth", destState: "TX", miles: 90, marketRpm: 4.0 },
+  { origin: "Fort Worth", originState: "TX", destination: "Tyler", destState: "TX", miles: 130, marketRpm: 3.8 },
+  { origin: "Tyler", originState: "TX", destination: "Dallas", destState: "TX", miles: 100, marketRpm: 3.95 },
+  { origin: "Fort Worth", originState: "TX", destination: "Dallas", destState: "TX", miles: 34, marketRpm: 6.5 },
 ];
 
 export const EQUIPMENT: EquipmentType[] = ["Dry Van", "Reefer", "Flatbed"];
 
-const DRIVER_ROSTER: { name: string; phone: string; cdl: string; homeBase: string; homeTimeTarget: string }[] = [
-  { name: "Marcus Bell", phone: "(214) 555-0148", cdl: "CDL-A TX 88213", homeBase: "Dallas, TX", homeTimeTarget: "Home by Friday" },
-  { name: "Yolanda Reyes", phone: "(469) 555-0172", cdl: "CDL-A TX 77102", homeBase: "Fort Worth, TX", homeTimeTarget: "Home by Saturday" },
-  { name: "Corey Franklin", phone: "(214) 555-0195", cdl: "CDL-A TX 65401", homeBase: "Dallas, TX", homeTimeTarget: "No preference set" },
-  { name: "Ava Whitmore", phone: "(972) 555-0163", cdl: "CDL-A TX 71234", homeBase: "Plano, TX", homeTimeTarget: "Home by Sunday" },
-  { name: "Deshawn Price", phone: "(214) 555-0187", cdl: "CDL-A TX 69022", homeBase: "Arlington, TX", homeTimeTarget: "No preference set" },
-  { name: "Nina Castillo", phone: "(469) 555-0129", cdl: "CDL-A TX 73310", homeBase: "Irving, TX", homeTimeTarget: "Home by Friday" },
-  { name: "Priya Anand", phone: "(214) 555-0116", cdl: "CDL-A TX 82097", homeBase: "Dallas, TX", homeTimeTarget: "No preference set" },
+const DRIVER_ROSTER: { name: string; phone: string; cdl: string; homeBase: string; runType: RunType; homeTimeTarget: string; homeInDays?: number }[] = [
+  { name: "Marcus Bell", phone: "(214) 555-0148", cdl: "CDL-A TX 88213", homeBase: "Dallas, TX", runType: "otr", homeTimeTarget: "Home in 2 weeks", homeInDays: 9 },
+  { name: "Yolanda Reyes", phone: "(469) 555-0172", cdl: "CDL-A TX 77102", homeBase: "Fort Worth, TX", runType: "regional", homeTimeTarget: "Home by Saturday" },
+  { name: "Corey Franklin", phone: "(214) 555-0195", cdl: "CDL-A TX 65401", homeBase: "Dallas, TX", runType: "local", homeTimeTarget: "Home every night" },
+  { name: "Ava Whitmore", phone: "(972) 555-0163", cdl: "CDL-A TX 71234", homeBase: "Plano, TX", runType: "regional", homeTimeTarget: "Home by Friday" },
+  { name: "Deshawn Price", phone: "(214) 555-0187", cdl: "CDL-A TX 69022", homeBase: "Arlington, TX", runType: "local", homeTimeTarget: "Home every night" },
+  { name: "Nina Castillo", phone: "(469) 555-0129", cdl: "CDL-A TX 73310", homeBase: "Irving, TX", runType: "otr", homeTimeTarget: "Home in 1 week", homeInDays: 5 },
+  { name: "Priya Anand", phone: "(214) 555-0116", cdl: "CDL-A TX 82097", homeBase: "Dallas, TX", runType: "otr", homeTimeTarget: "Home in 2 weeks", homeInDays: 9 },
 ];
 
 const CARRIER_PREFIXES = [
@@ -476,10 +490,11 @@ function buildLoad(
   brokers: Broker[],
   spec: LoadSpec,
   refCounter: number,
+  lanes: Lane[],
 ): Load {
   // Seeded history follows the same rules the AI books by: nobody it would refuse to work with.
   const broker = rng.pick(brokers.filter((b) => assessBroker(b).policy !== "block"));
-  const lane = rng.pick(LANES);
+  const lane = rng.pick(lanes);
   const equipmentType = rng.pick(EQUIPMENT);
   const marketRate = lane.miles * lane.marketRpm;
   // These multiplier ranges are only ~0.1 wide — pct()'s default of 1 decimal place would collapse almost
@@ -632,7 +647,9 @@ export function generateWorld(seed = 20260916): World {
   trucks[0].driverId = PRIMARY_DRIVER_ID;
 
   const drivers: Driver[] = DRIVER_ROSTER.map((d, i) => {
-    const payType: Driver["payType"] = rng.bool(0.6) ? "percentage" : "per_mile";
+    // Local drivers are paid by the hour; over-the-road and regional by the load or the mile.
+    const drawn: Driver["payType"] = rng.bool(0.6) ? "percentage" : "per_mile";
+    const payType: Driver["payType"] = d.runType === "local" ? "hourly" : drawn;
     const truck = trucks[i] ?? trucks[0];
     return {
       id: i === 0 ? PRIMARY_DRIVER_ID : i < trucks.length ? `driver-${i + 1}` : "driver-team-1",
@@ -647,9 +664,11 @@ export function generateWorld(seed = 20260916): World {
       rating: pct(rng, 4.6, 5.0, 1),
       hireDate: iso(-rng.int(60, 900) * 1440),
       homeBase: d.homeBase,
+      runType: d.runType,
       homeTimeTarget: d.homeTimeTarget,
+      homeDueAt: d.homeInDays ? iso(d.homeInDays * 1440) : undefined,
       payType,
-      payRate: payType === "percentage" ? pct(rng, 0.25, 0.32, 2) : pct(rng, 0.58, 0.68, 2),
+      payRate: payType === "percentage" ? pct(rng, 0.25, 0.32, 2) : payType === "hourly" ? pct(rng, 26, 31, 2) : pct(rng, 0.58, 0.68, 2),
     };
   });
   trucks[0].secondDriverId = "driver-team-1";
@@ -674,7 +693,21 @@ export function generateWorld(seed = 20260916): World {
     { stage: "delivered", truckId: trucks[4].id, createdOffset: -3400 },
   ];
 
-  const loads = specs.map((spec, i) => buildLoad(rng, brokers, spec, i));
+  // A truck's history matches how its driver runs: local trucks never show a cross-country load.
+  const lanesFor = (truckId: string | null) => {
+    const driver = drivers.find((d) => d.id === trucks.find((t) => t.id === truckId)?.driverId);
+    if (!driver) return LANES;
+    const fit = LANES.filter((l) => laneFits(l, driver.runType, driver.homeBase));
+    return fit.length ? fit : LANES;
+  };
+  const loads = specs.map((spec, i) => buildLoad(rng, brokers, spec, i, lanesFor(spec.truckId)));
+  // Local trucks start the day in the home yard unless they're already out on a load (set below).
+  for (const t of trucks) {
+    if (drivers.find((d) => d.id === t.driverId)?.runType === "local") {
+      t.currentCity = "Dallas";
+      t.currentState = "TX";
+    }
+  }
 
   // One demoable multi-stop load — a partial drop plus an extra pickup along the same route, the most
   // common real-world multi-stop pattern. Additive only: every other load still has zero stops.

@@ -10,6 +10,7 @@ const CITY_COORDS: Record<string, LatLng> = {
   "Chicago, IL": [41.8781, -87.6298],
   "Columbus, OH": [39.9612, -82.9988],
   "Dallas, TX": [32.7767, -96.797],
+  "Fort Worth, TX": [32.7555, -97.3308],
   "Denver, CO": [39.7392, -104.9903],
   "Houston, TX": [29.7604, -95.3698],
   "Indianapolis, IN": [39.7684, -86.1581],
@@ -26,10 +27,27 @@ const CITY_COORDS: Record<string, LatLng> = {
   "San Antonio, TX": [29.4241, -98.4936],
   "San Diego, CA": [32.7157, -117.1611],
   "Seattle, WA": [47.6062, -122.3321],
+  "Tyler, TX": [32.3513, -95.3011],
+  "Waco, TX": [31.5493, -97.1467],
 };
 
 export function cityCoords(city: string, state: string): LatLng | undefined {
   return CITY_COORDS[`${city}, ${state}`];
+}
+
+/** Like cityCoords, but home bases around Dallas–Fort Worth (Plano, Irving, Arlington…) count as the metro. */
+export function placeCoords(city: string, state: string): LatLng | undefined {
+  return cityCoords(city, state) ?? (state === "TX" ? cityCoords("Dallas", "TX") : undefined);
+}
+
+/** Straight-line distance times the usual detour of real roads. */
+export function roadMiles(a: LatLng, b: LatLng): number {
+  return distanceMiles(a, b) * 1.18;
+}
+
+/** Hours of work a load takes: the empty drive to it, loading, the loaded miles and unloading (2 hours each dock). */
+export function legHours(miles: number, deadheadMiles: number): number {
+  return (miles + deadheadMiles) / 50 + 4;
 }
 
 /** Great-circle distance in miles. */

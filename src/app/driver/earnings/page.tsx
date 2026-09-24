@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowUpRight, Clock, Gauge, Sparkles, Timer, TrendingUp } from "lucide-react";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads } from "@/lib/selectors";
-import { computeDriverPay } from "@/lib/settlements";
+import { computeDriverPay, payLabel } from "@/lib/settlements";
 import { weekEarnings } from "@/lib/earnings";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 
@@ -35,7 +35,7 @@ export default function DriverEarningsPage() {
         <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Your pay this week</p>
         <p className="mt-1 text-4xl font-semibold tabular tracking-tight">{formatCurrency(pay)}</p>
         <p className="mt-1 text-xs text-white/55">
-          {driver.payType === "percentage" ? `${Math.round(driver.payRate * 100)}% of each load` : `$${driver.payRate.toFixed(2)} per loaded mile`}
+          {payLabel(driver)}
           {team ? " · split with your team partner" : ""}
         </p>
         {week.overMarket > 0 && (

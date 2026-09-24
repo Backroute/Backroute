@@ -17,6 +17,7 @@ import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { TruckDriverChip } from "@/components/shared/truck-driver-chip";
 import { IncidentCard } from "@/components/shared/incident-card";
 import { useDriverRetention } from "@/components/shared/driver-retention";
+import { RUN_TYPE_LABEL } from "@/lib/run-types";
 import { useNow } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks, useCarrierDrivers, useCarrierEscalations, useDriverMap, useBrokerMap, useTruckMap, truckActiveLoads } from "@/lib/selectors";
@@ -297,7 +298,9 @@ export default function CarrierOverviewPage() {
                 return (
                   <div key={truck.id} className="flex flex-col justify-between gap-3 rounded-3xl border border-line bg-white p-4">
                     <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-400">{truck.unitNumber} · {driver?.name ?? "Unassigned"}</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-400">
+                        {truck.unitNumber} · {driver?.name ?? "Unassigned"}{driver ? ` · ${RUN_TYPE_LABEL[driver.runType]}` : ""}
+                      </p>
                       <p className="mt-0.5 text-lg font-semibold text-ink-950">Available in {truck.currentCity}, {truck.currentState}</p>
                       <p className="mt-1 text-xs text-ink-500">
                         {hasOffers ? "AI's top options are waiting for your pick." : "AI is sourcing the next load."}
@@ -315,7 +318,7 @@ export default function CarrierOverviewPage() {
                   key={truck.id}
                   {...carrierTripProps(truck, driver, current, next, hasOffers)}
                   showMap={false}
-                  truckLabel={`${truck.unitNumber} · ${driver?.name ?? "Unassigned"}`}
+                  truckLabel={`${truck.unitNumber} · ${driver?.name ?? "Unassigned"}${driver ? ` · ${RUN_TYPE_LABEL[driver.runType]}` : ""}`}
                   onOpen={() => setOpenTruckId(truck.id)}
                 />
               );

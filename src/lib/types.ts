@@ -95,6 +95,10 @@ export interface LoadStop {
 
 export type HosStatus = "driving" | "on_duty" | "off_duty" | "sleeper";
 
+/** How a driver runs, which decides every load the AI books for them: local drivers are home every night and stay
+ *  close, regional drivers stay within a day's drive and are home weekends, long-haul drivers go anywhere for weeks. */
+export type RunType = "local" | "regional" | "otr";
+
 export interface Driver {
   id: string;
   name: string;
@@ -108,9 +112,12 @@ export interface Driver {
   rating: number;
   hireDate: string;
   homeBase: string;
+  runType: RunType;
   homeTimeTarget: string;
-  /** Driver Settlement AI: how weekly pay is computed. */
-  payType: "percentage" | "per_mile";
+  /** Long haul: the day the driver is due home at the end of this run. */
+  homeDueAt?: string;
+  /** Driver Settlement AI: how pay is computed. Local drivers are usually paid by the hour. */
+  payType: "percentage" | "per_mile" | "hourly";
   payRate: number;
   /** Last time someone at the carrier actually talked with this driver, as logged on the Fleet page. */
   lastCheckInAt?: string;

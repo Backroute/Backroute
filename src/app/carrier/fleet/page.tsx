@@ -9,8 +9,11 @@ import { Avatar } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { DriverCheckInCard, useDriverRetention } from "@/components/shared/driver-retention";
-import { emptiesAt, homeTimeLine } from "@/components/shared/home-time";
-import { homeTimeStatus, type HomeTimeState } from "@/lib/home";
+import { emptiesAt, homeTimeLine, homeTimeTitle } from "@/components/shared/home-time";
+import { homeTimeStatus } from "@/lib/home";
+import { RUN_TYPE_DETAIL, RUN_TYPE_LABEL } from "@/lib/run-types";
+import { useStore } from "@/lib/store";
+import type { RunType } from "@/lib/types";
 import { useCarrierTrucks, useDriverMap, useCarrierLoads, truckActiveLoads } from "@/lib/selectors";
 import { useNow } from "@/lib/hooks";
 import { formatNumber } from "@/lib/utils";
@@ -30,20 +33,13 @@ const HOS_TONE: Record<HosStatus, "success" | "neutral" | "info" | "warning"> = 
   sleeper: "warning",
 };
 
-const HOME_LABEL: Record<HomeTimeState, (target: string) => string> = {
-  home: () => "Near home",
-  on_track: (t) => `${t}, on track`,
-  head_home: (t) => `${t}, heading home`,
-  late: (t) => `${t}, at risk`,
-  no_target: () => "No home-time day set",
-};
-
 export default function FleetPage() {
   const trucks = useCarrierTrucks();
   const drivers = useDriverMap();
   const loads = useCarrierLoads();
   const now = useNow();
   const flagged = useDriverRetention().filter((r) => r.view.level !== "good");
+  const setRunType = useStore((s) => s.actions.setRunType);
 
   return (
     <div>
@@ -104,6 +100,17 @@ export default function FleetPage() {
                       <p className="truncate text-sm font-medium text-ink-900">{driver.name}</p>
                       <p className="truncate text-xs text-ink-400">{driver.phone}</p>
                     </div>
+                    <select
+                      value={driver.runType}
+                      onChange={(e) => setRunType(driver.id, e.target.value as RunType)}
+                      aria-label={`How ${driver.name} runs`}
+                      title={RUN_TYPE_DETAIL[driver.runType]}
+                      className="rounded-full border border-line bg-white px-2.5 py-1 text-[11px] font-medium text-ink-800 outline-none focus:border-ink-400"
+                    >
+                      {(["local", "regional", "otr"] as const).map((t) => (
+                        <option key={t} value={t}>{RUN_TYPE_LABEL[t]}</option>
+                      ))}
+                    </select>
                     <a href={`tel:${driver.phone.replace(/[^\d+]/g, "")}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-100 text-ink-600 hover:bg-ink-200">
                       <Phone className="h-3.5 w-3.5" />
                     </a>
@@ -134,7 +141,7 @@ export default function FleetPage() {
                       <p className={`mt-2.5 flex items-start gap-1.5 text-xs ${home.state === "late" ? "text-[var(--accent-warn)]" : "text-ink-500"}`}>
                         <Home className="mt-0.5 h-3 w-3 shrink-0" />
                         <span>
-                          <span className="font-medium text-ink-800">{HOME_LABEL[home.state](home.target ?? "")}</span> · {homeTimeLine(home, "carrier")}
+                          <span className="font-medium text-ink-800">{homeTimeTitle(home)}</span> · {homeTimeLine(home, "carrier")}
                         </span>
                       </p>
                     )}

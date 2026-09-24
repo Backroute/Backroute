@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, usePrimaryCarrier } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
-import { computeDriverPay } from "@/lib/settlements";
+import { computeDriverPay, payLabel } from "@/lib/settlements";
+import { HOME_TIME_OPTIONS, RUN_TYPE_DETAIL, RUN_TYPE_LABEL } from "@/lib/run-types";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { HosStatus, TimeOffRequest } from "@/lib/types";
 
@@ -31,7 +32,6 @@ const HOS_TONE: Record<HosStatus, "success" | "neutral" | "info" | "warning"> = 
   sleeper: "warning",
 };
 
-const HOME_TIME_OPTIONS = ["No preference set", "Home by Friday", "Home by Saturday", "Home by Sunday"];
 
 export default function DriverProfilePage() {
   const driver = usePrimaryDriver();
@@ -41,6 +41,7 @@ export default function DriverProfilePage() {
   const loads = useCarrierLoads();
   const truck = trucks.find((t) => t.id === driver.truckId);
   const updateHomeTimeTarget = useStore((s) => s.actions.updateHomeTimeTarget);
+  const setRunType = useStore((s) => s.actions.setRunType);
   const requestTimeOff = useStore((s) => s.actions.requestTimeOff);
   const myTimeOff = useStore((s) => s.timeOffRequests)
     .filter((r) => r.driverId === driver.id)
@@ -99,23 +100,45 @@ export default function DriverProfilePage() {
       <div className="rounded-2xl border border-line p-4">
         <div className="flex items-center gap-2">
           <Home className="h-3.5 w-3.5 text-ink-400" />
-          <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">Home-time preference</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">How you run</p>
         </div>
-        <p className="mt-1 text-xs text-ink-500">AI factors this in when scoring your next-load options.</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {HOME_TIME_OPTIONS.map((opt) => (
+        <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="How you run">
+          {(["local", "regional", "otr"] as const).map((type) => (
             <button
-              key={opt}
-              onClick={() => updateHomeTimeTarget(driver.id, opt)}
+              key={type}
+              role="radio"
+              aria-checked={driver.runType === type}
+              onClick={() => setRunType(driver.id, type)}
               className={cn(
-                "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-                driver.homeTimeTarget === opt ? "bg-ink-950 text-white" : "bg-ink-100 text-ink-600 hover:bg-ink-150",
+                "rounded-xl px-3 py-2 text-xs font-semibold transition-colors",
+                driver.runType === type ? "bg-ink-950 text-white" : "bg-ink-100 text-ink-600 hover:bg-ink-150",
               )}
             >
-              {opt}
+              {RUN_TYPE_LABEL[type]}
             </button>
           ))}
         </div>
+        <p className="mt-2 text-xs text-ink-500">{RUN_TYPE_DETAIL[driver.runType]}. The AI only books loads that fit.</p>
+
+        {driver.runType !== "local" && (
+          <>
+            <p className="mt-4 text-xs font-medium text-ink-700">Home time</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {HOME_TIME_OPTIONS[driver.runType].map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => updateHomeTimeTarget(driver.id, opt)}
+                  className={cn(
+                    "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                    driver.homeTimeTarget === opt ? "bg-ink-950 text-white" : "bg-ink-100 text-ink-600 hover:bg-ink-150",
+                  )}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
         <p className="mt-3 text-xs text-ink-400">Home base: {driver.homeBase}</p>
       </div>
 
@@ -202,7 +225,7 @@ export default function DriverProfilePage() {
         ) : (
           <>
             <p className="mt-1 text-xs text-ink-500">
-              {driver.payType === "percentage" ? `${Math.round(driver.payRate * 100)}% of rate` : `$${driver.payRate.toFixed(2)}/mi`} · {formatCurrency(totalPay)} total
+              {payLabel(driver)} · {formatCurrency(totalPay)} total
             </p>
             <div className="mt-3 flex flex-col divide-y divide-line">
               {paidLoads.slice(0, 6).map((l) => (

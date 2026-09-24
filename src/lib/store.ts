@@ -29,6 +29,8 @@ import { dockClock, dockMinutes, detentionFor, formatDockTime } from "./detentio
 import { cityCoords, distanceMiles } from "./trip-geo";
 import { bookableBrokers, type BrokerPolicy } from "./broker-policy";
 import { homeTimeStatus } from "./home";
+import { HOME_TIME_OPTIONS, laneFits, RUN_TYPE_DETAIL, RUN_TYPE_LABEL } from "./run-types";
+import { payLabel } from "./settlements";
 import { clamp, formatDuration } from "./utils";
 import type {
   ActivityEvent,
@@ -44,7 +46,9 @@ import type {
   TimeOffRequest,
   Incident,
   IncidentType,
+  Lane,
   Load,
+  RunType,
   LoadDocument,
   MaintenanceAppointment,
   Truck,
@@ -139,10 +143,15 @@ function scheduleCallEnds(loads: Load[], finish: (loadId: string, callId: string
 
 /** Where home time stands for the truck's next load — a dispatcher checks this before booking anything. When it's
  *  tight, or the carrier said home first, the AI only books loads that bring the driver closer to home. */
-function homeOptions(driver: Driver | undefined, from: { city: string; state: string } | undefined): { homeBase?: string; headHome?: boolean } {
+function homeOptions(driver: Driver | undefined, from: { city: string; state: string } | undefined): { homeBase?: string; headHome?: boolean; runType?: RunType } {
   if (!driver) return {};
   const status = from ? homeTimeStatus(driver, from.city, from.state, new Date()).state : "no_target";
-  return { homeBase: driver.homeBase, headHome: !!driver.homePriority || status === "head_home" || status === "late" };
+  return { homeBase: driver.homeBase, runType: driver.runType, headHome: !!driver.homePriority || status === "head_home" || status === "late" };
+}
+
+/** Lanes this truck's driver actually runs, for the AI's own chaining. */
+function fitsDriver(driver: Driver | undefined): ((lane: Lane) => boolean) | undefined {
+  return driver ? (lane) => laneFits(lane, driver.runType, driver.homeBase) : undefined;
 }
 
 export type DriverDocType = "bol" | "pod" | "lumper_receipt";
@@ -303,7 +312,10 @@ interface StoreState {
      *  pickup/transit/delivery lifecycle still runs off the existing stage machine untouched. */
     completeLoadStop: (loadId: string, stopId: string) => void;
     seedInitialOffers: () => void;
+    /** Long-haul targets ("Home in 2 weeks") also set the date this run is due to end. */
     updateHomeTimeTarget: (driverId: string, target: string) => void;
+    /** Local, regional or long haul. Changing it drops any waiting offers that no longer fit so the AI re-sources. */
+    setRunType: (driverId: string, runType: RunType) => void;
     requestBetterRate: (loadId: string, actor: "driver" | "carrier", amount?: number) => void;
     /** Cancels a booked load that's fallen through (broker pulled it, detention refused, etc.). A truck
      *  already dispatched or at pickup earns the broker's TONU fee; earlier than that, no fee applies. */
@@ -375,12 +387,12 @@ function craftDriverReply(content: string, ctx: { driver?: Driver; currentLoad?:
   }
   if (/\bhome\b.*(weekend|time|friday|saturday|sunday)|when.*home|get home|home time/.test(c)) {
     return driver
-      ? `Your home-time preference is set to "${driver.homeTimeTarget}." Already weighing that when scoring your next options. Change it anytime in Profile.`
+      ? `You're set up as ${RUN_TYPE_LABEL[driver.runType].toLowerCase()}, "${driver.homeTimeTarget}." I check that before booking every load. Change it anytime in Profile.`
       : "Set your home-time preference in Profile and I'll weigh it when scoring your next loads.";
   }
   if (/\b(pay|earn|settlement|paycheck)\b|how much.*(make|get)/.test(c)) {
     return driver
-      ? `You're on ${driver.payType === "percentage" ? `${Math.round(driver.payRate * 100)}% of the rate` : `$${driver.payRate.toFixed(2)}/mile`}. Profile has this week's running total and every past settlement.`
+      ? `You're on ${payLabel(driver)}. Profile has this week's running total and every past settlement.`
       : "Check Profile for your pay statements. They update automatically after every delivery.";
   }
   if (c.includes("eta") || (c.includes("time") && !c.includes("home"))) {
@@ -630,7 +642,10 @@ export const useStore = create<StoreState>((set, get) => ({
           let effectiveTruck = trucks.find((t) => t.id === target.truckId);
 
           if (target.stage === "booked" && !target.truckId) {
-            effectiveTruck = trucks.find((t) => t.status === "available" && !t.currentLoadId);
+            // Only a free truck whose driver runs this kind of lane — a local driver never gets a cross-country load.
+            effectiveTruck = trucks.find(
+              (t) => t.status === "available" && !t.currentLoadId && (fitsDriver(state.drivers.find((d) => d.id === t.driverId))?.(target.lane) ?? true),
+            );
           }
 
           const workingLoad = effectiveTruck && !target.truckId ? { ...target, truckId: effectiveTruck.id } : target;
@@ -664,7 +679,10 @@ export const useStore = create<StoreState>((set, get) => ({
           if (effectiveTruck && shouldChainNextLoad(result.load, effectiveTruck)) {
             const chained = createSourcedLoad(
               bookable, PRIMARY_CARRIER_ID, state.tickCount + 1, effectiveTruck.id, true, excludeTiers, effectiveTruck.equipmentType,
-              pickLaneNear({ city: result.load.lane.destination, state: result.load.lane.destState }), surcharges,
+              pickLaneNear(
+                { city: result.load.lane.destination, state: result.load.lane.destState },
+                fitsDriver(state.drivers.find((d) => d.id === effectiveTruck!.driverId)),
+              ), surcharges,
             );
             loads = [chained, ...loads];
             trucks = trucks.map((t) => (t.id === effectiveTruck!.id ? { ...t, nextLoadId: chained.id } : t));
@@ -1419,9 +1437,54 @@ export const useStore = create<StoreState>((set, get) => ({
       }),
 
     updateHomeTimeTarget: (driverId, target) =>
-      set((state) => ({
-        drivers: state.drivers.map((d) => (d.id === driverId ? { ...d, homeTimeTarget: target } : d)),
-      })),
+      set((state) => {
+        const weeks = /^Home in (\d) week/.exec(target)?.[1];
+        return {
+          drivers: state.drivers.map((d) =>
+            d.id === driverId
+              ? { ...d, homeTimeTarget: target, homeDueAt: weeks ? new Date(Date.now() + Number(weeks) * 7 * 24 * 60 * 60 * 1000).toISOString() : d.homeDueAt }
+              : d,
+          ),
+        };
+      }),
+
+    setRunType: (driverId, runType) =>
+      set((state) => {
+        const driver = state.drivers.find((d) => d.id === driverId);
+        if (!driver || driver.runType === runType) return {};
+        const target = HOME_TIME_OPTIONS[runType].includes(driver.homeTimeTarget) ? driver.homeTimeTarget : HOME_TIME_OPTIONS[runType][runType === "otr" ? 1 : 0];
+        const weeks = /^Home in (\d) week/.exec(target)?.[1];
+        const truck = state.trucks.find((t) => t.driverId === driverId || t.secondDriverId === driverId);
+        const stale = new Set(
+          state.loads.filter((l) => l.truckId === truck?.id && l.stage === "offered" && !laneFits(l.lane, runType, driver.homeBase)).map((l) => l.offerGroupId),
+        );
+        const now = new Date().toISOString();
+        return {
+          drivers: state.drivers.map((d) =>
+            d.id === driverId
+              ? {
+                  ...d,
+                  runType,
+                  homeTimeTarget: target,
+                  homeDueAt: weeks ? new Date(Date.now() + Number(weeks) * 7 * 24 * 60 * 60 * 1000).toISOString() : d.homeDueAt,
+                  payType: runType === "local" ? "hourly" : d.payType === "hourly" ? "per_mile" : d.payType,
+                  payRate: runType === "local" && d.payType !== "hourly" ? 28 : runType !== "local" && d.payType === "hourly" ? 0.62 : d.payRate,
+                }
+              : d,
+          ),
+          // Waiting options that no longer fit are dropped; the AI sources new ones on its next pass.
+          loads: stale.size ? state.loads.map((l) => (l.stage === "offered" && stale.has(l.offerGroupId) ? { ...l, stage: "declined" as const, progressPct: 100, updatedAt: now } : l)) : state.loads,
+          activity: [
+            {
+              id: uid("act"), timestamp: now, type: "truck_reassigned" as const,
+              message: `${driver.name.split(" ")[0]} now runs ${RUN_TYPE_LABEL[runType].toLowerCase()}`,
+              detail: RUN_TYPE_DETAIL[runType],
+              carrierId: PRIMARY_CARRIER_ID, severity: "info" as const,
+            },
+            ...state.activity,
+          ].slice(0, 80),
+        };
+      }),
 
     requestBetterRate: (loadId, actor, amount) =>
       set((state) => {

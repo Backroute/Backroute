@@ -12,7 +12,7 @@ import { StatTile } from "@/components/ui/stat-tile";
 import { useBrokerMap, useCarrierLoads, useDriverMap, useTruckMap } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { useNow } from "@/lib/hooks";
-import { computeDriverPay, FACTORING_FEE_PCT } from "@/lib/settlements";
+import { computeDriverPay, FACTORING_FEE_PCT, payLabel } from "@/lib/settlements";
 import { paymentStatus, type PaymentState } from "@/lib/payments";
 import { computeFactoringCommission } from "@/lib/commissions";
 import { downloadCsv } from "@/lib/csv-export";
@@ -290,7 +290,7 @@ function DriverPayList({ loads, drivers, trucks }: { loads: Load[]; drivers: Map
             </div>
             <div className="text-right">
               <p className="text-sm font-semibold tabular text-ink-950">{formatCurrency(pay)}</p>
-              <p className="text-[11px] text-ink-400">{driver.payType === "percentage" ? `${Math.round(driver.payRate * 100)}% of rate` : `$${driver.payRate.toFixed(2)}/mi`}</p>
+              <p className="text-[11px] text-ink-400">{payLabel(driver)}</p>
             </div>
           </div>
         ))}

@@ -1,7 +1,8 @@
 import { EQUIPMENT, LANES } from "./mock-data";
 import { computeEconomics, computeLoadScore } from "./scoring";
-import { cityCoords, distanceMiles, transitWindow } from "./trip-geo";
-import { homeTonight, hoursToHome, legHours, reloadMarket } from "./home";
+import { cityCoords, distanceMiles, legHours, transitWindow } from "./trip-geo";
+import { homeTonight, hoursToHome, reloadMarket } from "./home";
+import { laneFits } from "./run-types";
 import type {
   ActivityEvent,
   ActivityType,
@@ -9,6 +10,7 @@ import type {
   CallTranscriptLine,
   EquipmentType,
   Incident,
+  RunType,
   IncidentStep,
   IncidentType,
   Lane,
@@ -49,10 +51,12 @@ export interface LanePlacement {
 
 /** Every lane ranked by how far its pickup is from `from`, with the real (road-adjusted) deadhead to reach it —
  *  the dispatcher's first question is always "what's loading near where this truck empties out?". */
-function lanesNear(from: TruckOrigin | undefined): LanePlacement[] | null {
+function lanesNear(from: TruckOrigin | undefined, fits?: (lane: Lane) => boolean): LanePlacement[] | null {
   const at = from ? cityCoords(from.city, from.state) : undefined;
   if (!at) return null;
-  return LANES.map((lane) => {
+  // Only work this driver takes (local, regional, long haul); if none of it is near, the nearest of whatever is.
+  const pool = fits && LANES.some(fits) ? LANES.filter(fits) : LANES;
+  return pool.map((lane) => {
     const origin = cityCoords(lane.origin, lane.originState);
     const miles = origin ? distanceMiles(at, origin) * 1.18 : Infinity;
     return { lane, deadheadMiles: miles < 15 ? randInt(3, 25) : Math.round(miles) };
@@ -60,8 +64,8 @@ function lanesNear(from: TruckOrigin | undefined): LanePlacement[] | null {
 }
 
 /** One of the two lanes loading closest to `from`, or undefined when the location isn't known. */
-export function pickLaneNear(from: TruckOrigin | undefined): LanePlacement | undefined {
-  const ranked = lanesNear(from);
+export function pickLaneNear(from: TruckOrigin | undefined, fits?: (lane: Lane) => boolean): LanePlacement | undefined {
+  const ranked = lanesNear(from, fits);
   return ranked ? pick(ranked.slice(0, 2)) : undefined;
 }
 
@@ -145,6 +149,8 @@ export interface OfferOptions {
   homeBase?: string;
   /** Home time is getting tight (or the carrier said home first): only loads that bring the driver closer count. */
   headHome?: boolean;
+  /** Local, regional or long haul: only lanes that fit how this driver runs are sourced. */
+  runType?: RunType;
 }
 
 /** AI has scanned the boards and scored several candidates for one truck — driver/carrier picks one. */
@@ -162,7 +168,8 @@ export function createLoadOfferBatch(
   const startHoursHome = opts.from ? hoursHomeFrom(opts.from.city, opts.from.state) : null;
 
   // What's loading near the truck; when it's time to head home, of those, the ones delivering closest to home.
-  const near = lanesNear(opts.from);
+  const runType = opts.runType;
+  const near = lanesNear(opts.from, runType && home ? (lane) => laneFits(lane, runType, home) : undefined);
   const placements = near
     ? opts.headHome && home
       ? near.slice(0, count * 2).sort((a, b) => (hoursHomeFrom(a.lane.destination, a.lane.destState) ?? 99) - (hoursHomeFrom(b.lane.destination, b.lane.destState) ?? 99)).slice(0, count)
