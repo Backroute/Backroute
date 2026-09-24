@@ -62,6 +62,12 @@ export interface Broker {
   /** Broker Shield AI: FMCSA authority check before the AI will negotiate with them. */
   authorityVerified: boolean;
   fraudRisk: "low" | "medium" | "high";
+  /** Payment history, from the carrier's own invoices plus the factoring partner's broker credit data. */
+  avgDaysToPay: number;
+  /** Share of detention claims the broker actually paid. */
+  detentionPaidPct: number;
+  /** Loads the broker cancelled on carriers after booking, last 90 days. */
+  cancellations90d: number;
 }
 
 export interface Lane {
@@ -106,6 +112,10 @@ export interface Driver {
   /** Driver Settlement AI: how weekly pay is computed. */
   payType: "percentage" | "per_mile";
   payRate: number;
+  /** Last time someone at the carrier actually talked with this driver, as logged on the Fleet page. */
+  lastCheckInAt?: string;
+  /** Carrier told the AI to put getting this driver home ahead of the best-paying load. */
+  homePriority?: boolean;
 }
 
 export interface Truck {
@@ -347,6 +357,13 @@ export interface Load {
   cancellationReason?: string;
   /** Truck-Ordered-Not-Used fee owed by the broker when a truck was already dispatched or at pickup. */
   tonuFee?: number;
+  /** On an offer: the AI's estimate of the best load home from where this one delivers. Not booked — loads home
+   *  usually post a day or two before pickup, so it's a plan, priced from this week's lane rates. */
+  loadHome?: { origin: string; originState: string; destination: string; destState: string; miles: number; deadheadMiles: number; estNet: number };
+  /** On an offer: it delivers near the driver's home, so there's no load home to plan. */
+  endsNearHome?: boolean;
+  /** Extra percentage the AI added to its ask because this broker pays slowly or disputes detention. */
+  surchargePct?: number;
   /** Intermediate stops beyond the lane's origin/destination — absent or empty means a normal single-pickup,
    *  single-delivery load, which is most of them. */
   stops?: LoadStop[];

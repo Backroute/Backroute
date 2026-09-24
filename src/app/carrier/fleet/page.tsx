@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { LoadStagePill } from "@/components/shared/load-stage";
+import { DriverCheckInCard, useDriverRetention } from "@/components/shared/driver-retention";
 import { useCarrierTrucks, useDriverMap, useCarrierLoads, truckActiveLoads } from "@/lib/selectors";
 import { useNow } from "@/lib/hooks";
 import { formatNumber } from "@/lib/utils";
@@ -32,10 +33,28 @@ export default function FleetPage() {
   const drivers = useDriverMap();
   const loads = useCarrierLoads();
   const now = useNow();
+  const flagged = useDriverRetention().filter((r) => r.view.level !== "good");
 
   return (
     <div>
       <PageHeader title="Fleet" description={`${trucks.length} trucks · ${drivers.size ?? 0} drivers on roster`} />
+
+      <section id="retention" aria-labelledby="retention-title" className="scroll-mt-4 px-4 pt-6 sm:px-8">
+        <h2 id="retention-title" className="text-sm font-semibold text-ink-950">Driver check-in</h2>
+        <p className="mt-0.5 max-w-2xl text-xs text-ink-500">
+          Warning signs, not a prediction: home time, pay, unpaid dock time, money you owe them, long days, and how long since
+          someone talked to them. The AI can steer loads toward home and chase what drivers are owed. Pay, time off and the call are yours.
+        </p>
+        {flagged.length === 0 ? (
+          <p className="mt-3 rounded-2xl border border-line bg-white px-4 py-5 text-center text-sm text-ink-500">Every driver looks good this week.</p>
+        ) : (
+          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {flagged.map(({ driver, view }) => (
+              <DriverCheckInCard key={driver.id} driver={driver} view={view} />
+            ))}
+          </div>
+        )}
+      </section>
 
       <div className="grid gap-5 px-4 py-6 sm:px-8 sm:grid-cols-2 xl:grid-cols-3">
         {trucks.map((truck) => {

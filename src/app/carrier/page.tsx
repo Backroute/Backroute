@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUpRight, CalendarClock, Check, LifeBuoy, Sparkles, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUpRight, CalendarClock, Check, LifeBuoy, Sparkles, UserRound, X } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { TruckDriverChip } from "@/components/shared/truck-driver-chip";
 import { IncidentCard } from "@/components/shared/incident-card";
+import { useDriverRetention } from "@/components/shared/driver-retention";
 import { useNow } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks, useCarrierDrivers, useCarrierEscalations, useDriverMap, useBrokerMap, useTruckMap, truckActiveLoads } from "@/lib/selectors";
@@ -50,6 +51,7 @@ export default function CarrierOverviewPage() {
     (i) => i.carrierId === carrier.id && (i.status === "active" || (now !== null && now - Date.parse(i.steps.at(-1)?.timestamp ?? i.createdAt) < 20_000)),
   );
   const liveCalls = loads.filter((l) => l.liveCall).length;
+  const driversAtRisk = useDriverRetention().filter((r) => r.view.level === "at_risk");
 
   const activeLoads = loads.filter((l) => l.stage !== "delivered");
   const netProfitMonth = loads.reduce((sum, l) => sum + (l.netProfit ?? 0), 0);
@@ -104,8 +106,8 @@ export default function CarrierOverviewPage() {
 
   // Escalations already handed to Backroute Support are listed but no longer wait on the carrier.
   const waitingEscalations = escalations.filter((e) => e.status !== "with_support");
-  const needsYouCount = waitingEscalations.length + pendingTimeOff.length + offerGroups.length;
-  const hasNeedsYouItems = escalations.filter((e) => !e.incidentId).length + pendingTimeOff.length + offerGroups.length > 0;
+  const needsYouCount = waitingEscalations.length + pendingTimeOff.length + offerGroups.length + driversAtRisk.length;
+  const hasNeedsYouItems = escalations.filter((e) => !e.incidentId).length + pendingTimeOff.length + offerGroups.length + driversAtRisk.length > 0;
 
   return (
     <div>
@@ -226,6 +228,20 @@ export default function CarrierOverviewPage() {
                   </div>
                 );
               })}
+
+              {driversAtRisk.map(({ driver, view }) => (
+                <div key={driver.id} className="rounded-2xl border border-[var(--accent-warn)]/40 bg-amber-50/70 p-4">
+                  <p className="flex items-center gap-2 text-sm font-medium text-ink-900">
+                    <UserRound className="h-4 w-4 text-ink-400" /> Check in with {driver.name}
+                  </p>
+                  <p className="mt-0.5 text-xs text-ink-600">{view.signals.slice(0, 2).map((s) => s.text).join(" · ")}</p>
+                  <div className="mt-3">
+                    <Button size="sm" variant="primary" href="/carrier/fleet#retention">
+                      See what to do
+                    </Button>
+                  </div>
+                </div>
+              ))}
 
               {pendingTimeOff.map((r) => {
                 const requester = driverMap.get(r.driverId);

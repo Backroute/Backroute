@@ -261,6 +261,20 @@ function layOutPlan(truck: Truck, driver: Driver | undefined, current: Load | un
   };
 }
 
+/** Hours of work a leg takes: the empty drive to it, loading, the loaded miles and unloading. */
+export function legHours(miles: number, deadheadMiles: number): number {
+  return (miles + deadheadMiles) / AVG_MPH + DOCK_HOURS * 2;
+}
+
+/** The AI's best guess at the load home from wherever a load delivers — or null when it already ends near home. */
+export function estimateLoadHome(fromCity: string, fromState: string, homeBase: string): PlanLeg | null {
+  const [city, state] = homeBase.split(", ");
+  const home = coordsFor(city, state);
+  const from = coordsFor(fromCity, fromState);
+  if (!home || !from || distanceMiles(from, home) < 60) return null;
+  return planLeg(fromCity, fromState, home, true);
+}
+
 export function formatClock(hourOfDay: number): string {
   return clock(hourOfDay);
 }

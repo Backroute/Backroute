@@ -9,6 +9,7 @@ import { useStore } from "@/lib/store";
 import { cityCoords, pickupLegStart, type LatLng } from "@/lib/trip-geo";
 import { BOOKING_STAGES, tripState, type TripState } from "@/lib/trip-state";
 import { DETENTION_RATE_HR, dockClock, formatDockTime } from "@/lib/detention";
+import { paymentStatus } from "@/lib/payments";
 import { Switch } from "@/components/ui/switch";
 import { CounterOfferButton } from "./counter-offer-button";
 import { SwipeToConfirm } from "./swipe-to-confirm";
@@ -337,6 +338,9 @@ export function DriverTripCompleteCard({
   const to = cityCoords(load.lane.destination, load.lane.destState);
   const nextIsBooking = nextLoad ? BOOKING_STAGES.includes(nextLoad.stage) : false;
   const detention = (load.accessorials ?? []).reduce((sum, a) => sum + a.amount, 0);
+  const broker = useStore((st) => st.brokers.find((b) => b.id === load.brokerId));
+  const factoringOn = useStore((st) => st.settings.enabledAddons.includes("factoring-ai"));
+  const payment = paymentStatus(load, broker, factoringOn, Date.parse(load.updatedAt));
 
   function chooseNext() {
     onContinue();
@@ -370,8 +374,10 @@ export function DriverTripCompleteCard({
         </div>
         <p className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-emerald-300">
           <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> POD checked</span>
-          <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Invoice sent to {brokerName ?? "broker"}</span>
-          <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Payment tracked</span>
+          <span className="flex items-center gap-1">
+            <Check className="h-3.5 w-3.5" /> Invoice packet sent to {payment.method === "factoring" ? "factoring" : brokerName ?? "the broker"}
+          </span>
+          <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Your pay goes on this week&apos;s settlement</span>
           {detention > 0 && <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> {formatCurrency(detention)} detention billed by AI</span>}
         </p>
 

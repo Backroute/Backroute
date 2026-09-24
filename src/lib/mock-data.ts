@@ -1,5 +1,6 @@
 import { createRng } from "./utils";
 import { computeEconomics, computeLoadScore } from "./scoring";
+import { assessBroker } from "./broker-policy";
 import type {
   ActivityEvent,
   Broker,
@@ -119,7 +120,16 @@ function buildBrokers(rng: ReturnType<typeof createRng>): Broker[] {
     tier: b.tier,
     authorityVerified: b.tier === "watch" ? rng.bool(0.7) : true,
     fraudRisk: b.tier === "preferred" ? "low" : b.tier === "standard" ? (rng.bool(0.85) ? "low" : "medium") : rng.pick(["medium", "high"] as const),
+    ...paymentHistory(b.tier, i),
   }));
+}
+
+/** Payment history comes from its own seed so adding it doesn't reshuffle the rest of the seeded world. */
+function paymentHistory(tier: Broker["tier"], i: number): Pick<Broker, "avgDaysToPay" | "detentionPaidPct" | "cancellations90d"> {
+  const r = createRng(4242 + i);
+  if (tier === "preferred") return { avgDaysToPay: r.int(19, 31), detentionPaidPct: r.int(78, 96), cancellations90d: r.int(0, 1) };
+  if (tier === "standard") return { avgDaysToPay: r.int(28, 46), detentionPaidPct: r.int(45, 82), cancellations90d: r.int(0, 3) };
+  return { avgDaysToPay: r.int(44, 68), detentionPaidPct: r.int(15, 50), cancellations90d: r.int(2, 6) };
 }
 
 function buildLightweightCarriers(rng: ReturnType<typeof createRng>, count: number): Carrier[] {
@@ -455,7 +465,8 @@ function buildLoad(
   spec: LoadSpec,
   refCounter: number,
 ): Load {
-  const broker = rng.pick(brokers);
+  // Seeded history follows the same rules the AI books by: nobody it would refuse to work with.
+  const broker = rng.pick(brokers.filter((b) => assessBroker(b).policy !== "block"));
   const lane = rng.pick(LANES);
   const equipmentType = rng.pick(EQUIPMENT);
   const marketRate = lane.miles * lane.marketRpm;

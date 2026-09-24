@@ -1,6 +1,7 @@
 import { EQUIPMENT, LANES } from "./mock-data";
 import { computeEconomics, computeLoadScore } from "./scoring";
 import { cityCoords, distanceMiles } from "./trip-geo";
+import { estimateLoadHome, legHours } from "./planner";
 import type {
   ActivityEvent,
   ActivityType,
@@ -73,12 +74,15 @@ export function createSourcedLoad(
   excludeTiers: Broker["tier"][] = [],
   equipmentType?: EquipmentType,
   placement?: LanePlacement,
+  /** Broker id → extra % the AI asks for, for brokers that pay slowly or dispute detention. */
+  surcharges: Record<string, number> = {},
 ): Load {
   const broker = pickBroker(brokers, excludeTiers);
   const lane = placement?.lane ?? pick(LANES);
   const marketRate = lane.miles * lane.marketRpm;
   const listedRate = Math.round(marketRate * (0.86 + Math.random() * 0.1));
-  const targetRate = Math.round(marketRate * (0.98 + Math.random() * 0.07));
+  const surchargePct = surcharges[broker.id];
+  const targetRate = Math.round(marketRate * (0.98 + Math.random() * 0.07) * (1 + (surchargePct ?? 0) / 100));
   const deadheadMiles = placement?.deadheadMiles ?? randInt(0, 85);
   const { fuelCost, tollCost } = costsForLane(lane.miles, deadheadMiles);
   const now = new Date().toISOString();
@@ -127,6 +131,7 @@ export function createSourcedLoad(
     aiConfidence: randInt(76, 98),
     ticksInStage: 0,
     progressPct: 4,
+    surchargePct,
   };
 }
 
@@ -136,6 +141,11 @@ export interface OfferOptions {
   from?: TruckOrigin;
   homeTimeTarget?: string;
   equipmentType?: EquipmentType;
+  surcharges?: Record<string, number>;
+  /** The driver's home base: the AI weighs each option by the whole trip, including the likely load home. */
+  homeBase?: string;
+  /** The carrier asked the AI to get this driver home first: a load that delivers near home wins. */
+  homePriority?: boolean;
 }
 
 /** AI has scanned the boards and scored several candidates for one truck — driver/carrier picks one. */
@@ -153,8 +163,9 @@ export function createLoadOfferBatch(
 
   const nearest = lanesNear(opts.from)?.slice(0, count);
   const candidates = Array.from({ length: count }, (_, i) => {
-    const base = createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType, nearest?.[i]);
+    const base = createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType, nearest?.[i], opts.surcharges);
     const { netProfit, rpm } = computeEconomics(base.targetRate, base.lane.miles, base.deadheadMiles, base.fuelCost, base.tollCost);
+    const home = opts.homeBase ? estimateLoadHome(base.lane.destination, base.lane.destState, opts.homeBase) : null;
     return {
       ...base,
       stage: "offered" as const,
@@ -162,6 +173,10 @@ export function createLoadOfferBatch(
       rpm,
       progressPct: 16,
       homeTimeFit: i === homeFitIndex,
+      endsNearHome: !!opts.homeBase && !home,
+      loadHome: home
+        ? { origin: home.lane.origin, originState: home.lane.originState, destination: home.lane.destination, destState: home.lane.destState, miles: home.lane.miles, deadheadMiles: home.deadheadMiles, estNet: home.net }
+        : undefined,
     };
   });
 
@@ -173,10 +188,25 @@ export function createLoadOfferBatch(
   // clean-broker candidate when the batch has one; only recommend a flagged one if every option is flagged.
   const brokerById = new Map(brokers.map((b) => [b.id, b]));
   const isLowRisk = (c: (typeof candidates)[number]) => (brokerById.get(c.brokerId)?.fraudRisk ?? "low") === "low";
-  const pool = candidates.some(isLowRisk) ? candidates.filter(isLowRisk) : candidates;
-  const best = pool.reduce((a, b) => (b.score > a.score ? b : a));
+  // With a home base known, options are weighed by the whole trip — this load plus the likely load home — per hour
+  // of work, the way a dispatcher weighs a great load into a dead market against a decent one with a good way back.
+  const tripValue = (c: (typeof candidates)[number]) => {
+    if (!opts.homeBase) return c.score;
+    const h = c.loadHome;
+    const hours = legHours(c.lane.miles, c.deadheadMiles) + (h ? legHours(h.miles, h.deadheadMiles) : 0);
+    return ((c.netProfit ?? 0) + (h?.estNet ?? 0)) / hours;
+  };
+  const top = (pool: typeof candidates) => pool.reduce((a, b) => (tripValue(b) > tripValue(a) ? b : a));
+  // Never pick a load that loses money when one that doesn't is on the table; get the driver home first when asked.
+  const profitable = candidates.filter((c) => (c.netProfit ?? 0) > 0);
+  let pool = profitable.length ? profitable : candidates;
+  if (opts.homePriority && pool.some((c) => c.endsNearHome)) pool = pool.filter((c) => c.endsNearHome);
+  // Broker Shield: a clean broker wins unless a flagged one is clearly better. Those get extra checks, not a pass.
+  const best = top(pool);
+  const clean = pool.filter(isLowRisk);
+  const pick = clean.length && tripValue(top(clean)) >= tripValue(best) * 0.8 ? top(clean) : best;
 
-  return candidates.map((c) => ({ ...c, offerGroupId, recommended: c.id === best.id }));
+  return candidates.map((c) => ({ ...c, offerGroupId, recommended: c.id === pick.id }));
 }
 
 interface OfferResolution {
@@ -435,6 +465,15 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
       const priorBrokerOffers = load.messages.filter((m) => m.direction === "inbound" && m.offerAmount);
       const threadAiLast = priorAiOffers.length ? priorAiOffers[priorAiOffers.length - 1].offerAmount! : load.targetRate;
       const threadBrokerLast = priorBrokerOffers.length ? priorBrokerOffers[priorBrokerOffers.length - 1].offerAmount! : load.listedRate;
+      // A slow-pay premium is a real ask, and some brokers just give the load to another carrier instead.
+      if (load.surchargePct && rounds >= 3 && chance(0.2)) {
+        next.stage = "declined";
+        next.progressPct = 100;
+        next.cancellationReason = `${b.company} wouldn't pay the ${load.surchargePct}% slow-pay premium. The AI walked away and is finding another load.`;
+        events.push(mkEvent(load.carrierId, load.id, "load_cancelled", `${b.company} passed on the slow-pay premium`, "The AI walked away and is finding another load", "info"));
+        const truckUpdates = truck && truck.nextLoadId === load.id ? { id: truck.id, nextLoadId: null } : undefined;
+        return { load: next, events, truckUpdates };
+      }
       if (rounds >= 5 || chance(0.32)) {
         const goVoice = chance(0.4) && !load.calls.length;
         if (goVoice) {

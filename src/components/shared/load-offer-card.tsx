@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Home, MessageCircle, Send, Sparkles, Truck as TruckIcon, X, Zap } from "lucide-react";
+import { Home, MessageCircle, Repeat, Send, Sparkles, Truck as TruckIcon, X, Zap } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { loadHighlight } from "@/lib/scoring";
 import type { OfferAskDraft } from "@/lib/engine";
@@ -102,7 +102,13 @@ export function LoadOfferCard({
             )}
             <span>· {load.equipmentType} · {load.lane.miles} mi</span>
           </p>
-          {broker && <BrokerTrustBadge broker={broker} className="mt-1" />}
+          {broker && (
+            <p className={cn("mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]", dark ? "text-white/60" : "text-ink-500")}>
+              <BrokerTrustBadge broker={broker} />
+              <span>Pays in ~{broker.avgDaysToPay} days</span>
+              {load.surchargePct ? <span className={dark ? "text-amber-200" : "text-[var(--accent-warn)]"}>AI asked +{load.surchargePct}% for slow pay</span> : null}
+            </p>
+          )}
           {(truck || driver) && (
             <p className={cn("mt-1 flex items-center gap-1 text-[11px] font-medium", dark ? "text-white/60" : "text-ink-500")}>
               <TruckIcon className="h-3 w-3 shrink-0" />
@@ -135,6 +141,31 @@ export function LoadOfferCard({
         <Stat label="Rate / mi" value={`$${(load.rpm ?? 0).toFixed(2)}`} dark={dark} pulse={askState === "pending"} />
         <Stat label="Pickup" value={load.pickupWindow.split(",")[0]} dark={dark} />
       </div>
+
+      {(load.loadHome || load.endsNearHome) && (
+        <div className={cn("rounded-xl px-2.5 py-2 text-xs", dark ? "bg-white/10 text-white/80" : "bg-ink-50 text-ink-600")}>
+          {load.loadHome ? (
+            <>
+              <p className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <Repeat className="h-3 w-3 shrink-0" /> Whole trip, est. net
+                </span>
+                <span className={cn("font-semibold tabular", dark ? "text-white" : "text-ink-950")}>
+                  {formatCurrency((load.netProfit ?? 0) + load.loadHome.estNet)}
+                </span>
+              </p>
+              <p className={cn("mt-0.5 text-[11px]", dark ? "text-white/55" : "text-ink-500")}>
+                Likely load home: {load.loadHome.origin} → {load.loadHome.destination}, about {formatCurrency(load.loadHome.estNet)} net
+                {load.loadHome.deadheadMiles > 30 ? ` after ${load.loadHome.deadheadMiles} empty mi` : ""}. An estimate, not booked yet.
+              </p>
+            </>
+          ) : (
+            <p className="flex items-center gap-1.5 font-medium">
+              <Home className="h-3 w-3 shrink-0" /> Delivers near the driver&apos;s home, so no load home is needed.
+            </p>
+          )}
+        </div>
+      )}
 
       {onAsk && onAskResolve && askState !== "idle" ? (
         <div className={cn("rounded-xl p-2.5", dark ? "bg-white/10" : "bg-ink-50")}>

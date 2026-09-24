@@ -2,12 +2,13 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { ChevronRight, ChevronUp, FileText, Loader2, Sparkles, X } from "lucide-react";
+import { ChevronRight, ChevronUp, FileText, Fuel, Loader2, Sparkles, X } from "lucide-react";
 import { cn, formatCurrency, timeAgo } from "@/lib/utils";
 import { useEscapeKey, useNow } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { cityCoords, pickupLegStart, type LatLng } from "@/lib/trip-geo";
 import { tripState } from "@/lib/trip-state";
+import { CARD_DISCOUNT, planFuel } from "@/lib/fuel";
 import { SwipeToConfirm } from "./swipe-to-confirm";
 import { TripMap } from "./trip-map";
 import { BrokerCallRow } from "./broker-call";
@@ -208,6 +209,8 @@ export function TripDetails({
         )}
       </Section>
 
+      <FuelPlanSection load={load} />
+
       <Section title="Load">
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <Fact label="Broker" value={brokerName ?? "—"} />
@@ -249,6 +252,48 @@ export function TripDetails({
         Open the full load page <ChevronRight className="h-4 w-4" />
       </Link>
     </>
+  );
+}
+
+/** Where to buy fuel on the loaded run — the driver still decides; the AI just says where it's cheapest. */
+function FuelPlanSection({ load }: { load: DriverTripCardProps["load"] }) {
+  const now = useNow();
+  const mpg = useStore((st) => st.trucks.find((t) => t.id === load.truckId)?.mpg ?? 6.5);
+  const s = tripState(load, now, false);
+  if (s.card === "booking" || load.stage === "at_delivery") return null;
+  const milesDone = s.card === "delivery" ? Math.round(load.lane.miles * s.legP) : 0;
+  const plan = planFuel(load, mpg, milesDone);
+  if (!plan) return null;
+
+  return (
+    <Section title="Fuel plan" icon={<Fuel className="h-3.5 w-3.5" />}>
+      <p className="text-sm">
+        Tank about {plan.startPct}% · {plan.milesLeft} loaded mi left · ~{plan.gallonsNeeded} gal at {mpg.toFixed(1)} mpg
+      </p>
+      {plan.stops.length === 0 ? (
+        <p className="mt-2 text-sm text-white/60">No fuel stop needed. You&apos;ll finish this run with more than a quarter tank.</p>
+      ) : (
+        <ol className="mt-3 flex flex-col gap-2.5">
+          {plan.stops.map((stop) => (
+            <li key={`${stop.state}-${stop.milesAhead}`} className="flex items-start justify-between gap-3 rounded-2xl bg-white/5 px-3.5 py-2.5">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{stop.chain}, {stop.stateName}</p>
+                <p className="text-xs text-white/55">About {stop.milesAhead} mi ahead · buy {stop.gallons} gal, not a full tank</p>
+              </div>
+              <p className="shrink-0 text-right text-sm font-semibold tabular">
+                ${stop.pricePerGal.toFixed(2)}
+                <span className="block text-[11px] font-normal text-white/50">with card</span>
+              </p>
+            </li>
+          ))}
+        </ol>
+      )}
+      {plan.savings > 0 && <p className="mt-2 text-xs text-emerald-300">About {formatCurrency(plan.savings)} less than filling up wherever the tank hits a quarter.</p>}
+      <p className="mt-2 text-[11px] leading-relaxed text-white/45">
+        Prices are this week&apos;s state averages with the {Math.round(CARD_DISCOUNT * 100)}¢ fuel card discount, which varies by stop. Fuel tax evens out on
+        your IFTA return, so the savings are pump price and discount only, not tax.
+      </p>
+    </Section>
   );
 }
 

@@ -15,6 +15,7 @@ import { NegotiationComposer } from "@/components/shared/negotiation-composer";
 import { NegotiationThread } from "@/components/shared/negotiation-thread";
 import { CallTranscript } from "@/components/shared/call-transcript";
 import { BrokerCallRow } from "@/components/shared/broker-call";
+import { PaymentCard } from "@/components/shared/payment-card";
 import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 import { LiveDot } from "@/components/shared/live-dot";
 import { StopsTimeline } from "@/components/shared/stops-timeline";
@@ -264,6 +265,7 @@ export default function LoadDetailPage() {
         </div>
 
         <div className="flex flex-col gap-6">
+          <PaymentCard load={load} />
           <Card>
             <CardHeader>
               <CardTitle>Rate & profit</CardTitle>

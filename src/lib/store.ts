@@ -27,6 +27,7 @@ import { computeEconomics, computeLoadScore } from "./scoring";
 import { nextStop } from "./load-status";
 import { dockClock, dockMinutes, detentionFor, formatDockTime } from "./detention";
 import { cityCoords, distanceMiles } from "./trip-geo";
+import { bookableBrokers, type BrokerPolicy } from "./broker-policy";
 import { clamp, formatDuration } from "./utils";
 import type {
   ActivityEvent,
@@ -167,6 +168,8 @@ export interface AgentSettings {
   avoidWatchBrokers: boolean;
   offersPerTruck: number;
   enabledAddons: string[];
+  /** Carrier's own call on a broker, overriding what the AI decided from its record. */
+  brokerOverrides: Record<string, BrokerPolicy>;
 }
 
 export interface LiveMetrics {
@@ -325,6 +328,13 @@ interface StoreState {
      *  log entry; just something Ops sees when scanning the Carriers table. */
     opsToggleCarrierFlag: (carrierId: string) => void;
     toggleAddon: (addonId: string) => void;
+    /** Carrier overrides the AI's call on a broker (null goes back to the AI's own). Blocking one also stops any
+     *  negotiation still open with them; loads already booked stay booked. */
+    setBrokerPolicy: (brokerId: string, policy: BrokerPolicy | null) => void;
+    /** The carrier logs that they actually talked with a driver — the AI can't do this part. */
+    logDriverCheckIn: (driverId: string) => void;
+    /** Tells the AI to pick loads that get this driver home before chasing the best rate. */
+    setHomePriority: (driverId: string, on: boolean) => void;
   };
 }
 
@@ -484,6 +494,7 @@ export const useStore = create<StoreState>((set, get) => ({
     avoidWatchBrokers: false,
     offersPerTruck: 3,
     enabledAddons: DEFAULT_ENABLED_ADDONS,
+    brokerOverrides: {},
   },
   liveMetrics: {
     activeCalls: 9,
@@ -503,12 +514,14 @@ export const useStore = create<StoreState>((set, get) => ({
         let incidents = state.incidents;
         const newEvents: ActivityEvent[] = [];
         const excludeTiers: Broker["tier"][] = state.settings.avoidWatchBrokers ? ["watch"] : [];
+        // Brokers the AI won't book are never sourced from; slow payers get a premium on the AI's ask.
+        const { brokers: bookable, surcharges } = bookableBrokers(state.brokers, state.settings.brokerOverrides);
 
         const activeLoads = loads.filter((l) => l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "cancelled" && l.carrierId === PRIMARY_CARRIER_ID);
 
         // Background market activity: loads the AI is working speculatively, not yet tied to a truck.
         if (activeLoads.length < 13 && Math.random() < 0.32) {
-          const newLoad = createSourcedLoad(state.brokers, PRIMARY_CARRIER_ID, state.tickCount, null, false, excludeTiers);
+          const newLoad = createSourcedLoad(bookable, PRIMARY_CARRIER_ID, state.tickCount, null, false, excludeTiers, undefined, undefined, surcharges);
           loads = [newLoad, ...loads];
           newEvents.push({
             id: uid("act"), timestamp: new Date().toISOString(), type: "load_sourced",
@@ -524,9 +537,12 @@ export const useStore = create<StoreState>((set, get) => ({
         if (freeTrucks.length && Math.random() < 0.35) {
           const truck = pick(freeTrucks);
           const driver = state.drivers.find((d) => d.id === truck.driverId);
-          const offers = createLoadOfferBatch(state.brokers, PRIMARY_CARRIER_ID, truck.id, state.tickCount, false, state.settings.offersPerTruck, {
+          const offers = createLoadOfferBatch(bookable, PRIMARY_CARRIER_ID, truck.id, state.tickCount, false, state.settings.offersPerTruck, {
             excludeTiers,
+            surcharges,
             homeTimeTarget: driver?.homeTimeTarget,
+            homeBase: driver?.homeBase,
+            homePriority: driver?.homePriority,
             equipmentType: truck.equipmentType,
             from: { city: truck.currentCity, state: truck.currentState },
           });
@@ -551,9 +567,12 @@ export const useStore = create<StoreState>((set, get) => ({
           const currentLoad = loads.find((l) => l.id === truck.currentLoadId);
           if (currentLoad?.stage === "in_transit" && Math.random() < 0.22) {
             const driver = state.drivers.find((d) => d.id === truck.driverId);
-            const offers = createLoadOfferBatch(state.brokers, PRIMARY_CARRIER_ID, truck.id, state.tickCount + 1, true, state.settings.offersPerTruck, {
+            const offers = createLoadOfferBatch(bookable, PRIMARY_CARRIER_ID, truck.id, state.tickCount + 1, true, state.settings.offersPerTruck, {
               excludeTiers,
+              surcharges,
               homeTimeTarget: driver?.homeTimeTarget,
+              homeBase: driver?.homeBase,
+              homePriority: driver?.homePriority,
               equipmentType: truck.equipmentType,
               from: { city: currentLoad.lane.destination, state: currentLoad.lane.destState },
             });
@@ -639,8 +658,8 @@ export const useStore = create<StoreState>((set, get) => ({
 
           if (effectiveTruck && shouldChainNextLoad(result.load, effectiveTruck)) {
             const chained = createSourcedLoad(
-              state.brokers, PRIMARY_CARRIER_ID, state.tickCount + 1, effectiveTruck.id, true, excludeTiers, effectiveTruck.equipmentType,
-              pickLaneNear({ city: result.load.lane.destination, state: result.load.lane.destState }),
+              bookable, PRIMARY_CARRIER_ID, state.tickCount + 1, effectiveTruck.id, true, excludeTiers, effectiveTruck.equipmentType,
+              pickLaneNear({ city: result.load.lane.destination, state: result.load.lane.destState }), surcharges,
             );
             loads = [chained, ...loads];
             trucks = trucks.map((t) => (t.id === effectiveTruck!.id ? { ...t, nextLoadId: chained.id } : t));
@@ -860,6 +879,55 @@ export const useStore = create<StoreState>((set, get) => ({
     },
 
     updateSettings: (partial) => set((state) => ({ settings: { ...state.settings, ...partial } })),
+
+    logDriverCheckIn: (driverId) =>
+      set((state) => ({ drivers: state.drivers.map((d) => (d.id === driverId ? { ...d, lastCheckInAt: new Date().toISOString() } : d)) })),
+
+    setHomePriority: (driverId, on) =>
+      set((state) => {
+        const driver = state.drivers.find((d) => d.id === driverId);
+        return {
+          drivers: state.drivers.map((d) => (d.id === driverId ? { ...d, homePriority: on } : d)),
+          activity: [
+            {
+              id: uid("act"), timestamp: new Date().toISOString(), type: "time_off" as const,
+              message: on ? `AI will get ${driver?.name.split(" ")[0] ?? "the driver"} home first` : `AI is back to best-paying loads for ${driver?.name.split(" ")[0] ?? "the driver"}`,
+              detail: on ? "Next-load picks favor loads that deliver near home, even at a lower rate." : "Home time is still weighed, just not first.",
+              carrierId: PRIMARY_CARRIER_ID, severity: "info" as const,
+            },
+            ...state.activity,
+          ].slice(0, 80),
+        };
+      }),
+
+    setBrokerPolicy: (brokerId, policy) =>
+      set((state) => {
+        const overrides = { ...state.settings.brokerOverrides };
+        if (policy) overrides[brokerId] = policy;
+        else delete overrides[brokerId];
+        const broker = state.brokers.find((b) => b.id === brokerId);
+        const now = new Date().toISOString();
+        const dropped = policy === "block" ? state.loads.filter((l) => l.brokerId === brokerId && ["sourced", "scoring", "negotiating"].includes(l.stage)) : [];
+        const droppedIds = new Set(dropped.map((l) => l.id));
+        return {
+          settings: { ...state.settings, brokerOverrides: overrides },
+          loads: droppedIds.size
+            ? state.loads.map((l) =>
+                droppedIds.has(l.id) ? { ...l, stage: "declined" as const, progressPct: 100, updatedAt: now, cancellationReason: `You chose not to book with ${broker?.company ?? "this broker"}.` } : l,
+              )
+            : state.loads,
+          trucks: droppedIds.size ? state.trucks.map((t) => (t.nextLoadId && droppedIds.has(t.nextLoadId) ? { ...t, nextLoadId: null } : t)) : state.trucks,
+          activity: [
+            {
+              id: uid("act"), timestamp: now, type: "escalation" as const,
+              message: policy === "block" ? `AI won't book ${broker?.company ?? "this broker"} anymore` : policy === "surcharge" ? `AI will ask ${broker?.company ?? "this broker"} for a slow-pay premium` : `AI is back to its own call on ${broker?.company ?? "this broker"}`,
+              detail: dropped.length ? `Stopped ${dropped.length} open negotiation${dropped.length === 1 ? "" : "s"}. Booked loads stay booked.` : "Applies to new loads from now on.",
+              carrierId: PRIMARY_CARRIER_ID, severity: "info" as const,
+            },
+            ...state.activity,
+          ].slice(0, 80),
+        };
+      }),
 
     toggleAddon: (addonId) =>
       set((state) => {
@@ -1324,8 +1392,12 @@ export const useStore = create<StoreState>((set, get) => ({
         if (!truck || truck.nextLoadId || !truck.currentLoadId) return {};
         const driver = state.drivers.find((d) => d.id === truck.driverId);
         const currentLoad = state.loads.find((l) => l.id === truck.currentLoadId);
-        const offers = createLoadOfferBatch(state.brokers, PRIMARY_CARRIER_ID, truck.id, state.tickCount, true, state.settings.offersPerTruck, {
+        const { brokers: bookable, surcharges } = bookableBrokers(state.brokers, state.settings.brokerOverrides);
+        const offers = createLoadOfferBatch(bookable, PRIMARY_CARRIER_ID, truck.id, state.tickCount, true, state.settings.offersPerTruck, {
+          surcharges,
           homeTimeTarget: driver?.homeTimeTarget,
+          homeBase: driver?.homeBase,
+          homePriority: driver?.homePriority,
           equipmentType: truck.equipmentType,
           from: currentLoad ? { city: currentLoad.lane.destination, state: currentLoad.lane.destState } : undefined,
         });

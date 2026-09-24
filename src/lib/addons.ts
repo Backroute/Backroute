@@ -17,9 +17,9 @@ export const ADDONS: Addon[] = [
   {
     id: "factoring-ai",
     name: "Factoring AI",
-    tagline: "Auto-submits invoices on delivery and gets you paid in 24 hours instead of 30-45 day broker terms",
+    tagline: "Submits the invoice packet the moment the POD checks out. Funds land the next business day, or the same day before the 11 AM cutoff, instead of 30-45 day broker terms",
     model: "commission",
-    commissionNote: "Free to you. Backroute earns a referral commission from our factoring partner, not from your invoice.",
+    commissionNote: "The AI is free. The factoring partner charges its 2.5% recourse fee, and Backroute earns a referral commission from them, not from your invoice.",
   },
   {
     id: "insurance-ai",
