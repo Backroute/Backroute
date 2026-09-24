@@ -281,7 +281,7 @@ export default function LoadDetailPage() {
                   tone={load.netProfit ? (load.netProfit > 0 ? "success" : "danger") : undefined}
                   strong
                 />
-                <Row label="Rate / mile" value={load.rpm ? `$${load.rpm.toFixed(2)}` : "—"} />
+                <Row label="Per mile" value={load.rpm ? `$${load.rpm.toFixed(2)}` : "—"} />
               </div>
             </CardContent>
           </Card>
@@ -293,9 +293,9 @@ export default function LoadDetailPage() {
             <CardContent className="!pt-3">
               <div className="flex flex-col gap-3.5">
                 <IconRow icon={Route} label="Distance" value={`${load.lane.miles} mi`} />
-                <IconRow icon={Gauge} label="Deadhead" value={`${load.deadheadMiles} mi`} />
+                <IconRow icon={Gauge} label="Empty miles" value={`${load.deadheadMiles} mi`} />
                 <IconRow icon={Fuel} label="Fuel cost" value={formatCurrency(load.fuelCost)} />
-                <IconRow icon={TrendingUp} label="Deadhead cost" value={formatCurrency(load.deadheadCost)} />
+                <IconRow icon={TrendingUp} label="Empty-mile cost" value={formatCurrency(load.deadheadCost)} />
                 <IconRow icon={TrendingUp} label="Tolls" value={formatCurrency(load.tollCost)} />
                 <IconRow icon={Percent} label="Backroute commission (2%)" value={formatCurrency(load.commission)} />
                 <div className="border-t border-line pt-3.5">

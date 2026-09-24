@@ -90,7 +90,7 @@ export default function DriverProfilePage() {
           <div className="mt-3 flex items-center justify-between rounded-xl bg-ink-50 px-3.5 py-2.5">
             <div>
               <p className="text-sm font-medium text-ink-900">{teammate.name}</p>
-              <p className="text-xs text-ink-400">{teammate.hoursRemaining.toFixed(1)}h HOS remaining</p>
+              <p className="text-xs text-ink-400">{teammate.hoursRemaining.toFixed(1)}h of driving left</p>
             </div>
             <Badge tone={HOS_TONE[teammate.hosStatus]}>{teammate.hosStatus.replace("_", " ")}</Badge>
           </div>

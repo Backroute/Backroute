@@ -136,7 +136,7 @@ export default function FleetPage() {
                 {driver && (
                   <div>
                     <div className="flex items-center justify-between text-xs text-ink-500">
-                      <span>HOS · <Badge tone={HOS_TONE[driver.hosStatus]}>{driver.hosStatus.replace("_", " ")}</Badge></span>
+                      <span>Hours · <Badge tone={HOS_TONE[driver.hosStatus]}>{driver.hosStatus.replace("_", " ")}</Badge></span>
                       <span className="tabular">{driver.hoursRemaining.toFixed(1)}h left</span>
                     </div>
                     <Progress value={hosPct} className="mt-2" />
@@ -158,7 +158,7 @@ export default function FleetPage() {
                 {secondDriver && (
                   <div>
                     <div className="flex items-center justify-between text-xs text-ink-500">
-                      <span>Co-driver HOS · <Badge tone={HOS_TONE[secondDriver.hosStatus]}>{secondDriver.hosStatus.replace("_", " ")}</Badge></span>
+                      <span>Co-driver hours · <Badge tone={HOS_TONE[secondDriver.hosStatus]}>{secondDriver.hosStatus.replace("_", " ")}</Badge></span>
                       <span className="tabular">{secondDriver.hoursRemaining.toFixed(1)}h left</span>
                     </div>
                     <Progress value={Math.min(100, (secondDriver.hoursRemaining / 11) * 100)} className="mt-2" />

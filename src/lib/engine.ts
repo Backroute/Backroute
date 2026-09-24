@@ -262,7 +262,13 @@ export function resolveLoadOffer(loads: Load[], offerGroupId: string, chosenId: 
 }
 
 /** Offers left unattended past the timeout get auto-resolved when autonomy is enabled. */
-export function autoResolveStaleOffers(loads: Load[], staleMs: number, autoBookEnabled: boolean): OfferResolution {
+/** On "within my rules": an option the AI may book without anyone picking — it makes money and pays at least the
+ *  carrier's floor against the lane's market rate. Anything else waits for a person. */
+export function clearsRules(load: Load, rateFloorPct: number): boolean {
+  return (load.netProfit ?? 0) > 0 && load.targetRate >= load.lane.miles * load.lane.marketRpm * (rateFloorPct / 100);
+}
+
+export function autoResolveStaleOffers(loads: Load[], staleMs: number, autoBookEnabled: boolean, rateFloorPct = 0): OfferResolution {
   if (!autoBookEnabled) return { loads, events: [] };
   const now = Date.now();
   const groupIds = new Set(
@@ -274,7 +280,7 @@ export function autoResolveStaleOffers(loads: Load[], staleMs: number, autoBookE
   for (const groupId of groupIds) {
     const group = result.filter((l) => l.offerGroupId === groupId && l.stage === "offered");
     const best = group.find((l) => l.recommended) ?? group[0];
-    if (!best) continue;
+    if (!best || !clearsRules(best, rateFloorPct)) continue;
     const resolved = resolveLoadOffer(result, groupId, best.id, "ai");
     result = resolved.loads;
     events.push(...resolved.events);

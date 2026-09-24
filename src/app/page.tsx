@@ -13,7 +13,7 @@ const STATS = [
 ];
 
 const FEATURES = [
-  { title: "Finds every load", body: "Scans every board and inbox, scored on true profit after fuel, tolls, and deadhead.", icon: Radar },
+  { title: "Finds every load", body: "Scans every board and inbox, scored on true profit after fuel, tolls, and empty miles.", icon: Radar },
   { title: "Negotiates everywhere", body: "Email, SMS, and voice, holding your rate floor all day on every channel.", icon: MessageSquare },
   { title: "Books the next one", body: "Confirms, tracks, and documents automatically, then rebooks before this load lands.", icon: Truck },
 ];

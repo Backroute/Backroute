@@ -13,15 +13,23 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   badge?: number;
+  /** Other routes that belong to this section and light it up. */
+  match?: string[];
 }
 
 /** Picks the most specific nav item matching the current path, so a portal root (e.g. /carrier) doesn't light up on every sub-route. */
 function bestMatchHref(pathname: string | null, navItems: NavItem[]): string | undefined {
   if (!pathname) return undefined;
   let best: NavItem | undefined;
+  let bestLen = -1;
   for (const item of navItems) {
-    const matches = pathname === item.href || pathname.startsWith(item.href.endsWith("/") ? item.href : `${item.href}/`);
-    if (matches && (!best || item.href.length > best.href.length)) best = item;
+    for (const href of [item.href, ...(item.match ?? [])]) {
+      const matches = pathname === href || pathname.startsWith(href.endsWith("/") ? href : `${href}/`);
+      if (matches && href.length > bestLen) {
+        best = item;
+        bestLen = href.length;
+      }
+    }
   }
   return best?.href;
 }

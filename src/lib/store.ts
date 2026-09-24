@@ -141,6 +141,13 @@ function scheduleCallEnds(loads: Load[], finish: (loadId: string, callId: string
   }
 }
 
+export const AUTONOMY_LABEL: Record<Autonomy, string> = { ask: "Ask me first", rules: "Within my rules", full: "Full autopilot" };
+export const AUTONOMY_DETAIL: Record<Autonomy, string> = {
+  ask: "The AI finds, scores and negotiates. You or the driver pick every load.",
+  rules: "The AI books on its own when a load makes money, pays your minimum rate and fits home time. The rest wait for a pick.",
+  full: "The AI books every truck's next load the moment it finds the best one.",
+};
+
 /** Where home time stands for the truck's next load — a dispatcher checks this before booking anything. When it's
  *  tight, or the carrier said home first, the AI only books loads that bring the driver closer to home. */
 function homeOptions(driver: Driver | undefined, from: { city: string; state: string } | undefined): { homeBase?: string; headHome?: boolean; runType?: RunType } {
@@ -179,7 +186,11 @@ function readDriverDocument(load: Load, type: DriverDocType): { note: string; lu
 
 export type Aggressiveness = "conservative" | "balanced" | "aggressive";
 
+/** How much the AI books on its own: every pick by a person, anything that clears the carrier's rules, or all of it. */
+export type Autonomy = "ask" | "rules" | "full";
+
 export interface AgentSettings {
+  autonomy: Autonomy;
   aggressiveness: Aggressiveness;
   autoBookEnabled: boolean;
   autoBookThreshold: number;
@@ -357,6 +368,8 @@ interface StoreState {
      *  log entry; just something Ops sees when scanning the Carriers table. */
     opsToggleCarrierFlag: (carrierId: string) => void;
     toggleAddon: (addonId: string) => void;
+    /** The one autopilot setting: carriers start on "ask" and move up as they trust the AI. */
+    setAutonomy: (level: Autonomy) => void;
     /** Carrier overrides the AI's call on a broker (null goes back to the AI's own). Blocking one also stops any
      *  negotiation still open with them; loads already booked stay booked. */
     setBrokerPolicy: (brokerId: string, policy: BrokerPolicy | null) => void;
@@ -383,7 +396,7 @@ function craftDriverReply(content: string, ctx: { driver?: Driver; currentLoad?:
   const { driver, currentLoad } = ctx;
 
   if (/how (does|do|is).*(dispatch|score|scoring|match|work)|how (backroute|this|it) works|explain.*dispatch/.test(c)) {
-    return "I scan every connected board and inbox, score each load on real profit after fuel and deadhead, then negotiate rate by phone, text, and email. Book, track, and document the trip automatically. You just pick which load, I handle the rest.";
+    return "I scan every connected board and inbox, score each load on real profit after fuel and empty miles, then negotiate rate by phone, text, and email. Book, track, and document the trip automatically. You just pick which load, I handle the rest.";
   }
   if (/\b(decline|reject|turn down|pass on|skip)\b.*load|what happens if i (decline|reject|skip)/.test(c)) {
     return "Nothing bad. Decline it and I'll keep sourcing others. If nobody picks within the window, your carrier's autonomy settings decide whether I auto-book the top-scored option or keep waiting.";
@@ -447,7 +460,7 @@ function craftCarrierReply(content: string, ctx: { loads: Load[]; trucks: Truck[
   const { loads, trucks, escalations } = ctx;
 
   if (/how (does|do|is).*(dispatch|score|scoring|match|work)|how (backroute|this|it) works|explain.*dispatch/.test(c)) {
-    return "I scan every connected board and inbox for your fleet, score each load on real profit after fuel and deadhead, then negotiate rate by phone, text, and email. Book, track, and document the trip. Your drivers just pick which load, I handle the rest.";
+    return "I scan every connected board and inbox for your fleet, score each load on real profit after fuel and empty miles, then negotiate rate by phone, text, and email. Book, track, and document the trip. Your drivers just pick which load, I handle the rest.";
   }
   if (/\b(escalat|need my attention|anything urgent|what needs (my|me)|approval)\b/.test(c)) {
     const open = escalations.filter((e) => e.status !== "resolved");
@@ -509,6 +522,7 @@ function findNegotiatingLoadForDriver(state: StoreState, driverId: string): Load
 export const useStore = create<StoreState>((set, get) => ({
   ...world,
   settings: {
+    autonomy: "ask",
     aggressiveness: "balanced",
     autoBookEnabled: false,
     autoBookThreshold: 350,
@@ -616,7 +630,7 @@ export const useStore = create<StoreState>((set, get) => ({
         }
 
         // Auto-pick offers nobody has acted on, if autonomy is enabled.
-        const staleResolved = autoResolveStaleOffers(loads, 13000, state.settings.autoBookEnabled);
+        const staleResolved = autoResolveStaleOffers(loads, 13000, state.settings.autoBookEnabled, state.settings.rateFloorPct);
         if (staleResolved.events.length) {
           loads = staleResolved.loads;
           newEvents.push(...staleResolved.events);
@@ -953,6 +967,38 @@ export const useStore = create<StoreState>((set, get) => ({
               id: uid("act"), timestamp: now, type: "escalation" as const,
               message: policy === "block" ? `AI won't book ${broker?.company ?? "this broker"} anymore` : policy === "surcharge" ? `AI will ask ${broker?.company ?? "this broker"} for a slow-pay premium` : `AI is back to its own call on ${broker?.company ?? "this broker"}`,
               detail: dropped.length ? `Stopped ${dropped.length} open negotiation${dropped.length === 1 ? "" : "s"}. Booked loads stay booked.` : "Applies to new loads from now on.",
+              carrierId: PRIMARY_CARRIER_ID, severity: "info" as const,
+            },
+            ...state.activity,
+          ].slice(0, 80),
+        };
+      }),
+
+    setAutonomy: (level) =>
+      set((state) => {
+        let loads = state.loads;
+        let trucks = state.trucks.map((t) => (level === "rules" ? t : { ...t, autoChainNextLoad: level === "full" }));
+        let events: ActivityEvent[] = [];
+        // Full autopilot books whatever is already waiting too, the same as switching each truck on.
+        if (level === "full") {
+          for (const truck of trucks) {
+            const waiting = loads.filter((l) => l.truckId === truck.id && l.stage === "offered");
+            if (!waiting.length) continue;
+            const picked = autoPickOffer(loads, trucks, waiting, truck.id);
+            loads = picked.loads;
+            trucks = picked.trucks;
+            events = [...events, ...picked.events];
+          }
+        }
+        return {
+          settings: { ...state.settings, autonomy: level, autoBookEnabled: level !== "ask" },
+          trucks,
+          loads,
+          activity: [
+            ...events,
+            {
+              id: uid("act"), timestamp: new Date().toISOString(), type: "escalation" as const,
+              message: `Autopilot: ${AUTONOMY_LABEL[level]}`, detail: AUTONOMY_DETAIL[level],
               carrierId: PRIMARY_CARRIER_ID, severity: "info" as const,
             },
             ...state.activity,

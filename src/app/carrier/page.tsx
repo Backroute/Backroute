@@ -16,8 +16,10 @@ import { Switch } from "@/components/ui/switch";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { TruckDriverChip } from "@/components/shared/truck-driver-chip";
 import { IncidentCard } from "@/components/shared/incident-card";
+import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { useDriverRetention } from "@/components/shared/driver-retention";
 import { RUN_TYPE_LABEL } from "@/lib/run-types";
+import { weekEarnings } from "@/lib/earnings";
 import { useNow } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks, useCarrierDrivers, useCarrierEscalations, useDriverMap, useBrokerMap, useTruckMap, truckActiveLoads } from "@/lib/selectors";
@@ -52,6 +54,7 @@ export default function CarrierOverviewPage() {
     (i) => i.carrierId === carrier.id && (i.status === "active" || (now !== null && now - Date.parse(i.steps.at(-1)?.timestamp ?? i.createdAt) < 20_000)),
   );
   const liveCalls = loads.filter((l) => l.liveCall).length;
+  const weekProfit = weekEarnings(loads).net;
   const driversAtRisk = useDriverRetention().filter((r) => r.view.level === "at_risk");
 
   const activeLoads = loads.filter((l) => l.stage !== "delivered");
@@ -113,16 +116,22 @@ export default function CarrierOverviewPage() {
   return (
     <div>
       <PageHeader
-        title="Overview"
+        title="Today"
         description={`${carrier.name} · ${trucks.length} trucks · ${carrier.plan} plan`}
         right={<LiveDot />}
       />
 
       <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
         <div className="rounded-3xl bg-ink-950 p-5 text-white sm:p-6">
-          <p className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-white/50">
-            <Sparkles className="h-3.5 w-3.5" /> AI Dispatcher
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <p className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-white/50">
+              <Sparkles className="h-3.5 w-3.5" /> AI Dispatcher
+            </p>
+            <div className="text-right">
+              <p className="text-3xl font-semibold tabular tracking-tight">{formatCurrency(weekProfit)}</p>
+              <p className="text-[11px] text-white/50">profit this week</p>
+            </div>
+          </div>
           <p className="mt-2 text-xl font-semibold leading-snug sm:text-2xl">
             {needsYouCount === 0
               ? "Nothing needs you. Every load is handled."
@@ -132,6 +141,10 @@ export default function CarrierOverviewPage() {
             {chainedCount} of {trucks.length} trucks already {chainedCount === 1 ? "has" : "have"} the next load lined up.
             {liveCalls > 0 && ` AI is on ${liveCalls === 1 ? "a broker call" : `${liveCalls} broker calls`} right now.`}
           </p>
+          <div className="mt-5">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-white/50">Autopilot</p>
+            <AutopilotControl dark />
+          </div>
           <div className="mt-5 grid grid-cols-3 gap-2">
             <BannerTile label="On the road" value={onRoad} />
             <BannerTile label="AI booking" value={booking} />

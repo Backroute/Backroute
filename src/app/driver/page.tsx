@@ -13,11 +13,13 @@ import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 import { IncidentCard } from "@/components/shared/incident-card";
 import { useNow } from "@/lib/hooks";
+import { weekEarnings } from "@/lib/earnings";
+import { computeDriverPay } from "@/lib/settlements";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap, truckActiveLoads } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { STAGE_CONFIRM } from "@/lib/stage-confirm";
 import { PRE_TRIP_STAGES } from "@/lib/trip-state";
-import { cn, formatCurrency, formatNumber } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 
 export default function DriverHomePage() {
@@ -90,8 +92,18 @@ export default function DriverHomePage() {
     : null;
 
   const homeTime = useHomeTime(driver, truck, currentLoad);
-  const weekLoads = loads.filter((l) => l.truckId === truck?.id);
-  const weekMiles = weekLoads.reduce((s, l) => s + l.lane.miles, 0);
+  const weekPay = weekEarnings(loads.filter((l) => l.truckId === truck?.id)).loads.reduce((s, l) => s + computeDriverPay(l, driver, !!truck?.secondDriverId), 0);
+  // The one thing every driver wants to know besides pay: when they're home.
+  const homeWhen =
+    driver.runType === "local" || driver.runType === "intown"
+      ? homeTime?.state === "late"
+        ? "Late tonight"
+        : "Tonight"
+      : homeTime?.target
+        ? homeTime.target.replace(/^Home (by |in )?/, "")
+        : homeTime?.hoursHome != null
+          ? `${Math.round(homeTime.hoursHome)} h away`
+          : "—";
 
   return (
     <div className="flex flex-col gap-5 px-5">
@@ -105,6 +117,16 @@ export default function DriverHomePage() {
               ? "Nothing needs you. AI Dispatcher has it handled."
               : `${todoCount} thing${todoCount === 1 ? "" : "s"} for you. AI handles the rest.`}
         </p>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <Link href="/driver/earnings" className="rounded-2xl border border-line px-4 py-3">
+            <p className="font-display text-2xl tabular text-ink-950">{formatCurrency(weekPay)}</p>
+            <p className="text-xs text-ink-500">Pay this week</p>
+          </Link>
+          <div className="rounded-2xl border border-line px-4 py-3">
+            <p className="font-display text-2xl text-ink-950">{homeWhen}</p>
+            <p className="text-xs text-ink-500">{driver.runType === "local" || driver.runType === "intown" ? `${driver.hoursRemaining.toFixed(1)} h of driving left` : "Home"}</p>
+          </div>
+        </div>
       </div>
 
       {incidents.map((incident) => (
@@ -196,12 +218,6 @@ export default function DriverHomePage() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3">
-        <Stat label="Miles this week" value={formatNumber(weekMiles)} />
-        <Stat label="Loads" value={weekLoads.length} />
-        <Stat label="HOS left" value={`${driver.hoursRemaining.toFixed(1)}h`} />
-      </div>
-
       {truck && (
         <Link href="/driver/loads" className="flex items-center justify-between rounded-2xl border border-line px-4 py-3.5 text-sm text-ink-700">
           <span className="flex items-center gap-2">
@@ -225,15 +241,6 @@ export default function DriverHomePage() {
       )}
 
       {calling && <VoiceCallModal spec={{ kind: "checkin", driverId: driver.id, driverFirstName: driver.name }} onClose={() => setCalling(false)} />}
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-2xl border border-line p-3.5 text-center">
-      <p className="font-display text-xl tabular text-ink-950">{value}</p>
-      <p className="mt-0.5 text-[10px] leading-tight text-ink-500">{label}</p>
     </div>
   );
 }

@@ -151,7 +151,7 @@ export default function CompliancePage() {
           <CardHeader>
             <div>
               <CardTitle className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4" /> Vehicle inspections</CardTitle>
-              <CardDescription>Pre-trip and post-trip DVIR reports logged by drivers.</CardDescription>
+              <CardDescription>Pre-trip and post-trip inspections logged by drivers.</CardDescription>
             </div>
             {dvirInspections.length > 0 && (
               <Button

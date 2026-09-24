@@ -14,6 +14,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierTrucks } from "@/lib/selectors";
 import { downloadCsv } from "@/lib/csv-export";
+import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Aggressiveness } from "@/lib/store";
 
@@ -118,15 +119,10 @@ export default function SettingsPage() {
               <div className="grid gap-6 lg:grid-cols-2">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Autonomy</CardTitle>
+                    <CardTitle>Autopilot</CardTitle>
                   </CardHeader>
                   <CardContent className="!pt-3 flex flex-col gap-4">
-                    <ToggleRow
-                      label="Auto-select when driver doesn't choose"
-                      desc="If nobody picks a load option within ~15s, AI books its top-scored pick automatically"
-                      checked={settings.autoBookEnabled}
-                      onChange={(v) => updateSettings({ autoBookEnabled: v })}
-                    />
+                    <AutopilotControl />
                     <ToggleRow label="Avoid low-reliability brokers" desc="Never source or negotiate with 'watch' tier brokers" checked={settings.avoidWatchBrokers} onChange={(v) => updateSettings({ avoidWatchBrokers: v })} />
                     <ToggleRow label="Voice agent" desc="Allow the AI to call brokers directly" checked={settings.voiceEnabled} onChange={(v) => updateSettings({ voiceEnabled: v })} />
                     <ToggleRow label="SMS agent" desc="Allow rate checks and counters over SMS" checked={settings.smsEnabled} onChange={(v) => updateSettings({ smsEnabled: v })} />
