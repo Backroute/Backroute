@@ -1,14 +1,31 @@
 import { computeDriverPay } from "./settlements";
-import { formatEta, legMiles } from "./trip-geo";
-import type { DispatchCall, DispatchCallChoice, DispatchCallEffect, DispatchCallKind, DispatchCallReport, Driver, DriverPrefs, Load } from "./types";
+import { legMiles } from "./trip-geo";
+import { pack, type CallPack, type PrefKey } from "./lang";
+import type {
+  DispatchCall,
+  DispatchCallChoice,
+  DispatchCallEffect,
+  DispatchCallKind,
+  DispatchCallOption,
+  DispatchCallReport,
+  Driver,
+  DriverPrefs,
+  Lang,
+  Load,
+} from "./types";
 
 /**
  * The calls a human dispatcher makes all day, scripted: a load to offer, the pickup number before the gate, the
  * receiver's rules before delivery, a late appointment already fixed, and where to park when hours run out. Every
  * call is short, says numbers in groups the way people read them over the phone, and ends with a text copy so the
- * driver never writes anything down while driving. Each turn is decided here; the store only applies the result.
+ * driver never writes anything down while driving.
+ *
+ * A call keeps facts, not sentences: the words come from the driver's language pack when they're spoken, so the same
+ * call can be said in Spanish to the driver and shown in English (or Punjabi) to the owner. Each turn is decided
+ * here; the store only applies the result.
  */
 
+/** Carrier-facing names for each kind of call. The carrier dashboard is English in the demo. */
 export const KIND_LABEL: Record<DispatchCallKind, string> = {
   next_load: "Next load",
   pickup_brief: "Before pickup",
@@ -31,20 +48,8 @@ export const CALL_GAP_MS = 20_000;
 
 const SHIPPERS = ["Great Plains Foods", "Lone Star Packaging", "Midway Paper Co.", "Summit Beverage", "Keystone Building Supply", "Harbor Cold Storage", "Redline Auto Parts", "Prairie Grain Mills"];
 const RECEIVERS = ["Walmart DC 6012", "Kroger DC", "Home Depot RDC", "Target DC 3807", "Sysco", "H-E-B Warehouse", "Costco Depot", "Lowe's RDC"];
-const PICKUP_NOTES = [
-  "Check in at the guard shack with that number and they'll give you a door",
-  "Trucks go in through the back gate off the service road, not the front lot",
-  "It's a live load, about two hours. Your detention clock starts at check-in",
-  "Shipping office is on the left as you pull in. They want your seal number on the BOL",
-];
-const DELIVERY_NOTES = [
-  "Receiving is around the back. Call-in is on the sign at the gate",
-  "They're strict on appointments, so check in 15 minutes early",
-  "They unload, you wait in the truck. Get the POD signed before you pull off",
-  "No overnight parking on site, so don't show up early the night before",
-];
 const ROADS = ["I-40", "I-35", "I-20", "I-30", "I-45", "I-10", "I-44"];
-const STOPS = ["the TA", "the Pilot", "the Love's", "the Petro"];
+const STOPS = ["TA", "Pilot", "Love's", "Petro"];
 
 function hash(s: string): number {
   let h = 2166136261;
@@ -53,18 +58,14 @@ function hash(s: string): number {
 }
 const from = <T,>(arr: T[], seed: number) => arr[seed % arr.length];
 
-/** "482719" → "4 8 2, 7 1 9": the way a dispatcher reads a number so it sticks. */
+/** "482719" → "4 8 2, 7 1 9": the way a dispatcher reads a number so it sticks. Digits are read in any language. */
 export function sayDigits(n: string): string {
   const groups = n.match(/.{1,3}/g) ?? [n];
   return groups.map((g) => g.split("").join(" ")).join(", ");
 }
 
-function hourLabel(h: number): string {
-  const hr = ((h + 11) % 12) + 1;
-  return `${hr} ${h < 12 ? "AM" : "PM"}`;
-}
-
 const firstName = (d: Driver) => d.name.split(" ")[0];
+export const driverLang = (d: Driver | undefined): Lang => d?.prefs?.language ?? "en";
 
 /** Whether the AI would drop this load into the driver's lap right now. */
 export function driverTakes(prefs: DriverPrefs | undefined, load: Pick<Load, "lane">): boolean {
@@ -77,13 +78,23 @@ export function lateOnThisLoad(loadId: string): boolean {
   return hash(loadId + "late") % 10 < 3;
 }
 
+export type QuietState = { kind: "sleeper" | "off_duty" } | { kind: "early"; hour: number } | null;
+
 /** Why a call can't ring right now, or null when it can. Sleeper and off duty are never interrupted. */
-export function quietReason(driver: Driver, now: Date): string | null {
-  if (driver.hosStatus === "sleeper") return `${firstName(driver)}'s in the sleeper`;
-  if (driver.hosStatus === "off_duty") return `${firstName(driver)}'s off duty`;
+export function quietState(driver: Driver, now: Date): QuietState {
+  if (driver.hosStatus === "sleeper") return { kind: "sleeper" };
+  if (driver.hosStatus === "off_duty") return { kind: "off_duty" };
   const before = driver.prefs?.noCallsBefore;
-  if (before !== undefined && now.getHours() < before) return `No calls before ${hourLabel(before)}`;
+  if (before !== undefined && now.getHours() < before) return { kind: "early", hour: before };
   return null;
+}
+
+/** The same, in words for the carrier's board. */
+export function quietReason(driver: Driver, now: Date): string | null {
+  const q = quietState(driver, now);
+  if (!q) return null;
+  if (q.kind === "early") return `No calls before ${pack("en").hour(q.hour)}`;
+  return q.kind === "sleeper" ? `${firstName(driver)}'s in the sleeper` : `${firstName(driver)}'s off duty`;
 }
 
 interface NewCall {
@@ -91,7 +102,7 @@ interface NewCall {
   driver: Driver;
   load?: Load;
   facts?: Record<string, string>;
-  options?: DispatchCall["options"];
+  options?: DispatchCallOption[];
 }
 
 export function newDispatchCall({ kind, driver, load, facts = {}, options }: NewCall): DispatchCall {
@@ -101,6 +112,7 @@ export function newDispatchCall({ kind, driver, load, facts = {}, options }: New
     carrierId: driver.carrierId,
     loadId: load?.id,
     kind,
+    lang: driverLang(driver),
     status: "queued",
     createdAt: new Date().toISOString(),
     lines: [],
@@ -114,69 +126,80 @@ export function newDispatchCall({ kind, driver, load, facts = {}, options }: New
 
 // ——— Facts gathered when the AI decides to call ———
 
-/** The next-load call reads the options best-first, in the driver's own money: what they make, not what the truck grosses. */
-export function nextLoadCall(driver: Driver, offers: Load[], emptyAt: string, team: boolean): DispatchCall | null {
-  const ranked = [...offers].sort((a, b) => Number(!!b.recommended) - Number(!!a.recommended) || b.score - a.score).slice(0, 3);
-  if (!ranked.length || !ranked[0].offerGroupId) return null;
-  const local = driver.runType === "local" || driver.runType === "intown";
-  const options = ranked.map((l) => {
-    const pay = Math.round(computeDriverPay(l, driver, team) / 5) * 5;
-    const home =
-      l.hoursHomeAfter === undefined
-        ? ""
-        : local
-          ? l.homeTonight
-            ? " You're home tonight."
-            : " It runs late, so you'd get home late."
-          : l.hoursHomeAfter < 1
-            ? " It delivers right by home."
-            : ` Leaves you about ${Math.round(l.hoursHomeAfter)} hours from home.`;
-    const move = l.lane.moveKind ? "move" : "load";
-    return {
-      loadId: l.id,
-      short: `${l.lane.origin} → ${l.lane.destination}, $${(l.bookedRate ?? l.targetRate).toLocaleString()}`,
-      say: `${l.lane.origin} to ${l.lane.destination}, ${l.lane.miles} miles, picks up ${l.pickupWindow.split(",")[0].toLowerCase()}. You'd make about $${pay.toLocaleString()} on this ${move}.${home}`,
-    };
-  });
-  const call = newDispatchCall({ kind: "next_load", driver, load: ranked[0], options, facts: { groupId: ranked[0].offerGroupId, emptyAt, count: String(offers.length) } });
-  return call;
+export interface EmptyAt {
+  kind: "after" | "in";
+  city: string;
 }
 
-/** The appointment the way you'd say it on the phone, from whatever the load carries. Loads without a set time get
+/** A load as the AI reads it out: in the driver's own money (what they make, not what the truck grosses). */
+function optionFor(l: Load, driver: Driver, team: boolean): DispatchCallOption {
+  const local = driver.runType === "local" || driver.runType === "intown";
+  const home: DispatchCallOption["home"] =
+    l.hoursHomeAfter === undefined
+      ? undefined
+      : local
+        ? { kind: l.homeTonight ? "tonight" : "late" }
+        : l.hoursHomeAfter < 1
+          ? { kind: "near" }
+          : { kind: "hours", hours: Math.round(l.hoursHomeAfter) };
+  return {
+    loadId: l.id,
+    short: `${l.lane.origin} → ${l.lane.destination}, $${(l.bookedRate ?? l.targetRate).toLocaleString()}`,
+    origin: l.lane.origin,
+    dest: l.lane.destination,
+    miles: l.lane.miles,
+    day: /^tomorrow/i.test(l.pickupWindow) ? "tomorrow" : "today",
+    pay: Math.round(computeDriverPay(l, driver, team) / 5) * 5,
+    move: !!l.lane.moveKind,
+    home,
+  };
+}
+
+/** The next-load call reads the options best-first. */
+export function nextLoadCall(driver: Driver, offers: Load[], emptyAt: EmptyAt, team: boolean): DispatchCall | null {
+  const ranked = [...offers].sort((a, b) => Number(!!b.recommended) - Number(!!a.recommended) || b.score - a.score).slice(0, 3);
+  if (!ranked.length || !ranked[0].offerGroupId) return null;
+  return newDispatchCall({
+    kind: "next_load",
+    driver,
+    load: ranked[0],
+    options: ranked.map((l) => optionFor(l, driver, team)),
+    facts: { groupId: ranked[0].offerGroupId, emptyKind: emptyAt.kind, emptyCity: emptyAt.city, count: String(offers.length) },
+  });
+}
+
+/** The appointment as the load carries it, turned into facts any language can say. Loads without a set time get
  *  the receiver's usual one. */
-function apptPhrase(window: string, h: number): string {
-  const moved = window.match(/Moved to (\d+ [AP]M)/);
-  if (moved) return `Your appointment is ${moved[1]}`;
+function apptFacts(window: string, h: number): Record<string, string> {
+  const to24 = (hr: string, ap: string) => String((Number(hr) % 12) + (ap === "PM" ? 12 : 0));
+  const moved = window.match(/Moved to (\d+) ([AP]M)/);
+  if (moved) return { apptKind: "at", apptA: to24(moved[1], moved[2]) };
   const slot = window.match(/appointment (\d+):00 ([AP]M)/);
-  if (slot) return `Your appointment is ${slot[1]} ${slot[2]}`;
-  if (/^Tomorrow, 7 AM/.test(window)) return "Your appointment is tomorrow at 7 AM";
+  if (slot) return { apptKind: "at", apptA: to24(slot[1], slot[2]) };
+  if (/^Tomorrow, 7 AM/.test(window)) return { apptKind: "tomorrow7" };
   const range = window.match(/(\d+):00–(\d+):00/);
-  if (range) return `They load between ${hourLabel(Number(range[1]))} and ${hourLabel(Number(range[2]))}`;
-  return `Your appointment is ${hourLabel(8 + (h % 8))}`;
+  if (range) return { apptKind: "window", apptA: range[1], apptB: range[2] };
+  return { apptKind: "at", apptA: String(8 + (h % 8)) };
 }
 
 export function briefCall(driver: Driver, load: Load, stop: "pickup" | "delivery", legP: number): DispatchCall {
   const h = hash(load.id + stop);
-  const number = String(100000 + (h % 900000));
   const container = load.lane.moveKind === "container_pickup" || load.lane.moveKind === "empty_return";
-  const place = stop === "pickup" ? from(SHIPPERS, h) : from(RECEIVERS, h);
-  const city = stop === "pickup" ? load.lane.origin : load.lane.destination;
   const milesLeft = Math.max(4, Math.round(legMiles(load, stop) * (1 - legP)));
   return newDispatchCall({
     kind: stop === "pickup" ? "pickup_brief" : "delivery_brief",
     driver,
     load,
     facts: {
-      place,
-      city,
-      number,
-      numberKind: container ? "Container number" : stop === "pickup" ? "Pickup number" : "Delivery number",
+      place: stop === "pickup" ? from(SHIPPERS, h) : from(RECEIVERS, h),
+      city: stop === "pickup" ? load.lane.origin : load.lane.destination,
+      number: String(100000 + (h % 900000)),
+      numberKind: container ? "container" : stop,
       prefix: container ? from(["MSCU", "MAEU", "CMAU", "HLXU"], h) : "",
-      eta: formatEta(milesLeft),
-      appt: apptPhrase(stop === "pickup" ? load.pickupWindow : load.deliveryWindow, h),
-      note: stop === "pickup" ? from(PICKUP_NOTES, h >>> 3) : from(DELIVERY_NOTES, h >>> 3),
-      door: String(3 + (h % 38)),
+      etaMin: String(Math.round((milesLeft / 50) * 60)),
+      note: String((h >>> 3) % 4),
       lumper: String(150 + (h % 4) * 25),
+      ...apptFacts(stop === "pickup" ? load.pickupWindow : load.deliveryWindow, h),
     },
   });
 }
@@ -187,14 +210,14 @@ export function lateCall(driver: Driver, load: Load): { call: DispatchCall; newW
   const delay = 30 + (h % 4) * 15;
   const appt = 9 + (h % 8);
   const moved = appt + Math.ceil(delay / 60);
-  const newWindow = `Moved to ${hourLabel(moved)} (was ${hourLabel(appt)})`;
+  const en = pack("en");
   return {
-    newWindow,
+    newWindow: `Moved to ${en.hour(moved)} (was ${en.hour(appt)})`,
     call: newDispatchCall({
       kind: "late_eta",
       driver,
       load,
-      facts: { road: from(ROADS, h), delay: String(delay), was: hourLabel(appt), now: hourLabel(moved), city: load.lane.destination },
+      facts: { road: from(ROADS, h), delay: String(delay), was: String(appt), now: String(moved), city: load.lane.destination },
     }),
   };
 }
@@ -203,7 +226,6 @@ export function lateCall(driver: Driver, load: Load): { call: DispatchCall; newW
 export function parkingCall(driver: Driver, load: Load, milesLeft: number): { call: DispatchCall; newWindow: string } {
   const h = hash(load.id + "park");
   const hoursLeft = driver.hoursRemaining;
-  const ahead = Math.max(20, Math.round(hoursLeft * 50 * 0.85));
   return {
     newWindow: "Tomorrow, 7 AM (moved, out of hours)",
     call: newDispatchCall({
@@ -211,10 +233,11 @@ export function parkingCall(driver: Driver, load: Load, milesLeft: number): { ca
       driver,
       load,
       facts: {
-        hours: hoursLeft < 1 ? "under an hour" : `about ${Math.round(hoursLeft)} hours`,
+        hours: String(hoursLeft < 1 ? 0 : Math.round(hoursLeft)),
         miles: String(Math.round(milesLeft)),
-        stop: `${from(STOPS, h)} at exit ${40 + (h % 300)}`,
-        ahead: String(ahead),
+        brand: from(STOPS, h),
+        exit: String(40 + (h % 300)),
+        ahead: String(Math.max(20, Math.round(hoursLeft * 50 * 0.85))),
         cost: String(15 + (h % 3) * 5),
       },
     }),
@@ -224,7 +247,7 @@ export function parkingCall(driver: Driver, load: Load, milesLeft: number): { ca
 /** The driver calls dispatch. The AI already knows what they'll likely ask about: their next load, their pay this week. */
 export function inboundCall(
   driver: Driver,
-  ctx: { weekPay: number; weekLoads: number; nextBooked?: Load; offers: Load[]; emptyAt: string; team: boolean },
+  ctx: { weekPay: number; weekLoads: number; nextBooked?: Load; offers: Load[]; emptyAt: EmptyAt; team: boolean },
 ): DispatchCall {
   const offer = ctx.offers.length ? nextLoadCall(driver, ctx.offers, ctx.emptyAt, ctx.team) : null;
   const booked = ctx.nextBooked;
@@ -233,9 +256,14 @@ export function inboundCall(
     driver,
     options: offer?.options,
     facts: {
-      ...(offer ? { groupId: offer.facts.groupId, count: offer.facts.count, emptyAt: ctx.emptyAt } : {}),
+      ...(offer ? { groupId: offer.facts.groupId, count: offer.facts.count, emptyKind: ctx.emptyAt.kind, emptyCity: ctx.emptyAt.city } : {}),
       ...(booked
-        ? { booked: `${booked.lane.origin} to ${booked.lane.destination}, ${booked.lane.miles} miles, picks up ${booked.pickupWindow.split(",")[0].toLowerCase()}` }
+        ? {
+            bookedOrigin: booked.lane.origin,
+            bookedDest: booked.lane.destination,
+            bookedMiles: String(booked.lane.miles),
+            bookedDay: /^tomorrow/i.test(booked.pickupWindow) ? "tomorrow" : "today",
+          }
         : {}),
       weekPay: String(Math.round(ctx.weekPay)),
       weekLoads: String(ctx.weekLoads),
@@ -247,6 +275,35 @@ export function setupCall(driver: Driver): DispatchCall {
   return newDispatchCall({ kind: "setup", driver });
 }
 
+// ——— Putting facts into words ———
+
+const money = (n: string | number) => `$${Number(n).toLocaleString()}`;
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+function emptyAtWords(L: CallPack, f: Record<string, string>): string {
+  return L.emptyAt(f.emptyKind === "in" ? "in" : "after", f.emptyCity ?? "");
+}
+
+function numberLine(L: CallPack, f: Record<string, string>): string {
+  const spoken = f.prefix ? `${f.prefix.split("").join(" ")}, ${sayDigits(f.number)}` : sayDigits(f.number);
+  return L.numberLine(L.numberKind[f.numberKind as "pickup" | "delivery" | "container"] ?? L.numberKind.pickup, spoken);
+}
+
+function apptWords(L: CallPack, f: Record<string, string>): string {
+  if (f.apptKind === "tomorrow7") return L.apptTomorrow7;
+  if (f.apptKind === "window") return L.apptWindow(L.hour(Number(f.apptA)), L.hour(Number(f.apptB)));
+  return L.apptAt(L.hour(Number(f.apptA)));
+}
+
+function noteWords(L: CallPack, call: DispatchCall): string {
+  const notes = call.kind === "pickup_brief" ? L.pickupNotes : L.deliveryNotes;
+  return notes[Number(call.facts.note) % notes.length];
+}
+
+function stopWords(L: CallPack, f: Record<string, string>): string {
+  return L.stop(f.brand, Number(f.exit));
+}
+
 // ——— The conversation ———
 
 export interface Turn {
@@ -256,6 +313,7 @@ export interface Turn {
   /** Replaces the call's effects when set. */
   effects?: DispatchCallEffect[];
   end?: boolean;
+  /** Carrier-facing, in English. */
   outcome?: string;
   /** Something the store starts on right away: an incident, or a person at the carrier. */
   report?: DispatchCallReport;
@@ -263,24 +321,35 @@ export interface Turn {
   facts?: Record<string, string>;
 }
 
-const c = (label: string, reply: string, match?: string, say = label): DispatchCallChoice => ({ label, reply, say, match });
-const BYE = c("Got it, thanks", "bye", "got it|thank|ok|okay|bye|good");
+/** A choice on screen. `match` holds English voice words; other languages match by the label, a number or a keyword. */
+const c = (label: string, reply: string, match?: string): DispatchCallChoice => ({ label, reply, say: label, match });
 
-function numberLine(f: Record<string, string>): string {
-  const spoken = f.prefix ? `${f.prefix.split("").join(" ")}, ${sayDigits(f.number)}` : sayDigits(f.number);
-  return `${f.numberKind} is ${spoken}.`;
+function offerChoices(L: CallPack, i: number, call: DispatchCall): DispatchCallChoice[] {
+  const more = (call.options?.length ?? 0) > i + 1;
+  return [
+    c(i === 0 ? L.ch.bookIt : L.ch.bookThis, `book:${i}`, "book|yes|yeah|take it|sure|sounds good"),
+    ...(more ? [c(L.ch.whatElse, `next:${i + 1}`, "else|other|next|another")] : i > 0 ? [c(L.ch.bookFirst, "book:0", "first")] : []),
+    c(L.ch.notNow, "later", "not now|later|no|pass|nah"),
+  ];
 }
 
-/** What the AI says when the driver picks up. */
-export function openCall(call: DispatchCall): Turn {
+const INBOUND_MENU = (L: CallPack): DispatchCallChoice[] => [
+  c(L.ch.myNext, "next_q", "next|load|where am i going"),
+  c(L.ch.brokeDown, "breakdown", "broke|breakdown|won't start|flat|tire|engine|smoke"),
+  c(L.ch.runningLate, "late", "late|traffic|behind|delay"),
+  c(L.ch.myPay, "pay", "pay|check|money|settlement|paid"),
+];
+
+/** What the AI says when the driver picks up, in `lang` (the driver's, unless it's being shown to the owner). */
+export function openCall(call: DispatchCall, lang: Lang = call.lang): Turn {
+  const L = pack(lang);
   const f = call.facts;
   switch (call.kind) {
     case "next_load": {
       const first = call.options?.[0];
-      const count = Number(f.count ?? 1);
       return {
-        say: `Hey ${f.name}, it's your AI dispatcher. Got a load for you ${f.emptyAt}. ${first?.say ?? ""} ${count > 1 ? `That's the best of ${count} I found.` : ""} Want it?`.replace(/\s+/g, " "),
-        choices: offerChoices(0, call),
+        say: L.nextOpen(f.name, emptyAtWords(L, f), first ? L.option(first) : "", Number(f.count ?? 1)),
+        choices: offerChoices(L, 0, call),
         step: "offer:0",
       };
     }
@@ -288,73 +357,63 @@ export function openCall(call: DispatchCall): Turn {
     case "delivery_brief": {
       const pickup = call.kind === "pickup_brief";
       return {
-        say: `Hey ${f.name}, quick one before you get there. You're about ${f.eta} from ${f.place} in ${f.city}. ${numberLine(f)} ${f.note}. ${f.appt}, and I already told the broker you're close. I texted you all of this.`,
-        choices: [c("Say the number again", "number", "number|again|repeat"), ...(pickup ? [] : [c("What if there's a lumper?", "lumper", "lumper|unload")]), BYE],
+        say: L.briefOpen({
+          name: f.name,
+          eta: L.duration(Number(f.etaMin)),
+          place: f.place,
+          city: f.city,
+          numberLine: numberLine(L, f),
+          note: noteWords(L, call),
+          appt: apptWords(L, f),
+        }),
+        choices: [c(L.ch.sayNumber, "number", "number|again|repeat"), ...(pickup ? [] : [c(L.ch.lumperQ, "lumper", "lumper|unload")]), c(L.ch.gotIt, "bye", "got it|thank|ok|okay|bye|good")],
         step: "brief",
       };
     }
     case "late_eta":
       return {
-        say: `Heads up, ${f.name}. There's a wreck on ${f.road} ahead, adds about ${f.delay} minutes. I already called the receiver in ${f.city} and moved your appointment from ${f.was} to ${f.now}, and told the broker. Nothing for you to do.`,
-        choices: [c("Should I go around?", "route", "around|route|another|detour"), c("OK, thanks", "bye", "ok|okay|thank|got it|bye")],
+        say: L.lateOpen({ name: f.name, road: f.road, delay: Number(f.delay), city: f.city, was: L.hour(Number(f.was)), now: L.hour(Number(f.now)) }),
+        choices: [c(L.ch.goAround, "route", "around|route|another|detour"), c(L.ch.okThanks, "bye", "ok|okay|thank|got it|bye")],
         step: "late",
       };
     case "hours_parking":
       return {
-        say: `${f.name}, you've got ${f.hours} of driving left and ${f.miles} miles to go, so you won't make the receiver today. I already moved your delivery to tomorrow at 7 AM and told the broker. ${cap(f.stop)}, ${f.ahead} miles ahead, takes reservations, $${f.cost} for the night. Want me to book you a spot? Lots around there fill up by 7.`,
-        choices: [c("Book the spot", "reserve", "book|reserve|yes|yeah|sure"), c("I'll find my own", "own", "own|no|myself|nah")],
+        say: L.parkOpen({ name: f.name, hours: Number(f.hours), miles: Number(f.miles), stop: stopWords(L, f), ahead: Number(f.ahead), cost: Number(f.cost) }),
+        choices: [c(L.ch.bookSpot, "reserve", "book|reserve|yes|yeah|sure"), c(L.ch.findOwn, "own", "own|no|myself|nah")],
         step: "parking",
       };
     case "inbound":
-      return {
-        say: `Hey ${f.name}, it's dispatch. What do you need?`,
-        choices: INBOUND_MENU,
-        step: "menu",
-      };
+      return { say: L.inOpen(f.name), choices: INBOUND_MENU(L), step: "menu" };
     case "setup":
       return {
-        say: `Hi ${f.name}, it's your AI dispatcher. Three quick questions so I only call when it's worth it. First, what's the earliest I can call you?`,
-        choices: [c("6 AM", "early:6", "six|6"), c("8 AM", "early:8", "eight|8"), c("Any time", "early:any", "any|whenever|anytime")],
+        say: L.setupOpen(f.name),
+        choices: [c(L.ch.early6, "early:6", "six|6"), c(L.ch.early8, "early:8", "eight|8"), c(L.ch.earlyAny, "early:any", "any|whenever|anytime")],
         step: "setup:early",
       };
   }
 }
 
-function cap(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function offerChoices(i: number, call: DispatchCall): DispatchCallChoice[] {
-  const more = (call.options?.length ?? 0) > i + 1;
-  return [
-    c(i === 0 ? "Book it" : "Book this one", `book:${i}`, "book|yes|yeah|take it|sure|sounds good"),
-    ...(more ? [c("What else?", `next:${i + 1}`, "else|other|next|another")] : i > 0 ? [c("Book the first one", "book:0", "first")] : []),
-    c("Not now", "later", "not now|later|no|pass|nah"),
-  ];
-}
-
-const PREF_WORDS: Record<string, { prefs: DriverPrefs; said: string }> = {
-  "early:6": { prefs: { noCallsBefore: 6 }, said: "I won't call before 6 AM" },
-  "early:8": { prefs: { noCallsBefore: 8 }, said: "I won't call before 8 AM" },
-  "early:any": { prefs: { noCallsBefore: undefined }, said: "I'll call any time you're on duty" },
-  "avoid:NJ": { prefs: { avoidStates: ["NJ"] }, said: "I'll keep you out of New Jersey and the city" },
-  "avoid:CA": { prefs: { avoidStates: ["CA"] }, said: "I'll keep you out of California" },
-  "avoid:none": { prefs: { avoidStates: [] }, said: "I'll send you anywhere that pays" },
-  "loads:call": { prefs: { newLoads: "call" }, said: "I'll call you with new loads" },
-  "loads:text": { prefs: { newLoads: "text" }, said: "I'll text you new loads instead of calling" },
+const PREF_VALUES: Record<PrefKey, DriverPrefs> = {
+  "early:6": { noCallsBefore: 6 },
+  "early:8": { noCallsBefore: 8 },
+  "early:any": { noCallsBefore: undefined },
+  "avoid:NJ": { avoidStates: ["NJ"] },
+  "avoid:CA": { avoidStates: ["CA"] },
+  "avoid:none": { avoidStates: [] },
+  "loads:call": { newLoads: "call" },
+  "loads:text": { newLoads: "text" },
 };
 
 /** The driver's call settings in plain words, for the end of the setup call and the Profile page. */
-export function describePrefs(prefs: DriverPrefs): string[] {
+export function describePrefs(prefs: DriverPrefs, lang: Lang = "en"): string[] {
+  const L = pack(lang);
   const avoid = prefs.avoidStates ?? [];
   return [
-    prefs.noCallsBefore !== undefined ? `No calls before ${hourLabel(prefs.noCallsBefore)}` : "Calls any time you're on duty",
-    avoid.length ? `No loads into ${avoid.map((s) => STATE_NAME[s] ?? s).join(" or ")}` : "Loads into any state",
-    prefs.newLoads === "text" ? "New loads by text" : "New loads by phone call",
+    prefs.noCallsBefore !== undefined ? L.prefLine.noCallsBefore(L.hour(prefs.noCallsBefore)) : L.prefLine.anyTime,
+    avoid.length ? L.prefLine.noLoadsInto(avoid.map((s) => L.stateName[s] ?? s)) : L.prefLine.anyState,
+    prefs.newLoads === "text" ? L.prefLine.loadsText : L.prefLine.loadsCall,
   ];
 }
-
-const STATE_NAME: Record<string, string> = { NJ: "New Jersey", CA: "California" };
 
 function mergedPrefs(effects: DispatchCallEffect[], add: DriverPrefs): DispatchCallEffect[] {
   const prev = effects.find((e) => e.type === "prefs");
@@ -362,123 +421,95 @@ function mergedPrefs(effects: DispatchCallEffect[], add: DriverPrefs): DispatchC
   return [...effects.filter((e) => e.type !== "prefs"), { type: "prefs", prefs }];
 }
 
-/** The AI's answer to what the driver said. The three things that always work — say that again, get me a person,
- *  and hanging up — are handled before any script. */
-export function respond(call: DispatchCall, reply: string): Turn {
+/** The AI's answer to what the driver said, in `lang`. Say that again and get me a person always work. */
+export function respond(call: DispatchCall, reply: string, lang: Lang = call.lang): Turn {
+  const L = pack(lang);
   const f = call.facts;
-  const lastAi = [...call.lines].reverse().find((l) => l.speaker === "ai")?.text ?? "";
+  const lastAi = [...call.lines].reverse().find((l) => l.speaker === "ai");
+  const lastAiText = (lang === call.lang ? lastAi?.text : (lastAi?.alt ?? lastAi?.text)) ?? "";
 
-  if (reply === "again") return { say: lastAi, choices: call.choices, step: call.step };
+  if (reply === "again") return { say: lastAiText, choices: call.choices, step: call.step };
   if (reply === "person") {
-    return {
-      say: `Sure. I'm getting someone from the office to call you back, usually within 10 minutes. Anything we already set up stays as is.`,
-      choices: [],
-      step: "person",
-      end: true,
-      report: { person: `${f.name} asked for a person` },
-      outcome: `${f.name} asked for a person. Call back`,
-    };
+    return { say: L.person, choices: [], step: "person", end: true, report: { person: `${f.name} asked for a person` }, outcome: `${f.name} asked for a person. Call back` };
   }
 
   if (call.kind === "next_load") {
-    const turn = nextLoadTurn(call, reply);
+    const turn = nextLoadTurn(L, call, reply);
     if (turn) return turn;
   }
-
   if (call.kind === "inbound") {
-    const turn = inboundTurn(call, reply);
+    const turn = inboundTurn(L, call, reply);
     if (turn) return turn;
   }
 
   if (call.kind === "pickup_brief" || call.kind === "delivery_brief") {
-    if (reply === "number") return { say: `${numberLine(f)} It's in your texts too.`, choices: call.choices, step: "brief" };
-    if (reply === "lumper") {
-      return {
-        say: `If they want a lumper, the broker covers up to $${f.lumper}. Pay with the fleet card, get a receipt, and snap it in the app. I'll bill it back.`,
-        choices: call.choices.filter((ch) => ch.reply !== "lumper"),
-        step: "brief",
-      };
-    }
-    if (reply === "bye") return { say: "Drive safe.", choices: [], step: "end", end: true, outcome: `${f.numberKind} and dock rules given, texted` };
+    const kindLabel = pack("en").numberKind[f.numberKind as "pickup"] ?? "Number";
+    const choices = openCall(call, lang).choices;
+    if (reply === "number") return { say: L.repeatNumber(numberLine(L, f)), choices: choices.filter((ch) => call.choices.some((x) => x.reply === ch.reply)), step: "brief" };
+    if (reply === "lumper") return { say: L.lumper(Number(f.lumper)), choices: choices.filter((ch) => ch.reply !== "lumper"), step: "brief" };
+    if (reply === "bye") return { say: L.driveSafe, choices: [], step: "end", end: true, outcome: `${kindLabel} and dock rules given, texted` };
   }
 
   if (call.kind === "late_eta") {
-    if (reply === "route") {
-      return {
-        say: "I don't have a better route than your truck GPS. Going around this one adds more miles than it saves, so staying on it is still faster.",
-        choices: [c("OK, thanks", "bye", "ok|okay|thank|got it|bye")],
-        step: "late",
-      };
-    }
-    if (reply === "bye") return { say: "Drive safe.", choices: [], step: "end", end: true, outcome: `Driver knows the new ${f.now} appointment` };
+    if (reply === "route") return { say: L.route, choices: [c(L.ch.okThanks, "bye", "ok|okay|thank|got it|bye")], step: "late" };
+    if (reply === "bye") return { say: L.driveSafe, choices: [], step: "end", end: true, outcome: `Driver knows the new ${pack("en").hour(Number(f.now))} appointment` };
   }
 
   if (call.kind === "hours_parking") {
+    const stopEn = stopWords(pack("en"), f);
     if (reply === "reserve") {
       return {
-        say: `Booked. The spot's under your company name at ${f.stop}, on the fleet card. Say cancel if you'd rather not.`,
-        choices: [c("Cancel that", "cancel", "cancel|wait|stop|undo"), c("Thanks, bye", "bye", "thank|bye|ok|okay|good")],
+        say: L.reserved(stopWords(L, f)),
+        choices: [c(L.ch.cancelThat, "cancel", "cancel|wait|stop|undo"), c(L.ch.thanksBye, "bye", "thank|bye|ok|okay|good")],
         step: "reserved",
-        effects: [{ type: "reserve_parking", place: f.stop, cost: Number(f.cost) }],
-        outcome: `Parking reserved at ${f.stop} ($${f.cost})`,
+        effects: [{ type: "reserve_parking", place: stopEn, cost: Number(f.cost) }],
+        outcome: `Parking reserved at ${stopEn} ($${f.cost})`,
       };
     }
-    if (reply === "cancel") {
-      return { say: "Cancelled, no spot booked. Don't leave it too late, those lots fill up.", choices: [], step: "end", end: true, effects: [], outcome: "Driver finding their own parking" };
-    }
-    if (reply === "own") {
-      return { say: "OK. Don't leave it too late, those lots fill up. Delivery's still tomorrow at 7.", choices: [], step: "end", end: true, outcome: "Driver finding their own parking" };
-    }
-    if (reply === "bye") return { say: "Rest up. Talk tomorrow.", choices: [], step: "end", end: true };
+    if (reply === "cancel") return { say: L.parkCancelled, choices: [], step: "end", end: true, effects: [], outcome: "Driver finding their own parking" };
+    if (reply === "own") return { say: L.parkOwn, choices: [], step: "end", end: true, outcome: "Driver finding their own parking" };
+    if (reply === "bye") return { say: L.restUp, choices: [], step: "end", end: true };
   }
 
   if (call.kind === "setup") {
-    const pref = PREF_WORDS[reply];
-    const effects = pref ? mergedPrefs(call.effects, pref.prefs) : call.effects;
-    if (call.step === "setup:early" && pref) {
+    const key = reply as PrefKey;
+    const value = PREF_VALUES[key];
+    const effects = value ? mergedPrefs(call.effects, value) : call.effects;
+    if (call.step === "setup:early" && value) {
       return {
-        say: `Got it, ${pref.said}. And I never call while you're in the sleeper or off duty; I text instead. Any states you won't run to?`,
-        choices: [c("No New Jersey or NYC", "avoid:NJ", "jersey|new york|nyc|city"), c("No California", "avoid:CA", "california|cali"), c("I'll go anywhere", "avoid:none", "anywhere|none|no|all")],
+        say: L.setupQ2(L.prefSaid[key]),
+        choices: [c(L.ch.avoidNJ, "avoid:NJ", "jersey|new york|nyc|city"), c(L.ch.avoidCA, "avoid:CA", "california|cali"), c(L.ch.avoidNone, "avoid:none", "anywhere|none|no|all")],
         step: "setup:avoid",
         effects,
       };
     }
-    if (call.step === "setup:avoid" && pref) {
+    if (call.step === "setup:avoid" && value) {
       return {
-        say: `${pref.said}. Last one. When I find your next loads, do you want a call, or just a text?`,
-        choices: [c("Call me", "loads:call", "call|phone"), c("Just text me", "loads:text", "text|message")],
+        say: L.setupQ3(L.prefSaid[key]),
+        choices: [c(L.ch.loadsCall, "loads:call", "call|phone"), c(L.ch.loadsText, "loads:text", "text|message")],
         step: "setup:loads",
         effects,
       };
     }
-    if (call.step === "setup:loads" && pref) {
+    if (call.step === "setup:loads" && value) {
       const saved = effects.find((e) => e.type === "prefs");
-      const said = describePrefs(saved?.type === "prefs" ? saved.prefs : {});
-      return {
-        say: `All set. ${said.join(". ")}. You can change any of it in your Profile. Drive safe.`,
-        choices: [],
-        step: "end",
-        end: true,
-        effects,
-        outcome: "Call preferences set",
-      };
+      return { say: L.setupDone(describePrefs(saved?.type === "prefs" ? saved.prefs : {}, lang)), choices: [], step: "end", end: true, effects, outcome: "Call preferences set" };
     }
   }
 
-  return { say: "Sorry, I didn't catch that.", choices: call.choices, step: call.step };
+  return { say: L.sorry, choices: call.choices, step: call.step };
 }
 
 /** Offering loads: the same whether the AI called about them or the driver called and asked. */
-function nextLoadTurn(call: DispatchCall, reply: string): Turn | null {
+function nextLoadTurn(L: CallPack, call: DispatchCall, reply: string): Turn | null {
   const f = call.facts;
   const opts = call.options ?? [];
   if (reply.startsWith("book:")) {
-    const i = Number(reply.slice(5));
-    const opt = opts[i];
-    if (!opt || !f.groupId) return { say: "That one's gone. Let me look again and call you back.", choices: [], step: "end", end: true };
+    const opt = opts[Number(reply.slice(5))];
+    if (!opt || !f.groupId) return { say: L.gone, choices: [], step: "end", end: true };
     return {
-      say: `Done. Booking ${opt.short.split(",")[0].replace(" → ", " to ")}. I'll text you the pickup details once the rate con's signed. Changed your mind? Say cancel in the next few seconds.`,
-      choices: [c("Cancel that", "cancel", "cancel|wait|stop|undo"), c("Thanks, bye", "bye", "thank|bye|ok|okay|good")],
+      say: L.booking(opt.origin, opt.dest),
+      choices: [c(L.ch.cancelThat, "cancel", "cancel|wait|stop|undo"), c(L.ch.thanksBye, "bye", "thank|bye|ok|okay|good")],
       step: "booked",
       effects: [{ type: "book", groupId: f.groupId, loadId: opt.loadId }],
       outcome: `Booked ${opt.short}`,
@@ -486,71 +517,39 @@ function nextLoadTurn(call: DispatchCall, reply: string): Turn | null {
   }
   if (reply.startsWith("next:")) {
     const i = Number(reply.slice(5));
-    return { say: `Next one: ${opts[i]?.say ?? ""}`, choices: offerChoices(i, call), step: `offer:${i}` };
+    return { say: L.nextMore(opts[i] ? L.option(opts[i]) : ""), choices: offerChoices(L, i, call), step: `offer:${i}` };
   }
-  if (reply === "cancel") {
-    return {
-      say: "Cancelled, nothing's booked. The options are still on your Home screen, and I'll check back in about 30 minutes. Loads go fast, so don't wait too long.",
-      choices: [],
-      step: "end",
-      end: true,
-      effects: [],
-      outcome: "Driver cancelled on the call. Nothing booked",
-    };
-  }
-  if (reply === "later") {
-    return {
-      say: "No problem. They're on your Home screen whenever you're ready. Loads go fast, so I'll check back in about 30 minutes.",
-      choices: [],
-      step: "end",
-      end: true,
-      outcome: "Driver will pick in the app",
-    };
-  }
-  if (reply === "bye") return { say: "You got it. Drive safe.", choices: [], step: "end", end: true };
+  if (reply === "cancel") return { say: L.cancelledLoad, choices: [], step: "end", end: true, effects: [], outcome: "Driver cancelled on the call. Nothing booked" };
+  if (reply === "later") return { say: L.later, choices: [], step: "end", end: true, outcome: "Driver will pick in the app" };
+  if (reply === "bye") return { say: L.byeLoad, choices: [], step: "end", end: true };
   return null;
 }
 
-const INBOUND_MENU: DispatchCallChoice[] = [
-  c("My next load", "next_q", "next|load|where am i going"),
-  c("I broke down", "breakdown", "broke|breakdown|won't start|flat|tire|engine|smoke"),
-  c("I'm running late", "late", "late|traffic|behind|delay"),
-  c("My pay", "pay", "pay|check|money|settlement|paid"),
-];
-
-const money = (n: string | number) => `$${Number(n).toLocaleString()}`;
-
 /** A driver calling in: the handful of reasons drivers actually call dispatch, each handled on the spot. */
-function inboundTurn(call: DispatchCall, reply: string): Turn | null {
+function inboundTurn(L: CallPack, call: DispatchCall, reply: string): Turn | null {
   const f = call.facts;
   if (call.step.startsWith("offer") || call.step === "booked") {
-    const turn = nextLoadTurn(call, reply);
+    const turn = nextLoadTurn(L, call, reply);
     if (turn) return turn;
   }
-  const THANKS = c("Thanks", "bye", "thank|ok|okay|bye|good|got it");
+  const THANKS = c(L.ch.thanks, "bye", "thank|ok|okay|bye|good|got it");
   switch (reply) {
     case "next_q": {
-      if (f.booked) return { say: `Your next load's already booked: ${f.booked}. Details are on your Home screen.`, choices: [THANKS], step: "answered", facts: { topic: "next" } };
+      if (f.bookedOrigin) {
+        const desc = L.bookedDesc({ origin: f.bookedOrigin, dest: f.bookedDest, miles: Number(f.bookedMiles), day: f.bookedDay === "tomorrow" ? "tomorrow" : "today" });
+        return { say: L.inBooked(desc), choices: [THANKS], step: "answered", facts: { topic: "next" }, outcome: "Next load read back" };
+      }
       const first = call.options?.[0];
       if (first && f.groupId) {
-        return {
-          say: `I've got ${Number(f.count) > 1 ? `${f.count} options` : "one"} for you ${f.emptyAt}. Best one: ${first.say} Want it?`,
-          choices: offerChoices(0, call),
-          step: "offer:0",
-          facts: { topic: "next" },
-        };
+        return { say: L.inOptions(Number(f.count), emptyAtWords(L, f), L.option(first)), choices: offerChoices(L, 0, call), step: "offer:0", facts: { topic: "next" } };
       }
-      return { say: "Nothing booked yet. I'm working the boards now and I'll call you the moment I have something good.", choices: [THANKS], step: "answered", facts: { topic: "next" } };
+      return { say: L.inNothing, choices: [THANKS], step: "answered", facts: { topic: "next" }, outcome: "Nothing booked yet, told the driver" };
     }
     case "breakdown":
-      return {
-        say: "OK. First, are you off the road and safe?",
-        choices: [c("Yes, I'm safe", "safe", "yes|safe|shoulder|fine|parked"), c("No, I need help now", "danger", "no|help|hurt|accident|fire")],
-        step: "breakdown",
-      };
+      return { say: L.bdQ, choices: [c(L.ch.safeYes, "safe", "yes|safe|shoulder|fine|parked"), c(L.ch.dangerNo, "danger", "no|help|hurt|accident|fire")], step: "breakdown" };
     case "safe":
       return {
-        say: "Good. I'm on it: finding the nearest shop that can come to you, and telling the broker the load's delayed. Flashers on, triangles out. I'll call you back with the ETA.",
+        say: L.bdSafe,
         choices: [],
         step: "end",
         end: true,
@@ -560,7 +559,7 @@ function inboundTurn(call: DispatchCall, reply: string): Turn | null {
       };
     case "danger":
       return {
-        say: "If anyone's hurt, hang up and call 911 first. I'm getting someone from the office on it right now, and I've started on a tow and a shop.",
+        say: L.bdDanger,
         choices: [],
         step: "end",
         end: true,
@@ -569,77 +568,76 @@ function inboundTurn(call: DispatchCall, reply: string): Turn | null {
         facts: { topic: "breakdown" },
       };
     case "late":
-      return {
-        say: "How late are you going to be?",
-        choices: [c("About 30 minutes", "late:30", "thirty|30|half"), c("About an hour", "late:60", "hour|one|60"), c("Two hours or more", "late:120", "two|more|2")],
-        step: "late",
-      };
+      return { say: L.lateQ, choices: [c(L.ch.late30, "late:30", "thirty|30|half"), c(L.ch.late60, "late:60", "hour|one|60"), c(L.ch.late120, "late:120", "two|more|2")], step: "late" };
     case "late:30":
     case "late:60":
     case "late:120": {
-      const mins = Number(reply.slice(5));
-      const said = mins === 30 ? "about 30 minutes" : mins === 60 ? "about an hour" : "two hours or more";
+      const mins = Number(reply.slice(5)) as 30 | 60 | 120;
+      const saidEn = pack("en").lateAmount[mins];
       return {
-        say: `Got it, ${said}. I'm telling the receiver and the broker now and asking to move your appointment. I'll text you the new time. Drive safe.`,
+        say: L.lateConfirm(L.lateAmount[mins]),
         choices: [],
         step: "end",
         end: true,
-        report: { incident: { type: "delay", note: `${f.name} called in running ${said} late` } },
-        outcome: `Running ${said} late. AI moving the appointment`,
-        facts: { topic: "late", late: said },
+        report: { incident: { type: "delay", note: `${f.name} called in running ${saidEn} late` } },
+        outcome: `Running ${saidEn} late. AI moving the appointment`,
+        facts: { topic: "late", late: String(mins) },
       };
     }
     case "pay":
       return {
-        say:
-          Number(f.weekLoads) > 0
-            ? `So far this week you've made ${money(f.weekPay)} on ${f.weekLoads} load${f.weekLoads === "1" ? "" : "s"}. It's paid on your company's normal settlement day. I texted you the breakdown.`
-            : "Nothing's settled for this week yet. Your pay shows up in Earnings as soon as a load delivers.",
+        say: Number(f.weekLoads) > 0 ? L.pay(money(f.weekPay), Number(f.weekLoads)) : L.payNone,
         choices: [THANKS],
         step: "answered",
         outcome: "Pay question answered",
         facts: { topic: "pay" },
       };
     case "bye":
-      return { say: "Anytime. Drive safe.", choices: [], step: "end", end: true, outcome: call.outcome ?? "Question answered" };
+      return { say: L.inBye, choices: [], step: "end", end: true, outcome: call.outcome ?? "Question answered" };
   }
   return null;
 }
 
 /** The text that lands in the driver's Messages when the call ends, or instead of a call that couldn't happen. */
 export function textCopyFor(call: DispatchCall): string {
+  const L = pack(call.lang);
   const f = call.facts;
+  const booked = call.effects.find((e) => e.type === "book");
+  const bookedShort = booked?.type === "book" ? call.options?.find((o) => o.loadId === booked.loadId)?.short : undefined;
   switch (call.kind) {
-    case "next_load": {
-      const booked = call.effects.find((e) => e.type === "book");
-      if (booked) {
-        const opt = call.options?.find((o) => o.loadId === booked.loadId);
-        return `Booked from our call: ${opt?.short ?? "your next load"}. Pickup details come once the rate con is signed.`;
-      }
-      return `Load options ${f.emptyAt}:\n${(call.options ?? []).map((o, i) => `${i + 1}. ${o.short}`).join("\n")}\nPick one on your Home screen.`;
-    }
+    case "next_load":
+      return bookedShort ? L.txt.booked(bookedShort) : L.txt.options(emptyAtWords(L, f), (call.options ?? []).map((o) => o.short));
     case "pickup_brief":
     case "delivery_brief":
-      return `${call.kind === "pickup_brief" ? "Pickup" : "Delivery"}: ${f.place}, ${f.city}\n${f.numberKind}: ${f.prefix ? f.prefix + " " : ""}${f.number}\n${f.appt}\n${f.note}.`;
+      return L.txt.brief({
+        pickup: call.kind === "pickup_brief",
+        place: f.place,
+        city: f.city,
+        numberKind: L.numberKind[f.numberKind as "pickup"] ?? L.numberKind.pickup,
+        number: `${f.prefix ? f.prefix + " " : ""}${f.number}`,
+        appt: apptWords(L, f),
+        note: noteWords(L, call),
+      });
     case "late_eta":
-      return `Your ${f.city} appointment moved from ${f.was} to ${f.now} (wreck on ${f.road}). The broker knows.`;
+      return L.txt.late({ city: f.city, was: L.hour(Number(f.was)), now: L.hour(Number(f.now)), road: f.road });
     case "hours_parking": {
-      const parked = call.effects.find((e) => e.type === "reserve_parking");
-      return parked
-        ? `Parking reserved: ${f.stop}, ${f.ahead} mi ahead, $${f.cost} on the fleet card. Delivery moved to tomorrow 7 AM.`
-        : `You're out of hours before the receiver. Delivery moved to tomorrow 7 AM. ${cap(f.stop)}, ${f.ahead} mi ahead, takes reservations ($${f.cost}).`;
+      const p = { stop: cap(stopWords(L, f)), ahead: Number(f.ahead), cost: Number(f.cost) };
+      return call.effects.some((e) => e.type === "reserve_parking") ? L.txt.parkReserved(p) : L.txt.parkNot(p);
     }
     case "setup":
-      return "Your call settings are saved. Change them any time in Profile.";
-    case "inbound": {
-      const booked = call.effects.find((e) => e.type === "book");
-      if (booked) return `Booked from our call: ${call.options?.find((o) => o.loadId === booked.loadId)?.short ?? "your next load"}. Pickup details come once the rate con is signed.`;
-      if (f.topic === "pay") return `Your pay this week so far: ${money(f.weekPay)} on ${f.weekLoads} load${f.weekLoads === "1" ? "" : "s"}. Full breakdown in Earnings.`;
-      if (f.topic === "breakdown") return "Breakdown logged. The AI is finding a shop and has told the broker. Stay with the truck; the ETA comes by call and text.";
-      if (f.topic === "late") return `Logged: running ${f.late} late. The receiver and broker are being told; your new appointment time comes by text.`;
-      return `From your call with dispatch: ${call.outcome ?? "question answered"}.`;
-    }
+      return L.txt.setup;
+    case "inbound":
+      if (bookedShort) return L.txt.booked(bookedShort);
+      if (f.topic === "pay") return L.txt.inPay(money(f.weekPay), Number(f.weekLoads));
+      if (f.topic === "breakdown") return L.txt.inBreakdown;
+      if (f.topic === "late") return L.txt.inLate(L.lateAmount[Number(f.late) as 30 | 60 | 120] ?? "");
+      return L.txt.inGeneric;
   }
+}
+
+/** The text a driver gets when the AI books their next load on its own. */
+export function autoBookedText(lang: Lang, load: Load): string {
+  return pack(lang).txt.autoBooked({ origin: load.lane.origin, dest: load.lane.destination, miles: load.lane.miles, pickup: load.pickupWindow });
 }
 
 /** Whether this call still matters: a brief for a stop already reached, or offers already picked, isn't worth a ring. */
@@ -658,4 +656,32 @@ export function stillRelevant(call: DispatchCall, loads: Load[]): boolean {
     case "inbound":
       return true;
   }
+}
+
+/**
+ * What the driver meant, from what they said out loud. English choices carry their own voice words; in every
+ * language a number works ("two", "dos", "ਦੋ"), and so does a word from the button. "Again", "a person" and
+ * "hang up" always work. Returns a reply, "hangup", or null.
+ */
+export function matchSpoken(heard: string, call: DispatchCall): string | null {
+  const L = pack(call.lang);
+  const h = heard.toLowerCase().trim();
+  const tokens = h.split(/[\s,.!?¿¡।]+/).filter(Boolean);
+  const has = (w: string) => (w.includes(" ") ? h.includes(w) : tokens.includes(w));
+  if (call.lang === "en") {
+    for (const ch of call.choices) if (ch.match && new RegExp(`\\b(${ch.match})`).test(h)) return ch.reply;
+  }
+  const byNumber = L.words.numbers.findIndex((ws) => ws.some(has));
+  if (byNumber >= 0 && call.choices[byNumber]) return call.choices[byNumber].reply;
+  if (L.words.again.some((w) => h.includes(w))) return "again";
+  if (L.words.person.some((w) => h.includes(w))) return "person";
+  if (L.words.hangup.some((w) => h.includes(w))) return "hangup";
+  for (const ch of call.choices) {
+    const words = ch.label.toLowerCase().split(/[\s,.!?¿¡।]+/).filter((w) => w.length >= 4);
+    if (words.some((w) => h.includes(w))) return ch.reply;
+  }
+  if (call.lang === "en") return null;
+  // English trucking words work in every language ("book it", "cancel").
+  for (const ch of call.choices) if (ch.match && new RegExp(`\\b(${ch.match})`).test(h)) return ch.reply;
+  return null;
 }

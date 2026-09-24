@@ -17,6 +17,7 @@ import { downloadCsv } from "@/lib/csv-export";
 import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { DailyTextPreview } from "@/components/shared/daily-text";
 import { DispatchLineCard } from "@/components/shared/dispatch-line-card";
+import { OwnerLanguageCard } from "@/components/shared/owner-language-card";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Aggressiveness } from "@/lib/store";
 
@@ -95,6 +96,8 @@ export default function SettingsPage() {
               </Card>
 
               <DispatchLineCard />
+
+              <OwnerLanguageCard />
 
               <Card>
                 <CardHeader>

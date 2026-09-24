@@ -6,12 +6,14 @@ import { cn } from "@/lib/utils";
 import { useEscapeKey, useNow } from "@/lib/hooks";
 import { tripState } from "@/lib/trip-state";
 import { makeRecognizer, say, type Recognizer } from "@/lib/speech";
+import { useDriverUi } from "@/lib/lang/use-driver-ui";
+import type { DriveCommand, UiText } from "@/lib/lang/ui";
 import type { Load } from "@/lib/types";
 
-type Command = "arrived" | "loaded" | "unloaded" | "late" | "call" | "next";
-
-/** What a driver might say for each command, matched loosely so "I'm loaded up" or "call dispatch" both work. */
-const PHRASES: [Command, RegExp][] = [
+/** Commands in the driver's language, checked in this order so "unloaded" wins over "loaded". English also keeps
+ *  its looser patterns ("I'm loaded up", "at the dock"). */
+const ORDER: DriveCommand[] = ["unloaded", "loaded", "arrived", "late", "call", "next"];
+const EN: [DriveCommand, RegExp][] = [
   ["unloaded", /\bunload(ed)?\b|\bempty\b/],
   ["loaded", /\bload(ed)?\b/],
   ["arrived", /\barriv(e|ed|ing)\b|\bhere\b|\bat the (dock|shipper|receiver)\b/],
@@ -19,6 +21,11 @@ const PHRASES: [Command, RegExp][] = [
   ["call", /\bcall\b|\bdispatch\b|\btalk\b/],
   ["next", /\bnext\b|\bwhat now\b|\bwhere\b|\beta\b/],
 ];
+
+function commandFor(heard: string, t: UiText, english: boolean): DriveCommand | null {
+  if (english) return EN.find(([, re]) => re.test(heard))?.[0] ?? null;
+  return ORDER.find((cmd) => t.driveWords[cmd].some((w) => heard.includes(w.toLowerCase()))) ?? null;
+}
 
 /**
  * Hands-free while the truck is moving: no reading, no typing — the next stop in big type, four big buttons, and voice
@@ -43,7 +50,8 @@ export function DrivingMode({
 }) {
   const now = useNow();
   const s = tripState(load, now, needsPreTrip);
-  const [reply, setReply] = useState("Say \"I've arrived\", \"I'm loaded\", \"running late\" or \"call dispatch\".");
+  const { t, lang, info } = useDriverUi();
+  const [reply, setReply] = useState(t.driveHint);
   const [listening, setListening] = useState(false);
   const recognizer = useRef<Recognizer | null>(null);
   const [canListen] = useState(() => makeRecognizer() !== null);
@@ -52,29 +60,31 @@ export function DrivingMode({
 
   const place = s.card === "pickup" ? `${load.lane.origin}, ${load.lane.originState}` : `${load.lane.destination}, ${load.lane.destState}`;
 
-  function run(cmd: Command) {
+  function run(cmd: DriveCommand) {
     let text: string;
     if (cmd === "arrived") {
       if (s.next.action === "arrive") {
         onArrive();
-        text = `Checked you in at ${place}. The AI told the ${s.card === "pickup" ? "shipper and broker" : "receiver and broker"}.`;
-      } else text = s.arrived ? "You're already checked in here." : "Finish the steps at this stop first.";
+        text = t.checkedIn(place);
+      } else text = s.arrived ? t.alreadyIn : t.finishSteps;
     } else if (cmd === "loaded" || cmd === "unloaded") {
       if (s.arrived && !s.handled && s.next.action === cmd) {
         onTripStep(cmd);
-        text = cmd === "loaded" ? "Got it, you're loaded. Snap the BOL when you're parked." : "Got it, you're unloaded. Snap the POD when you're parked.";
-      } else text = s.arrived ? "Already done at this stop." : "You're not at the stop yet.";
+        text = cmd === "loaded" ? t.gotLoaded : t.gotUnloaded;
+      } else text = s.arrived ? t.alreadyDone : t.notThere;
     } else if (cmd === "late") {
       onLate();
-      text = "Told the broker and the receiver you're running late. The AI will send your new time.";
+      text = t.toldLate;
     } else if (cmd === "call") {
       onCall();
       return;
     } else {
-      text = `Next: ${s.next.title}. ${s.card === "booking" ? "" : `${place}, ${s.drive}.`}`;
+      // The step names come from the trip screens, which are English in the demo; other languages get the place.
+      const stop = s.card === "pickup" ? t.pickup : s.card === "delivery" ? t.delivery : t.nextLoad;
+      text = lang === "en" ? `Next: ${s.next.title}. ${s.card === "booking" ? "" : `${place}, ${s.drive}.`}` : `${stop}: ${place}${s.card === "booking" ? "" : `, ${s.drive}`}.`;
     }
     setReply(text);
-    say(text);
+    say(text, undefined, { lang: info.speech });
   }
 
   function listen() {
@@ -82,19 +92,18 @@ export function DrivingMode({
       recognizer.current?.stop();
       return;
     }
-    const r = makeRecognizer();
+    const r = makeRecognizer(info.speech);
     if (!r) return;
     recognizer.current = r;
-    r.lang = "en-US";
     r.interimResults = false;
     r.onresult = (e) => {
       const heard = e.results[0][0].transcript.toLowerCase();
-      const match = PHRASES.find(([, re]) => re.test(heard));
-      if (match) run(match[0]);
+      const cmd = commandFor(heard, t, lang === "en");
+      if (cmd) run(cmd);
       else {
-        const text = `I heard "${heard}". Try "I've arrived", "I'm loaded", "running late" or "call dispatch".`;
+        const text = t.heard(heard);
         setReply(text);
-        say(text);
+        say(text, undefined, { lang: info.speech });
       }
     };
     r.onend = () => setListening(false);
@@ -108,15 +117,15 @@ export function DrivingMode({
     <div role="dialog" aria-modal="true" aria-label="Driving mode" className="fixed inset-0 z-[70] flex flex-col bg-ink-950 p-5 text-white">
       <div className="flex items-center justify-between">
         <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-300">
-          <Navigation className="h-4 w-4" /> Driving mode
+          <Navigation className="h-4 w-4" /> {t.drivingMode}
         </p>
         <button type="button" onClick={onClose} className="flex items-center gap-1.5 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold">
-          <X className="h-4 w-4" /> I&apos;m parked
+          <X className="h-4 w-4" /> {t.parked}
         </button>
       </div>
 
       <div className="mt-8">
-        <p className="text-sm text-white/50">{s.card === "pickup" ? "Pickup" : s.card === "delivery" ? "Delivery" : "Next load"}</p>
+        <p className="text-sm text-white/50">{s.card === "pickup" ? t.pickup : s.card === "delivery" ? t.delivery : t.nextLoad}</p>
         <p className="mt-1 text-4xl font-semibold leading-tight tracking-tight">{s.card === "booking" ? `${load.lane.origin} → ${load.lane.destination}` : place}</p>
         {s.card !== "booking" && <p className="mt-2 text-2xl font-semibold tabular text-white/80">{s.drive}</p>}
       </div>
@@ -127,13 +136,13 @@ export function DrivingMode({
 
       <div className="mt-auto grid grid-cols-2 gap-3">
         <button type="button" onClick={() => run(s.arrived && !s.handled ? (s.card === "pickup" ? "loaded" : "unloaded") : "arrived")} className={cn(big, "bg-white text-ink-950")}>
-          <Package className="h-7 w-7" /> {s.arrived && !s.handled ? (s.card === "pickup" ? "I'm loaded" : "I'm unloaded") : "I've arrived"}
+          <Package className="h-7 w-7" /> {s.arrived && !s.handled ? (s.card === "pickup" ? t.loaded : t.unloaded) : t.arrived}
         </button>
         <button type="button" onClick={() => run("late")} className={cn(big, "bg-white/10")}>
-          <Clock className="h-7 w-7" /> Running late
+          <Clock className="h-7 w-7" /> {t.late}
         </button>
         <button type="button" onClick={() => run("call")} className={cn(big, "bg-white/10")}>
-          <Phone className="h-7 w-7" /> Call dispatch
+          <Phone className="h-7 w-7" /> {t.callDispatch}
         </button>
         <button
           type="button"
@@ -142,11 +151,11 @@ export function DrivingMode({
           className={cn(big, listening ? "bg-emerald-400 text-ink-950" : "bg-emerald-400/20 text-emerald-200")}
         >
           {listening ? <MicOff className="h-7 w-7" /> : <Mic className="h-7 w-7" />}
-          {canListen ? (listening ? "Listening…" : "Speak") : "What's next?"}
+          {canListen ? (listening ? `${t.listening}…` : t.speak) : t.whatsNext}
         </button>
       </div>
       <p className="mt-4 text-center text-xs text-white/40">
-        With an ELD connected, this opens by itself when the truck starts moving. Photos and anything with typing wait until you&apos;re parked.
+        {t.driveFooter}
       </p>
     </div>
   );

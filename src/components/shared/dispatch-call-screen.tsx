@@ -5,34 +5,10 @@ import { Mic, MicOff, MessageSquareText, Phone, PhoneOff, RotateCcw, UserRound }
 import { cn, formatDuration } from "@/lib/utils";
 import { useNow } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
-import { DISPATCH_LINE, KIND_LABEL, OWNER_NAME } from "@/lib/dispatch-calls";
-import { makeRecognizer, say, stopSpeaking, type Recognizer } from "@/lib/speech";
+import { DISPATCH_LINE, matchSpoken, OWNER_NAME } from "@/lib/dispatch-calls";
+import { canSpeak, makeRecognizer, say, stopSpeaking, type Recognizer } from "@/lib/speech";
+import { useDriverUi } from "@/lib/lang/use-driver-ui";
 import type { DispatchCall } from "@/lib/types";
-
-const RING_SUBTITLE: Record<DispatchCall["kind"], string> = {
-  next_load: "About your next load",
-  pickup_brief: "Before you get to pickup",
-  delivery_brief: "Before you get to delivery",
-  late_eta: "Your delivery appointment",
-  hours_parking: "Your hours and parking",
-  setup: "Setting up your calls",
-  inbound: "Calling dispatch",
-};
-
-/** Words that always work on a call, whatever the AI just asked. */
-const ALWAYS: [string, RegExp][] = [
-  ["again", /\b(again|repeat|say that|what was that|come again)\b/],
-  ["person", /\b(person|human|someone|somebody|real|office)\b/],
-  ["hangup", /\b(hang up|goodbye)\b/],
-];
-
-/** Picks what the driver meant from what they said, or null when nothing fits. */
-function matchReply(heard: string, call: DispatchCall): string | null {
-  for (const choice of call.choices) {
-    if (choice.match && new RegExp(`\\b(${choice.match})`).test(heard)) return choice.reply;
-  }
-  return ALWAYS.find(([, re]) => re.test(heard))?.[0] ?? null;
-}
 
 /**
  * The AI dispatcher calling the driver: a real incoming-call screen, then a call the driver can run without looking —
@@ -42,7 +18,8 @@ function matchReply(heard: string, call: DispatchCall): string | null {
 export function IncomingCallHost({ driverId }: { driverId: string }) {
   const calls = useStore((s) => s.dispatchCalls);
   const active = calls.find((c) => c.driverId === driverId && (c.status === "ringing" || c.status === "live"));
-  const [ended, setEnded] = useState<{ outcome?: string } | null>(null);
+  const { t } = useDriverUi();
+  const [ended, setEnded] = useState<{ missed: boolean } | null>(null);
   const [shownId, setShownId] = useState<string | null>(null);
 
   // A call that was on screen and just ended shows "Call ended" for a moment, so it doesn't just vanish.
@@ -50,7 +27,7 @@ export function IncomingCallHost({ driverId }: { driverId: string }) {
   if (!active && shownId) {
     const last = calls.find((c) => c.id === shownId);
     setShownId(null);
-    if (last?.status === "done" || last?.status === "missed") setEnded({ outcome: last.status === "missed" ? "Sent you a text instead" : last.outcome });
+    if (last?.status === "done" || last?.status === "missed") setEnded({ missed: last.status === "missed" });
   }
   useEffect(() => {
     if (!ended) return;
@@ -65,8 +42,8 @@ export function IncomingCallHost({ driverId }: { driverId: string }) {
       <div role="status" className="fixed inset-x-0 top-4 z-[80] mx-auto flex w-[min(92vw,24rem)] items-center gap-3 rounded-2xl bg-ink-950 px-4 py-3 text-white shadow-lg">
         <MessageSquareText className="h-5 w-5 shrink-0 text-emerald-300" />
         <div className="min-w-0">
-          <p className="text-sm font-semibold">Call ended</p>
-          <p className="truncate text-xs text-white/60">{ended.outcome ? `${ended.outcome}. ` : ""}Copy in your Messages.</p>
+          <p className="text-sm font-semibold">{t.callEnded}</p>
+          <p className="truncate text-xs text-white/60">{ended.missed ? `${t.textedInstead}. ` : ""}{t.copyInMessages}</p>
         </div>
       </div>
     );
@@ -76,6 +53,7 @@ export function IncomingCallHost({ driverId }: { driverId: string }) {
 
 function Ringing({ call }: { call: DispatchCall }) {
   const { answerDispatchCall, declineDispatchCall } = useStore((s) => s.actions);
+  const { t } = useDriverUi();
   useRingtone();
   return (
     <div role="alertdialog" aria-modal="true" aria-label="Incoming call from AI Dispatch" className="fixed inset-0 z-[80] flex flex-col items-center bg-ink-950 px-6 pb-12 pt-24 text-white">
@@ -83,11 +61,11 @@ function Ringing({ call }: { call: DispatchCall }) {
         <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/25" />
         <span className="relative flex h-24 w-24 items-center justify-center rounded-full bg-white text-2xl font-semibold text-ink-950">AI</span>
       </span>
-      <p className="mt-6 text-3xl font-semibold tracking-tight">{call.channel === "phone" ? "Titan Dispatch" : "AI Dispatch"}</p>
-      <p className="mt-2 text-base text-white/60">{call.channel === "phone" ? `${DISPATCH_LINE} · phone call` : RING_SUBTITLE[call.kind]}</p>
+      <p className="mt-6 text-3xl font-semibold tracking-tight">{call.channel === "phone" ? "Titan Dispatch" : t.aiDispatch}</p>
+      <p className="mt-2 text-base text-white/60">{call.channel === "phone" ? `${DISPATCH_LINE} · ${t.phoneCall}` : t.ringSub[call.kind]}</p>
       {call.channel === "phone" && (
         <p className="mt-6 max-w-xs text-center text-xs text-white/40">
-          Demo: this is how it rings on a regular phone, no app needed. A real line needs a phone provider connected.
+          {t.phoneDemo}
         </p>
       )}
       <div className="mt-auto grid w-full max-w-xs grid-cols-2 gap-10">
@@ -95,13 +73,13 @@ function Ringing({ call }: { call: DispatchCall }) {
           <span className="flex h-18 w-18 items-center justify-center rounded-full bg-white/15 p-5">
             <MessageSquareText className="h-8 w-8" />
           </span>
-          Later, text me
+          {t.laterText}
         </button>
         <button type="button" onClick={() => answerDispatchCall(call.id)} className="flex flex-col items-center gap-2 text-sm font-semibold">
           <span className="flex h-18 w-18 items-center justify-center rounded-full bg-emerald-500 p-5">
             <Phone className="h-8 w-8" />
           </span>
-          Answer
+          {t.answer}
         </button>
       </div>
     </div>
@@ -110,6 +88,7 @@ function Ringing({ call }: { call: DispatchCall }) {
 
 function LiveCall({ call }: { call: DispatchCall }) {
   const { replyDispatchCall, hangUpDispatchCall } = useStore((s) => s.actions);
+  const { t, info } = useDriverUi();
   const now = useNow();
   const [listening, setListening] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
@@ -124,20 +103,19 @@ function LiveCall({ call }: { call: DispatchCall }) {
 
   function listen() {
     recognizer.current?.stop();
-    const r = makeRecognizer();
+    const r = makeRecognizer(info.speech);
     if (!r) return;
     recognizer.current = r;
-    r.lang = "en-US";
     r.interimResults = false;
     r.onresult = (e) => {
       const heard = e.results[0][0].transcript.toLowerCase().trim();
       const current = callRef.current;
-      const reply = matchReply(heard, current);
+      const reply = matchSpoken(heard, current);
       if (reply === "hangup") hangUpDispatchCall(current.id);
       else if (reply) {
         setHint(null);
         replyDispatchCall(current.id, reply, heard.charAt(0).toUpperCase() + heard.slice(1));
-      } else setHint(`Didn't catch "${heard}". Say it again or tap.`);
+      } else setHint(t.didntCatch(heard));
     };
     r.onend = () => setListening(false);
     r.onerror = (e) => {
@@ -165,7 +143,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
         if (autoListen.current && canListen && callRef.current.status === "live") listen();
       },
       // The owner sounds like a different person than the AI.
-      last.speaker === "owner" ? { pitch: 0.8, rate: 1 } : {},
+      last.speaker === "owner" ? { pitch: 0.8, rate: 1, lang: info.speech } : { lang: info.speech },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [call.lines.length]);
@@ -178,6 +156,8 @@ function LiveCall({ call }: { call: DispatchCall }) {
     [],
   );
 
+  // Voices load late on some phones, so this is asked again on every render rather than once.
+  const voiceMissing = canSpeak(info.speech) === false;
   const secs = now && call.answeredAt ? Math.max(0, Math.round((now - Date.parse(call.answeredAt)) / 1000)) : 0;
   const lines = call.lines.slice(-4);
   const bookedSomething = call.effects.some((e) => e.type === "book" || e.type === "reserve_parking");
@@ -186,9 +166,9 @@ function LiveCall({ call }: { call: DispatchCall }) {
     <div role="dialog" aria-modal="true" aria-label="Call with AI Dispatch" className="fixed inset-0 z-[80] flex flex-col bg-ink-950 px-5 pb-6 pt-8 text-white">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-lg font-semibold">{call.ownerTookOver ? `${OWNER_NAME} · Titan Freight` : "AI Dispatch"}</p>
+          <p className="text-lg font-semibold">{call.ownerTookOver ? `${OWNER_NAME} · Titan Freight` : t.aiDispatch}</p>
           <p className="text-xs text-white/50">
-            {call.ownerTookOver ? "AI is taking notes" : KIND_LABEL[call.kind]} · <span className="tabular">{formatDuration(secs)}</span>
+            {call.ownerTookOver ? t.takingNotes : t.ringSub[call.kind]} · <span className="tabular">{formatDuration(secs)}</span>
           </p>
         </div>
         {canListen && (
@@ -199,7 +179,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
             className={cn("flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold", listening ? "bg-emerald-400 text-ink-950" : "bg-white/10 text-white/80")}
           >
             {listening ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-            {listening ? "Listening" : "Tap to talk"}
+            {listening ? t.listening : t.tapToTalk}
           </button>
         )}
       </div>
@@ -218,6 +198,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
           </p>
         ))}
         {hint && <p className="text-xs text-amber-200">{hint}</p>}
+        {voiceMissing && <p className="text-xs text-white/40">{t.noVoice(info.native)}</p>}
       </div>
 
       {call.choices.length > 0 && (
@@ -232,6 +213,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
                 ch.reply === "cancel" ? "bg-red-500/90 text-white" : i === 0 && !bookedSomething ? "bg-white text-ink-950" : "bg-white/10",
               )}
             >
+              <span aria-hidden className="mr-2 text-sm font-medium opacity-50">{i + 1}</span>
               {ch.label}
             </button>
           ))}
@@ -241,15 +223,15 @@ function LiveCall({ call }: { call: DispatchCall }) {
       <div className="mt-5 grid grid-cols-3 items-center gap-3">
         <button
           type="button"
-          onClick={() => (call.ownerTookOver ? replyDispatchCall(call.id, "again", "Sorry, say that again?") : replyDispatchCall(call.id, "again"))}
+          onClick={() => (call.ownerTookOver ? replyDispatchCall(call.id, "again", t.sayAgain) : replyDispatchCall(call.id, "again"))}
           className="flex flex-col items-center gap-1 text-[11px] text-white/60"
         >
           <span className="rounded-full bg-white/10 p-3">
             <RotateCcw className="h-5 w-5" />
           </span>
-          Say that again
+          {t.sayAgain}
         </button>
-        <button type="button" onClick={() => hangUpDispatchCall(call.id)} aria-label="Hang up" className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-500">
+        <button type="button" onClick={() => hangUpDispatchCall(call.id)} aria-label={t.hangUp} className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-500">
           <PhoneOff className="h-7 w-7" />
         </button>
         {call.ownerTookOver ? (
@@ -259,7 +241,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
             <span className="rounded-full bg-white/10 p-3">
               <UserRound className="h-5 w-5" />
             </span>
-            Get me a person
+            {t.person}
           </button>
         )}
       </div>

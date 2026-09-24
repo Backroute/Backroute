@@ -31,6 +31,7 @@ import { bookableBrokers, type BrokerPolicy } from "./broker-policy";
 import { homeTimeStatus } from "./home";
 import { HOME_TIME_OPTIONS, laneFits, RUN_TYPE_DETAIL, RUN_TYPE_LABEL } from "./run-types";
 import { computeDriverPay, payLabel } from "./settlements";
+import { pack, type QuickPhrase } from "./lang";
 import { weekEarnings } from "./earnings";
 import {
   briefCall,
@@ -38,8 +39,11 @@ import {
   driverTakes,
   KIND_LABEL,
   lateCall,
+  autoBookedText,
+  driverLang,
   inboundCall,
   lateOnThisLoad,
+  type EmptyAt,
   nextLoadCall,
   OWNER_NAME,
   openCall,
@@ -58,11 +62,13 @@ import type {
   Carrier,
   CarrierMessage,
   DispatchCall,
+  DispatchCallChoice,
   DispatchCallKind,
   Driver,
   DriverMessage,
   DriverPrefs,
   HosStatus,
+  Lang,
   DvirInspection,
   DvirItem,
   Escalation,
@@ -239,11 +245,13 @@ interface CallDraft {
   driverMessages: DriverMessage[];
   dispatchCalls: DispatchCall[];
   events: ActivityEvent[];
+  /** The owner's language, for the second copy of every line they read on the board. */
+  ownerLang: Lang;
 }
 
 function draftFrom(state: StoreState): CallDraft {
   const { brokers, incidents, loads, trucks, drivers, escalations, driverMessages, dispatchCalls } = state;
-  return { brokers, incidents, loads, trucks, drivers, escalations, driverMessages, dispatchCalls, events: [] };
+  return { brokers, incidents, loads, trucks, drivers, escalations, driverMessages, dispatchCalls, events: [], ownerLang: state.settings.ownerLanguage };
 }
 
 function callDraftResult(d: CallDraft) {
@@ -275,31 +283,52 @@ function ringCall(d: CallDraft, call: DispatchCall) {
   patchCall(d, call.id, { status: "ringing", ringingAt: new Date().toISOString(), channel: reach });
 }
 
-function answerCall(d: CallDraft, call: DispatchCall) {
+/** The owner's copy of a line, when the owner reads a different language than the driver speaks. */
+function ownerCopy(d: CallDraft, call: DispatchCall, inOwnerLang: () => string): string | undefined {
+  return d.ownerLang === call.lang ? undefined : inOwnerLang();
+}
+
+/** Choices in the driver's language, each carrying the owner's version for the transcript. */
+function withAlt(choices: DispatchCallChoice[], ownerChoices: DispatchCallChoice[] | undefined): DispatchCallChoice[] {
+  return ownerChoices ? choices.map((ch, i) => ({ ...ch, alt: ownerChoices[i]?.label })) : choices;
+}
+
+/** The AI's opening line, said in the driver's language and kept in the owner's. */
+function openingFor(d: CallDraft, call: DispatchCall) {
   const turn = openCall(call);
+  const owner = d.ownerLang === call.lang ? undefined : openCall(call, d.ownerLang);
+  return { ...turn, alt: owner?.say, choices: withAlt(turn.choices, owner?.choices) };
+}
+
+function answerCall(d: CallDraft, call: DispatchCall) {
+  const turn = openingFor(d, call);
   const now = new Date().toISOString();
-  patchCall(d, call.id, { status: "live", answeredAt: now, lines: [{ speaker: "ai", text: turn.say, at: now }], choices: turn.choices, step: turn.step });
+  patchCall(d, call.id, { status: "live", answeredAt: now, lines: [{ speaker: "ai", text: turn.say, at: now, alt: turn.alt }], choices: turn.choices, step: turn.step });
 }
 
 /** One back-and-forth on a live call. `heard` is what the driver actually said, when they spoke instead of tapping. */
 function replyToCall(d: CallDraft, callId: string, reply: string, heard?: string) {
   const call = d.dispatchCalls.find((c) => c.id === callId);
   if (!call || call.status !== "live") return;
-  const said =
-    heard ??
-    (reply === "again" ? "Say that again?" : reply === "person" ? "Can I talk to a person?" : call.choices.find((ch) => ch.reply === reply)?.say ?? reply);
+  const L = pack(call.lang);
+  const O = pack(d.ownerLang);
+  const choice = call.choices.find((ch) => ch.reply === reply);
+  const said = heard ?? (reply === "again" ? L.saidAgain : reply === "person" ? L.saidPerson : choice?.say ?? reply);
+  // What the driver said, for an owner who reads another language: the button's own translation when there is one.
+  const saidAlt = ownerCopy(d, call, () => (reply === "again" ? O.saidAgain : reply === "person" ? O.saidPerson : choice?.alt ?? said));
   const now = new Date().toISOString();
 
   // The owner has the call now: the AI only listens and keeps the record.
   if (call.ownerTookOver) {
-    patchCall(d, callId, { lines: [...call.lines, { speaker: "driver", text: said, at: now }] });
+    patchCall(d, callId, { lines: [...call.lines, { speaker: "driver", text: said, at: now, alt: saidAlt }] });
     return;
   }
 
   const turn = respond(call, reply);
+  const ownerTurn = d.ownerLang === call.lang ? undefined : respond(call, reply, d.ownerLang);
   patchCall(d, callId, {
-    lines: [...call.lines, { speaker: "driver", text: said, at: now }, { speaker: "ai", text: turn.say, at: now }],
-    choices: turn.choices,
+    lines: [...call.lines, { speaker: "driver", text: said, at: now, alt: saidAlt }, { speaker: "ai", text: turn.say, at: now, alt: ownerTurn?.say }],
+    choices: withAlt(turn.choices, ownerTurn?.choices),
     step: turn.step,
     ...(turn.effects ? { effects: turn.effects } : {}),
     ...(turn.outcome !== undefined ? { outcome: turn.outcome } : {}),
@@ -374,7 +403,7 @@ function endCall(d: CallDraft, callId: string) {
 }
 
 /** The calls the AI decides to make this tick, then who's ringing, held, missed or talking. */
-function runDispatchCalls(d: CallDraft, newOfferBatches: { truckId: string; offers: Load[]; emptyAt: string }[]) {
+function runDispatchCalls(d: CallDraft, newOfferBatches: { truckId: string; offers: Load[]; emptyAt: EmptyAt }[]) {
   const now = new Date();
   const nowMs = now.getTime();
   const has = (driverId: string, kind: DispatchCallKind, loadId?: string) => d.dispatchCalls.some((c) => c.driverId === driverId && c.kind === kind && c.loadId === loadId);
@@ -447,7 +476,7 @@ function runDispatchCalls(d: CallDraft, newOfferBatches: { truckId: string; offe
       const last = active.lines.at(-1);
       if (active.ownerTookOver) {
         // Talking with the owner now: the driver answers them, and the owner hangs up when they're done.
-        if (last?.speaker === "owner" && nowMs - Date.parse(last.at) > 3000) replyToCall(d, active.id, "ack", pick(["Sounds good.", "Yep, will do.", "Got it, thanks."]));
+        if (last?.speaker === "owner" && nowMs - Date.parse(last.at) > 3000) replyToCall(d, active.id, "ack");
         continue;
       }
       if (last && nowMs - Date.parse(last.at) > 4000) {
@@ -510,6 +539,8 @@ export interface AgentSettings {
   notifySms: boolean;
   /** The owner's end-of-day summary text. */
   dailyText: boolean;
+  /** The owner's language: their end-of-day text and the call transcripts on their dashboard. */
+  ownerLanguage: Lang;
   rateFloorPct: number;
   avoidWatchBrokers: boolean;
   offersPerTruck: number;
@@ -705,7 +736,7 @@ interface StoreState {
     /** The owner steps into a live call: the AI says so and hands over, then just keeps the record. */
     takeOverDispatchCall: (callId: string) => void;
     /** The owner talking on a call they took over. */
-    ownerSayOnCall: (callId: string, text: string) => void;
+    ownerSayOnCall: (callId: string, text: string, quick?: QuickPhrase) => void;
   };
 }
 
@@ -864,6 +895,7 @@ export const useStore = create<StoreState>((set, get) => ({
     notifyEmail: true,
     notifySms: false,
     dailyText: true,
+    ownerLanguage: "en",
     rateFloorPct: 96,
     avoidWatchBrokers: false,
     offersPerTruck: 3,
@@ -891,7 +923,7 @@ export const useStore = create<StoreState>((set, get) => ({
         // Brokers the AI won't book are never sourced from; slow payers get a premium on the AI's ask.
         const { brokers: bookable, surcharges } = bookableBrokers(state.brokers, state.settings.brokerOverrides);
 
-        const offerBatches: { truckId: string; offers: Load[]; emptyAt: string }[] = [];
+        const offerBatches: { truckId: string; offers: Load[]; emptyAt: EmptyAt }[] = [];
         const autoBooked: { truckId: string; loadId?: string }[] = [];
 
         const activeLoads = loads.filter((l) => l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "cancelled" && l.carrierId === PRIMARY_CARRIER_ID);
@@ -929,7 +961,7 @@ export const useStore = create<StoreState>((set, get) => ({
             newEvents.push(...picked.events);
             autoBooked.push({ truckId: truck.id, loadId: picked.events.find((e) => e.loadId)?.loadId });
           } else {
-            offerBatches.push({ truckId: truck.id, offers, emptyAt: `in ${truck.currentCity}` });
+            offerBatches.push({ truckId: truck.id, offers, emptyAt: { kind: "in", city: truck.currentCity } });
             newEvents.push({
             id: uid("act"), timestamp: new Date().toISOString(), type: "load_offered",
             message: `AI found ${offers.length} ${truck.equipmentType.toLowerCase()} loads for ${truck.unitNumber}`, detail: `Scanned every connected board, awaiting ${driver ? driver.name.split(" ")[0] : "driver"}'s pick`,
@@ -961,7 +993,7 @@ export const useStore = create<StoreState>((set, get) => ({
               newEvents.push(...picked.events);
               autoBooked.push({ truckId: truck.id, loadId: picked.events.find((e) => e.loadId)?.loadId });
             } else {
-              offerBatches.push({ truckId: truck.id, offers, emptyAt: `after you deliver in ${currentLoad.lane.destination}` });
+              offerBatches.push({ truckId: truck.id, offers, emptyAt: { kind: "after", city: currentLoad.lane.destination } });
               newEvents.push({
                 id: uid("act"), timestamp: new Date().toISOString(), type: "load_offered",
                 message: `Next-load options ready for ${truck.unitNumber}`, detail: `Pre-negotiating before delivery, ${offers.length} options found`,
@@ -1133,7 +1165,7 @@ export const useStore = create<StoreState>((set, get) => ({
         for (const { truckId, loadId } of autoBooked) {
           const booked = draft.loads.find((l) => l.id === loadId);
           const driverId = trucks.find((t) => t.id === truckId)?.driverId;
-          if (booked && driverId) textDriver(draft, driverId, `Booked your next load: ${booked.lane.origin} → ${booked.lane.destination}, ${booked.lane.miles} mi, picks up ${booked.pickupWindow}. Details in the app.`);
+          if (booked && driverId) textDriver(draft, driverId, autoBookedText(driverLang(draft.drivers.find((x) => x.id === driverId)), booked));
         }
         runDispatchCalls(draft, offerBatches);
         newEvents.push(...draft.events);
@@ -2218,13 +2250,13 @@ export const useStore = create<StoreState>((set, get) => ({
           weekLoads: week.loads.length,
           nextBooked: state.loads.find((l) => l.id === truck?.nextLoadId),
           offers: state.loads.filter((l) => l.truckId === truck?.id && l.stage === "offered"),
-          emptyAt: current ? `after you deliver in ${current.lane.destination}` : `in ${truck?.currentCity ?? "town"}`,
+          emptyAt: current ? { kind: "after", city: current.lane.destination } : { kind: "in", city: truck?.currentCity ?? "" },
           team,
         });
-        const opening = openCall(base);
+        const opening = openingFor(draftFrom(state), base);
         const call: DispatchCall = {
           ...base, loadId: current?.id, status: "live", channel: driver.prefs?.reach ?? "app", ringingAt: now, answeredAt: now,
-          lines: [{ speaker: "ai", text: opening.say, at: now }], choices: opening.choices, step: opening.step,
+          lines: [{ speaker: "ai", text: opening.say, at: now, alt: opening.alt }], choices: opening.choices, step: opening.step,
         };
         return { dispatchCalls: [call, ...state.dispatchCalls].slice(0, 60) };
       }),
@@ -2236,12 +2268,15 @@ export const useStore = create<StoreState>((set, get) => ({
         if (call?.status !== "live" || call.ownerTookOver) return {};
         const now = new Date().toISOString();
         const first = d.drivers.find((x) => x.id === call.driverId)?.name.split(" ")[0] ?? "there";
+        const L = pack(call.lang);
+        const O = pack(d.ownerLang);
+        const other = d.ownerLang !== call.lang;
         patchCall(d, callId, {
           ownerTookOver: true,
-          lines: [...call.lines, { speaker: "ai", text: `${first}, ${OWNER_NAME} from the office just joined. I'll let you two talk and keep notes.`, at: now }],
+          lines: [...call.lines, { speaker: "ai", text: L.ownerJoined(first, OWNER_NAME), at: now, alt: other ? O.ownerJoined(first, OWNER_NAME) : undefined }],
           choices: [
-            { label: "Sounds good", reply: "ack", say: "Sounds good.", match: "good|ok|okay|yes|yeah|sure|will do" },
-            { label: "Hold on a sec", reply: "hold", say: "Hold on a sec.", match: "hold|wait|second|sec" },
+            { label: L.ch.soundsGood, reply: "ack", say: L.ch.soundsGood, match: "good|ok|okay|yes|yeah|sure|will do", alt: other ? O.ch.soundsGood : undefined },
+            { label: L.ch.holdOn, reply: "hold", say: L.ch.holdOn, match: "hold|wait|second|sec", alt: other ? O.ch.holdOn : undefined },
           ],
           outcome: `${OWNER_NAME} took the call over`,
         });
@@ -2249,11 +2284,16 @@ export const useStore = create<StoreState>((set, get) => ({
         return { dispatchCalls: d.dispatchCalls, activity: [...d.events, ...state.activity].slice(0, 80) };
       }),
 
-    ownerSayOnCall: (callId, text) =>
+    ownerSayOnCall: (callId, text, quick) =>
       set((state) => {
         const call = state.dispatchCalls.find((c) => c.id === callId);
-        if (call?.status !== "live" || !call.ownerTookOver || !text.trim()) return {};
-        const line = { speaker: "owner" as const, text: text.trim(), at: new Date().toISOString() };
+        if (call?.status !== "live" || !call.ownerTookOver || (!quick && !text.trim())) return {};
+        // A quick phrase reaches the driver in their language. Typed words go as typed: live translation of free
+        // speech needs the real voice AI connected.
+        const ownerLang = state.settings.ownerLanguage;
+        const line = quick
+          ? { speaker: "owner" as const, text: pack(call.lang).quick[quick], at: new Date().toISOString(), alt: ownerLang !== call.lang ? pack(ownerLang).quick[quick] : undefined }
+          : { speaker: "owner" as const, text: text.trim(), at: new Date().toISOString() };
         return { dispatchCalls: state.dispatchCalls.map((c) => (c.id === callId ? { ...c, lines: [...c.lines, line] } : c)) };
       }),
   },

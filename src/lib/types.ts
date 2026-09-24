@@ -134,7 +134,12 @@ export interface Driver {
   prefs?: DriverPrefs;
 }
 
+/** Languages the AI dispatcher speaks with drivers and owners. Brokers are always worked in English. */
+export type Lang = "en" | "es" | "pa" | "hi" | "ru" | "uk" | "fr";
+
 export interface DriverPrefs {
+  /** The language the AI calls, texts and shows the app in. */
+  language?: Lang;
   /** Hour of the day (0–23) before which the AI doesn't call; it texts instead. */
   noCallsBefore?: number;
   /** States the driver won't take loads into (e.g. NJ for the NYC area). */
@@ -516,8 +521,26 @@ export interface DispatchCallChoice {
   /** What the store does with it; `say` is what the driver is heard saying. */
   reply: string;
   say: string;
-  /** Loose words that pick this choice when the driver says it out loud. */
+  /** Loose words that pick this choice when the driver says it out loud (English). */
   match?: string;
+  /** The same choice in the owner's language, for the carrier's transcript. */
+  alt?: string;
+}
+
+/** A load the AI reads out on a call, kept as facts so it can be said in any language. */
+export interface DispatchCallOption {
+  loadId: string;
+  /** "Dallas → Memphis, $1,450" — the same in every language. */
+  short: string;
+  origin: string;
+  dest: string;
+  miles: number;
+  day: "today" | "tomorrow";
+  /** What the driver makes on it. */
+  pay: number;
+  /** An in-town move rather than a load. */
+  move: boolean;
+  home?: { kind: "tonight" | "late" | "near" | "hours"; hours?: number };
 }
 
 /** Something the driver agreed to on the call. It happens when the call ends, so "cancel that" can still undo it. */
@@ -550,7 +573,10 @@ export interface DispatchCall {
   ringingAt?: string;
   answeredAt?: string;
   endedAt?: string;
-  lines: { speaker: "ai" | "driver" | "owner"; text: string; at: string }[];
+  /** The driver's language, which the whole call is in. */
+  lang: Lang;
+  /** `alt` is the line in the owner's language when it differs from the driver's. */
+  lines: { speaker: "ai" | "driver" | "owner"; text: string; at: string; alt?: string }[];
   /** Where it rang: the app, or the driver's regular phone. */
   channel?: "app" | "phone";
   /** The carrier's owner took the call over from the AI (listening in is silent and needs no flag). */
@@ -560,7 +586,7 @@ export interface DispatchCall {
   step: string;
   /** Facts frozen when the call was created: pickup number, door, the options on offer. */
   facts: Record<string, string>;
-  options?: { loadId: string; say: string; short: string }[];
+  options?: DispatchCallOption[];
   effects: DispatchCallEffect[];
   /** The one-line result shown on the carrier board and in call history. */
   outcome?: string;

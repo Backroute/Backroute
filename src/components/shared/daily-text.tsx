@@ -5,8 +5,7 @@ import { useStore } from "@/lib/store";
 import { useNow } from "@/lib/hooks";
 import { usePrimaryCarrier, useCarrierLoads } from "@/lib/selectors";
 import { formatCurrency } from "@/lib/utils";
-
-const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+import { pack } from "@/lib/lang";
 
 /** The owner's end-of-day text: what got done, what it made, and the one thing that needs them — for owners who'll
  *  never open a dashboard but read every text. */
@@ -19,6 +18,7 @@ export function useDailyText(): string | null {
   const escalations = useStore((s) => s.escalations);
   const timeOff = useStore((s) => s.timeOffRequests);
   const expenses = useStore((s) => s.expenses);
+  const ownerLang = useStore((s) => s.settings.ownerLanguage);
   if (now === null) return null;
 
   const today = new Date(now).toDateString();
@@ -31,14 +31,16 @@ export function useDailyText(): string | null {
     ...expenses.filter((e) => e.status === "pending").map((e) => `pay back ${name(e.driverId)}'s ${formatCurrency(e.amount)} ${e.category}`),
     ...timeOff.filter((r) => r.carrierId === carrier.id && r.status === "pending").map((r) => `answer ${name(r.driverId)}'s time-off request`),
   ];
-  const d = new Date(now);
-  const parts = [
-    `${carrier.name}, ${WEEKDAY[d.getDay()]}: ${delivered.length} load${delivered.length === 1 ? "" : "s"} delivered, ${formatCurrency(profit)} profit.`,
-    rolling ? `${rolling} truck${rolling === 1 ? "" : "s"} still rolling tonight.` : "All trucks parked for the night.",
-    asks.length ? `${asks.length} thing${asks.length === 1 ? " needs" : "s need"} you, first: ${asks[0].charAt(0).toLowerCase()}${asks[0].slice(1)}.` : "Nothing needs you.",
-    "Details: backroute.app/today",
-  ];
-  return parts.join(" ");
+  // In the owner's language. The first ask is only spelled out in English; other languages give the count.
+  return pack(ownerLang).daily({
+    carrier: carrier.name,
+    weekday: new Date(now).getDay(),
+    delivered: delivered.length,
+    profit: formatCurrency(profit),
+    rolling,
+    asks: asks.length,
+    firstAsk: asks[0],
+  });
 }
 
 export function DailyTextPreview() {

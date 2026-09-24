@@ -6,6 +6,7 @@ import { laneFits } from "./run-types";
 import type {
   ActivityEvent,
   Broker,
+  Lang,
   Carrier,
   CarrierMessage,
   Driver,
@@ -110,14 +111,14 @@ export const LANES: Lane[] = [
 
 export const EQUIPMENT: EquipmentType[] = ["Dry Van", "Reefer", "Flatbed"];
 
-const DRIVER_ROSTER: { name: string; phone: string; cdl: string; homeBase: string; runType: RunType; homeTimeTarget: string; homeInDays?: number }[] = [
+const DRIVER_ROSTER: { name: string; language?: Lang; phone: string; cdl: string; homeBase: string; runType: RunType; homeTimeTarget: string; homeInDays?: number }[] = [
   { name: "Marcus Bell", phone: "(214) 555-0148", cdl: "CDL-A TX 88213", homeBase: "Dallas, TX", runType: "otr", homeTimeTarget: "Home in 2 weeks", homeInDays: 9 },
-  { name: "Yolanda Reyes", phone: "(469) 555-0172", cdl: "CDL-A TX 77102", homeBase: "Fort Worth, TX", runType: "regional", homeTimeTarget: "Home by Saturday" },
+  { name: "Yolanda Reyes", language: "es", phone: "(469) 555-0172", cdl: "CDL-A TX 77102", homeBase: "Fort Worth, TX", runType: "regional", homeTimeTarget: "Home by Saturday" },
   { name: "Corey Franklin", phone: "(214) 555-0195", cdl: "CDL-A TX 65401", homeBase: "Dallas, TX", runType: "local", homeTimeTarget: "Home every night" },
   { name: "Ava Whitmore", phone: "(972) 555-0163", cdl: "CDL-A TX 71234", homeBase: "Plano, TX", runType: "regional", homeTimeTarget: "Home by Friday" },
   { name: "Deshawn Price", phone: "(214) 555-0187", cdl: "CDL-A TX 69022", homeBase: "Arlington, TX", runType: "intown", homeTimeTarget: "Home every night" },
-  { name: "Nina Castillo", phone: "(469) 555-0129", cdl: "CDL-A TX 73310", homeBase: "Irving, TX", runType: "otr", homeTimeTarget: "Home in 1 week", homeInDays: 5 },
-  { name: "Priya Anand", phone: "(214) 555-0116", cdl: "CDL-A TX 82097", homeBase: "Dallas, TX", runType: "otr", homeTimeTarget: "Home in 2 weeks", homeInDays: 9 },
+  { name: "Nina Castillo", language: "es", phone: "(469) 555-0129", cdl: "CDL-A TX 73310", homeBase: "Irving, TX", runType: "otr", homeTimeTarget: "Home in 1 week", homeInDays: 5 },
+  { name: "Priya Anand", language: "pa", phone: "(214) 555-0116", cdl: "CDL-A TX 82097", homeBase: "Dallas, TX", runType: "otr", homeTimeTarget: "Home in 2 weeks", homeInDays: 9 },
 ];
 
 const CARRIER_PREFIXES = [
@@ -676,6 +677,7 @@ export function generateWorld(seed = 20260916): World {
       runType: d.runType,
       homeTimeTarget: d.homeTimeTarget,
       homeDueAt: d.homeInDays ? iso(d.homeInDays * 1440) : undefined,
+      prefs: d.language ? { language: d.language } : undefined,
       payType,
       payRate:
         payType === "percentage" ? pct(rng, 0.25, 0.32, 2) : payType === "hourly" ? pct(rng, 26, 31, 2) : payType === "per_move" ? pct(rng, 65, 85, 0) : pct(rng, 0.58, 0.68, 2),

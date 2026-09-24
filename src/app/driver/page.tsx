@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ArrowDown, ArrowUpRight, ClipboardCheck, Link2, MapPin, Navigation, Phone } from "lucide-react";
 import { DrivingMode } from "@/components/shared/driving-mode";
 import { CallStatusLine } from "@/components/shared/call-settings";
+import { useDriverUi } from "@/lib/lang/use-driver-ui";
 import { HomeTimeCard, useHomeTime } from "@/components/shared/home-time";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
@@ -25,6 +26,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 
 export default function DriverHomePage() {
   const driver = usePrimaryDriver();
+  const { t } = useDriverUi();
   const trucks = useCarrierTrucks();
   const loads = useCarrierLoads();
   const brokers = useBrokerMap();
@@ -101,8 +103,8 @@ export default function DriverHomePage() {
   const homeWhen =
     driver.runType === "local" || driver.runType === "intown"
       ? homeTime?.state === "late"
-        ? "Late tonight"
-        : "Tonight"
+        ? t.lateTonight
+        : t.tonight
       : homeTime?.target
         ? homeTime.target.replace(/^Home (by |in )?/, "")
         : homeTime?.hoursHome != null
@@ -113,33 +115,33 @@ export default function DriverHomePage() {
     <div className="flex flex-col gap-5 px-5">
       <div>
         <div className="flex items-center justify-between gap-3">
-          <h1 className="font-display text-2xl text-ink-950">Hi {driver.name.split(" ")[0]}</h1>
+          <h1 className="font-display text-2xl text-ink-950">{t.hi(driver.name.split(" ")[0])}</h1>
           {currentLoad && !completedLoad && (
             <button
               type="button"
               onClick={() => setDriving(true)}
               className="flex items-center gap-1.5 rounded-full bg-ink-950 px-3.5 py-2 text-xs font-semibold text-white"
             >
-              <Navigation className="h-3.5 w-3.5" /> Driving mode
+              <Navigation className="h-3.5 w-3.5" /> {t.drivingMode}
             </button>
           )}
         </div>
         <p className="mt-1 flex items-center gap-2 text-sm text-ink-500">
           <span className={cn("h-2 w-2 shrink-0 rounded-full", todoCount ? "bg-[var(--accent-warn)]" : "bg-[var(--accent-live)]")} />
           {completedLoad
-            ? "Load delivered. Nice work."
+            ? t.delivered
             : todoCount === 0
-              ? "Nothing needs you. AI Dispatcher has it handled."
-              : `${todoCount} thing${todoCount === 1 ? "" : "s"} for you. AI handles the rest.`}
+              ? t.nothingNeeds
+              : t.thingsForYou(todoCount)}
         </p>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <Link href="/driver/earnings" className="rounded-2xl border border-line px-4 py-3">
             <p className="font-display text-2xl tabular text-ink-950">{formatCurrency(weekPay)}</p>
-            <p className="text-xs text-ink-500">Pay this week</p>
+            <p className="text-xs text-ink-500">{t.payWeek}</p>
           </Link>
           <div className="rounded-2xl border border-line px-4 py-3">
             <p className="font-display text-2xl text-ink-950">{homeWhen}</p>
-            <p className="text-xs text-ink-500">{driver.runType === "local" || driver.runType === "intown" ? `${driver.hoursRemaining.toFixed(1)} h of driving left` : "Home"}</p>
+            <p className="text-xs text-ink-500">{driver.runType === "local" || driver.runType === "intown" ? t.hoursLeft(driver.hoursRemaining.toFixed(1)) : t.home}</p>
           </div>
         </div>
       </div>
@@ -176,7 +178,7 @@ export default function DriverHomePage() {
             <p className="text-sm text-ink-500">No active load. The AI is sourcing your next one now.</p>
           )}
           <button onClick={callDispatch} className="flex items-center gap-1.5 rounded-full border border-line px-4 py-2 text-xs font-medium text-ink-700">
-            <Phone className="h-3.5 w-3.5" /> Call AI Dispatcher
+            <Phone className="h-3.5 w-3.5" /> {t.callDispatch}
           </button>
         </div>
       )}

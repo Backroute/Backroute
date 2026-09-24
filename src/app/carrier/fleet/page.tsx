@@ -14,7 +14,8 @@ import { homeTimeStatus } from "@/lib/home";
 import { RUN_TYPE_DETAIL, RUN_TYPE_LABEL, RUN_TYPES } from "@/lib/run-types";
 import { useStore } from "@/lib/store";
 import { payLabel } from "@/lib/settlements";
-import type { RunType } from "@/lib/types";
+import type { Lang, RunType } from "@/lib/types";
+import { LANGS } from "@/lib/lang";
 import { useCarrierTrucks, useDriverMap, useCarrierLoads, truckActiveLoads } from "@/lib/selectors";
 import { useNow } from "@/lib/hooks";
 import { formatNumber } from "@/lib/utils";
@@ -41,6 +42,7 @@ export default function FleetPage() {
   const now = useNow();
   const flagged = useDriverRetention().filter((r) => r.view.level !== "good");
   const setRunType = useStore((s) => s.actions.setRunType);
+  const setDriverPrefs = useStore((s) => s.actions.setDriverPrefs);
 
   return (
     <div>
@@ -112,6 +114,17 @@ export default function FleetPage() {
                     >
                       {RUN_TYPES.map((t) => (
                         <option key={t} value={t}>{RUN_TYPE_LABEL[t]}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={driver.prefs?.language ?? "en"}
+                      onChange={(e) => setDriverPrefs(driver.id, { language: e.target.value as Lang })}
+                      aria-label={`${driver.name}'s language`}
+                      title="The language the AI calls and texts this driver in"
+                      className="rounded-full border border-line bg-white px-2.5 py-1 text-[11px] font-medium text-ink-800 outline-none focus:border-ink-400"
+                    >
+                      {LANGS.map((l) => (
+                        <option key={l.code} value={l.code}>{l.native}</option>
                       ))}
                     </select>
                     <a href={`tel:${driver.phone.replace(/[^\d+]/g, "")}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-100 text-ink-600 hover:bg-ink-200">

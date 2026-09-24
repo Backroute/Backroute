@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CalendarClock, DollarSign, Home, Phone, Star, Users } from "lucide-react";
-import { CallSettingsCard } from "@/components/shared/call-settings";
+import { CallSettingsCard, LanguageCard } from "@/components/shared/call-settings";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,6 +80,8 @@ export default function DriverProfilePage() {
         <Progress value={(driver.hoursRemaining / 11) * 100} className="mt-2" />
         <p className="mt-1.5 text-xs text-ink-400">{driver.hoursRemaining.toFixed(1)} hours remaining today</p>
       </div>
+
+      <LanguageCard driver={driver} />
 
       <CallSettingsCard driver={driver} />
 
