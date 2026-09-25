@@ -77,6 +77,7 @@ export async function cancelLoad(ctx: CarrierContext, load: Load, reason: string
       amount: tonu,
       // The rate con's own TONU amount is inside the rules; the AI's usual amount is a judgment call.
       withinRules: tonuOnRateCon(load) !== null,
+      rule: "tonu_default",
       why: `${load.referenceNumber} was cancelled after the truck was dispatched. Claim $${tonu} TONU${tonuOnRateCon(load) ? "" : " (the rate con didn't say, so this is the usual amount)"}?`,
     });
 

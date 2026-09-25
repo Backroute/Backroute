@@ -8,6 +8,9 @@ import { DRIVER_SYSTEM, OWNER_SYSTEM } from "../ai/prompts";
 import { driverSnapshot, ownerSnapshot } from "../ai/snapshot";
 import { LANG_INFO } from "../lang/pack";
 import { PRIMARY_CARRIER_ID } from "../mock-data";
+import { memoryNote } from "./memory";
+import { handleBreakdown } from "./roadside";
+import { recordFeedback } from "./care";
 import { LOAD_STAGE_LABEL, LOAD_STAGE_ORDER, type ActivityEvent, type Driver, type Escalation, type Load, type LoadStage, type MessageChannel } from "../types";
 import type { Item } from "../cloud/rows";
 import { addActivity, save, type CarrierContext } from "./db";
@@ -122,9 +125,16 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: "sms" | "voic
       inputSchema: z.object({
         kind: z.enum(["breakdown", "accident", "late", "weather", "dock", "safety", "other"]),
         details: z.string().describe("What happened, where, and what the driver needs, in a sentence or two."),
+        where: z.string().optional().describe("Where the truck is, if the driver said: highway and mile marker, exit, or town."),
         urgent: z.boolean(),
       }),
-      run: async ({ kind, details, urgent }) => {
+      run: async ({ kind, details, where, urgent }) => {
+        // A breakdown with nobody hurt: the AI finds help near the truck, calls a shop, and tells the broker.
+        if (kind === "breakdown" && !urgent) {
+          const said = await handleBreakdown(ctx, driver, details, where, channel);
+          effects.done.push("Working the breakdown: shops, broker, owner");
+          return said;
+        }
         const load = current();
         await raise(ctx, {
           reason: `${driver.name} (${kind}): ${details}`,
@@ -136,6 +146,22 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: "sms" | "voic
         await addActivity(ctx.carrier.id, event({ type: "incident", loadId: load?.id, message: `${first} reported a problem: ${kind}`, detail: details, severity: urgent ? "danger" : "warning" }));
         effects.done.push(`Told the owner: ${kind}`);
         return "The owner has been told and it's on their Needs you list.";
+      },
+    }),
+    betaZodTool({
+      name: "driver_feedback",
+      description:
+        "How the driver says things are going: answering the weekly check-in, or whenever they bring up how they feel about the job, pay, home time or the truck. Record it; unhappy drivers and requests reach the owner.",
+      inputSchema: z.object({
+        mood: z.enum(["good", "ok", "bad"]),
+        note: z.string().optional().describe("What they said, in a sentence, in English."),
+        homeBy: z.string().optional().describe("A date they asked to be home by, YYYY-MM-DD."),
+        wantsOwner: z.boolean().optional().describe("They asked to talk to the owner, or mentioned quitting or pay problems."),
+      }),
+      run: async (f) => {
+        const said = await recordFeedback(ctx, driver, f);
+        effects.done.push("Recorded how the driver is doing");
+        return said;
       },
     }),
     betaZodTool({
@@ -256,7 +282,7 @@ export async function brokerEmailDraft(ctx: CarrierContext, email: BrokerEmail):
   const context = {
     carrier: ctx.carrier.name,
     fleet: ownerSnapshot(snapshotSource(ctx), { ask: "Ask me first", rules: "Within my rules", full: "Full autopilot" }),
-    thisLoad: email.load ? { ref: email.load.referenceNumber, lane: `${email.load.lane.origin}, ${email.load.lane.originState} → ${email.load.lane.destination}, ${email.load.lane.destState}`, rate: email.load.bookedRate ?? email.load.targetRate, pickup: email.load.pickupWindow, delivery: email.load.deliveryWindow, stage: LOAD_STAGE_LABEL[email.load.stage] } : null,
+    thisLoad: email.load ? { ref: email.load.referenceNumber, lane: `${email.load.lane.origin}, ${email.load.lane.originState} → ${email.load.lane.destination}, ${email.load.lane.destState}`, rate: email.load.bookedRate ?? email.load.targetRate, pickup: email.load.pickupWindow, delivery: email.load.deliveryWindow, stage: LOAD_STAGE_LABEL[email.load.stage], history: memoryNote(ctx.loads, ctx.brokers, email.load) || undefined } : null,
     earlierEmails: email.thread.map((t) => ({ direction: t.direction === "in" ? "from broker" : "from us", body: (t.body ?? "").slice(0, 1500) })),
     attachments: email.attachmentNotes,
   };

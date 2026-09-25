@@ -139,6 +139,10 @@ export interface Driver {
   lastCheckInAt?: string;
   /** Carrier told the AI to put getting this driver home ahead of the best-paying load. */
   homePriority?: boolean;
+  /** Real accounts: the last time the ELD had the truck at the driver's home. */
+  lastHomeAt?: string;
+  /** Real accounts: how the driver said things are going, from the weekly check-in or any conversation. */
+  care?: { at: string; mood: "good" | "ok" | "bad"; note?: string; homeBy?: string };
   /** How the driver wants the AI dispatcher to reach them, set on a setup call or in Profile. */
   prefs?: DriverPrefs;
 }
@@ -181,6 +185,10 @@ export interface Truck {
   homeBase: string;
   /** Real accounts with an ELD connected: where the truck actually is, and when that was read. */
   position?: { lat: number; lon: number; at: string; description?: string; source: "samsara" | "motive" };
+  /** Real accounts: the AI's plan for this truck (now, next, home time), refreshed every dispatch round. */
+  plan?: { lines: string[]; at: string };
+  /** Real accounts: a breakdown the AI is working on (shops found near the truck, and which one it's calling). */
+  roadside?: Roadside;
   currentLoadId: string | null;
   nextLoadId: string | null;
   /** A load this truck just delivered that the driver hasn't dismissed yet — keeps the "load complete"
@@ -194,6 +202,30 @@ export interface Truck {
   lastServiceMiles: number;
   serviceIntervalMiles: number;
   nextInspectionDue: string;
+}
+
+export interface RoadsideShop {
+  name: string;
+  address: string;
+  phone: string;
+  rating?: number;
+  openNow?: boolean;
+  miles?: number;
+}
+
+export interface Roadside {
+  at: string;
+  driverId: string;
+  loadId?: string;
+  details: string;
+  where: string;
+  shops: RoadsideShop[];
+  /** Index of the shop the AI is calling (or last called). */
+  calling: number;
+  /** The shop that said yes. */
+  found?: { shop: string; phone: string; eta: string | null };
+  /** Every shop said no or didn't answer. */
+  exhausted?: boolean;
 }
 
 /** One checklist item in a DVIR (Driver Vehicle Inspection Report). */
@@ -529,6 +561,8 @@ export interface Escalation {
   rateConLoadId?: string;
   /** A message the AI wrote and wants to send on the carrier's behalf: approve sends it (edited or as is). */
   draft?: DraftMessage;
+  /** The AI noticed the owner keeps approving this kind of email unchanged, and offers to stop asking. */
+  suggestRule?: OwnerRule;
   /** Where this came from, when it arrived by a real channel. */
   source?: MessageChannel;
   /** The person on Backroute's support team who took it. */
@@ -555,9 +589,19 @@ export interface DraftMessage {
   amount?: number;
   /** Stored files that go with it (the invoice, the POD, the carrier's setup papers). */
   attachments?: { fileId: string; name: string }[];
+  /** The owner rule that would have let this go without asking (see OwnerRule). */
+  rule?: OwnerRule;
+  /** The owner changed the wording before sending. */
+  edited?: boolean;
 }
 
-export type DraftPurpose = "reply" | "book_request" | "counter" | "accept" | "setup_packet" | "invoice" | "detention" | "payment_reminder" | "tonu" | "eta_update";
+/**
+ * Judgment calls the owner can hand to the AI once they trust it with them. Off until the owner turns one on (in
+ * Settings, or by saying yes when the AI notices they keep approving the same thing unchanged).
+ */
+export type OwnerRule = "tonu_default" | "detention_default" | "invoice_noted_pod" | "replies";
+
+export type DraftPurpose = "reply" | "book_request" | "counter" | "accept" | "setup_packet" | "invoice" | "detention" | "payment_reminder" | "tonu" | "eta_update" | "capacity";
 
 export interface DriverMessage {
   id: string;

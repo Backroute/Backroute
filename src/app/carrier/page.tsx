@@ -20,6 +20,7 @@ import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { DailyTextPreview } from "@/components/shared/daily-text";
 import { DriverCallsBoard } from "@/components/shared/driver-calls-board";
 import { DraftApproval, SourceTag } from "@/components/shared/draft-approval";
+import { RuleSuggestion } from "@/components/cloud/owner-rules";
 import { useDriverRetention } from "@/components/shared/driver-retention";
 import { RUN_TYPE_LABEL } from "@/lib/run-types";
 import { weekEarnings } from "@/lib/earnings";
@@ -222,7 +223,9 @@ export default function CarrierOverviewPage() {
                     )}
                     <SourceTag source={e.source} />
                     <p className="text-sm leading-relaxed text-ink-800">{e.reason}</p>
-                    {e.draft && !(signedIn && e.status === "with_support") ? (
+                    {e.suggestRule && signedIn ? (
+                      <RuleSuggestion escalation={e} />
+                    ) : e.draft && !(signedIn && e.status === "with_support") ? (
                       <DraftApproval escalation={e} />
                     ) : signedIn && e.status === "with_support" ? (
                       // A real account: Backroute's support team has it. The owner can still step in on an emergency.

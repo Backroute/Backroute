@@ -55,6 +55,31 @@ export async function sendSetupPacket(ctx: CarrierContext, sender: { from: strin
   });
 }
 
+/** Booked on the phone with a broker we had no email for: confirm in writing, with the packet, so the rate con comes back here. */
+export async function confirmPhoneBooking(ctx: CarrierContext, load: Load, to: string, amount: number, contactName?: string) {
+  const papers = await latestFiles(ctx.carrier.id, ["w9", "coi", "authority", "noa"]);
+  const today = new Date().toISOString().slice(0, 10);
+  const order = ["w9", "coi", "authority", "noa"];
+  const attach = papers
+    .filter((p) => (p.kind !== "noa" || ctx.settings.factoringEmail) && !(p.kind === "coi" && p.expires_on && p.expires_on < today))
+    .sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
+  const label: Record<string, string> = { w9: "W-9", coi: "certificate of insurance", authority: "operating authority", noa: "notice of assignment" };
+  return sendOrQueue(ctx, {
+    purpose: "accept",
+    to,
+    toName: contactName,
+    subject: mail.subjectFor(load, "Booked"),
+    body: mail.phoneBooked(ctx.carrier, ctx.settings, load, amount, attach.map((p) => label[p.kind]), contactName),
+    loadId: load.id,
+    amount,
+    attachments: attach.map((p) => ({ fileId: p.id, name: p.name })),
+    withinRules: true,
+    // Already agreed on a call the rules or the owner started: this is the paperwork for it.
+    ownerAsked: true,
+    why: `Confirm ${load.referenceNumber} in writing to ${to}.`,
+  });
+}
+
 // ─── Invoices ────────────────────────────────────────────────────────────────
 
 function invoicePdf(ctx: CarrierContext, load: Load, number: string, amount: number): Buffer {
@@ -120,6 +145,7 @@ export async function sendInvoices(ctx: CarrierContext): Promise<string[]> {
         attachments: [{ fileId, name: `${number}.pdf` }, { fileId: pod.fileId!, name: pod.name }, ...(bol ? [{ fileId: bol.fileId!, name: bol.name }] : [])],
         // A POD with something written on it (a shortage, damage, no signature) waits for the owner.
         withinRules: !pod.flagged,
+        rule: "invoice_noted_pod",
         why: pod.flagged ? `Invoice ${number} for ${load.referenceNumber} is ready, but check the POD first: ${pod.aiNote ?? "the AI saw a problem on it"}.` : `Invoice ${number} for ${load.referenceNumber}, $${amount.toLocaleString()}, is ready to send with the POD.`,
       });
       done.push(`${load.referenceNumber}: invoice ${result}`);
@@ -182,6 +208,7 @@ export async function sendDetentionClaims(ctx: CarrierContext, now: number): Pro
           amount,
           // Without the broker's own detention terms, the AI's $/hour is a guess: the owner checks it first.
           withinRules: terms.perHour !== null,
+          rule: "detention_default",
           why: `${load.referenceNumber} sat ${Math.round(d.minutes / 6) / 10} hours at ${d.stop}. Claim $${amount} in detention${terms.perHour ? "" : ` (at $${perHour}/hour: the rate con didn't say, so check it)`}?`,
         });
         done.push(`${load.referenceNumber}: detention at ${d.stop} ${result}`);

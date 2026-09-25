@@ -15,6 +15,8 @@ import { askSupportAboutBroker, checkBroker } from "./brokers";
 import { callBroker } from "./broker-call";
 import { canMakePickup } from "./eld";
 import { answerBroker, askFor, floorFor } from "./pricing";
+import { laneMemory } from "./memory";
+import { homeTimeStatus } from "../home";
 import * as mail from "./templates";
 
 /**
@@ -51,10 +53,12 @@ export async function brokerFor(ctx: CarrierContext, email: string, name: string
 }
 
 /** The truck that can take a load soonest with the least empty driving, if any. */
-function bestTruck(ctx: CarrierContext, o: { equipment: Load["equipmentType"]; originCity: string; originState: string; pickupAt: number | null; miles: number }) {
+function bestTruck(ctx: CarrierContext, o: { equipment: Load["equipmentType"]; originCity: string; originState: string; destinationState: string; pickupAt: number | null; miles: number }) {
   let best: { truck: Truck; deadhead: number } | null = null;
   for (const truck of ctx.trucks) {
     if (!truck.driverId || truck.equipmentType !== o.equipment || truck.status === "maintenance" || truck.nextLoadId) continue;
+    // States the driver said they won't run into.
+    if (ctx.drivers.find((d) => d.id === truck.driverId)?.prefs?.avoidStates?.includes(o.destinationState)) continue;
     const busy = ctx.loads.find((l) => l.id === truck.currentLoadId && !["delivered", "cancelled", "declined"].includes(l.stage));
     let from = { city: truck.currentCity, state: truck.currentState };
     if (busy) {
@@ -65,7 +69,7 @@ function bestTruck(ctx: CarrierContext, o: { equipment: Load["equipmentType"]; o
     // A truck already chasing a load the AI asked for stays on that one.
     if (ctx.loads.some((l) => l.truckId === truck.id && l.stage === "negotiating")) continue;
     const deadhead = estimateMiles(from, { city: o.originCity, state: o.originState }) ?? 150;
-    if (deadhead > MAX_DEADHEAD) continue;
+    if (deadhead > (ctx.settings.maxDeadhead ?? MAX_DEADHEAD)) continue;
     // With an ELD connected: only a driver who has the hours to get there in time.
     if (!busy && !canMakePickup(ctx.drivers.find((d) => d.id === truck.driverId), deadhead, o.miles, o.pickupAt, Date.now())) continue;
     if (!best || deadhead < best.deadhead) best = { truck, deadhead };
@@ -98,12 +102,12 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
     if (pickupAt && Date.parse(pickupAt) < Date.now()) continue; // Already gone.
     const miles = o.miles ?? estimateMiles({ city: o.originCity, state: o.originState }, { city: o.destinationCity, state: o.destinationState });
     if (!miles) continue;
-    const fit = bestTruck(ctx, { equipment, originCity: o.originCity, originState: o.originState, pickupAt: pickupAt ? Date.parse(pickupAt) : null, miles });
+    const fit = bestTruck(ctx, { equipment, originCity: o.originCity, originState: o.originState, destinationState: o.destinationState, pickupAt: pickupAt ? Date.parse(pickupAt) : null, miles });
     if (!fit) continue;
 
     const posted = o.rate ?? 0;
     const draft = { lane: { miles }, listedRate: posted } as Pick<Load, "lane" | "listedRate">;
-    const ask = askFor(draft as Load, ctx.settings);
+    const ask = askFor(draft as Load, ctx.settings, laneMemory(ctx.loads, ctx.brokers, { originState: o.originState, destState: o.destinationState }));
     const base = makeLoad(
       {
         truckId: fit.truck.id,
@@ -150,14 +154,16 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
 
   // Within the rules, the AI asks for the best one per truck on its own.
   const asked: Load[] = [];
-  const trusted = assessBroker(broker, ctx.settings.brokerOverrides).policy !== "block";
+  // A board poster with a phone and no MC yet: the AI calls, asks for the MC and checks it before agreeing to book.
+  const checkOnCall = !broker.mc && !!broker.phone && !broker.email && !!sender.feed;
+  const trusted = assessBroker(broker, ctx.settings.brokerOverrides).policy !== "block" || checkOnCall;
   if (ctx.settings.autonomy !== "ask" && added.length && !trusted) await askSupportAboutBroker(ctx, broker, added[0].id);
   if (ctx.settings.autonomy !== "ask" && trusted) {
     const byTruck = new Map<string, Load[]>();
     for (const l of added) byTruck.set(l.truckId!, [...(byTruck.get(l.truckId!) ?? []), l]);
     for (const group of byTruck.values()) {
       const floor = (l: Load) => floorFor(l, ctx.settings);
-      const pick = group.filter((l) => floor(l) !== null && l.targetRate >= floor(l)!).sort((a, b) => (b.netProfit ?? 0) - (a.netProfit ?? 0))[0];
+      const pick = pickForTruck(ctx, group.filter((l) => floor(l) !== null && l.targetRate >= floor(l)!));
       if (pick) {
         await requestBooking(ctx, pick, pick.targetRate, { byRules: true });
         asked.push(pick);
@@ -165,6 +171,30 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
     }
   }
   return { added, asked };
+}
+
+/**
+ * Which of a truck's offers the AI goes for, the way a dispatcher weighs it: a load that would make the driver miss
+ * their home time is out; when the driver needs to head home (or the owner said to get them home first), the one
+ * that ends closest to home; otherwise the one that makes the most.
+ */
+export function pickForTruck(ctx: Pick<CarrierContext, "trucks" | "drivers">, loads: Load[], now = new Date()): Load | undefined {
+  if (!loads.length) return undefined;
+  const truck = ctx.trucks.find((t) => t.id === loads[0].truckId);
+  const driver = ctx.drivers.find((d) => d.id === truck?.driverId);
+  if (!truck || !driver?.homeBase) return [...loads].sort((a, b) => (b.netProfit ?? 0) - (a.netProfit ?? 0))[0];
+  // Judged when the load is done (a load for Sunday is checked against next week's home day, not today's clock).
+  const after = (l: Load) => {
+    const at = new Date(Math.max(now.getTime(), Date.parse(l.deliveryAt ?? l.pickupAt ?? "") || 0));
+    const local = driver.runType === "local" || driver.runType === "intown";
+    const d = local && at.toDateString() !== now.toDateString() ? { ...driver, hoursRemaining: 11 } : driver;
+    return homeTimeStatus(d, l.lane.destination, l.lane.destState, at);
+  };
+  const ok = loads.filter((l) => after(l).state !== "late");
+  const nowState = homeTimeStatus(driver, truck.currentCity, truck.currentState, now).state;
+  if (driver.homePriority || nowState === "head_home" || nowState === "late")
+    return ok.sort((a, b) => (after(a).hoursHome ?? 999) - (after(b).hoursHome ?? 999) || (b.netProfit ?? 0) - (a.netProfit ?? 0))[0];
+  return ok.sort((a, b) => (b.netProfit ?? 0) - (a.netProfit ?? 0))[0];
 }
 
 /**

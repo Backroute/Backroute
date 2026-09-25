@@ -7,6 +7,10 @@ import { followUpByPhone } from "@/lib/agent/broker-call";
 import { applyEld, lateNotices, readEld } from "@/lib/agent/eld";
 import { pullFeed, readFeed } from "@/lib/agent/feeds";
 import { integrationsFor, setStatus, type EldConfig, type FeedConfig } from "@/lib/agent/integrations";
+import { isBoard, runBoards } from "@/lib/agent/boards";
+import { offerCapacity } from "@/lib/agent/capacity";
+import { refreshPlans } from "@/lib/agent/plan";
+import { trackHomeTime, weeklyCare } from "@/lib/agent/care";
 import { publicUrl, twilioConfigured } from "@/lib/channels/twilio";
 
 export const maxDuration = 300;
@@ -40,22 +44,33 @@ export async function GET(request: Request) {
         done.push(...(await sendDetentionClaims(ctx, now)));
         done.push(...(await chasePayments(ctx, now)));
       }
-      // Connections: the ELD (where trucks are, drivers' hours) and load feeds.
-      for (const link of await integrationsFor(id)) {
+      // Connections, in order: the ELD first (where trucks are, drivers' hours), then load feeds and load boards,
+      // which search from where the trucks now are.
+      const links = await integrationsFor(id);
+      for (const link of links.filter((l) => l.kind === "samsara" || l.kind === "motive")) {
+        const kind = link.kind as "samsara" | "motive";
         try {
-          if (link.kind === "load_feed") {
-            const cfg = link.config as FeedConfig;
-            const added = await pullFeed(ctx, await readFeed(cfg), cfg.name ?? "Load feed");
-            if (added) done.push(`${added} load${added === 1 ? "" : "s"} from ${cfg.name ?? "the load feed"}`);
-            await setStatus(id, "load_feed", `Connected · last read ${new Date(now).toISOString().slice(11, 16)} UTC`);
-          } else {
-            const applied = await applyEld(ctx, link.kind, await readEld(link.kind, (link.config as EldConfig).apiKey));
-            await setStatus(id, link.kind, `Connected · ${applied.trucks} trucks, ${applied.drivers} drivers updated`);
-          }
+          const applied = await applyEld(ctx, kind, await readEld(kind, (link.config as EldConfig).apiKey));
+          await setStatus(id, kind, `Connected · ${applied.trucks} trucks, ${applied.drivers} drivers updated`);
         } catch (e) {
-          await setStatus(id, link.kind, `Not working: ${e instanceof Error ? e.message : "error"}`);
+          await setStatus(id, kind, `Not working: ${e instanceof Error ? e.message : "error"}`);
         }
       }
+      for (const link of links.filter((l) => l.kind === "load_feed")) {
+        try {
+          const cfg = link.config as FeedConfig;
+          const added = await pullFeed(ctx, await readFeed(cfg), cfg.name ?? "Load feed");
+          if (added) done.push(`${added} load${added === 1 ? "" : "s"} from ${cfg.name ?? "the load feed"}`);
+          await setStatus(id, "load_feed", `Connected · last read ${new Date(now).toISOString().slice(11, 16)} UTC`);
+        } catch (e) {
+          await setStatus(id, "load_feed", `Not working: ${e instanceof Error ? e.message : "error"}`);
+        }
+      }
+      done.push(...(await runBoards(ctx, links.filter((l) => isBoard(l.kind)), now, (row, status) => setStatus(id, row.kind, status))));
+      done.push(...(await offerCapacity(ctx, now)));
+      done.push(...(await trackHomeTime(ctx, now)));
+      done.push(...(await weeklyCare(ctx, now)));
+      await refreshPlans(ctx, now);
       if (emailConfigured()) done.push(...(await lateNotices(ctx, now)));
       const expired = await expireOffers(ctx, now);
       if (expired) done.push(`${expired} old offer${expired === 1 ? "" : "s"} taken off the board`);

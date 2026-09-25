@@ -91,15 +91,49 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - An invoice past its terms gets a polite reminder 3 days late, another at 13 days, then support calls the broker's accounts payable. Skipped when the carrier factors.
 - **Cancellations:** when a broker cancels, the load comes off the truck and the driver is told not to go, in their language. If the truck was already dispatched, a TONU claim is sent, using the rate con's amount, or $150 checked first. The truck's other offers come back, and within the rules the AI asks for the best one.
 - **The AI calls brokers:**
-  - When a book request gets no email answer in 30 minutes, the AI phones the broker. It does the same right away for a broker who only gave a phone number.
+  - When a book request gets no email answer in 30 minutes, the AI phones the broker. It does the same right away for a broker who only gave a phone number (most load board posts).
+  - A broker it has no MC number for is asked for it on the call, and it's checked with FMCSA before the AI agrees to book.
+  - After booking by phone with a broker it has no email for, it asks where to send the confirmation, then emails a written confirmation with the carrier packet so the rate con comes back to the carrier's address.
   - It says it's an AI and that the call is transcribed, and asks the price the rules set.
-  - It counters or accepts only through the same rules as email, and can't be talked into another number. It leaves a short voicemail if nobody answers.
+  - It counters or accepts only through the same rules as email, and can't be talked into another number. It leaves a short voicemail if nobody answers, and a phone-only broker gets one more call.
   - The booking is still confirmed by the broker's rate con.
-- **Load feeds:** any list of loads a broker, shipper or load board publishes as JSON or CSV at a web address (Settings → General → ELD and load feeds). It's read every round, and the loads go through the same matching and booking as email. Format below.
+- **Load boards** (Settings → General → ELD, load boards and feeds), once Backroute has the board's agreement:
+  - **Truckstop** (the carrier's Integration ID) and **DAT** (the carrier's DAT login email). Any other board with an API (123Loadboard, Direct Freight, a broker's portal) is described in JSON by Backroute support, with no new code.
+  - Every 30 minutes, for each truck that's empty or delivers within a day and a half, the AI searches within 150 miles of where it will be empty, from when it will be. That lines up the reload before delivery.
+  - Loads heading toward the driver's home come first. They go through the same broker check, pricing and booking as email.
+  - If the owner turns it on, each truck is also posted as available once a day.
+  - Before the agreement is in place, the carrier can still save their side; it shows "waiting on Backroute's agreement".
+- **Load feeds:** any list of loads a broker, shipper or load board publishes as JSON or CSV at a web address (Settings → General → ELD, load boards and feeds). It's read every round, and the loads go through the same matching and booking as email. Format below.
 - **ELD (Samsara or Motive):**
   - Truck locations and drivers' hours are read every round.
   - The AI offers a truck only loads its driver has the hours to reach in time.
   - It emails the broker as soon as a truck can't make an appointment, instead of 30 minutes after.
+- **Pricing and planning like a dispatcher who's been there a while:**
+  - **Lane history:** when the carrier has hauled a lane at least twice in the last 4 months, the AI asks what it usually gets there, up to 15% over the posted rate. It never goes under the owner's lowest rate.
+  - **Broker memory:** on calls and replies, the AI knows what the carrier hauled with that broker, what it got, and whether they usually push back.
+  - **Home time:** when a driver needs to head home, or the owner said "get them home first", the AI picks the load that ends closest to home. It never picks one that would make the driver miss their home day. It skips states a driver said they won't go to.
+  - **Capacity emails:** when a truck has nothing lined up, the AI emails up to 4 checked brokers who've sent loads out of that state, saying the truck will be free. That's at most once a day to each broker.
+  - **A plan per truck** on the Fleet page: what it's on, what's next or where the AI is looking, and whether the driver makes it home on time.
+- **Breakdowns:** when a driver reports one, the AI:
+  - finds repair shops, tire service or towing (Google Places) near the ELD position, or near where the driver says they are.
+  - texts the driver the nearest open ones.
+  - phones them one by one until one says they can come, then texts the driver that shop's number and how soon.
+  - emails the broker that the load is delayed.
+  - puts the repair bill in front of the owner. The AI never agrees to a repair price.
+- **Your rules** (Settings → General): judgment calls the owner can hand to the AI:
+  - TONU at the usual amount
+  - detention at the usual rate
+  - invoices with a noted POD
+  - the AI's own email replies on Within my rules
+  - the most empty miles to a pickup
+
+  All are off to start. When the owner has sent 3 of the same kind in a row without changing a word, the AI offers once to stop asking.
+- **Drivers:**
+  - A weekly "how's it going?" text in each driver's language, answered by the same AI.
+  - If a driver is unhappy, asks for the owner or mentions quitting, the owner is asked to call them.
+  - A home-day request is noted and planned around.
+  - The ELD notes when the truck was at the driver's home. After 3 weeks away, the owner is told.
+  - If the owner turns it on, each driver gets a weekly text with their loads, miles and estimated pay before deductions.
 - **Ask the AI** (dashboard) and driver **Messages** in the app are answered by the AI from the carrier's own data.
 - **Evening text:** at 6 PM Central the owner gets a text: what was delivered, what it made, how many trucks are rolling, and what needs them.
 - **The log:** every text, call and email in or out is listed in Settings, with what the AI did.
@@ -109,14 +143,19 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
 
 The AI now does the day-to-day work of a dispatcher by email, text and phone. What's still out of its reach, or needs something from outside:
 
-- **Load boards need an agreement.** DAT, Truckstop and 123Loadboard give API access only under a paid business agreement. Until then, loads come from broker emails and load feeds. With access, their results map onto the load-feed format.
-- **Calls are simple.** The AI can phone brokers about one load and handle a price back and forth. It doesn't make cold calls to find freight, or handle long negotiations with several loads on one call. Some brokers won't deal with an AI and hang up; those come back to email or to support.
-- **Emergencies need a person.** The AI tells a driver to call 911, alerts support and the owner, and keeps the load moving on paper. A person has to reach the driver, arrange a tow or repair, and deal with a claim.
-- **Where it guesses, it asks first:**
+- **Load boards need Backroute's agreement with each board.** The code is ready, and each board switches on when its logins are set (below).
+  - Truckstop is built from its public web-service reference.
+  - DAT's developer documents are only open to partners, so the DAT addresses and fields must be checked against DAT's documents when access is granted. They're marked in `src/lib/agent/boards/dat.ts`.
+  - Boards' terms usually limit how results are used; check them when signing.
+- **Calls take turns.** The AI and the broker (or shop) speak in turns through Twilio's speech recognition, so there's a short pause after each person speaks, and talking over each other doesn't work.
+  - A natural, interruptible voice needs an always-on server holding the call's audio stream (Twilio Media Streams with a realtime speech model). Vercel functions can't hold that open, so it would run on a separate small server. That's the next step for calls.
+  - Some brokers won't deal with an AI and hang up. Those come back to email or to support.
+- **Emergencies need a person.** For a crash, the AI tells the driver to call 911 and alerts support and the owner. A person reaches the driver, deals with the police report and the insurance claim, and approves any repair.
+- **Where it guesses, it asks first**, until the owner turns on the matching rule:
   - a TONU amount the rate con doesn't give
   - detention pay without the broker's terms
   - a POD with a shortage written on it
-  - a new broker that fails the check
+  - A new broker that fails the check always waits.
 - **Miles and ETAs:** they come from about 130 freight cities and each state's middle. For a town not on the list, miles are rough, and the AI doesn't send late notices from them. A mapping service would make both exact.
 - **Invoices are simple:** one page with the line-haul rate. Accessorials (lumper, detention, TONU) aren't added to them yet.
 - **Two screens editing the same load at once:** the last save wins, and that includes the AI's own changes.
@@ -196,9 +235,9 @@ Get a free web key at https://mobile.fmcsa.dot.gov/QCDevsite/ and set `FMCSA_WEB
 3. From then on, signing in takes them to `/ops`, the support console. Nobody can add themselves: the table can only be changed from the SQL Editor.
 4. Set `SUPPORT_PHONES` (e.g. `+13125550100,+13125550101`) for texts about urgent items.
 
-### 8. ELD and load feeds (per carrier)
+### 8. ELD, load boards and feeds (per carrier)
 
-The owner connects these in **Settings → General → ELD and load feeds**. Keys are checked when added and kept on the server; nobody can read them back.
+The owner connects these in **Settings → General → ELD, load boards and feeds**. Keys are checked when added and kept on the server; nobody can read them back.
 
 - **Samsara:** an API token with read access to vehicles and hours of service.
 - **Motive:** an API key.
@@ -215,6 +254,35 @@ The owner connects these in **Settings → General → ELD and load feeds**. Key
   | `brokerName`, `brokerEmail`, `brokerPhone`, `brokerMc` | An email or a phone is required |
 
   A header (e.g. an API key) can be added for feeds that need one.
+
+### 9. Load boards (Backroute's side, once per board)
+
+Each board gives Backroute a partner login under its agreement. Until one is set, carriers can save their side and it waits.
+
+- **Truckstop:** set `TRUCKSTOP_WS_USERNAME`, `TRUCKSTOP_WS_PASSWORD` and `TRUCKSTOP_WS_BASE`.
+  - The base is the web-service address Truckstop gives with the login; their test one is `https://testws.truckstop.com`.
+  - Each carrier enters their own Truckstop **Integration ID**.
+- **DAT:** set `DAT_SERVICE_EMAIL` and `DAT_SERVICE_PASSWORD` (Backroute's service account).
+  - If DAT gives different addresses, also set `DAT_IDENTITY_BASE` and `DAT_FREIGHT_BASE`.
+  - Each carrier enters the email they sign in to DAT with.
+  - Check `src/lib/agent/boards/dat.ts` against DAT's documents first.
+- **Any other board:** Backroute support pastes a JSON description in the carrier's settings, under **Another load board**:
+  - the search address, with `{{originCity}}`, `{{originState}}`, `{{radius}}`, `{{date}}`, `{{equipment}}` and `{{equipmentCode}}` filled in for each truck
+  - any headers
+  - where the list of loads is in the answer
+  - which field is which, using the load-feed field names above
+
+  It's tested with a search when it's added.
+
+### 10. Google Places: help for breakdowns
+
+In Google Cloud:
+
+1. Enable **Places API (New)**.
+2. Create an API key restricted to it.
+3. Set `GOOGLE_PLACES_API_KEY`.
+
+Without it, the AI still tells the owner and the broker about a breakdown, but a person has to find the shop.
 
 ## Before real drivers: rules to get right
 
@@ -234,6 +302,8 @@ The owner connects these in **Settings → General → ELD and load feeds**. Key
 | Twilio texts | About 1 cent each, plus carrier fees |
 | Twilio calls, including speech recognition | A few cents a minute |
 | Claude (Opus 5) | $5 per million input tokens and $25 per million output tokens: a few cents per text, chat answer or POD photo checked, and a little more per spoken turn, per broker email (it's read, then answered) or per rate con |
+| Google Places (breakdowns) | About 3–4 cents per search with phone numbers; one search per breakdown |
+| Load boards | Set by each board's agreement |
 | Check-in calls | Twilio's per-minute rate for outbound calls; most check-ins are texts |
 | The dispatcher's rounds | Every 10 minutes is about 4,300 short runs a month. Vercel Pro is $20 a month; an outside scheduler is free or close to it |
 
@@ -319,6 +389,32 @@ The code was run against local stand-ins that behave like the real services:
   - Trucks and drivers are matched, and unknown ones are listed.
   - Location and hours are saved, and the broker gets one late notice when the truck can't make it.
 - **Full autopilot:** a decision the AI won't make goes to support, not the owner.
+- **Load boards** (against stand-ins built from Truckstop's public reference and the DAT shape in the code):
+  - Without Backroute's logins, a carrier can save their side, nothing is searched, and it says it's waiting.
+  - A wrong Truckstop Integration ID is caught when it's added.
+  - Each free truck is searched from where it is, for its equipment, and posted once a day. Searches repeat every 30 minutes, not every round.
+  - A post with no phone or email is skipped.
+  - A phone-only poster gets a call. The AI asks their MC, checks it with FMCSA on the call, books, emails the confirmation and packet to the address they give, and their rate con books the load.
+  - DAT signs in as the organization, then the carrier's user, searches from the truck, and posts it.
+  - A board described in JSON is checked when added. Its searches fill in the truck's city, date and equipment, and its loads go through the broker check and booking.
+- **Smarter booking:**
+  - A lane hauled twice at $3.59 a mile is asked at that rate, not 5% over a lower post.
+  - "Get Marcus home first" picks the load to Dallas over a better-paying one to Atlanta.
+  - A state the driver avoids isn't offered.
+  - Brokers who've sent loads from the state hear a truck is free, once a day, only checked ones.
+  - Each truck's plan is saved and shown on the Fleet page.
+- **Breakdowns:**
+  - Shops are searched near the ELD position. The driver gets the nearest open ones, closed ones marked, ones without a phone left out.
+  - The AI calls the first shop. On a no, it calls the next, and the one that says yes goes to the driver with how soon.
+  - The broker gets a delay notice, and the owner sees what was done and that the bill is theirs.
+  - A second report doesn't start over.
+- **Owner rules:**
+  - After an edited approval, then 3 sent as written, the AI offers once to stop asking.
+  - With the TONU rule on, a TONU claim goes out without waiting.
+- **Drivers:**
+  - The weekly check-in goes in each driver's language, once a week, and the pay text matches their loads and miles.
+  - An unhappy driver reaches the owner, and a home-day request is recorded.
+  - The ELD's position at home is noted, and 25 days away tells the owner.
 
 **None of it has been run against the live services yet.** These are all untested:
 
@@ -326,6 +422,7 @@ The code was run against local stand-ins that behave like the real services:
 - Real voices and speech recognition
 - Supabase Realtime
 - Live Claude answers, and how well the AI reads real broker emails and real POD photos
+- Truckstop, DAT, Google Places and the ELDs themselves
 
 Before inviting drivers:
 

@@ -46,6 +46,17 @@ Thanks,
 ${signature(carrier, settings)}`;
 }
 
+export function phoneBooked(carrier: CarrierRow, settings: AgentSettings, load: Load, amount: number, papers: string[], toName?: string) {
+  return `${hello(toName)}
+
+Confirming what we agreed on the phone: load ${load.referenceNumber}, ${lane(load)}, picking up ${load.pickupWindow}, at ${money(amount)} all in.
+
+Please send the rate confirmation to this address and we'll dispatch.${papers.length ? ` Our carrier packet is attached: ${papers.join(", ")}.` : ""}
+
+Thanks,
+${signature(carrier, settings)}`;
+}
+
 export function setupPacket(carrier: CarrierRow, settings: AgentSettings, papers: string[], toName?: string) {
   return `${hello(toName)}
 
@@ -124,6 +135,26 @@ export function etaUpdate(carrier: CarrierRow, settings: AgentSettings, load: Lo
 Heads up on load ${load.referenceNumber}: our truck is running behind for the ${stop} in ${place}. Its current ETA is ${eta}, from its live location and the driver's hours.
 
 We'll keep you posted if that changes. Let us know if the ${stop === "pickup" ? "shipper" : "receiver"} needs a new appointment.
+
+Thanks,
+${signature(carrier, settings)}`;
+}
+
+export function capacity(carrier: CarrierRow, settings: AgentSettings, t: { equipment: string; city: string; state: string; when: string; toward?: string }, toName?: string) {
+  return `${hello(toName)}
+
+We'll have a ${t.equipment.toLowerCase()} empty in ${t.city}, ${t.state} ${t.when}${t.toward ? `, and we'd like to head toward ${t.toward}` : ""}. If you have anything out of that area, send it over with the rate and we'll answer quickly.
+
+Thanks,
+${signature(carrier, settings)}`;
+}
+
+export function breakdownNotice(carrier: CarrierRow, settings: AgentSettings, load: Load, where: string) {
+  return `Hi,
+
+Our truck on load ${load.referenceNumber} (${lane(load)}) broke down near ${where}. We're getting it repaired now and will send a new ETA as soon as the shop gives us one.
+
+If the appointment needs to move, or you'd rather recover the load, let us know here.
 
 Thanks,
 ${signature(carrier, settings)}`;

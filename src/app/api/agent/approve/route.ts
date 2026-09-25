@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { dbConfigured, loadContext, save } from "@/lib/agent/db";
 import { deliver } from "@/lib/agent/outbox";
+import { noticeApprovals } from "@/lib/agent/learning";
 import { asUser } from "@/lib/agent/user";
 import { emailConfigured } from "@/lib/channels/email";
 import type { Item } from "@/lib/cloud/rows";
@@ -26,11 +27,13 @@ export async function POST(request: Request) {
   if (!escalation.draft || escalation.status === "resolved") return Response.json({ error: "nothing_to_send" }, { status: 409 });
 
   const body = parsed.data.body ?? escalation.draft.body;
+  const edited = body.trim() !== escalation.draft.body.trim();
   const now = new Date().toISOString();
   let load: Load | undefined;
+  let ctx: Awaited<ReturnType<typeof loadContext>> = null;
   if (parsed.data.send) {
     if (!emailConfigured()) return Response.json({ error: "email_off" }, { status: 503 });
-    const ctx = await loadContext(carrierId);
+    ctx = await loadContext(carrierId);
     if (!ctx) return Response.json({ error: "not_found" }, { status: 404 });
     await deliver(ctx, { ...escalation.draft, body }, escalation.loadId || undefined, { approved: true });
     load = ctx.loads.find((l) => l.id === escalation.loadId);
@@ -40,9 +43,10 @@ export async function POST(request: Request) {
     status: "resolved",
     resolvedBy: "carrier",
     resolvedAt: now,
-    draft: { ...escalation.draft, body, ...(parsed.data.send ? { sentAt: now } : {}) },
+    draft: { ...escalation.draft, body, edited, ...(parsed.data.send ? { sentAt: now } : {}) },
     ...(parsed.data.send ? {} : { resolutionNote: "Not sent" }),
   };
   await save("escalations", carrierId, updated as unknown as Item);
+  if (ctx) await noticeApprovals(ctx, updated);
   return Response.json({ escalation: updated, loads: load ? [load] : [] });
 }

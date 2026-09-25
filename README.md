@@ -31,21 +31,25 @@ Open [http://localhost:3000](http://localhost:3000). Visit `/carrier`, `/ops`, o
 The real version switches on from environment variables:
 
 - **Accounts:** sign-in by phone, and a fleet the owner types in, with no sample data.
-- **Loads:** added by hand, read off a rate con PDF, or found in what brokers email and in load feeds.
+- **Loads:** added by hand, read off a rate con PDF, or found in broker emails, load feeds and load boards (Truckstop, DAT and others, once Backroute's agreement with each is signed).
 - **The AI:** runs on the server (Claude).
 - **Texts and calls:** a dispatch number drivers text and call (Twilio), in 7 languages.
 - **Check-ins:** the AI texts or calls drivers before appointments and follows up when they're late or go quiet.
 - **Broker email and phone** (Postmark, Twilio):
   - book requests, counter-offers and setup packets
-  - calls to brokers who don't answer an email
+  - calls to brokers who don't answer an email, and to board posters who only list a phone (the MC is checked on the call)
   - invoices with the POD, detention and TONU claims, and payment reminders
   - priced by the owner's lowest rate per mile, which is enforced in code
   - every new broker checked with FMCSA before booking
+- **Smarter booking:** asks what the carrier usually gets on a lane, remembers each broker, plans around drivers' home time, and emails brokers when a truck will be free. Each truck has a plan on the Fleet page.
+- **Breakdowns:** nearby shops found (Google Places), phoned one by one, the driver texted the one that can come, the broker told of the delay.
+- **Owner rules:** judgment calls the owner hands to the AI. After the owner sends 3 of the same kind unchanged, the AI offers to stop asking.
+- **Drivers:** a weekly check-in in their language, the owner told when someone's unhappy or long away from home, and optional weekly pay texts.
 - **ELD and load feeds:** Samsara or Motive for truck locations and drivers' hours, and any JSON or CSV list of loads.
 - **Backroute support:** anything the AI can't handle goes to your support team's console at `/ops`, not to a dispatcher. On full autopilot the owner only hears about emergencies.
 - **Evening text:** an end-of-day text to the owner.
 
-Load boards (DAT, Truckstop) need a business agreement before they can be connected, and emergencies still need a person on the support team.
+Each load board switches on when Backroute's partner login for it is set. Emergencies still need a person on the support team.
 
 `DEPLOY.md` covers the setup, the tests, and what isn't done yet. The server side is in `src/lib/agent`, `src/lib/channels` and `src/app/api`. The database schema and access rules are in `supabase/migrations/`.
 

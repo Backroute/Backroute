@@ -36,6 +36,11 @@ const HOS_TONE: Record<HosStatus, "success" | "neutral" | "info" | "warning"> = 
   sleeper: "warning",
 };
 
+function minutesAgo(iso: string, now: number): string {
+  const m = Math.max(0, Math.round((now - Date.parse(iso)) / 60000));
+  return m < 1 ? "just now" : m < 60 ? `${m} min ago` : `${Math.round(m / 60)}h ago`;
+}
+
 export default function FleetPage() {
   const trucks = useCarrierTrucks();
   const drivers = useDriverMap();
@@ -92,8 +97,20 @@ export default function FleetPage() {
                     <p className="mt-1 flex items-center gap-1 text-[11px] text-ink-400">
                       <MapPin className="h-3 w-3" /> {truck.currentCity}, {truck.currentState}
                       <span className="text-ink-300">·</span>
-                      GPS via Samsara, {now === null ? "just now" : `${pingSecondsAgo(truck.id, now)}s ago`}
+                      {!signedIn
+                        ? `GPS via Samsara, ${now === null ? "just now" : `${pingSecondsAgo(truck.id, now)}s ago`}`
+                        : truck.position
+                          ? `GPS via ${truck.position.source === "samsara" ? "Samsara" : "Motive"}, ${now === null ? "" : minutesAgo(truck.position.at, now)}`
+                          : "From the last load (no ELD connected)"}
                     </p>
+                    {signedIn && truck.plan && truck.plan.lines.length > 0 && (
+                      <div className="mt-2 rounded-xl bg-ink-50 px-2.5 py-2 text-[11px] leading-relaxed text-ink-700">
+                        <p className="font-medium text-ink-900">The AI&apos;s plan</p>
+                        {truck.plan.lines.map((line) => (
+                          <p key={line}>{line}</p>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <Badge tone={truck.status === "available" ? "success" : truck.status === "on_load" ? "info" : "warning"}>
                     {truck.status.replace("_", " ")}

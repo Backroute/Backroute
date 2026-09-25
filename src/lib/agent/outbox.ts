@@ -1,7 +1,7 @@
 import "server-only";
 import { emailConfigured, sendEmail } from "../channels/email";
 import type { Item } from "../cloud/rows";
-import type { DraftMessage, DraftPurpose, Escalation, Load } from "../types";
+import type { DraftMessage, DraftPurpose, Escalation, Load, OwnerRule } from "../types";
 import { addActivity, filesById, logChannel, save, type CarrierContext } from "./db";
 import { event, passToOwner } from "./dispatcher";
 
@@ -30,21 +30,25 @@ export interface Outgoing {
   attachments?: { fileId: string; name: string }[];
   /** Inside the owner's numbers (the caller checked). */
   withinRules: boolean;
+  /** When it isn't: the owner rule that, if they've turned it on, covers it anyway. */
+  rule?: OwnerRule;
   /** The owner asked for exactly this (e.g. tapped Ask to book it): it goes now, whatever the autopilot setting. */
   ownerAsked?: boolean;
   /** For Needs you, when it waits: what it is and why it's waiting. */
   why: string;
 }
 
-export function goesNow(autonomy: CarrierContext["settings"]["autonomy"], o: Pick<Outgoing, "purpose" | "withinRules">): boolean {
-  if (!o.withinRules) return false;
-  if (autonomy === "full") return true;
-  return autonomy === "rules" && o.purpose !== "reply";
+export function goesNow(settings: Pick<CarrierContext["settings"], "autonomy" | "ownerRules">, o: Pick<Outgoing, "purpose" | "withinRules" | "rule">): boolean {
+  const on = (r?: OwnerRule) => !!r && !!settings.ownerRules?.[r];
+  if (!o.withinRules && !on(o.rule)) return false;
+  if (settings.autonomy === "full") return true;
+  // A reply the AI wrote itself goes on "Within my rules" only when the owner said replies can.
+  return settings.autonomy === "rules" && (o.purpose !== "reply" || on("replies"));
 }
 
 /** Sends it, or leaves it for the owner. */
 export async function sendOrQueue(ctx: CarrierContext, o: Outgoing): Promise<"sent" | "queued"> {
-  if (emailConfigured() && (o.ownerAsked || goesNow(ctx.settings.autonomy, o))) {
+  if (emailConfigured() && (o.ownerAsked || goesNow(ctx.settings, o))) {
     await deliver(ctx, { channel: "email", to: o.to, toName: o.toName, subject: o.subject, body: o.body, inReplyTo: o.inReplyTo, purpose: o.purpose, amount: o.amount, attachments: o.attachments }, o.loadId, { auto: true });
     return "sent";
   }
@@ -56,7 +60,7 @@ async function queue(ctx: CarrierContext, o: Outgoing) {
   const e = await passToOwner(ctx, { reason: o.why, loadId: o.loadId, label: LABEL[o.purpose], source: "email", to: "decider" });
   const withDraft: Escalation = {
     ...e,
-    draft: { channel: "email", to: o.to, toName: o.toName, subject: o.subject, body: o.body, inReplyTo: o.inReplyTo, purpose: o.purpose, amount: o.amount, attachments: o.attachments },
+    draft: { channel: "email", to: o.to, toName: o.toName, subject: o.subject, body: o.body, inReplyTo: o.inReplyTo, purpose: o.purpose, amount: o.amount, attachments: o.attachments, rule: o.rule ?? (o.purpose === "reply" ? "replies" : undefined) },
   };
   await save("escalations", ctx.carrier.id, withDraft as unknown as Item);
   const i = ctx.escalations.findIndex((x) => x.id === e.id);
@@ -74,6 +78,7 @@ const LABEL: Record<DraftPurpose, string> = {
   payment_reminder: "Send the payment reminder",
   tonu: "Send the TONU claim",
   eta_update: "Send the late notice",
+  capacity: "Tell them the truck is free",
 };
 
 const WHAT: Record<DraftPurpose, string> = {
@@ -87,6 +92,7 @@ const WHAT: Record<DraftPurpose, string> = {
   payment_reminder: "Reminded about payment:",
   tonu: "Claimed truck-ordered-not-used from",
   eta_update: "Told the broker the truck is running late:",
+  capacity: "Told a broker about a free truck:",
 };
 
 /** Sends a draft (now, or when the owner approves it) and records what it means for the load. */

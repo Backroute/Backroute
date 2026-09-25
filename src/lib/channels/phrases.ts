@@ -160,3 +160,46 @@ export const LOAD_CANCELLED: Record<Lang, (ref: string, place: string) => string
   uk: (r, p) => `Брокер скасував вантаж ${r} до ${p}. На завантаження не їдь. Шукаю тобі наступний вантаж, напишу.`,
   fr: (r, p) => `Le courtier a annulé le voyage ${r} vers ${p}. Ne va pas au chargement. Je te cherche le prochain voyage et je t'écris.`,
 };
+
+/** Breakdown: the repair shops the AI found near the truck, and what the one it called said. */
+export const SHOPS_NEAR: Record<Lang, (p: { list: string; calling: string | null }) => string> = {
+  en: (p) => `Repair help near you:\n${p.list}\n${p.calling ? `I'm calling ${p.calling} now and will text you what they say.` : "Call the first one that's open."} Stay safe: flashers on, triangles out.`,
+  es: (p) => `Talleres cerca de ti:\n${p.list}\n${p.calling ? `Estoy llamando a ${p.calling} ahora y te escribo lo que digan.` : "Llama al primero que esté abierto."} Cuídate: intermitentes y triángulos.`,
+  pa: (p) => `ਤੁਹਾਡੇ ਨੇੜੇ ਰਿਪੇਅਰ:\n${p.list}\n${p.calling ? `ਮੈਂ ਹੁਣੇ ${p.calling} ਨੂੰ ਫ਼ੋਨ ਕਰ ਰਿਹਾ ਹਾਂ, ਉਹ ਕੀ ਕਹਿੰਦੇ ਹਨ ਮੈਸੇਜ ਕਰਾਂਗਾ।` : "ਜੋ ਪਹਿਲਾ ਖੁੱਲ੍ਹਾ ਹੈ ਉਸ ਨੂੰ ਫ਼ੋਨ ਕਰੋ।"} ਧਿਆਨ ਰੱਖੋ: ਫਲੈਸ਼ਰ ਚਾਲੂ, ਤਿਕੋਣ ਬਾਹਰ।`,
+  hi: (p) => `आपके पास रिपेयर:\n${p.list}\n${p.calling ? `मैं अभी ${p.calling} को फ़ोन कर रहा हूँ, वे जो कहें मैसेज करूँगा।` : "जो पहला खुला हो उसे फ़ोन करें।"} सुरक्षित रहें: फ्लैशर चालू, त्रिकोण बाहर।`,
+  ru: (p) => `Ремонт рядом с тобой:\n${p.list}\n${p.calling ? `Звоню в ${p.calling}, напишу, что скажут.` : "Звони в первый, что открыт."} Аварийка и знаки.`,
+  uk: (p) => `Ремонт поруч із тобою:\n${p.list}\n${p.calling ? `Дзвоню в ${p.calling}, напишу, що скажуть.` : "Дзвони в перший, що відкритий."} Аварійка і знаки.`,
+  fr: (p) => `Réparation près de toi :\n${p.list}\n${p.calling ? `J'appelle ${p.calling} maintenant et je t'écris ce qu'ils disent.` : "Appelle le premier qui est ouvert."} Prudence : feux de détresse et triangles.`,
+};
+
+export const SHOP_CAN_HELP: Record<Lang, (p: { shop: string; phone: string; eta: string | null }) => string> = {
+  en: (p) => `${p.shop} can help${p.eta ? ` (${p.eta})` : ""}. Call them to set it up: ${p.phone}. The owner knows.`,
+  es: (p) => `${p.shop} puede ayudar${p.eta ? ` (${p.eta})` : ""}. Llámalos para arreglarlo: ${p.phone}. El dueño ya sabe.`,
+  pa: (p) => `${p.shop} ਮਦਦ ਕਰ ਸਕਦੇ ਹਨ${p.eta ? ` (${p.eta})` : ""}। ਗੱਲ ਪੱਕੀ ਕਰਨ ਲਈ ਫ਼ੋਨ ਕਰੋ: ${p.phone}। ਮਾਲਕ ਨੂੰ ਪਤਾ ਹੈ।`,
+  hi: (p) => `${p.shop} मदद कर सकते हैं${p.eta ? ` (${p.eta})` : ""}। तय करने के लिए फ़ोन करें: ${p.phone}। मालिक को पता है।`,
+  ru: (p) => `${p.shop} могут помочь${p.eta ? ` (${p.eta})` : ""}. Позвони им договориться: ${p.phone}. Владелец в курсе.`,
+  uk: (p) => `${p.shop} можуть допомогти${p.eta ? ` (${p.eta})` : ""}. Подзвони їм домовитися: ${p.phone}. Власник у курсі.`,
+  fr: (p) => `${p.shop} peut t'aider${p.eta ? ` (${p.eta})` : ""}. Appelle-les pour organiser : ${p.phone}. Le propriétaire est au courant.`,
+};
+
+/** The weekly check-in the AI sends each driver, the way a good dispatcher calls to ask how it's going. */
+export const WEEKLY_CHECKIN: Record<Lang, (first: string, carrier: string) => string> = {
+  en: (f, c) => `Hi ${f}, it's the AI dispatcher for ${c}. Quick weekly check-in: how's it going out there? Anything about loads, pay, home time or the truck you'd like changed? Just reply here.`,
+  es: (f, c) => `Hola ${f}, habla el despachador IA de ${c}. Chequeo semanal rápido: ¿cómo va todo? ¿Algo de cargas, pago, tiempo en casa o el camión que quieras cambiar? Responde aquí.`,
+  pa: (f, c) => `ਸਤ ਸ੍ਰੀ ਅਕਾਲ ${f}, ਮੈਂ ${c} ਦਾ AI ਡਿਸਪੈਚਰ ਹਾਂ। ਹਫ਼ਤਾਵਾਰੀ ਹਾਲ-ਚਾਲ: ਸਭ ਠੀਕ ਚੱਲ ਰਿਹਾ ਹੈ? ਲੋਡ, ਤਨਖ਼ਾਹ, ਘਰ ਦਾ ਸਮਾਂ ਜਾਂ ਟਰੱਕ ਬਾਰੇ ਕੁਝ ਬਦਲਣਾ ਹੋਵੇ ਤਾਂ ਇੱਥੇ ਦੱਸੋ।`,
+  hi: (f, c) => `नमस्ते ${f}, मैं ${c} का AI डिस्पैचर हूँ। हफ़्ते का हाल-चाल: सब ठीक चल रहा है? लोड, पेमेंट, घर का समय या ट्रक के बारे में कुछ बदलना हो तो यहीं बताइए।`,
+  ru: (f, c) => `Привет, ${f}, это AI-диспетчер ${c}. Еженедельный вопрос: как дела в дороге? Что-то по грузам, оплате, времени дома или траку хочешь поменять? Просто ответь сюда.`,
+  uk: (f, c) => `Привіт, ${f}, це AI-диспетчер ${c}. Щотижневе питання: як справи в дорозі? Щось щодо вантажів, оплати, часу вдома чи трака хочеш змінити? Просто відповідай сюди.`,
+  fr: (f, c) => `Salut ${f}, ici le répartiteur IA de ${c}. Petit point de la semaine : comment ça va sur la route ? Quelque chose à changer côté voyages, paie, temps à la maison ou camion ? Réponds ici.`,
+};
+
+/** The weekly pay summary, when the owner turned it on. Before deductions: the owner's payroll has the final number. */
+export const WEEKLY_PAY: Record<Lang, (p: { loads: number; miles: string; pay: string; from: string; to: string }) => string> = {
+  en: (p) => `Your week (${p.from} to ${p.to}): ${p.loads} load${p.loads === 1 ? "" : "s"}, ${p.miles} miles, about ${p.pay} in pay before deductions. Questions about it? Reply here.`,
+  es: (p) => `Tu semana (${p.from} a ${p.to}): ${p.loads} carga${p.loads === 1 ? "" : "s"}, ${p.miles} millas, unos ${p.pay} de pago antes de deducciones. ¿Preguntas? Responde aquí.`,
+  pa: (p) => `ਤੁਹਾਡਾ ਹਫ਼ਤਾ (${p.from} ਤੋਂ ${p.to}): ${p.loads} ਲੋਡ, ${p.miles} ਮੀਲ, ਕਟੌਤੀਆਂ ਤੋਂ ਪਹਿਲਾਂ ਲਗਭਗ ${p.pay}। ਕੋਈ ਸਵਾਲ? ਇੱਥੇ ਦੱਸੋ।`,
+  hi: (p) => `आपका हफ़्ता (${p.from} से ${p.to}): ${p.loads} लोड, ${p.miles} मील, कटौती से पहले लगभग ${p.pay}। कोई सवाल? यहीं बताइए।`,
+  ru: (p) => `Твоя неделя (${p.from}–${p.to}): грузов ${p.loads}, ${p.miles} миль, около ${p.pay} до вычетов. Вопросы? Пиши сюда.`,
+  uk: (p) => `Твій тиждень (${p.from}–${p.to}): вантажів ${p.loads}, ${p.miles} миль, близько ${p.pay} до відрахувань. Питання? Пиши сюди.`,
+  fr: (p) => `Ta semaine (du ${p.from} au ${p.to}) : ${p.loads} voyage${p.loads === 1 ? "" : "s"}, ${p.miles} milles, environ ${p.pay} de paie avant retenues. Des questions ? Réponds ici.`,
+};

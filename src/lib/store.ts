@@ -75,6 +75,7 @@ import type {
   DriverPrefs,
   HosStatus,
   Lang,
+  OwnerRule,
   RateConReview,
   Translations,
   DvirInspection,
@@ -691,6 +692,14 @@ export interface AgentSettings {
   enabledAddons: string[];
   /** Carrier's own call on a broker, overriding what the AI decided from its record. */
   brokerOverrides: Record<string, BrokerPolicy>;
+  /** Real accounts: judgment calls the owner lets the AI make without asking. */
+  ownerRules?: Partial<Record<OwnerRule, boolean>>;
+  /** Real accounts: the most empty miles the AI will drive a truck to a pickup (default 300). */
+  maxDeadhead?: number;
+  /** Real accounts: the AI's weekly how's-it-going text to each driver. On unless turned off. */
+  driverCheckins?: boolean;
+  /** Real accounts: a weekly text to each driver with their loads, miles and estimated pay. Off unless turned on. */
+  payTexts?: boolean;
 }
 
 export interface LiveMetrics {

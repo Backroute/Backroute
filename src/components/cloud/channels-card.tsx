@@ -101,7 +101,7 @@ export function ChannelsCard() {
             <p className="mt-1.5 text-xs text-ink-400">No texts, calls or emails yet.</p>
           ) : (
             <ul className="mt-1.5 flex flex-col gap-1.5">
-              {status.log.slice(0, 12).map((m, n) => {
+              {status.log.slice(0, 20).map((m, n) => {
                 const Icon = ICON[m.channel];
                 const who = m.counterparty?.startsWith("call:") ? "Call" : m.counterparty?.includes("@") ? m.counterparty : m.counterparty ? formatPhone(m.counterparty) : "";
                 return (

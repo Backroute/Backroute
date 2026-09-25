@@ -17,13 +17,20 @@ export function floorFor(load: Pick<Load, "lane">, settings: Pick<AgentSettings,
  * What to ask a broker for a load they posted. Dispatchers ask a little over the posted rate; never under the floor.
  * Null when there's nothing to go on (no floor and no posted rate): the owner names the price.
  */
-export function askFor(load: Pick<Load, "lane" | "listedRate">, settings: Pick<AgentSettings, "minRpm">): number | null {
+export function askFor(load: Pick<Load, "lane" | "listedRate">, settings: Pick<AgentSettings, "minRpm">, lane?: { count: number; avgRpm: number | null }): number | null {
   const floor = floorFor(load, settings);
   const posted = load.listedRate > 0 ? load.listedRate : null;
-  if (posted && floor) return Math.max(floor, round25(posted * 1.05));
-  if (posted) return round25(posted * 1.05);
-  if (floor) return round25(floor * 1.12);
-  return null;
+  let ask: number | null = null;
+  if (posted && floor) ask = Math.max(floor, round25(posted * 1.05));
+  else if (posted) ask = round25(posted * 1.05);
+  else if (floor) ask = round25(floor * 1.12);
+  // The carrier has hauled this lane for more, more than once: ask for what it usually gets, up to 15% over the post.
+  if (lane?.avgRpm && lane.count >= 2) {
+    const usual = round25(lane.avgRpm * load.lane.miles);
+    const cap = posted ? round25(posted * 1.15) : usual;
+    ask = Math.max(ask ?? 0, Math.min(usual, cap));
+  }
+  return ask;
 }
 
 export type Answer = { action: "accept"; amount: number } | { action: "counter"; amount: number } | { action: "owner"; why: string };

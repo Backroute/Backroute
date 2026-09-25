@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowUpRight, Briefcase, Check, LifeBuoy, X } from "lucide-react";
 import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { DraftApproval } from "@/components/shared/draft-approval";
+import { RuleSuggestion } from "@/components/cloud/owner-rules";
 import { Switch } from "@/components/ui/switch";
 import { useStore } from "@/lib/store";
 import { useNow } from "@/lib/hooks";
@@ -48,7 +49,9 @@ export function OwnerNeedsYou({ driver, truck }: { driver: Driver; truck: Truck 
             <p lang="en" className="text-sm leading-snug text-ink-800">
               {e.reason}
             </p>
-            {e.draft ? (
+            {e.suggestRule ? (
+              <RuleSuggestion escalation={e} />
+            ) : e.draft ? (
               <DraftApproval escalation={e} />
             ) : e.status === "with_support" ? (
               <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-ink-500">

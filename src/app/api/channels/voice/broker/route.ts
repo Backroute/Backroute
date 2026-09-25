@@ -1,5 +1,5 @@
 import { loadContext, logChannel } from "@/lib/agent/db";
-import { brokerCallKey, brokerCallOpening, VOICEMAIL } from "@/lib/agent/broker-call";
+import { brokerCallKey, brokerCallOpening, retryAfterVoicemail, VOICEMAIL } from "@/lib/agent/broker-call";
 import { publicUrl, readTwilioWebhook, say, sayAndListen, twiml, twilioConfigured } from "@/lib/channels/twilio";
 
 export const maxDuration = 30;
@@ -18,6 +18,7 @@ export async function POST(request: Request) {
   if ((params.AnsweredBy ?? "").startsWith("machine")) {
     const vm = VOICEMAIL(ctx, load);
     await logChannel({ carrierId, channel: "voice", direction: "out", providerId: `${params.CallSid}:voicemail`, counterparty: key, body: vm, data: { kind: "broker_call", loadId: load.id, voicemail: true } });
+    await retryAfterVoicemail(ctx, load);
     return twiml(`${say(vm, "en")}<Hangup/>`);
   }
   const opening = brokerCallOpening(ctx, load);
