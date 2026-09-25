@@ -68,6 +68,15 @@ export async function sendSms(to: string, body: string): Promise<string | undefi
   return data.sid;
 }
 
+/** Calling out needs a phone number to call from; a Messaging Service alone can only text. */
+export const canCallOut = () => twilioConfigured() && Boolean(process.env.TWILIO_FROM_NUMBER);
+
+/** Rings a driver. When they pick up, Twilio asks `url` what to say (and signs that request like any other). */
+export async function startCall(to: string, url: string): Promise<string | undefined> {
+  const data = await twilio("/Calls.json", { To: to, From: process.env.TWILIO_FROM_NUMBER!, Url: url, Method: "POST", Timeout: "25" });
+  return data.sid;
+}
+
 // ─── TwiML ───────────────────────────────────────────────────────────────────
 
 export const xml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");

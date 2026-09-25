@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Home, MessageCircle, Repeat, Send, Sparkles, Truck as TruckIcon, X, Zap } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { useStore } from "@/lib/store";
 import { formatHours } from "@/lib/home";
 import { MOVE_LABEL } from "@/lib/run-types";
 import { loadHighlight } from "@/lib/scoring";
@@ -41,6 +42,9 @@ export function LoadOfferCard({
   compact?: boolean;
 }) {
   const [askState, setAskState] = useState<AskState>("idle");
+  // A real account's offers came from broker emails: the button asks the broker to book it, at the AI's price.
+  const real = useStore((s) => s.session.mode !== "demo");
+  const [asking, setAsking] = useState(false);
   const [text, setText] = useState("");
   const [reply, setReply] = useState("");
 
@@ -148,14 +152,14 @@ export function LoadOfferCard({
       </p>
 
       <div className="grid grid-cols-2 gap-2">
-        <Stat label={load.lane.moveKind ? "Flat per move" : "Total offer"} value={formatCurrency(load.targetRate)} dark={dark} pulse={askState === "pending"} />
+        <Stat label={real ? (load.listedRate > 0 ? `AI will ask (posted ${formatCurrency(load.listedRate)})` : "AI will ask") : load.lane.moveKind ? "Flat per move" : "Total offer"} value={formatCurrency(load.targetRate)} dark={dark} pulse={askState === "pending"} />
         <Stat label="Est. net" value={formatCurrency(load.netProfit ?? 0)} dark={dark} pulse={askState === "pending"} emphasize />
         {load.lane.moveKind ? (
           <Stat label="Move" value={MOVE_LABEL[load.lane.moveKind]} dark={dark} />
         ) : (
           <Stat label="Per mile" value={`$${(load.rpm ?? 0).toFixed(2)}`} dark={dark} pulse={askState === "pending"} />
         )}
-        <Stat label="Pickup" value={load.pickupWindow.split(",")[0]} dark={dark} />
+        <Stat label="Pickup" value={load.pickupWindow.split(",").slice(0, real ? 2 : 1).join(",")} dark={dark} />
       </div>
 
       {!load.lane.moveKind && (load.hoursHomeAfter !== undefined || load.reloadMarket) && (
@@ -247,14 +251,18 @@ export function LoadOfferCard({
           size={compact ? "md" : "lg"}
           variant={dark ? "secondary" : "primary"}
           className={cn(dark ? "!bg-white !text-ink-950 hover:!bg-white/90" : "", "flex-1 !font-semibold")}
-          onClick={onSelect}
+          disabled={asking}
+          onClick={() => {
+            if (real) setAsking(true);
+            onSelect();
+          }}
         >
-          Select this load
+          {real ? (asking ? "Asking the broker…" : "Ask to book it") : "Select this load"}
         </Button>
       </div>
 
       <p className={cn("text-center text-[10px]", dark ? "text-white/35" : "text-ink-300")}>
-        Sourced from {load.source} · <TimeAgo iso={load.createdAt} />
+        {real ? load.source : `Sourced from ${load.source}`} · <TimeAgo iso={load.createdAt} />
       </p>
     </div>
   );

@@ -31,13 +31,20 @@ Open [http://localhost:3000](http://localhost:3000). Visit `/carrier`, `/ops`, o
 The real version switches on from environment variables:
 
 - **Accounts:** sign-in by phone, and a fleet the owner types in, with no sample data.
-- **Loads:** added by hand or read off a rate con PDF.
+- **Loads:** added by hand, read off a rate con PDF, or found in what brokers email the carrier.
 - **The AI:** runs on the server (Claude).
 - **Texts and calls:** a dispatch number drivers text and call (Twilio), in 7 languages.
-- **Broker email:** read and answered with drafts the owner approves (Postmark).
+- **Check-ins:** the AI texts or calls drivers before appointments and follows up when they're late or go quiet.
+- **Broker email** (Postmark):
+  - book requests, counter-offers and setup packets
+  - invoices with the POD, and detention claims
+  - priced by the owner's lowest rate per mile, which is enforced in code
+  - the autopilot setting decides what waits for the owner's OK
 - **Evening text:** an end-of-day text to the owner.
 
-`DEPLOY.md` has the setup, what's tested, and what isn't done yet. The server side is in `src/lib/agent`, `src/lib/channels` and `src/app/api`. The database schema and access rules are in `supabase/migrations/`.
+It isn't a full replacement for a human dispatcher yet: no load boards, no calls to brokers, no ELD.
+
+`DEPLOY.md` covers the setup, the tests, and what isn't done yet. The server side is in `src/lib/agent`, `src/lib/channels` and `src/app/api`. The database schema and access rules are in `supabase/migrations/`.
 
 ## Stack
 

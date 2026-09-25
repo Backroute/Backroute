@@ -95,6 +95,8 @@ export interface RateConReading {
   miles?: number | null;
   pickup: string | null;
   delivery: string | null;
+  pickupLocal?: string | null;
+  deliveryLocal?: string | null;
   equipment: string | null;
   detention: string | null;
   paymentTerms: string | null;

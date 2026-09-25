@@ -32,6 +32,9 @@ export const Reading = z.object({
   miles: z.number().nullable(),
   pickup: z.string().nullable(),
   delivery: z.string().nullable(),
+  // The appointment (or the start of the window) in the stop's own local time, "YYYY-MM-DDTHH:mm", when the date is on it.
+  pickupLocal: z.string().nullable(),
+  deliveryLocal: z.string().nullable(),
   equipment: z.string().nullable(),
   detention: z.string().nullable(),
   paymentTerms: z.string().nullable(),

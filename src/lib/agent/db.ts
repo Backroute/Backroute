@@ -165,3 +165,77 @@ export async function threadWith(carrierId: string, channel: "sms" | "voice" | "
   return (data ?? []).reverse();
 }
 
+
+// ─── Marks: what the AI already did on its own for a load ────────────────────
+
+/** Claims a mark (a check-in, a call, an invoice). False when it was already taken, so the job does each thing once. */
+export async function claimMark(carrierId: string, loadId: string, kind: string, data: Record<string, unknown> = {}): Promise<boolean> {
+  const { error } = await admin().from("agent_marks").insert({ carrier_id: carrierId, load_id: loadId, kind, data });
+  if (error?.code === "23505") return false;
+  if (error) throw error;
+  return true;
+}
+
+/** Gives a mark back when the thing it stood for didn't happen (the text failed), so the next run tries again. */
+export async function releaseMark(carrierId: string, loadId: string, kind: string) {
+  await admin().from("agent_marks").delete().eq("carrier_id", carrierId).eq("load_id", loadId).eq("kind", kind);
+}
+
+/** The carrier's marks, as "loadId:kind" → when it was made. */
+export async function marksFor(carrierId: string): Promise<Map<string, { at: string; data: Record<string, unknown> }>> {
+  const since = new Date(Date.now() - 30 * 86400_000).toISOString();
+  const { data, error } = await admin().from("agent_marks").select("load_id, kind, data, created_at").eq("carrier_id", carrierId).gte("created_at", since);
+  if (error) throw error;
+  return new Map((data ?? []).map((r) => [`${r.load_id}:${r.kind}`, { at: r.created_at as string, data: (r.data ?? {}) as Record<string, unknown> }]));
+}
+
+/** Whether a driver has said anything since then: a text, a call, or a message in the app. */
+export async function heardFrom(carrierId: string, driverId: string, since: string): Promise<boolean> {
+  const [channel, app] = await Promise.all([
+    admin().from("channel_messages").select("id").eq("carrier_id", carrierId).eq("driver_id", driverId).eq("direction", "in").gt("created_at", since).limit(1),
+    admin().from("driver_messages").select("id, data").eq("carrier_id", carrierId).eq("driver_id", driverId).gt("created_at", since).order("created_at", { ascending: false }).limit(20),
+  ]);
+  if (channel.error) throw channel.error;
+  if (app.error) throw app.error;
+  return (channel.data?.length ?? 0) > 0 || (app.data ?? []).some((r) => (r.data as DriverMessage).from === "driver");
+}
+
+// ─── Files (carrier_files) ───────────────────────────────────────────────────
+
+export interface StoredFile {
+  id: string;
+  kind: string;
+  name: string;
+  content_type: string;
+  data: string;
+  load_id: string | null;
+  expires_on: string | null;
+  note: string | null;
+}
+
+export async function storeFile(carrierId: string, f: { kind: string; name: string; contentType: string; bytes: Buffer; loadId?: string | null; note?: string | null }): Promise<string> {
+  const { data, error } = await admin()
+    .from("carrier_files")
+    .insert({ carrier_id: carrierId, kind: f.kind, load_id: f.loadId ?? null, name: f.name, content_type: f.contentType, size: f.bytes.length, data: f.bytes.toString("base64"), note: f.note ?? null })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id as string;
+}
+
+export async function filesById(carrierId: string, ids: string[]): Promise<StoredFile[]> {
+  if (!ids.length) return [];
+  const { data, error } = await admin().from("carrier_files").select("id, kind, name, content_type, data, load_id, expires_on, note").eq("carrier_id", carrierId).in("id", ids);
+  if (error) throw error;
+  return (data ?? []) as StoredFile[];
+}
+
+/** The newest file of each kind asked for (e.g. the carrier's W-9 and COI, or a load's POD), without the contents. */
+export async function latestFiles(carrierId: string, kinds: string[], loadId?: string): Promise<Omit<StoredFile, "data">[]> {
+  let q = admin().from("carrier_files").select("id, kind, name, content_type, load_id, expires_on, note").eq("carrier_id", carrierId).in("kind", kinds);
+  if (loadId) q = q.eq("load_id", loadId);
+  const { data, error } = await q.order("created_at", { ascending: false }).limit(50);
+  if (error) throw error;
+  const seen = new Set<string>();
+  return ((data ?? []) as Omit<StoredFile, "data">[]).filter((f) => (seen.has(f.kind) ? false : (seen.add(f.kind), true)));
+}

@@ -37,8 +37,15 @@ export function rowFor(table: Table, kind: RecordKind | undefined, carrierId: st
     ...(kind ? { kind } : {}),
     ...COLUMNS[kind ?? (table as Exclude<Table, "records">)](item),
     ...(CREATED_ONLY.has(table) ? {} : { updated_at: now }),
-    data: item,
+    data: table === "loads" ? withoutPreviews(item) : item,
   };
+}
+
+// A driver's photo preview is a link that only works in their own browser tab; it isn't saved.
+function withoutPreviews(item: Item): Item {
+  const docs = (item as { documents?: { previewUrl?: string }[] }).documents;
+  if (!docs?.some((d) => d.previewUrl?.startsWith("blob:"))) return item;
+  return { ...item, documents: docs.map(({ previewUrl, ...d }) => (previewUrl?.startsWith("blob:") ? d : { ...d, previewUrl })) } as Item;
 }
 
 export const conflictKey = (kind?: RecordKind) => (kind ? "carrier_id,kind,id" : "carrier_id,id");

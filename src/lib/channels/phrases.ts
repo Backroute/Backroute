@@ -73,3 +73,79 @@ export const NEW_LOAD: Record<Lang, (p: { ref: string; from: string; to: string;
   uk: (p) => `Новий вантаж ${p.ref}: ${p.from} → ${p.to}. Завантаження ${p.pickup}. Розвантаження ${p.delivery}. Деталі в застосунку Backroute. Питання пиши сюди.`,
   fr: (p) => `Nouveau voyage ${p.ref} : ${p.from} → ${p.to}. Chargement ${p.pickup}. Livraison ${p.delivery}. Détails dans l'appli Backroute. Réponds ici si tu as des questions.`,
 };
+
+type Stop = { ref: string; place: string; time: string };
+
+/**
+ * The check-ins the AI sends drivers on its own, like a dispatcher watching the board: before each appointment, when
+ * one is missed, and for the POD. The driver answers by text or on a call, and the AI takes it from there.
+ */
+export const CHECKIN: Record<"before_pickup" | "pickup_late" | "before_delivery" | "delivery_late" | "pod_needed", Record<Lang, (p: Stop) => string>> = {
+  before_pickup: {
+    en: (p) => `Load ${p.ref}: pickup at ${p.place} is ${p.time}. On track? Reply here if anything's off.`,
+    es: (p) => `Carga ${p.ref}: la recogida en ${p.place} es ${p.time}. ¿Vas a tiempo? Responde aquí si hay algún problema.`,
+    pa: (p) => `ਲੋਡ ${p.ref}: ${p.place} ਵਿੱਚ ਪਿਕਅੱਪ ${p.time} ਹੈ। ਸਮੇਂ ਸਿਰ ਹੋ? ਕੋਈ ਗੱਲ ਹੋਵੇ ਤਾਂ ਇੱਥੇ ਦੱਸੋ।`,
+    hi: (p) => `लोड ${p.ref}: ${p.place} में पिकअप ${p.time} है। समय पर हैं? कोई दिक्कत हो तो यहीं बताइए।`,
+    ru: (p) => `Груз ${p.ref}: загрузка в ${p.place} — ${p.time}. Успеваешь? Если что-то не так, напиши сюда.`,
+    uk: (p) => `Вантаж ${p.ref}: завантаження в ${p.place} — ${p.time}. Встигаєш? Якщо щось не так, напиши сюди.`,
+    fr: (p) => `Voyage ${p.ref} : chargement à ${p.place} ${p.time}. Tu es dans les temps ? Réponds ici s'il y a un souci.`,
+  },
+  pickup_late: {
+    en: (p) => `Load ${p.ref}: pickup at ${p.place} was ${p.time}. Are you there? Reply with where you are.`,
+    es: (p) => `Carga ${p.ref}: la recogida en ${p.place} era ${p.time}. ¿Ya llegaste? Responde con dónde estás.`,
+    pa: (p) => `ਲੋਡ ${p.ref}: ${p.place} ਵਿੱਚ ਪਿਕਅੱਪ ${p.time} ਸੀ। ਪਹੁੰਚ ਗਏ? ਦੱਸੋ ਕਿੱਥੇ ਹੋ।`,
+    hi: (p) => `लोड ${p.ref}: ${p.place} में पिकअप ${p.time} था। पहुँच गए? बताइए आप कहाँ हैं।`,
+    ru: (p) => `Груз ${p.ref}: загрузка в ${p.place} была ${p.time}. Ты на месте? Напиши, где ты.`,
+    uk: (p) => `Вантаж ${p.ref}: завантаження в ${p.place} було ${p.time}. Ти на місці? Напиши, де ти.`,
+    fr: (p) => `Voyage ${p.ref} : le chargement à ${p.place} était ${p.time}. Tu es arrivé ? Dis-moi où tu es.`,
+  },
+  before_delivery: {
+    en: (p) => `Load ${p.ref}: delivery in ${p.place} is ${p.time}. On track? Reply here if you'll be late.`,
+    es: (p) => `Carga ${p.ref}: la entrega en ${p.place} es ${p.time}. ¿Vas a tiempo? Avisa aquí si vas a llegar tarde.`,
+    pa: (p) => `ਲੋਡ ${p.ref}: ${p.place} ਵਿੱਚ ਡਿਲੀਵਰੀ ${p.time} ਹੈ। ਸਮੇਂ ਸਿਰ ਹੋ? ਦੇਰ ਹੋਵੇ ਤਾਂ ਇੱਥੇ ਦੱਸੋ।`,
+    hi: (p) => `लोड ${p.ref}: ${p.place} में डिलीवरी ${p.time} है। समय पर हैं? देर हो तो यहीं बताइए।`,
+    ru: (p) => `Груз ${p.ref}: выгрузка в ${p.place} — ${p.time}. Успеваешь? Если опаздываешь, напиши сюда.`,
+    uk: (p) => `Вантаж ${p.ref}: розвантаження в ${p.place} — ${p.time}. Встигаєш? Якщо запізнюєшся, напиши сюди.`,
+    fr: (p) => `Voyage ${p.ref} : livraison à ${p.place} ${p.time}. Tu es dans les temps ? Préviens ici si tu seras en retard.`,
+  },
+  delivery_late: {
+    en: (p) => `Load ${p.ref}: delivery in ${p.place} was ${p.time}. Are you there? Reply with where you are.`,
+    es: (p) => `Carga ${p.ref}: la entrega en ${p.place} era ${p.time}. ¿Ya llegaste? Responde con dónde estás.`,
+    pa: (p) => `ਲੋਡ ${p.ref}: ${p.place} ਵਿੱਚ ਡਿਲੀਵਰੀ ${p.time} ਸੀ। ਪਹੁੰਚ ਗਏ? ਦੱਸੋ ਕਿੱਥੇ ਹੋ।`,
+    hi: (p) => `लोड ${p.ref}: ${p.place} में डिलीवरी ${p.time} थी। पहुँच गए? बताइए आप कहाँ हैं।`,
+    ru: (p) => `Груз ${p.ref}: выгрузка в ${p.place} была ${p.time}. Ты на месте? Напиши, где ты.`,
+    uk: (p) => `Вантаж ${p.ref}: розвантаження в ${p.place} було ${p.time}. Ти на місці? Напиши, де ти.`,
+    fr: (p) => `Voyage ${p.ref} : la livraison à ${p.place} était ${p.time}. Tu es arrivé ? Dis-moi où tu es.`,
+  },
+  pod_needed: {
+    en: (p) => `Load ${p.ref}: once you're unloaded, take a photo of the signed POD in the Backroute app. Tell me here about any shortage or damage.`,
+    es: (p) => `Carga ${p.ref}: cuando te descarguen, toma una foto del POD firmado en la app de Backroute. Avísame aquí si hay faltantes o daños.`,
+    pa: (p) => `ਲੋਡ ${p.ref}: ਅਨਲੋਡ ਹੋਣ ਤੋਂ ਬਾਅਦ, Backroute ਐਪ ਵਿੱਚ ਦਸਤਖ਼ਤ ਵਾਲੇ POD ਦੀ ਫ਼ੋਟੋ ਲਓ। ਕੋਈ ਘਾਟ ਜਾਂ ਨੁਕਸਾਨ ਹੋਵੇ ਤਾਂ ਇੱਥੇ ਦੱਸੋ।`,
+    hi: (p) => `लोड ${p.ref}: अनलोड होने के बाद, Backroute ऐप में साइन किए हुए POD की फ़ोटो लीजिए। कोई कमी या नुकसान हो तो यहीं बताइए।`,
+    ru: (p) => `Груз ${p.ref}: после выгрузки сфотографируй подписанный POD в приложении Backroute. Если есть недостача или повреждения, напиши сюда.`,
+    uk: (p) => `Вантаж ${p.ref}: після розвантаження сфотографуй підписаний POD у застосунку Backroute. Якщо є нестача чи пошкодження, напиши сюди.`,
+    fr: (p) => `Voyage ${p.ref} : une fois déchargé, prends en photo le POD signé dans l'appli Backroute. Dis-moi ici s'il y a un manque ou des dommages.`,
+  },
+};
+
+/** How a check-in call opens, before the question. It says it's an AI. */
+export const CHECKIN_CALL: Record<Lang, (first: string, carrier: string) => string> = {
+  en: (f, c) => `Hi ${f}, this is the AI dispatcher for ${c}, checking on your load.`,
+  es: (f, c) => `Hola ${f}, habla el despachador de inteligencia artificial de ${c}, para preguntar por tu carga.`,
+  pa: (f, c) => `ਸਤ ਸ੍ਰੀ ਅਕਾਲ ${f}, ਮੈਂ ${c} ਦਾ AI ਡਿਸਪੈਚਰ ਹਾਂ, ਤੁਹਾਡੇ ਲੋਡ ਬਾਰੇ ਪੁੱਛਣ ਲਈ ਫ਼ੋਨ ਕੀਤਾ ਹੈ।`,
+  hi: (f, c) => `नमस्ते ${f}, मैं ${c} का AI डिस्पैचर हूँ, आपके लोड के बारे में पूछने के लिए फ़ोन किया है।`,
+  ru: (f, c) => `Привет, ${f}, это AI-диспетчер компании ${c}, звоню узнать про твой груз.`,
+  uk: (f, c) => `Привіт, ${f}, це AI-диспетчер компанії ${c}, дзвоню дізнатися про твій вантаж.`,
+  fr: (f, c) => `Bonjour ${f}, ici le répartiteur IA de ${c}, j'appelle pour ton voyage.`,
+};
+
+/** To the owner, when a driver doesn't answer a check-in. The details are on the Needs you list. */
+export const DRIVER_SILENT: Record<Lang, (driver: string, ref: string) => string> = {
+  en: (d, r) => `Backroute: ${d} hasn't answered about load ${r}. It's in Needs you.`,
+  es: (d, r) => `Backroute: ${d} no ha respondido sobre la carga ${r}. Está en «Te necesita».`,
+  pa: (d, r) => `Backroute: ${d} ਨੇ ਲੋਡ ${r} ਬਾਰੇ ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ। ਇਹ "ਤੁਹਾਡੀ ਲੋੜ ਹੈ" ਸੂਚੀ ਵਿੱਚ ਹੈ।`,
+  hi: (d, r) => `Backroute: ${d} ने लोड ${r} के बारे में जवाब नहीं दिया। यह "आपकी ज़रूरत है" सूची में है।`,
+  ru: (d, r) => `Backroute: ${d} не отвечает по грузу ${r}. Это в разделе «Нужно твоё решение».`,
+  uk: (d, r) => `Backroute: ${d} не відповідає щодо вантажу ${r}. Це в розділі «Потрібне твоє рішення».`,
+  fr: (d, r) => `Backroute : ${d} n'a pas répondu pour le voyage ${r}. C'est dans « Ça t'attend ».`,
+};

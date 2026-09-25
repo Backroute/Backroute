@@ -1,18 +1,29 @@
 import "server-only";
 import { aiConfigured } from "../ai/server";
 import { readRateConPdf } from "../ai/rate-con-reader";
-import { emailConfigured, messageIdHeader, plainText, sendEmail, type InboundEmail } from "../channels/email";
+import { messageIdHeader, plainText, type InboundEmail } from "../channels/email";
 import { agreedTerms } from "../rate-con-terms";
 import type { Item } from "../cloud/rows";
 import type { Load, RateConPdfReading } from "../types";
-import { addActivity, loadContext, logChannel, save, threadWith } from "./db";
-import { brokerEmailDraft, event, passToOwner, queueDraft } from "./dispatcher";
+import { addActivity, loadContext, save, threadWith } from "./db";
+import { brokerEmailDraft, event, passToOwner } from "./dispatcher";
+import { readBrokerEmail } from "./broker-mail";
+import { answerRateReply, bookIt, offersFromEmail, type Sender } from "./booking";
+import { sendOrQueue } from "./outbox";
+import { sendSetupPacket } from "./paperwork";
+import { dollarAmounts, onlyKnownPrices } from "./pricing";
 
 const ACTIVE = new Set(["negotiating", "rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery"]);
 
 /**
- * A broker's email to the carrier's Backroute address. The AI reads any rate con attached (checking it against the
- * load it belongs to), then writes the reply. The reply waits for the owner unless autopilot is on full.
+ * A broker's email to the carrier's Backroute address, handled the way a dispatcher would:
+ *
+ * - A rate con attached is read and checked against its load. When it confirms a load the AI asked for and matches,
+ *   the load is booked onto its truck (on "Within my rules" or full autopilot; on "Ask me first" the owner taps Book it).
+ * - Loads offered: each that fits a truck goes on the owner's board, and within the rules the AI asks to book the best.
+ * - An answer to our price: taken, countered once at the owner's lowest, or passed to the owner (lib/agent/pricing).
+ * - A request for setup papers: the packet goes out with the carrier's W-9, insurance certificate and authority.
+ * - Anything else: the AI writes a reply, which waits for the owner unless autopilot is on full.
  */
 export async function handleInboundEmail(carrierId: string, email: InboundEmail) {
   const ctx = await loadContext(carrierId);
@@ -20,6 +31,7 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
   const from = (email.FromFull?.Email ?? email.From).toLowerCase();
   const fromName = email.FromFull?.Name || email.FromName || from;
   const text = plainText(email);
+  const sender: Sender = { from, fromName, subject: email.Subject, messageId: messageIdHeader(email) };
   const haystack = `${email.Subject}\n${text}`.toLowerCase();
 
   const broker = ctx.brokers.find((b) => b.email?.toLowerCase() === from);
@@ -52,6 +64,15 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
         const updated: Load = { ...load, rateConReading: saved, updatedAt: saved.readAt };
         await save("loads", carrierId, updated as unknown as Item);
         const serious = reading.mismatches.filter((m) => m.serious).length;
+        load = updated;
+        // The broker's rate con for a load the AI asked for: it confirms the booking when it matches.
+        if (load.stage === "negotiating" || load.stage === "offered") {
+          if (serious) await passToOwner(ctx, { reason: `${fromName}'s rate con for ${load.referenceNumber} doesn't match what was agreed: ${reading.summary}`, loadId: load.id, label: "I'll sort it", source: "email" });
+          else if (ctx.settings.autonomy !== "ask") {
+            load = (await bookIt(ctx, load, reading.totalRate ?? undefined)).load;
+            notes.push(`The rate con matched, so ${load.referenceNumber} is now booked and the driver has been told.`);
+          } else await passToOwner(ctx, { reason: `${fromName} sent the rate con for ${load.referenceNumber} and it matches. Open the load and tap Book it to put it on the truck.`, loadId: load.id, label: "Got it", source: "email" });
+        }
         await addActivity(
           carrierId,
           event({
@@ -82,6 +103,19 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
     return;
   }
 
+  const reading = await readBrokerEmail(email.Subject, text);
+  if (reading?.kind === "setup_request") return sendSetupPacket(ctx, { ...sender, contactName: reading.contactName });
+  if (reading?.kind === "load_offers" && reading.offers.length && !pdfs.length) {
+    const { added } = await offersFromEmail(ctx, reading.offers, sender);
+    if (!added.length)
+      await addActivity(carrierId, event({ type: "load_offered", message: `${fromName} sent ${reading.offers.length} load${reading.offers.length === 1 ? "" : "s"}; none fit a free truck`, detail: email.Subject, severity: "info" }));
+    return;
+  }
+  if (reading?.kind === "rate_reply" && load?.stage === "negotiating") {
+    const handled = await answerRateReply(ctx, load, { brokerRate: reading.brokerRate, agreed: reading.agreedToOurRate, contactName: reading.contactName }, sender);
+    if (handled !== false) return;
+  }
+
   const thread = (await threadWith(carrierId, "email", from, 8)).filter((m) => !(m.direction === "in" && m.body === text));
   const draft = await brokerEmailDraft(ctx, { from, fromName, subject: email.Subject, text, attachmentNotes: notes, thread, load });
   if (draft.effects.failed) {
@@ -90,21 +124,20 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
   }
   if (!draft.body) return;
 
-  const subject = /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`;
-  const inReplyTo = messageIdHeader(email);
-  if (ctx.settings.autonomy === "full" && emailConfigured()) {
-    const id = await sendEmail({ to: from, subject, text: draft.body, fromName: ctx.carrier.name, inReplyTo });
-    await logChannel({ carrierId, channel: "email", direction: "out", providerId: id ?? null, counterparty: from, body: draft.body, data: { subject, auto: true } });
-    await addActivity(carrierId, event({ type: "negotiation_email", loadId: load?.id, message: `AI replied to ${fromName}`, detail: subject, severity: "info" }));
-    return;
-  }
-  await queueDraft(ctx, {
+  // A reply the AI wrote may only repeat prices already in the conversation or on the load.
+  const known = [
+    ...dollarAmounts(`${email.Subject}\n${text}\n${thread.map((t) => t.body ?? "").join("\n")}`),
+    ...(load ? [load.listedRate, load.targetRate, load.bookedRate ?? 0, load.bookRequest?.ask ?? 0] : []),
+  ];
+  await sendOrQueue(ctx, {
+    purpose: "reply",
     to: from,
     toName: fromName,
-    subject,
+    subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`,
     body: draft.body,
-    inReplyTo,
+    inReplyTo: sender.messageId,
     loadId: load?.id,
+    withinRules: onlyKnownPrices(draft.body, known),
     why: `${fromName} emailed about ${load ? load.referenceNumber : `"${email.Subject}"`}. The AI wrote a reply for you to check.`,
   });
 }

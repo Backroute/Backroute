@@ -4,6 +4,7 @@ import { supabase } from "./client";
 import type { Membership } from "./account";
 import { useStore } from "../store";
 import { PRIMARY_CARRIER_ID } from "../mock-data";
+import { switchToRealDockClock } from "../detention";
 import { conflictKey, CREATED_ONLY, rowFor, type Item, type RecordKind, type Table } from "./rows";
 
 /**
@@ -166,6 +167,7 @@ export async function connect(m: Membership, opts: { fresh?: boolean } = {}) {
   const fresh = !!opts.fresh;
   if (mode === "driver" && !loaded.get("drivers")?.some((d) => d.id === m.driverId)) throw new NotSetUpError();
 
+  switchToRealDockClock();
   const c: Connection = {
     carrierId: m.carrierId,
     mode,
@@ -372,6 +374,23 @@ function listen(c: Connection, specs: Spec[]): RealtimeChannel {
   // Removals aren't sent to filtered subscriptions, so another screen's deletion shows here after a reload.
   channel.subscribe();
   return channel;
+}
+
+/**
+ * What the server just changed and sent back (a load after a book request, an escalation after it was sent): shown
+ * right away, and remembered as saved so this screen doesn't write it back.
+ */
+export function applyFromServer(slice: "loads" | "escalations" | "trucks" | "brokers", items: Item[]) {
+  const c = conn;
+  const spec = c && SPECS.find((s) => s.slice === slice);
+  for (const item of items) {
+    if (c && spec) applyRemote(c, spec, item);
+    else
+      useStore.setState((s) => {
+        const list = s[slice] as unknown as Item[];
+        return { [slice]: list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [item, ...list] } as Partial<State>;
+      });
+  }
 }
 
 function applyRemote(c: Connection, spec: Spec, item: Item) {

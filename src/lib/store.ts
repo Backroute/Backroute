@@ -35,6 +35,7 @@ import { brokerCorrects, RATE_CON_FIX_MS, RATE_CON_READ_MS, refusedSummary, revi
 import { pack, type QuickPhrase } from "./lang";
 import { weekEarnings } from "./earnings";
 import { askAi, setTyping } from "./ai/client";
+import { uploadFile } from "./cloud/files";
 import { makeBroker, makeLoad, makeTruckAndDriver, type FleetEntry, type NewLoad } from "./fleet";
 import { driverSnapshot, ownerSnapshot } from "./ai/snapshot";
 import {
@@ -656,6 +657,15 @@ export type Aggressiveness = "conservative" | "balanced" | "aggressive";
 export type Autonomy = "ask" | "rules" | "full";
 
 export interface AgentSettings {
+  /** Real accounts: the lowest rate per loaded mile the AI will ask for or accept from a broker. */
+  minRpm?: number;
+  /** Real accounts: where brokers send payment questions, and the address that goes on invoices. */
+  remitEmail?: string;
+  businessAddress?: string;
+  /** Real accounts: invoices go to the factoring company instead of the broker when this is set. */
+  factoringEmail?: string;
+  /** Real accounts: the AI texts drivers before pickup and delivery, and follows up. On unless turned off. */
+  checkIns?: boolean;
   autonomy: Autonomy;
   aggressiveness: Aggressiveness;
   autoBookEnabled: boolean;
@@ -796,7 +806,7 @@ interface StoreState {
     setSealNumber: (loadId: string, sealNumber: string) => void;
     /** Driver photographs a document at the stop; a moment later the AI has read it and marks it verified
      *  (and for a lumper receipt, files the reimbursement itself). Re-uploading replaces the previous one. */
-    uploadLoadDocument: (loadId: string, type: DriverDocType, file: { name: string; previewUrl?: string }) => void;
+    uploadLoadDocument: (loadId: string, type: DriverDocType, file: { name: string; previewUrl?: string; file?: File }) => void;
     recaptureDocument: (loadId: string, type: "bol" | "pod") => void;
     selectLoadOffer: (offerGroupId: string, loadId: string, actor: "driver" | "carrier") => void;
     reportIncident: (driverId: string, truckId: string, type: IncidentType, note: string) => void;
@@ -1625,7 +1635,7 @@ export const useStore = create<StoreState>((set, get) => ({
         const load = state.loads.find((l) => l.id === loadId);
         if (!load) return {};
         const truck = state.trucks.find((t) => t.id === load.truckId);
-        const result = confirmLoadStage(load, truck);
+        const result = confirmLoadStage(load, truck, state.session.mode === "demo");
         if (result.load === load) return {};
         let trucks = state.trucks;
         const aiEvent = aiMilestoneEvent(result.load, state.brokers.find((b) => b.id === load.brokerId)?.company ?? "the broker");
@@ -1763,6 +1773,34 @@ export const useStore = create<StoreState>((set, get) => ({
           ].slice(0, 80),
         };
       });
+      if (get().session.mode !== "demo") {
+        // A real account: the file is stored on the server, and the AI there checks it (signed, the right document,
+        // anything written on it). Nothing is made up if that fails; the driver is asked to retake it.
+        const settle = (patch: Partial<LoadDocument>, message: string, detail: string, severity: "success" | "warning") =>
+          set((state) => {
+            const load = state.loads.find((l) => l.id === loadId);
+            if (!load?.documents.some((d) => d.id === docId)) return {};
+            return {
+              loads: state.loads.map((l) => (l.id === loadId ? { ...l, documents: l.documents.map((d) => (d.id === docId ? { ...d, ...patch } : d)) } : l)),
+              activity: [
+                { id: uid("act"), timestamp: new Date().toISOString(), type: "document_captured" as const, message, detail: `${load.referenceNumber} · ${detail}`, loadId, carrierId: load.carrierId, severity },
+                ...state.activity,
+              ].slice(0, 80),
+            };
+          });
+        if (!file.file) return settle({ status: "failed", aiNote: "Didn't upload." }, `The ${DRIVER_DOC_LABEL[type]} didn't upload`, "Retake it", "warning");
+        void uploadFile(type, file.file, { loadId }).then((r) => {
+          if (!r.ok) return settle({ status: "failed", aiNote: r.reason }, `The ${DRIVER_DOC_LABEL[type]} didn't upload`, r.reason, "warning");
+          const note = r.note ?? "Saved.";
+          settle(
+            { status: "verified", fileId: r.id, aiNote: note, flagged: r.status === "check" },
+            r.status === "check" ? `Check the ${DRIVER_DOC_LABEL[type]}` : `${DRIVER_DOC_LABEL[type]} saved`,
+            note,
+            r.status === "check" ? "warning" : "success",
+          );
+        });
+        return;
+      }
       setTimeout(() => {
         set((state) => {
           const load = state.loads.find((l) => l.id === loadId);
@@ -1816,7 +1854,13 @@ export const useStore = create<StoreState>((set, get) => ({
         };
       }),
 
-    selectLoadOffer: (offerGroupId, loadId, actor) =>
+    selectLoadOffer: (offerGroupId, loadId, actor) => {
+      // A real account: the AI emails the broker to book it (lib/cloud/agent), and the load changes when that's done.
+      if (get().session.mode !== "demo") {
+        // Loaded when needed: it reaches back into the store through the sync.
+        void import("./cloud/agent").then((m) => m.askToBook(loadId)).then((problem) => problem && window.alert(problem));
+        return;
+      }
       set((state) => {
         const { loads, events } = resolveLoadOffer(state.loads, offerGroupId, loadId, actor);
         const chosen = loads.find((l) => l.id === loadId);
@@ -1829,7 +1873,8 @@ export const useStore = create<StoreState>((set, get) => ({
           trucks,
           activity: [...events, ...state.activity].slice(0, 80),
         };
-      }),
+      });
+    },
 
     reportIncident: (driverId, truckId, type, note) =>
       set((state) => {
@@ -2174,7 +2219,11 @@ export const useStore = create<StoreState>((set, get) => ({
       const broker = existing ?? makeBroker(brokerName, brokerEmail);
       // The truck's first load is dispatched right away; one behind it waits as the next load.
       const first = !truck.currentLoadId;
-      const load: Load = { ...makeLoad({ ...input, brokerId: broker.id }, broker, truck, first ? "dispatched" : "booked"), ...(rateConReading ? { rateConReading } : {}) };
+      const load: Load = {
+        ...makeLoad({ ...input, brokerId: broker.id }, broker, truck, first ? "dispatched" : "booked"),
+        ...(rateConReading ? { rateConReading } : {}),
+        ...(brokerEmail?.trim() ? { brokerContactEmail: brokerEmail.trim() } : {}),
+      };
       const event: ActivityEvent = {
         id: uid("act"), timestamp: load.createdAt, type: "booked", loadId: load.id, carrierId: PRIMARY_CARRIER_ID,
         message: `Load added: ${load.lane.origin} → ${load.lane.destination}`,

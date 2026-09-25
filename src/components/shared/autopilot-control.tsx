@@ -7,9 +7,9 @@ const LEVELS: Autonomy[] = ["ask", "rules", "full"];
 
 /** What each level does in a real account today: the AI answers drivers on its own; this decides broker emails. */
 const REAL_DETAIL: Record<Autonomy, string> = {
-  ask: "The AI answers drivers by text and phone on its own. Anything it writes to a broker waits for your OK.",
-  rules: "For now the same as Ask me first: replies to brokers wait for your OK. Sending within your rules is coming.",
-  full: "The AI answers drivers and sends its replies to brokers itself. You still see everything it sent.",
+  ask: "The AI answers drivers and checks in with them on its own. Every email to a broker (book requests, invoices, replies) waits for your OK.",
+  rules: "The AI also asks to book loads, counters, accepts, sends invoices, detention claims and setup packets on its own, but only at or above your lowest rate per mile. Replies it writes itself, and anything under your lowest, wait for you.",
+  full: "Everything in Within my rules, plus it sends the replies it writes. A reply that names a new price, or anything under your lowest rate, still waits for you.",
 };
 
 /** The one autopilot setting — how much the AI books without asking. */

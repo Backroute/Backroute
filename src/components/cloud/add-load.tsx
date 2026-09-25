@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { FileSearch, Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authHeader, readRateCon } from "@/lib/ai/client";
-import { estimateMiles } from "@/lib/fleet";
+import { estimateMiles, guessEquipment } from "@/lib/fleet";
+import { formatAtStop, stopLocalToIso, zoneFor } from "@/lib/stop-time";
 import { useStore } from "@/lib/store";
 import type { EquipmentType, RateConPdfReading } from "@/lib/types";
 
@@ -23,12 +24,13 @@ interface Form {
   miles: string;
   pickupWindow: string;
   deliveryWindow: string;
+  /** "YYYY-MM-DDTHH:mm" in the stop's local time. */
+  pickupLocal: string;
+  deliveryLocal: string;
   rate: string;
   equipment: EquipmentType;
 }
 
-const guessEquipment = (text: string | null): EquipmentType | null =>
-  !text ? null : /reefer|refrig/i.test(text) ? "Reefer" : /flat/i.test(text) ? "Flatbed" : /container|chassis/i.test(text) ? "Container" : /van/i.test(text) ? "Dry Van" : null;
 
 /**
  * A load the owner booked: typed in, or filled in from the broker's rate con PDF by the AI (it reads the terms, the
@@ -68,6 +70,8 @@ function AddLoadPanel({ onDone }: { onDone: () => void }) {
     miles: "",
     pickupWindow: "",
     deliveryWindow: "",
+    pickupLocal: "",
+    deliveryLocal: "",
     rate: "",
     equipment: trucks[0]?.equipmentType ?? "Dry Van",
   });
@@ -95,6 +99,8 @@ function AddLoadPanel({ onDone }: { onDone: () => void }) {
       miles: r.miles ? String(Math.round(r.miles)) : x.miles,
       pickupWindow: r.pickup ?? x.pickupWindow,
       deliveryWindow: r.delivery ?? x.deliveryWindow,
+      pickupLocal: r.pickupLocal?.slice(0, 16) ?? x.pickupLocal,
+      deliveryLocal: r.deliveryLocal?.slice(0, 16) ?? x.deliveryLocal,
       rate: r.totalRate != null ? String(r.totalRate) : x.rate,
       equipment: guessEquipment(r.equipment) ?? x.equipment,
     }));
@@ -102,14 +108,17 @@ function AddLoadPanel({ onDone }: { onDone: () => void }) {
   }
 
   const rate = Number(f.rate.replace(/[$,\s]/g, ""));
+  const pickupAt = stopLocalToIso(f.pickupLocal, f.originState);
+  const deliveryAt = stopLocalToIso(f.deliveryLocal, f.destinationState);
   const estimate = estimateMiles({ city: f.originCity, state: f.originState }, { city: f.destinationCity, state: f.destinationState });
   const missing = [
     !f.truckId && "the truck",
     !f.brokerName.trim() && "the broker",
     (!f.originCity.trim() || !/^[A-Za-z]{2}$/.test(f.originState.trim())) && "pickup city and state",
     (!f.destinationCity.trim() || !/^[A-Za-z]{2}$/.test(f.destinationState.trim())) && "delivery city and state",
-    !f.pickupWindow.trim() && "pickup time",
-    !f.deliveryWindow.trim() && "delivery time",
+    !pickupAt && "pickup date and time",
+    !deliveryAt && "delivery date and time",
+    pickupAt && deliveryAt && deliveryAt <= pickupAt && "a delivery time after the pickup",
     !(rate > 0) && "the rate",
     !f.miles && !estimate && "the miles",
   ].filter(Boolean);
@@ -127,8 +136,11 @@ function AddLoadPanel({ onDone }: { onDone: () => void }) {
       destinationCity: f.destinationCity,
       destinationState: f.destinationState,
       miles: f.miles ? Number(f.miles) : undefined,
-      pickupWindow: f.pickupWindow,
-      deliveryWindow: f.deliveryWindow,
+      // What the driver reads: the broker's own wording when there is some (e.g. "FCFS 8–2"), else the appointment.
+      pickupWindow: f.pickupWindow.trim() || formatAtStop(pickupAt!, f.originState),
+      deliveryWindow: f.deliveryWindow.trim() || formatAtStop(deliveryAt!, f.destinationState),
+      pickupAt: pickupAt!,
+      deliveryAt: deliveryAt!,
       rate,
       equipment: f.equipment,
       rateConReading: reading ?? undefined,
@@ -194,12 +206,12 @@ function AddLoadPanel({ onDone }: { onDone: () => void }) {
             <input className={input} placeholder="Pickup city" aria-label="Pickup city" value={f.originCity} onChange={(e) => set({ originCity: e.target.value })} />
             <input className={input} placeholder="State" aria-label="Pickup state" maxLength={2} value={f.originState} onChange={(e) => set({ originState: e.target.value.toUpperCase() })} />
           </div>
-          <input className={`${input} col-span-2`} placeholder="Pickup date and time" aria-label="Pickup date and time" value={f.pickupWindow} onChange={(e) => set({ pickupWindow: e.target.value })} />
+          <StopTime label="Pickup" state={f.originState} local={f.pickupLocal} note={f.pickupWindow} onLocal={(v) => set({ pickupLocal: v })} onNote={(v) => set({ pickupWindow: v })} />
           <div className="col-span-2 grid grid-cols-[1fr_4.5rem] gap-2">
             <input className={input} placeholder="Delivery city" aria-label="Delivery city" value={f.destinationCity} onChange={(e) => set({ destinationCity: e.target.value })} />
             <input className={input} placeholder="State" aria-label="Delivery state" maxLength={2} value={f.destinationState} onChange={(e) => set({ destinationState: e.target.value.toUpperCase() })} />
           </div>
-          <input className={`${input} col-span-2`} placeholder="Delivery date and time" aria-label="Delivery date and time" value={f.deliveryWindow} onChange={(e) => set({ deliveryWindow: e.target.value })} />
+          <StopTime label="Delivery" state={f.destinationState} local={f.deliveryLocal} note={f.deliveryWindow} onLocal={(v) => set({ deliveryLocal: v })} onNote={(v) => set({ deliveryWindow: v })} />
           <input className={input} placeholder={estimate ? `Miles (about ${estimate})` : "Miles"} aria-label="Miles" inputMode="numeric" value={f.miles} onChange={(e) => set({ miles: e.target.value.replace(/\D/g, "") })} />
           <select className={input} aria-label="Equipment" value={f.equipment} onChange={(e) => set({ equipment: e.target.value as EquipmentType })}>
             {EQUIPMENT.map((q) => (
@@ -214,6 +226,24 @@ function AddLoadPanel({ onDone }: { onDone: () => void }) {
         </Button>
         <p className="mt-2 text-center text-[11px] text-ink-400">It goes to the driver&apos;s app right away, and they get a text about it when texting is on. Fuel and profit are estimates.</p>
       </div>
+    </div>
+  );
+}
+
+/** The appointment in the stop's own local time (the AI checks in with the driver from it), plus the broker's wording. */
+function StopTime({ label, state, local, note, onLocal, onNote }: { label: string; state: string; local: string; note: string; onLocal: (v: string) => void; onNote: (v: string) => void }) {
+  const input = "min-w-0 rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-ink-400";
+  const zone = /^[A-Za-z]{2}$/.test(state.trim()) ? zoneFor(state).split("/").pop()!.replace(/_/g, " ") : null;
+  return (
+    <div className="col-span-2 grid grid-cols-2 gap-2">
+      <label className="flex flex-col gap-1 text-xs font-medium text-ink-700">
+        {label} appointment{zone ? ` (${zone} time)` : ""}
+        <input className={input} type="datetime-local" aria-label={`${label} date and time`} value={local} onChange={(e) => onLocal(e.target.value)} />
+      </label>
+      <label className="flex flex-col gap-1 text-xs font-medium text-ink-700">
+        Notes for the driver (optional)
+        <input className={input} placeholder="e.g. FCFS 8 AM–2 PM, appt #" aria-label={`${label} notes`} value={note} onChange={(e) => onNote(e.target.value)} />
+      </label>
     </div>
   );
 }

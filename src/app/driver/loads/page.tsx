@@ -18,7 +18,9 @@ export default function DriverLoadsPage() {
   const resolveOfferDetail = useStore((s) => s.actions.resolveOfferDetail);
 
   const truck = trucks.find((t) => t.id === driver.truckId);
-  const pendingOffers = loads.filter((l) => l.truckId === truck?.id && l.stage === "offered").sort((a, b) => b.score - a.score);
+  // In a real account the office books loads with brokers; a company driver's app shows what's booked, not offers.
+  const picksLoads = useStore((s) => s.session.mode !== "driver");
+  const pendingOffers = loads.filter((l) => l.truckId === truck?.id && l.stage === "offered" && picksLoads).sort((a, b) => b.score - a.score);
   const myLoads = [...loads.filter((l) => l.truckId === truck?.id && l.stage !== "offered")].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
   );

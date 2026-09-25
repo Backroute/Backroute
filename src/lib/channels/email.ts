@@ -41,7 +41,14 @@ export function plainText(email: InboundEmail): string {
   return text.replace(/\n{3,}/g, "\n\n").trim().slice(0, 12000);
 }
 
-export async function sendEmail(p: { to: string; subject: string; text: string; fromName: string; inReplyTo?: string; replyTo?: string }) {
+export interface Attachment {
+  name: string;
+  contentType: string;
+  /** Base64. */
+  content: string;
+}
+
+export async function sendEmail(p: { to: string; subject: string; text: string; fromName: string; inReplyTo?: string; replyTo?: string; attachments?: Attachment[] }) {
   const base = process.env.POSTMARK_API_BASE?.replace(/\/$/, "") ?? "https://api.postmarkapp.com";
   const res = await fetch(`${base}/email`, {
     method: "POST",
@@ -53,6 +60,7 @@ export async function sendEmail(p: { to: string; subject: string; text: string; 
       TextBody: p.text,
       ...(p.replyTo ? { ReplyTo: p.replyTo } : {}),
       ...(p.inReplyTo ? { Headers: [{ Name: "In-Reply-To", Value: p.inReplyTo }, { Name: "References", Value: p.inReplyTo }] } : {}),
+      ...(p.attachments?.length ? { Attachments: p.attachments.map((a) => ({ Name: a.name, Content: a.content, ContentType: a.contentType })) } : {}),
       MessageStream: "outbound",
     }),
   });

@@ -319,8 +319,12 @@ export interface LoadDocument {
   type: "rate_confirmation" | "bol" | "pod" | "invoice" | "lumper_receipt";
   name: string;
   generatedAt: string;
-  /** "pending" while the AI is still reading a driver upload. */
-  status: "pending" | "verified";
+  /** "pending" while the AI is still reading a driver upload; "failed" when it didn't reach the server (retake it). */
+  status: "pending" | "verified" | "failed";
+  /** Real accounts: the AI saw a problem on it (not signed, the wrong document, a shortage or damage written on it). */
+  flagged?: boolean;
+  /** Real accounts: the stored file (api/files/[id]). */
+  fileId?: string;
   uploadedBy?: "driver";
   /** In-session preview of the driver's photo (an object URL, so it doesn't survive a reload). */
   previewUrl?: string;
@@ -438,6 +442,17 @@ export interface Load {
   rateCon?: RateConReview;
   /** The real AI's reading of a rate con PDF the owner uploaded, checked against what was agreed on this load. */
   rateConReading?: RateConPdfReading;
+  /** Real accounts: pickup and delivery appointment times, for check-ins and detention. */
+  pickupAt?: string;
+  deliveryAt?: string;
+  /** Who at the broker to email about this load (from their email or the rate con). */
+  brokerContactEmail?: string;
+  /** The AI asked the broker to book this load: the price it asked, and where that stands. */
+  bookRequest?: { ask: number; askedAt: string; status: "drafted" | "sent" | "accepted" | "declined"; countered?: boolean; brokerOffer?: number };
+  /** The broker's email this load came from, so the book request answers it in the same thread. */
+  offerEmail?: { subject: string; messageId?: string };
+  invoice?: LoadInvoice;
+  detentionClaims?: DetentionClaim[];
   /** Intermediate stops beyond the lane's origin/destination — absent or empty means a normal single-pickup,
    *  single-delivery load, which is most of them. */
   stops?: LoadStop[];
@@ -521,7 +536,15 @@ export interface DraftMessage {
   /** The email this answers, so the reply lands in the same thread. */
   inReplyTo?: string;
   sentAt?: string;
+  /** What it's for: a reply the AI wrote, or one of the dispatcher's standard emails (written from a template). */
+  purpose?: DraftPurpose;
+  /** The price it names, for a book request, counter or acceptance. */
+  amount?: number;
+  /** Stored files that go with it (the invoice, the POD, the carrier's setup papers). */
+  attachments?: { fileId: string; name: string }[];
 }
+
+export type DraftPurpose = "reply" | "book_request" | "counter" | "accept" | "setup_packet" | "invoice" | "detention";
 
 export interface DriverMessage {
   id: string;
@@ -677,6 +700,8 @@ export interface RateConPdfReading {
   miles?: number | null;
   pickup: string | null;
   delivery: string | null;
+  pickupLocal?: string | null;
+  deliveryLocal?: string | null;
   equipment: string | null;
   detention: string | null;
   paymentTerms: string | null;
@@ -684,4 +709,32 @@ export interface RateConPdfReading {
   mismatches: { item: string; agreed: string; onDoc: string; serious: boolean }[];
   otherConcerns: string[];
   summary: string;
+}
+
+/** The follow-ups the AI dispatcher sends drivers on its own, each at most once per load. */
+export type CheckinKind =
+  | "before_pickup"
+  | "pickup_late"
+  | "pickup_silent"
+  | "before_delivery"
+  | "delivery_late"
+  | "delivery_silent"
+  | "pod_needed"
+  | "pod_silent";
+
+export interface LoadInvoice {
+  number: string;
+  amount: number;
+  draftedAt: string;
+  sentAt?: string;
+  sentTo?: string;
+  paidAt?: string;
+}
+
+export interface DetentionClaim {
+  stop: "pickup" | "delivery";
+  minutes: number;
+  amount: number;
+  draftedAt: string;
+  sentAt?: string;
 }

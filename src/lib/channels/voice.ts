@@ -2,7 +2,9 @@ import "server-only";
 import { aiConfigured } from "../ai/server";
 import { carrierById, driverByPhone, loadContext, logChannel, threadWith, addActivity } from "../agent/db";
 import { driverTurn, event, passToOwner } from "../agent/dispatcher";
-import { DIDNT_HEAR, GOODBYE, GREETING, PASSED_ON_CALL, UNKNOWN_NUMBER } from "./phrases";
+import { checkinText } from "../agent/checkins";
+import type { CheckinKind } from "../types";
+import { CHECKIN_CALL, DIDNT_HEAR, GOODBYE, GREETING, PASSED_ON_CALL, UNKNOWN_NUMBER } from "./phrases";
 import { publicUrl, say, sayAndListen, twiml } from "./twilio";
 
 /**
@@ -25,8 +27,25 @@ export async function answerCall(request: Request, params: Record<string, string
   return twiml(sayAndListen(greeting, lang, publicUrl(request, "/api/channels/voice/turn")));
 }
 
+// On a call the AI placed (a check-in), the driver is the one being called.
+const driverNumber = (params: Record<string, string>) => ((params.Direction ?? "").startsWith("outbound") ? params.To : params.From) ?? "";
+
+/** A check-in call the AI placed has been picked up: say who's calling and why, then listen like any other call. */
+export async function checkinCall(request: Request, params: Record<string, string>, loadId: string, kind: CheckinKind) {
+  const found = await driverByPhone(driverNumber(params));
+  if (!found) return twiml("<Hangup/>");
+  const { carrierId, driver } = found;
+  const ctx = await loadContext(carrierId);
+  const load = ctx?.loads.find((l) => l.id === loadId);
+  if (!ctx || !load) return twiml("<Hangup/>");
+  const lang = driver.prefs?.language ?? "en";
+  const opening = `${CHECKIN_CALL[lang](driver.name.split(" ")[0], ctx.carrier.name)} ${checkinText(kind, load, driver)}`;
+  await logChannel({ carrierId, channel: "voice", direction: "out", providerId: `${params.CallSid}:greeting`, driverId: driver.id, counterparty: callKey(params.CallSid), body: opening, data: { kind: "checkin", checkin: kind, loadId } });
+  return twiml(sayAndListen(opening, lang, publicUrl(request, "/api/channels/voice/turn")));
+}
+
 export async function nextTurn(request: Request, params: Record<string, string>, missed: number) {
-  const found = await driverByPhone(params.From ?? "");
+  const found = await driverByPhone(driverNumber(params));
   if (!found) return twiml("<Hangup/>");
   const { carrierId, driver } = found;
   const lang = driver.prefs?.language ?? "en";

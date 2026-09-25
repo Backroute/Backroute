@@ -4,6 +4,7 @@ import { Sparkles } from "lucide-react";
 import { LoadOfferCard } from "./load-offer-card";
 import { TruckDriverChip } from "./truck-driver-chip";
 import type { OfferAskDraft } from "@/lib/engine";
+import { useStore } from "@/lib/store";
 import type { Broker, Driver, Load, Truck } from "@/lib/types";
 
 /** Shared "choose your next load" picker — used at the top of both the carrier Overview and driver Home, so it looks identical in both apps. */
@@ -25,6 +26,8 @@ export function NextLoadOffers({
   onAsk: (loadId: string, text: string) => { draft: OfferAskDraft; pendingReply: string; resolved: boolean };
   onAskResolve: (loadId: string, draft: OfferAskDraft) => string;
 }) {
+  // A real account's offers are loads brokers emailed; there's no load board behind them, and questions go by email.
+  const real = useStore((s) => s.session.mode !== "demo");
   if (offerGroups.length === 0) return null;
   const totalCount = offerGroups.reduce((sum, [, loads]) => sum + loads.length, 0);
 
@@ -34,10 +37,17 @@ export function NextLoadOffers({
         <Sparkles className="h-4 w-4 text-ink-950" />
         <p className="text-sm font-semibold text-ink-950">Choose your next load</p>
       </div>
-      <p className="mb-3 text-xs text-ink-500">
-        AI checked every connected board and scored {totalCount} option{totalCount === 1 ? "" : "s"} for you. Its pick weighs pay per hour, how far each
-        load leaves the driver from home, and whether there&apos;s freight to reload after.
-      </p>
+      {real ? (
+        <p className="mb-3 text-xs text-ink-500">
+          {totalCount} load{totalCount === 1 ? "" : "s"} brokers emailed you fit{totalCount === 1 ? "s" : ""} a truck. Pick one and the AI emails the broker to book it
+          at the price shown, never under your lowest rate. The booking is confirmed when their rate con comes back and matches.
+        </p>
+      ) : (
+        <p className="mb-3 text-xs text-ink-500">
+          AI checked every connected board and scored {totalCount} option{totalCount === 1 ? "" : "s"} for you. Its pick weighs pay per hour, how far each
+          load leaves the driver from home, and whether there&apos;s freight to reload after.
+        </p>
+      )}
       <div className="flex flex-col gap-6">
         {offerGroups.map(([groupId, groupLoads]) => {
           // The AI pick leads: it can beat a higher score once home time and the next reload are counted.
@@ -63,8 +73,8 @@ export function NextLoadOffers({
                     truck={truck}
                     driver={driver}
                     onSelect={() => onSelect(groupId, load.id)}
-                    onAsk={(text) => onAsk(load.id, text)}
-                    onAskResolve={(draft) => onAskResolve(load.id, draft)}
+                    onAsk={real ? undefined : (text) => onAsk(load.id, text)}
+                    onAskResolve={real ? undefined : (draft) => onAskResolve(load.id, draft)}
                   />
                 ))}
               </div>

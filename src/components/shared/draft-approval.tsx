@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Mail, Send, X } from "lucide-react";
+import { Loader2, Mail, Paperclip, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authHeader } from "@/lib/ai/client";
-import { useStore } from "@/lib/store";
-import type { Escalation } from "@/lib/types";
+import { applyFromServer } from "@/lib/cloud/sync";
+import { openFile } from "@/lib/cloud/files";
+import type { Item } from "@/lib/cloud/rows";
+import type { Escalation, Load } from "@/lib/types";
 
 /**
  * A reply the AI wrote for a broker, waiting for the owner. They can fix the wording, then send it or not. Nothing
@@ -26,13 +28,13 @@ export function DraftApproval({ escalation }: { escalation: Escalation }) {
         headers: { "content-type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({ escalationId: escalation.id, send, body: body.trim() === draft.body.trim() ? undefined : body }),
       });
-      const data = (await res.json().catch(() => null)) as { escalation?: Escalation; error?: string } | null;
+      const data = (await res.json().catch(() => null)) as { escalation?: Escalation; loads?: Load[]; error?: string } | null;
       if (!res.ok || !data?.escalation) {
         setError(data?.error === "email_off" ? "Email isn't switched on yet, so it can't be sent." : "Couldn't do that. Check your connection and try again.");
         return;
       }
-      const updated = data.escalation;
-      useStore.setState((s) => ({ escalations: s.escalations.map((e) => (e.id === updated.id ? updated : e)) }));
+      applyFromServer("escalations", [data.escalation as unknown as Item]);
+      if (data.loads?.length) applyFromServer("loads", data.loads as unknown as Item[]);
     } finally {
       setBusy(null);
     }
@@ -53,6 +55,7 @@ export function DraftApproval({ escalation }: { escalation: Escalation }) {
         rows={Math.min(10, Math.max(4, body.split("\n").length + 1))}
         className="mt-2 w-full resize-y rounded-lg border border-line bg-ink-50/50 px-3 py-2 text-sm leading-relaxed text-ink-900 outline-none focus:border-ink-400"
       />
+      {draft.attachments?.length ? <Attachments files={draft.attachments} /> : null}
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <Button size="sm" variant="primary" disabled={!!busy || !body.trim()} onClick={() => answer(true)}>
           {busy === "send" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />} Send
@@ -62,6 +65,23 @@ export function DraftApproval({ escalation }: { escalation: Escalation }) {
         </Button>
         {error && <span className="text-xs text-[var(--accent-danger)]">{error}</span>}
       </div>
+    </div>
+  );
+}
+
+function Attachments({ files }: { files: { fileId: string; name: string }[] }) {
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      {files.map((f) => (
+        <button
+          key={f.fileId}
+          type="button"
+          onClick={() => void openFile(f.fileId)}
+          className="inline-flex items-center gap-1 rounded-full border border-line bg-white px-2.5 py-1 text-[11px] font-medium text-ink-700 hover:border-ink-300"
+        >
+          <Paperclip className="h-3 w-3" /> {f.name}
+        </button>
+      ))}
     </div>
   );
 }

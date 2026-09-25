@@ -55,7 +55,9 @@ export default function DriverHomePage() {
 
   const truck = trucks.find((t) => t.id === driver.truckId);
   const { current: currentLoad, next: nextLoad } = truckActiveLoads(loads, truck);
-  const pendingOffers = loads.filter((l) => l.truckId === truck?.id && l.stage === "offered");
+  // In a real account the office books loads with brokers; a company driver's app shows what's booked, not offers.
+  const picksLoads = useStore((s) => s.session.mode !== "driver");
+  const pendingOffers = loads.filter((l) => l.truckId === truck?.id && l.stage === "offered" && picksLoads);
 
   const offerGroups = (() => {
     const map = new Map<string, typeof pendingOffers>();

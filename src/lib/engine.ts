@@ -593,7 +593,8 @@ const MANUAL_STAGE_ADVANCE: Partial<Record<LoadStage, LoadStage>> = {
  * waiting on the automatic tick loop — same side effects as advanceLoad's equivalent transitions
  * (BOL/POD/invoice generation, freeing the truck on delivery), just decisive rather than randomized.
  */
-export function confirmLoadStage(load: Load, truck: Truck | undefined): StepResult {
+/** `standIns`: the demo makes up a BOL, POD and invoice when the driver didn't upload one. A real account never does. */
+export function confirmLoadStage(load: Load, truck: Truck | undefined, standIns = true): StepResult {
   const nextStage = MANUAL_STAGE_ADVANCE[load.stage];
   if (!nextStage) return { load, events: [] };
 
@@ -603,6 +604,16 @@ export function confirmLoadStage(load: Load, truck: Truck | undefined): StepResu
   if (nextStage === "at_pickup" || nextStage === "at_delivery") {
     const key = nextStage === "at_pickup" ? "arrivedPickupAt" : "arrivedDeliveryAt";
     next.tripChecklist = { ...load.tripChecklist, [key]: next.updatedAt };
+  }
+  // Leaving the dock ends its clock, for detention, if the driver didn't tick "loaded" / "unloaded" first.
+  if (nextStage === "in_transit" && !load.tripChecklist?.loadedAt) next.tripChecklist = { ...next.tripChecklist, loadedAt: next.updatedAt };
+  if (nextStage === "delivered" && !load.tripChecklist?.unloadedAt) next.tripChecklist = { ...next.tripChecklist, unloadedAt: next.updatedAt };
+  if (!standIns) {
+    const label = { at_pickup: "Driver confirmed arrival at pickup", in_transit: "Driver confirmed loaded", at_delivery: "Driver confirmed arrival at delivery", delivered: "Driver confirmed delivery" } as Partial<Record<LoadStage, string>>;
+    if (label[nextStage]) events.push(mkEvent(load.carrierId, load.id, nextStage === "delivered" ? "delivered" : "check_call", label[nextStage]!, `${load.referenceNumber} · ${nextStage === "at_pickup" || nextStage === "in_transit" ? load.lane.origin : load.lane.destination}`, nextStage === "delivered" ? "success" : "info"));
+    const truckUpdates =
+      nextStage === "delivered" && truck ? { id: truck.id, status: "available" as const, currentLoadId: null, currentCity: load.lane.destination, currentState: load.lane.destState } : undefined;
+    return { load: next, events, truckUpdates };
   }
 
   if (nextStage === "at_pickup") {

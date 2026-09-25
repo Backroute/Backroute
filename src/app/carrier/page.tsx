@@ -191,12 +191,16 @@ export default function CarrierOverviewPage() {
                   <div key={groupId} className="rounded-2xl border border-[var(--accent-warn)]/40 bg-amber-50/70 p-4">
                     {(truck || driver) && <TruckDriverChip truck={truck} driver={driver} className="mb-2 !bg-white/60" />}
                     <p className="text-sm font-medium text-ink-900">Pick the next load</p>
-                    <p className="mt-0.5 text-xs text-ink-600">AI found the top {group.length}. Your pick, then AI books it.</p>
+                    <p className="mt-0.5 text-xs text-ink-600">
+                      {signedIn
+                        ? `${group.length} load${group.length === 1 ? "" : "s"} from broker emails fit${group.length === 1 ? "s" : ""}. Pick one and the AI asks the broker to book it.`
+                        : `AI found the top ${group.length}. Your pick, then AI books it.`}
+                    </p>
                     <div className="mt-3 flex flex-wrap items-center gap-3">
                       <Button href="#next-load" size="sm" variant="primary">
                         Choose <ArrowDown className="h-3.5 w-3.5" />
                       </Button>
-                      {truck && (
+                      {truck && !signedIn && (
                         <Button size="sm" variant="outline" onClick={() => setAutoChain(truck.id, true)}>
                           <Sparkles className="h-3.5 w-3.5" /> Let AI pick
                         </Button>

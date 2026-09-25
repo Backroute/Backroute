@@ -86,7 +86,11 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: "sms" | "voic
         const target = REPORTS[status];
         if (LOAD_STAGE_ORDER.indexOf(target) <= LOAD_STAGE_ORDER.indexOf(load.stage))
           return `Not changed: ${load.referenceNumber} is already ${LOAD_STAGE_LABEL[load.stage]}.`;
-        const updated: Load = { ...load, stage: target, ticksInStage: 0, updatedAt: now(), progressPct: target === "at_pickup" ? 20 : target === "in_transit" ? 45 : 90 };
+        const at = now();
+        // The times go on the trip checklist too: they start and stop the dock clock for detention.
+        const times = { at_pickup: { arrivedPickupAt: at }, in_transit: { loadedAt: at }, at_delivery: { arrivedDeliveryAt: at } }[target];
+        const tripChecklist = { ...load.tripChecklist, ...Object.fromEntries(Object.entries(times).filter(([k]) => !load.tripChecklist?.[k as keyof typeof times])) };
+        const updated: Load = { ...load, stage: target, tripChecklist, ticksInStage: 0, updatedAt: at, progressPct: target === "at_pickup" ? 20 : target === "in_transit" ? 45 : 90 };
         await save("loads", ctx.carrier.id, updated as unknown as Item);
         ctx.loads = ctx.loads.map((l) => (l.id === load.id ? updated : l));
         await addActivity(
@@ -272,20 +276,6 @@ export async function brokerEmailDraft(ctx: CarrierContext, email: BrokerEmail):
     console.error("[dispatcher] broker email failed", error instanceof Anthropic.APIError ? error.status : error);
     return { body: null, effects: { ...effects, failed: true } };
   }
-}
-
-/** The owner has to approve this before it goes out, unless autopilot is on full. */
-export async function queueDraft(ctx: CarrierContext, p: { to: string; toName?: string; subject: string; body: string; inReplyTo?: string; loadId?: string; why: string }) {
-  return raise(ctx, {
-    reason: p.why,
-    loadId: p.loadId,
-    label: "Send this reply",
-    source: "email",
-  }).then(async (e) => {
-    const withDraft: Escalation = { ...e, draft: { channel: "email", to: p.to, toName: p.toName, subject: p.subject, body: p.body, inReplyTo: p.inReplyTo } };
-    await save("escalations", ctx.carrier.id, withDraft as unknown as Item);
-    return withDraft;
-  });
 }
 
 export { ALIAS, event, uid, raise as passToOwner };

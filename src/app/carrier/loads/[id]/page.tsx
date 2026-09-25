@@ -28,6 +28,8 @@ import { useStore } from "@/lib/store";
 import { STAGE_CONFIRM } from "@/lib/stage-confirm";
 import { aiDispatcherNote, isTransitStage } from "@/lib/load-status";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { openFile } from "@/lib/cloud/files";
+import { BookingCard } from "@/components/cloud/booking-card";
 import type { Driver, LoadStage, Truck } from "@/lib/types";
 
 /** Cancellable once rate is locked in; once in transit the freight is already moving, so that's a
@@ -61,6 +63,8 @@ export default function LoadDetailPage() {
   const reassignTruck = useStore((s) => s.actions.reassignTruck);
   const startBrokerCall = useStore((s) => s.actions.startBrokerCall);
   const [calling, setCalling] = useState(false);
+  // A real account: broker work is real email (BookingCard); the demo's simulated negotiation stays in the demo.
+  const real = useStore((s) => s.session.mode !== "demo");
   const [cancelling, setCancelling] = useState(false);
   const [declining, setDeclining] = useState(false);
   const [reassigning, setReassigning] = useState(false);
@@ -166,6 +170,9 @@ export default function LoadDetailPage() {
 
       <div className="grid gap-6 px-4 py-6 sm:px-8 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
+          {real ? (
+            <BookingCard load={load} broker={broker} />
+          ) : (
           <Card>
             <CardHeader>
               <div>
@@ -216,6 +223,7 @@ export default function LoadDetailPage() {
               )}
             </CardContent>
           </Card>
+          )}
 
           <RateConCard load={load} />
           <RateConReader load={load} broker={broker} />
@@ -242,10 +250,17 @@ export default function LoadDetailPage() {
                           <div>
                             <p className="text-sm font-medium text-ink-900">{doc.name}</p>
                             <p className="text-xs text-ink-400">{doc.uploadedBy === "driver" ? "Uploaded by driver · " : ""}{formatDateTime(doc.generatedAt)}</p>
-                            {doc.aiNote && <p className="mt-0.5 text-xs text-[var(--accent-live)]">AI checked: {doc.aiNote}</p>}
+                            {doc.aiNote && <p className={`mt-0.5 text-xs ${doc.flagged || doc.status === "failed" ? "text-[var(--accent-warn)]" : "text-[var(--accent-live)]"}`}>AI checked: {doc.aiNote}</p>}
                           </div>
                         </div>
-                        <Badge tone={doc.status === "verified" ? "success" : "warning"}>{doc.status}</Badge>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {doc.fileId && (
+                            <Button size="sm" variant="ghost" onClick={() => void openFile(doc.fileId!)}>
+                              Open
+                            </Button>
+                          )}
+                          <Badge tone={doc.status === "verified" && !doc.flagged ? "success" : "warning"}>{doc.flagged ? "check it" : doc.status}</Badge>
+                        </div>
                       </div>
                     ))}
                     {pendingType && (

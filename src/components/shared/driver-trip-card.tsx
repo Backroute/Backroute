@@ -18,7 +18,8 @@ import { BrokerCallRow } from "./broker-call";
 import type { DriverDocType } from "@/lib/store";
 import type { Load, LoadDocument } from "@/lib/types";
 
-export type UploadedFile = { name: string; previewUrl?: string };
+/** `file` goes to the server in a real account; the demo only keeps the name and a preview. */
+export type UploadedFile = { name: string; previewUrl?: string; file?: File };
 
 export interface DriverTripCardProps {
   load: Load;
@@ -592,7 +593,7 @@ export function DocumentSlot({ doc, label, readOnly, onFile }: { doc?: LoadDocum
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    onFile({ name: file.name, previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined });
+    onFile({ name: file.name, previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined, file });
   }
 
   const picker = readOnly ? null : (
@@ -631,8 +632,10 @@ export function DocumentSlot({ doc, label, readOnly, onFile }: { doc?: LoadDocum
           <p className="mt-0.5 flex items-center gap-1 text-[11px] text-white/60">
             <Loader2 className="h-3 w-3 animate-spin" /> AI is reading it…
           </p>
+        ) : doc.status === "failed" ? (
+          <p className="mt-0.5 text-[11px] leading-snug text-amber-300">{doc.aiNote ?? "Didn't upload."} Tap Retake.</p>
         ) : (
-          <p className="mt-0.5 text-[11px] leading-snug text-emerald-300">AI checked: {doc.aiNote ?? "looks good"}</p>
+          <p className={`mt-0.5 text-[11px] leading-snug ${doc.flagged ? "text-amber-300" : "text-emerald-300"}`}>AI checked: {doc.aiNote ?? "looks good"}</p>
         )}
       </div>
       {!readOnly && (

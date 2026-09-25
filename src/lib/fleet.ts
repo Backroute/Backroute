@@ -100,6 +100,9 @@ export interface NewLoad {
   miles?: number;
   pickupWindow: string;
   deliveryWindow: string;
+  /** The appointments as instants (see lib/stop-time), for check-ins and detention. */
+  pickupAt?: string;
+  deliveryAt?: string;
   rate: number;
   equipment: EquipmentType;
   weight?: number;
@@ -113,11 +116,11 @@ export function estimateMiles(a: { city: string; state: string }, b: { city: str
 }
 
 /** A booked load, with the same cost and profit math as every other load in the app. */
-export function makeLoad(input: NewLoad, broker: Broker, truck: Truck, stage: "dispatched" | "booked"): Load {
+export function makeLoad(input: NewLoad, broker: Broker, truck: Truck, stage: "dispatched" | "booked" | "offered", deadheadMiles = 0): Load {
   const miles = Math.max(1, Math.round(input.miles ?? estimateMiles({ city: input.originCity, state: input.originState }, { city: input.destinationCity, state: input.destinationState }) ?? 500));
   const fuelCost = Math.round((miles / truck.mpg) * 3.9);
   const tollCost = 0;
-  const econ = computeEconomics(input.rate, miles, 0, fuelCost, tollCost);
+  const econ = computeEconomics(input.rate, miles, deadheadMiles, fuelCost, tollCost);
   const now = iso();
   return {
     id: uid("load"),
@@ -137,17 +140,19 @@ export function makeLoad(input: NewLoad, broker: Broker, truck: Truck, stage: "d
     weight: input.weight ?? 0,
     pickupWindow: input.pickupWindow.trim(),
     deliveryWindow: input.deliveryWindow.trim(),
+    ...(input.pickupAt ? { pickupAt: input.pickupAt } : {}),
+    ...(input.deliveryAt ? { deliveryAt: input.deliveryAt } : {}),
     listedRate: input.rate,
     targetRate: input.rate,
     bookedRate: input.rate,
-    deadheadMiles: 0,
+    deadheadMiles,
     fuelCost,
     tollCost,
     deadheadCost: econ.deadheadCost,
     commission: econ.commission,
     netProfit: econ.netProfit,
     rpm: econ.rpm,
-    score: computeLoadScore({ rate: input.rate, netProfit: econ.netProfit, miles, deadheadMiles: 0, rpm: econ.rpm, marketRpm: econ.rpm, brokerReliability: broker.reliability }),
+    score: computeLoadScore({ rate: input.rate, netProfit: econ.netProfit, miles, deadheadMiles, rpm: econ.rpm, marketRpm: econ.rpm, brokerReliability: broker.reliability }),
     carrierId: PRIMARY_CARRIER_ID,
     truckId: truck.id,
     messages: [],
@@ -161,3 +166,7 @@ export function makeLoad(input: NewLoad, broker: Broker, truck: Truck, stage: "d
     progressPct: stage === "dispatched" ? 5 : 0,
   };
 }
+
+/** The equipment a rate con or broker email names, in the app's four kinds. */
+export const guessEquipment = (text: string | null | undefined): EquipmentType | null =>
+  !text ? null : /reefer|refrig/i.test(text) ? "Reefer" : /flat|step ?deck/i.test(text) ? "Flatbed" : /container|chassis/i.test(text) ? "Container" : /van/i.test(text) ? "Dry Van" : null;

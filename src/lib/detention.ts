@@ -9,6 +9,12 @@ export const DOCK_MINUTES_PER_SEC = 5;
 
 const SESSION_START = typeof window === "undefined" ? 0 : Date.now();
 
+// The demo's sped-up dock clock; a real account switches to real time when it loads (lib/cloud/sync).
+let minutesPerSecond = DOCK_MINUTES_PER_SEC;
+export function switchToRealDockClock() {
+  minutesPerSecond = 1 / 60;
+}
+
 export type DockStop = "pickup" | "delivery";
 
 export interface DockClock {
@@ -35,7 +41,7 @@ export function dockMinutes(load: Load, stop: DockStop, now: number): number | n
   const start = arrived ? Date.parse(arrived) : SESSION_START;
   const endIso = stop === "pickup" ? c?.loadedAt : c?.unloadedAt;
   const end = endIso ? Date.parse(endIso) : now;
-  return Math.max(0, Math.round(((end - start) / 1000) * DOCK_MINUTES_PER_SEC));
+  return Math.max(0, Math.round(((end - start) / 1000) * minutesPerSecond));
 }
 
 /** The dock clock for whichever stop the truck is sitting at right now, or null when it's on the road. */

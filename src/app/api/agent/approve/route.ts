@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { addActivity, carrierById, dbConfigured, logChannel, save } from "@/lib/agent/db";
-import { event } from "@/lib/agent/dispatcher";
+import { dbConfigured, loadContext, save } from "@/lib/agent/db";
+import { deliver } from "@/lib/agent/outbox";
 import { asUser } from "@/lib/agent/user";
-import { emailConfigured, sendEmail } from "@/lib/channels/email";
+import { emailConfigured } from "@/lib/channels/email";
 import type { Item } from "@/lib/cloud/rows";
-import type { Escalation } from "@/lib/types";
+import type { Escalation, Load } from "@/lib/types";
 
 const Body = z.object({ escalationId: z.string().min(1), send: z.boolean(), body: z.string().trim().min(1).max(20000).optional() });
 
@@ -27,13 +27,13 @@ export async function POST(request: Request) {
 
   const body = parsed.data.body ?? escalation.draft.body;
   const now = new Date().toISOString();
+  let load: Load | undefined;
   if (parsed.data.send) {
     if (!emailConfigured()) return Response.json({ error: "email_off" }, { status: 503 });
-    const carrier = await carrierById(carrierId);
-    const draft = escalation.draft;
-    const id = await sendEmail({ to: draft.to, subject: draft.subject ?? "", text: body, fromName: carrier?.name ?? "Dispatch", inReplyTo: draft.inReplyTo });
-    await logChannel({ carrierId, channel: "email", direction: "out", providerId: id ?? null, counterparty: draft.to.toLowerCase(), body, data: { subject: draft.subject, approved: true } });
-    await addActivity(carrierId, event({ type: "negotiation_email", loadId: escalation.loadId || undefined, message: `Sent the AI's reply to ${draft.toName ?? draft.to}`, detail: draft.subject ?? "", severity: "success" }));
+    const ctx = await loadContext(carrierId);
+    if (!ctx) return Response.json({ error: "not_found" }, { status: 404 });
+    await deliver(ctx, { ...escalation.draft, body }, escalation.loadId || undefined, { approved: true });
+    load = ctx.loads.find((l) => l.id === escalation.loadId);
   }
   const updated: Escalation = {
     ...escalation,
@@ -44,5 +44,5 @@ export async function POST(request: Request) {
     ...(parsed.data.send ? {} : { resolutionNote: "Not sent" }),
   };
   await save("escalations", carrierId, updated as unknown as Item);
-  return Response.json({ escalation: updated });
+  return Response.json({ escalation: updated, loads: load ? [load] : [] });
 }
