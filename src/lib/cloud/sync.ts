@@ -4,6 +4,7 @@ import { supabase } from "./client";
 import type { Membership } from "./account";
 import { useStore } from "../store";
 import { PRIMARY_CARRIER_ID } from "../mock-data";
+import { conflictKey, CREATED_ONLY, rowFor, type Item, type RecordKind, type Table } from "./rows";
 
 /**
  * Saving and loading a carrier's data, and keeping every signed-in screen in step.
@@ -15,8 +16,6 @@ import { PRIMARY_CARRIER_ID } from "../mock-data";
  */
 
 type State = ReturnType<typeof useStore.getState>;
-type Item = { id: string } & Record<string, unknown>;
-type RecordKind = "incident" | "maintenance" | "dvir" | "time_off" | "expense" | "carrier_message";
 type Slice =
   | "drivers"
   | "trucks"
@@ -30,16 +29,15 @@ type Slice =
   | "dvirInspections"
   | "timeOffRequests"
   | "expenses"
-  | "carrierMessages";
+  | "carrierMessages"
+  | "brokers";
 
 interface Spec {
   slice: Slice;
-  table: string;
+  table: Table;
   kind?: RecordKind;
   /** Items in the app that belong to this carrier (the demo world also holds other carriers' loads for Ops). */
   mine?: (item: Item) => boolean;
-  /** The indexed columns next to `data` that the access rules read. */
-  cols: (item: Item) => Record<string, unknown>;
   /** When the item happened, for ordering what comes back. */
   time: (item: Item) => string;
   newestFirst: boolean;
@@ -49,59 +47,33 @@ interface Spec {
   driverReads?: boolean;
   /** Logs that only grow: load the newest this many. */
   limit?: number;
-  created?: boolean;
 }
 
-const str = (v: unknown) => (typeof v === "string" ? v : null);
 const ours = (i: Item) => i.carrierId === PRIMARY_CARRIER_ID;
 const at = (k: string) => (i: Item) => String(i[k] ?? "");
+const none = () => "";
 
 const SPECS: Spec[] = [
-  { slice: "drivers", table: "drivers", cols: (i) => ({ name: i.name, phone: str(i.phone) }), time: () => "", newestFirst: false, driver: "update" },
-  {
-    slice: "trucks",
-    table: "trucks",
-    cols: (i) => ({ unit_number: str(i.unitNumber), driver_id: str(i.driverId), second_driver_id: str(i.secondDriverId) }),
-    time: () => "",
-    newestFirst: false,
-    driver: null,
-    driverReads: true,
-  },
-  { slice: "loads", table: "loads", mine: ours, cols: (i) => ({ truck_id: str(i.truckId), stage: i.stage }), time: at("createdAt"), newestFirst: true, driver: "update" },
-  { slice: "escalations", table: "escalations", mine: ours, cols: (i) => ({ load_id: str(i.loadId), status: i.status }), time: at("createdAt"), newestFirst: true, driver: null },
-  { slice: "dispatchCalls", table: "dispatch_calls", cols: (i) => ({ driver_id: i.driverId, status: i.status }), time: at("createdAt"), newestFirst: true, driver: "upsert" },
-  {
-    slice: "driverMessages",
-    table: "driver_messages",
-    cols: (i) => ({ driver_id: i.driverId, created_at: i.timestamp }),
-    time: at("timestamp"),
-    newestFirst: false,
-    driver: "insert",
-    limit: 500,
-    created: true,
-  },
-  {
-    slice: "activity",
-    table: "activity",
-    mine: (i) => !i.carrierId || ours(i),
-    cols: (i) => ({ load_id: str(i.loadId), created_at: i.timestamp }),
-    time: at("timestamp"),
-    newestFirst: true,
-    driver: null,
-    limit: 80,
-    created: true,
-  },
-  { slice: "incidents", table: "records", kind: "incident", cols: (i) => ({ driver_id: str(i.driverId) }), time: at("createdAt"), newestFirst: true, driver: "upsert" },
-  { slice: "maintenanceAppointments", table: "records", kind: "maintenance", cols: () => ({ driver_id: null }), time: at("createdAt"), newestFirst: true, driver: null },
-  { slice: "dvirInspections", table: "records", kind: "dvir", cols: (i) => ({ driver_id: str(i.driverId) }), time: at("createdAt"), newestFirst: true, driver: "upsert" },
-  { slice: "timeOffRequests", table: "records", kind: "time_off", cols: (i) => ({ driver_id: str(i.driverId) }), time: at("createdAt"), newestFirst: true, driver: "upsert" },
-  { slice: "expenses", table: "records", kind: "expense", cols: (i) => ({ driver_id: str(i.driverId) }), time: at("createdAt"), newestFirst: true, driver: "upsert" },
-  { slice: "carrierMessages", table: "records", kind: "carrier_message", cols: () => ({ driver_id: null }), time: at("timestamp"), newestFirst: false, driver: null, limit: 300 },
+  { slice: "drivers", table: "drivers", time: none, newestFirst: false, driver: "update" },
+  { slice: "trucks", table: "trucks", time: none, newestFirst: false, driver: null, driverReads: true },
+  { slice: "loads", table: "loads", mine: ours, time: at("createdAt"), newestFirst: true, driver: "update" },
+  { slice: "escalations", table: "escalations", mine: ours, time: at("createdAt"), newestFirst: true, driver: null },
+  { slice: "dispatchCalls", table: "dispatch_calls", time: at("createdAt"), newestFirst: true, driver: "upsert" },
+  { slice: "driverMessages", table: "driver_messages", time: at("timestamp"), newestFirst: false, driver: "insert", limit: 500 },
+  { slice: "activity", table: "activity", mine: (i) => !i.carrierId || ours(i), time: at("timestamp"), newestFirst: true, driver: null, limit: 80 },
+  { slice: "incidents", table: "records", kind: "incident", time: at("createdAt"), newestFirst: true, driver: "upsert" },
+  { slice: "maintenanceAppointments", table: "records", kind: "maintenance", time: at("createdAt"), newestFirst: true, driver: null },
+  { slice: "dvirInspections", table: "records", kind: "dvir", time: at("createdAt"), newestFirst: true, driver: "upsert" },
+  { slice: "timeOffRequests", table: "records", kind: "time_off", time: at("createdAt"), newestFirst: true, driver: "upsert" },
+  { slice: "expenses", table: "records", kind: "expense", time: at("createdAt"), newestFirst: true, driver: "upsert" },
+  { slice: "carrierMessages", table: "records", kind: "carrier_message", time: at("timestamp"), newestFirst: false, driver: null, limit: 300 },
+  // Brokers the carrier added with a load; the sample brokers stay in the app only.
+  { slice: "brokers", table: "records", kind: "broker", mine: ours, time: none, newestFirst: false, driver: null, driverReads: true },
 ];
 
 const driverSees = (s: Spec) => s.driver !== null || !!s.driverReads;
 const specKey = (s: Spec) => `${s.table}/${s.kind ?? ""}`;
-const conflictOf = (s: Spec) => (s.kind ? "carrier_id,kind,id" : "carrier_id,id");
+const conflictOf = (s: Spec) => conflictKey(s.kind);
 
 /** JSON with sorted keys: Postgres stores jsonb in its own key order, so plain JSON.stringify can't compare. */
 export function stable(v: unknown): string {
@@ -157,7 +129,7 @@ async function selectAll(s: Spec, carrierId: string): Promise<Item[]> {
   for (let from = 0; ; from += page) {
     let q = db.from(s.table).select("data").eq("carrier_id", carrierId);
     if (s.kind) q = q.eq("kind", s.kind);
-    if (s.limit) q = q.order(s.created ? "created_at" : "updated_at", { ascending: false });
+    if (s.limit) q = q.order(CREATED_ONLY.has(s.table) ? "created_at" : "updated_at", { ascending: false });
     const to = s.limit ? Math.min(from + page, s.limit) - 1 : from + page - 1;
     const { data, error } = await q.range(from, to);
     if (error) throw error;
@@ -189,7 +161,9 @@ export async function connect(m: Membership, opts: { fresh?: boolean } = {}) {
     const lists = await Promise.all(specs.map((s) => selectAll(s, m.carrierId)));
     specs.forEach((s, n) => loaded.set(s.slice, lists[n]));
   }
-  const fresh = !!opts.fresh || (mode === "office" && !(loaded.get("trucks")?.length ?? 0));
+  // Only a carrier created a moment ago at sign-up starts from what's in the app. Anything else, even an empty
+  // fleet, loads from the database, so sample data never ends up in a real account.
+  const fresh = !!opts.fresh;
   if (mode === "driver" && !loaded.get("drivers")?.some((d) => d.id === m.driverId)) throw new NotSetUpError();
 
   const c: Connection = {
@@ -327,14 +301,7 @@ async function flush(c: Connection) {
       };
 
       const now = new Date().toISOString();
-      const rowOf = (i: Item) => ({
-        id: i.id,
-        carrier_id: c.carrierId,
-        ...(spec.kind ? { kind: spec.kind } : {}),
-        ...spec.cols(i),
-        ...(spec.created ? {} : { updated_at: now }),
-        data: i,
-      });
+      const rowOf = (i: Item) => rowFor(spec.table, spec.kind, c.carrierId, i, now);
       for (let n = 0; n < changed.length; n += 200) {
         const chunk = changed.slice(n, n + 200);
         if (how === "update") {

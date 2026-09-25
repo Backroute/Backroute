@@ -17,6 +17,7 @@ import { cloudEnabled } from "@/lib/cloud/client";
 import { createCarrierAccount } from "@/lib/cloud/account";
 import { connect as connectCarrier } from "@/lib/cloud/sync";
 import { inDemo } from "@/lib/cloud/demo";
+import { FleetForm } from "@/components/cloud/fleet-form";
 
 type Step = "mc" | "eld" | "rules" | "autopilot" | "done";
 const STEPS: Step[] = ["mc", "eld", "rules", "autopilot"];
@@ -50,7 +51,7 @@ function Signup() {
   const carrier = usePrimaryCarrier();
   const drivers = useStore((s) => s.drivers);
   const trucks = useStore((s) => s.trucks);
-  const { updateSettings, setRunType, updateHomeTimeTarget } = useStore((s) => s.actions);
+  const { updateSettings, setRunType, updateHomeTimeTarget, setUpRealFleet } = useStore((s) => s.actions);
   const [step, setStep] = useState<Step>("mc");
   const [mc, setMc] = useState("");
   const [looking, setLooking] = useState(false);
@@ -64,6 +65,10 @@ function Signup() {
   // Owner-operator: one truck, and the person signing up drives it. They get one app instead of a dashboard.
   const [solo, setSolo] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
+  const [realDriverId, setRealDriverId] = useState<string | null>(null);
+  // A real account types in its own fleet; the demo reads the sample fleet "off the ELD". Only rendered in the
+  // browser when accounts are on (the sign-in check comes first), so reading the tab's demo flag here is safe.
+  const real = cloudEnabled && !inDemo();
   const [saveError, setSaveError] = useState<string | null>(null);
   const primary = drivers.find((d) => d.id === PRIMARY_DRIVER_ID);
   const shownDrivers = solo && primary ? [primary] : drivers;
@@ -111,7 +116,7 @@ function Signup() {
           mc: mc.replace(/^MC-?/i, ""),
           dot: fmcsa?.dotNumber ?? carrier.dot.replace(/^DOT-?/i, ""),
           ownerOperator: !!solo,
-          driverId: solo ? PRIMARY_DRIVER_ID : null,
+          driverId: solo ? (realDriverId ?? PRIMARY_DRIVER_ID) : null,
         });
         await connectCarrier(m, { fresh: true });
       } catch {
@@ -182,7 +187,7 @@ function Signup() {
                     </li>
                     {fmcsa.city && <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[var(--accent-live)]" /> {fmcsa.city}, {fmcsa.state}</li>}
                   </ul>
-                  <p className="mt-3 text-[11px] text-ink-400">From FMCSA, just now. The trucks and drivers below are still the demo fleet.</p>
+                  <p className="mt-3 text-[11px] text-ink-400">From FMCSA, just now.{real ? "" : " The trucks and drivers below are still the demo fleet."}</p>
                   {!fmcsa.allowedToOperate && (
                     <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-[var(--accent-danger)]">
                       FMCSA shows this authority isn&apos;t active. Brokers won&apos;t book you and Backroute can&apos;t dispatch until it is.
@@ -230,7 +235,28 @@ function Signup() {
             </>
           )}
 
-          {step === "eld" && (
+          {step === "eld" && real && (
+            <>
+              <h1 className="font-display text-2xl text-ink-950">{solo ? "Your truck" : "Your trucks and drivers"}</h1>
+              <p className="mt-1 text-sm text-ink-500">
+                The AI texts and calls {solo ? "you" : "each driver"} on this number, in {solo ? "your" : "their"} language. Connecting your ELD to fill this in
+                automatically is coming; for now, type {solo ? "it" : "them"} in once.
+              </p>
+              <div className="mt-5">
+                <FleetForm
+                  solo={!!solo}
+                  submitLabel="Next"
+                  onSubmit={(entries) => {
+                    const made = setUpRealFleet(entries);
+                    setRealDriverId(made[0]?.id ?? null);
+                    setStep("rules");
+                  }}
+                />
+              </div>
+            </>
+          )}
+
+          {step === "eld" && !real && (
             <>
               <h1 className="font-display text-2xl text-ink-950">Connect your ELD</h1>
               <p className="mt-1 text-sm text-ink-500">
@@ -350,7 +376,11 @@ function Signup() {
               </span>
               <h1 className="mt-4 font-display text-2xl text-ink-950">You&apos;re set up</h1>
               <p className="mt-1 text-sm text-ink-500">
-                {solo ? "The AI is already looking for your next load. Everything is in one app on your phone." : `The AI is already looking for loads for your ${trucks.length} trucks.`}
+                {real
+                  ? `Next: add your ${solo ? "" : "drivers' "}loads on the Loads page, or send the rate con to your Backroute email. The AI keeps ${solo ? "you" : "your drivers"} updated by text and answers the dispatch line.`
+                  : solo
+                    ? "The AI is already looking for your next load. Everything is in one app on your phone."
+                    : `The AI is already looking for loads for your ${trucks.length} trucks.`}
               </p>
               <Button href={solo ? "/driver" : "/carrier"} className="mt-6 w-full">
                 {solo ? "Open your app" : "Go to your dashboard"} <ArrowRight className="h-4 w-4" />

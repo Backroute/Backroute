@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Phone, Send } from "lucide-react";
+import { MessageSquare, Phone, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
 import { usePrimaryDriver } from "@/lib/selectors";
@@ -52,6 +52,7 @@ export default function DriverMessagesPage() {
               <p className={cn("mt-1 flex items-center gap-1.5 text-[10px]", m.from === "driver" ? "text-white/50" : "text-ink-400")}>
                 <TimeAgo iso={m.timestamp} />
                 {m.ai && <LiveAiMark />}
+                {m.channel === "sms" && <MessageSquare className="h-2.5 w-2.5" aria-label="By text" />}
               </p>
             </div>
           </div>

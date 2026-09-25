@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Download } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
+import { AddLoadButton } from "@/components/cloud/add-load";
 import { Tabs } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +59,7 @@ export default function CarrierLoadsPage() {
   const requestOfferDetail = useStore((s) => s.actions.requestOfferDetail);
   const resolveOfferDetail = useStore((s) => s.actions.resolveOfferDetail);
   const [group, setGroup] = useState("active");
+  const signedIn = useStore((s) => s.session.mode !== "demo");
 
   const activeGroup = GROUPS.find((g) => g.key === group)!;
   const filtered = useMemo(() => {
@@ -86,6 +88,7 @@ export default function CarrierLoadsPage() {
         description={`${loads.length} loads`}
         right={
           <div className="flex items-center gap-3">
+            {signedIn && <AddLoadButton />}
             <Button size="sm" variant="secondary" onClick={() => exportLoads(filtered, brokers, trucks)}>
               <Download className="h-3.5 w-3.5" /> Export CSV
             </Button>

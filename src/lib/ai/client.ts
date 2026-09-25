@@ -16,7 +16,7 @@ export function setTyping(thread: string, on: boolean) {
 let unavailable = false;
 const NOT_FOR_THIS_VISIT = new Set(["ai_off", "demo_scripted", "demo_limit"]);
 
-async function authHeader(): Promise<Record<string, string>> {
+export async function authHeader(): Promise<Record<string, string>> {
   if (!cloudEnabled) return {};
   try {
     const { data } = await supabase().auth.getSession();
@@ -85,8 +85,14 @@ export interface RateConReading {
   isRateCon: boolean;
   broker: string | null;
   brokerMc: string | null;
+  brokerEmail?: string | null;
   loadNumber: string | null;
   totalRate: number | null;
+  originCity?: string | null;
+  originState?: string | null;
+  destinationCity?: string | null;
+  destinationState?: string | null;
+  miles?: number | null;
   pickup: string | null;
   delivery: string | null;
   equipment: string | null;
@@ -101,10 +107,10 @@ export interface RateConReading {
 export type RateConResult = { ok: true; reading: RateConReading } | { ok: false; reason: "off" | "failed" };
 
 /** Sends a rate con PDF to the real AI. Unlike chat there's no scripted stand-in: a PDF needs the real thing. */
-export async function readRateCon(file: File, agreed: AgreedTerms): Promise<RateConResult> {
+export async function readRateCon(file: File, agreed: AgreedTerms | null): Promise<RateConResult> {
   const form = new FormData();
   form.set("file", file);
-  form.set("agreed", JSON.stringify(agreed));
+  if (agreed) form.set("agreed", JSON.stringify(agreed));
   const wasUnavailable = unavailable;
   unavailable = false; // A deliberate upload always asks, even after chat fell back.
   const data = await post<{ reading?: RateConReading; error?: string }>("/api/ai/rate-con", form, false, 120_000);

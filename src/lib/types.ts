@@ -50,6 +50,8 @@ export type EquipmentType = "Dry Van" | "Reefer" | "Flatbed" | "Container";
 
 export interface Broker {
   id: string;
+  /** Set on brokers a carrier added themselves (with a load); the sample brokers have none. */
+  carrierId?: string;
   company: string;
   contact: string;
   phone: string;
@@ -153,6 +155,8 @@ export interface DriverPrefs {
   newLoads?: "call" | "text";
   /** Where calls and texts go: the app, or a regular phone call and SMS for drivers who won't use an app. */
   reach?: "app" | "phone";
+  /** The driver texted STOP to the dispatch number: no texts until they text START. */
+  smsOptOut?: boolean;
 }
 
 export interface Truck {
@@ -499,6 +503,24 @@ export interface Escalation {
   incidentId?: string;
   /** Set when this is a rate con the broker wouldn't correct: approve signs it anyway, reject walks away. */
   rateConLoadId?: string;
+  /** A message the AI wrote and wants to send on the carrier's behalf: approve sends it (edited or as is). */
+  draft?: DraftMessage;
+  /** Where this came from, when it arrived by a real channel. */
+  source?: MessageChannel;
+}
+
+/** How a message reached Backroute or left it: the app itself, or a real text, call or email. */
+export type MessageChannel = "app" | Channel;
+
+export interface DraftMessage {
+  channel: "email" | "sms";
+  to: string;
+  toName?: string;
+  subject?: string;
+  body: string;
+  /** The email this answers, so the reply lands in the same thread. */
+  inReplyTo?: string;
+  sentAt?: string;
 }
 
 export interface DriverMessage {
@@ -509,6 +531,8 @@ export interface DriverMessage {
   timestamp: string;
   /** Answered by the real AI (Claude) rather than the scripted demo replies. */
   ai?: boolean;
+  /** Came in or went out by text or on a call, not in the app. */
+  channel?: MessageChannel;
 }
 
 /** Fleet-level chat — not tied to any one load, unlike negotiation messages. The carrier's equivalent
@@ -643,8 +667,14 @@ export interface RateConPdfReading {
   isRateCon: boolean;
   broker: string | null;
   brokerMc: string | null;
+  brokerEmail?: string | null;
   loadNumber: string | null;
   totalRate: number | null;
+  originCity?: string | null;
+  originState?: string | null;
+  destinationCity?: string | null;
+  destinationState?: string | null;
+  miles?: number | null;
   pickup: string | null;
   delivery: string | null;
   equipment: string | null;

@@ -35,6 +35,7 @@ import { brokerCorrects, RATE_CON_FIX_MS, RATE_CON_READ_MS, refusedSummary, revi
 import { pack, type QuickPhrase } from "./lang";
 import { weekEarnings } from "./earnings";
 import { askAi, setTyping } from "./ai/client";
+import { makeBroker, makeLoad, makeTruckAndDriver, type FleetEntry, type NewLoad } from "./fleet";
 import { driverSnapshot, ownerSnapshot } from "./ai/snapshot";
 import {
   briefCall,
@@ -828,6 +829,12 @@ interface StoreState {
     requestBetterRate: (loadId: string, actor: "driver" | "carrier", amount?: number) => void;
     /** Keeps the real AI's reading of an uploaded rate con on the load, and logs what it found. */
     saveRateConReading: (loadId: string, reading: RateConPdfReading) => void;
+    /** A real account's sign-up: the fleet the owner typed in replaces the sample fleet, and everything else starts empty. */
+    setUpRealFleet: (entries: FleetEntry[]) => Driver[];
+    /** Adds trucks and drivers to a real fleet (Fleet page). */
+    addToFleet: (entries: FleetEntry[]) => void;
+    /** A load the owner booked themselves: typed in or read off its rate con. The broker is added if new. */
+    addLoad: (input: Omit<NewLoad, "brokerId"> & { brokerName: string; brokerEmail?: string | null; rateConReading?: RateConPdfReading }) => Load;
     /** Cancels a booked load that's fallen through (broker pulled it, detention refused, etc.). A truck
      *  already dispatched or at pickup earns the broker's TONU fee; earlier than that, no fee applies. */
     cancelLoad: (loadId: string, reason: string) => void;
@@ -2133,6 +2140,57 @@ export const useStore = create<StoreState>((set, get) => ({
           activity: [event, ...state.activity].slice(0, 80),
         };
       }),
+
+    setUpRealFleet: (entries) => {
+      const made = entries.map(makeTruckAndDriver);
+      const ours = <T extends { carrierId?: string }>(list: T[]) => list.filter((x) => x.carrierId !== PRIMARY_CARRIER_ID);
+      set((state) => ({
+        trucks: made.map((m) => m.truck),
+        drivers: made.map((m) => m.driver),
+        loads: ours(state.loads),
+        escalations: ours(state.escalations),
+        activity: [],
+        dispatchCalls: [],
+        driverMessages: [],
+        carrierMessages: [],
+        incidents: [],
+        maintenanceAppointments: [],
+        dvirInspections: [],
+        timeOffRequests: [],
+        expenses: [],
+      }));
+      return made.map((m) => m.driver);
+    },
+
+    addToFleet: (entries) => {
+      const made = entries.map(makeTruckAndDriver);
+      set((state) => ({ trucks: [...state.trucks, ...made.map((m) => m.truck)], drivers: [...state.drivers, ...made.map((m) => m.driver)] }));
+    },
+
+    addLoad: ({ brokerName, brokerEmail, rateConReading, ...input }) => {
+      const state = get();
+      const truck = state.trucks.find((t) => t.id === input.truckId)!;
+      const existing = state.brokers.find((b) => b.carrierId === PRIMARY_CARRIER_ID && b.company.toLowerCase() === brokerName.trim().toLowerCase());
+      const broker = existing ?? makeBroker(brokerName, brokerEmail);
+      // The truck's first load is dispatched right away; one behind it waits as the next load.
+      const first = !truck.currentLoadId;
+      const load: Load = { ...makeLoad({ ...input, brokerId: broker.id }, broker, truck, first ? "dispatched" : "booked"), ...(rateConReading ? { rateConReading } : {}) };
+      const event: ActivityEvent = {
+        id: uid("act"), timestamp: load.createdAt, type: "booked", loadId: load.id, carrierId: PRIMARY_CARRIER_ID,
+        message: `Load added: ${load.lane.origin} → ${load.lane.destination}`,
+        detail: `${truck.unitNumber} · ${broker.company} · $${(load.bookedRate ?? 0).toLocaleString()}${rateConReading ? " · from the rate con" : ""}`,
+        severity: "success",
+      };
+      set((s) => ({
+        brokers: existing ? s.brokers : [...s.brokers, broker],
+        loads: [load, ...s.loads],
+        trucks: s.trucks.map((t) =>
+          t.id !== truck.id ? t : first ? { ...t, currentLoadId: load.id, status: "on_load" as const } : t.nextLoadId ? t : { ...t, nextLoadId: load.id },
+        ),
+        activity: [event, ...s.activity].slice(0, 80),
+      }));
+      return load;
+    },
 
     requestBetterRate: (loadId, actor, amount) =>
       set((state) => {

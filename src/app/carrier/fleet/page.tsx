@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Home, Link2, MapPin, Phone, Sparkles, Users } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
+import { AddTruckButton } from "@/components/cloud/add-truck";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
@@ -43,10 +44,11 @@ export default function FleetPage() {
   const flagged = useDriverRetention().filter((r) => r.view.level !== "good");
   const setRunType = useStore((s) => s.actions.setRunType);
   const setDriverPrefs = useStore((s) => s.actions.setDriverPrefs);
+  const signedIn = useStore((s) => s.session.mode !== "demo");
 
   return (
     <div>
-      <PageHeader title="Fleet" description={`${trucks.length} trucks · ${drivers.size ?? 0} drivers on roster`} />
+      <PageHeader title="Fleet" description={`${trucks.length} trucks · ${drivers.size ?? 0} drivers on roster`} right={signedIn ? <AddTruckButton /> : undefined} />
 
       <section id="retention" aria-labelledby="retention-title" className="scroll-mt-4 px-4 pt-6 sm:px-8">
         <h2 id="retention-title" className="text-sm font-semibold text-ink-950">Driver check-in</h2>

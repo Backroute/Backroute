@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowUpRight, Briefcase, Check, LifeBuoy, X } from "lucide-react";
 import { AutopilotControl } from "@/components/shared/autopilot-control";
+import { DraftApproval } from "@/components/shared/draft-approval";
 import { Switch } from "@/components/ui/switch";
 import { useStore } from "@/lib/store";
 import { useNow } from "@/lib/hooks";
@@ -31,7 +32,7 @@ export function OwnerNeedsYou({ driver, truck }: { driver: Driver; truck: Truck 
   const mine = escalations.filter(
     (e) =>
       e.status !== "resolved" &&
-      (truckLoads.has(e.loadId) || (e.incidentId && myIncidents.has(e.incidentId)) || (!e.loadId && e.reason.startsWith(first))),
+      (truckLoads.has(e.loadId) || (e.incidentId && myIncidents.has(e.incidentId)) || (!e.loadId && e.reason.startsWith(first)) || (!!e.draft && !e.loadId)),
   );
   if (!mine.length) return null;
 
@@ -47,7 +48,9 @@ export function OwnerNeedsYou({ driver, truck }: { driver: Driver; truck: Truck 
             <p lang="en" className="text-sm leading-snug text-ink-800">
               {e.reason}
             </p>
-            {e.status === "with_support" ? (
+            {e.draft ? (
+              <DraftApproval escalation={e} />
+            ) : e.status === "with_support" ? (
               <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-ink-500">
                 <LifeBuoy className="h-3.5 w-3.5 animate-pulse" /> {t.supportOnIt}
               </p>

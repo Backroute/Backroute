@@ -7,25 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LiveAiMark } from "@/components/shared/ai-typing";
 import { useStore } from "@/lib/store";
-import { readRateCon, type AgreedTerms } from "@/lib/ai/client";
-import { DETENTION_FREE_MIN, DETENTION_RATE_HR } from "@/lib/detention";
+import { readRateCon } from "@/lib/ai/client";
+import { agreedTerms } from "@/lib/rate-con-terms";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import type { Broker, Load } from "@/lib/types";
-
-/** What the load says was agreed, which the AI checks the broker's paper against. */
-function agreedTerms(load: Load, broker: Broker | undefined): AgreedTerms {
-  return {
-    broker: broker?.company ?? "Unknown broker",
-    rate: load.bookedRate ?? load.targetRate,
-    origin: `${load.lane.origin}, ${load.lane.originState}`,
-    destination: `${load.lane.destination}, ${load.lane.destState}`,
-    pickup: load.pickupWindow,
-    delivery: load.deliveryWindow,
-    equipment: load.equipmentType,
-    detention: `${DETENTION_FREE_MIN / 60} hrs free, then $${DETENTION_RATE_HR}/hr`,
-    paymentTerms: "Net 30",
-  };
-}
 
 /**
  * Upload the broker's rate con PDF and the real AI reads it: the terms on the paper, and anything that doesn't

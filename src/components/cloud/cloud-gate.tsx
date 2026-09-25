@@ -10,6 +10,7 @@ import { claimInvites, homeFor, myMemberships } from "@/lib/cloud/account";
 import { connect, NotSetUpError, signOut, useSyncStatus } from "@/lib/cloud/sync";
 import { inDemo } from "@/lib/cloud/demo";
 import { DemoBanner } from "./demo-banner";
+import { FleetForm } from "./fleet-form";
 import { useStore } from "@/lib/store";
 
 type Area = "carrier" | "driver" | "signup";
@@ -74,13 +75,7 @@ function LiveGate({ area, children }: { area: Area; children: React.ReactNode })
         {children}
       </>
     );
-  if (state === "ready")
-    return (
-      <>
-        {children}
-        <OfflineNotice />
-      </>
-    );
+  if (state === "ready") return <ReadyOrSetUp area={area}>{children}</ReadyOrSetUp>;
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-ink-50 px-6 text-center">
       <Logo />
@@ -120,5 +115,33 @@ function OfflineNotice() {
         <CloudOff className="h-3.5 w-3.5" /> Not saved yet. Trying again when you&apos;re back online.
       </p>
     </div>
+  );
+}
+
+/** A real carrier with no trucks yet (sign-up was left halfway) adds them before anything else. */
+function ReadyOrSetUp({ area, children }: { area: Area; children: React.ReactNode }) {
+  const empty = useStore((s) => s.session.mode === "office" && s.trucks.length === 0);
+  const solo = useStore((s) => s.settings.ownerOperator);
+  const addToFleet = useStore((s) => s.actions.addToFleet);
+  if (empty && area !== "signup")
+    return (
+      <div className="min-h-screen bg-ink-50 px-4 py-10">
+        <div className="mx-auto flex max-w-xl flex-col gap-5">
+          <Logo />
+          <section className="rounded-3xl border border-line bg-white p-6">
+            <h1 className="font-display text-2xl text-ink-950">{solo ? "Add your truck" : "Add your trucks and drivers"}</h1>
+            <p className="mt-1 text-sm text-ink-500">Your account has no trucks yet. Add them once and you&apos;re in.</p>
+            <div className="mt-5">
+              <FleetForm solo={solo} submitLabel="Save and continue" onSubmit={(entries) => addToFleet(entries)} />
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  return (
+    <>
+      {children}
+      <OfflineNotice />
+    </>
   );
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUpRight, CalendarClock, Check, LifeBuoy, Sparkles, UserRound, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUpRight, CalendarClock, Check, LifeBuoy, Phone, Sparkles, UserRound, X } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
@@ -19,6 +19,7 @@ import { IncidentCard } from "@/components/shared/incident-card";
 import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { DailyTextPreview } from "@/components/shared/daily-text";
 import { DriverCallsBoard } from "@/components/shared/driver-calls-board";
+import { DraftApproval, SourceTag } from "@/components/shared/draft-approval";
 import { useDriverRetention } from "@/components/shared/driver-retention";
 import { RUN_TYPE_LABEL } from "@/lib/run-types";
 import { weekEarnings } from "@/lib/earnings";
@@ -44,6 +45,7 @@ export default function CarrierOverviewPage() {
   const requestOfferDetail = useStore((s) => s.actions.requestOfferDetail);
   const resolveOfferDetail = useStore((s) => s.actions.resolveOfferDetail);
   const resolveEscalation = useStore((s) => s.actions.resolveEscalation);
+  const signedIn = useStore((s) => s.session.mode !== "demo");
   const routeEscalationToSupport = useStore((s) => s.actions.routeEscalationToSupport);
   const respondTimeOff = useStore((s) => s.actions.respondTimeOff);
   const pendingTimeOff = useStore((s) => s.timeOffRequests).filter((r) => r.carrierId === carrier.id && r.status === "pending");
@@ -214,8 +216,23 @@ export default function CarrierOverviewPage() {
                     {e.complexity === "critical" && e.status !== "with_support" && (
                       <Badge tone="danger" className="mb-1.5">Needs a human judgment call</Badge>
                     )}
+                    <SourceTag source={e.source} />
                     <p className="text-sm leading-relaxed text-ink-800">{e.reason}</p>
-                    {e.status === "with_support" ? (
+                    {e.draft ? (
+                      <DraftApproval escalation={e} />
+                    ) : signedIn && e.complexity === "critical" ? (
+                      // A real account: no simulated support desk. The owner calls the driver and closes it out.
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        {driver && (
+                          <Button size="sm" variant="primary" href={`tel:${driver.phone.replace(/[^\d+]/g, "")}`}>
+                            <Phone className="h-3.5 w-3.5" /> Call {driver.name.split(" ")[0]}
+                          </Button>
+                        )}
+                        <Button size="sm" variant="outline" onClick={() => resolveEscalation(e.id, true)}>
+                          <Check className="h-3.5 w-3.5" /> I&apos;ve handled it
+                        </Button>
+                      </div>
+                    ) : e.status === "with_support" ? (
                       <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-ink-500">
                         <LifeBuoy className="h-3.5 w-3.5 animate-pulse" /> Backroute Support is reviewing this. You&apos;ll be notified.
                       </p>
