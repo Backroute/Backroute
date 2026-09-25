@@ -1,6 +1,9 @@
 "use client";
 
-import { demoAllowed } from "@/lib/cloud/demo";
+import { useEffect, useState } from "react";
+import { demoAllowed, inDemo } from "@/lib/cloud/demo";
+import { cloudEnabled } from "@/lib/cloud/client";
+import { SupportGate } from "@/components/cloud/support-gate";
 import { NotAvailable } from "@/components/cloud/not-available";
 import { BarChart3, Building2, LayoutGrid, Lock, Radio, ShieldAlert, Truck, Users } from "lucide-react";
 import { PortalShell, type NavItem } from "@/components/shared/portal-shell";
@@ -22,8 +25,17 @@ const NAV: NavItem[] = [
 ];
 
 export default function OpsLayout({ children }: { children: React.ReactNode }) {
-  // Ops still runs on the sample world. On a real site without the demo, it's closed until it reads real data.
-  if (!demoAllowed) return <NotAvailable title="Ops isn't connected yet" body="The ops portal still shows sample data, so it's off on this site." />;
+  // A demo tab (or a site without accounts) sees the sample ops portal. On the real site, /ops is Backroute's support
+  // console for the people on the support team list.
+  const [mode, setMode] = useState<"demo" | "support" | null>(null);
+  useEffect(() => {
+    // Which one it is depends on this tab (sessionStorage), so it's decided in the browser.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMode(!cloudEnabled || inDemo() ? "demo" : "support");
+  }, []);
+  if (mode === null) return null;
+  if (mode === "support") return <SupportGate />;
+  if (!demoAllowed) return <NotAvailable title="Not available" body="This site has no demo." />;
   return <OpsShell>{children}</OpsShell>;
 }
 

@@ -21,6 +21,7 @@ import { OwnerLanguageCard } from "@/components/shared/owner-language-card";
 import { AppAccessCard } from "@/components/cloud/app-access";
 import { ChannelsCard } from "@/components/cloud/channels-card";
 import { BusinessCard, DocumentsCard } from "@/components/cloud/business-card";
+import { ConnectionsCard } from "@/components/cloud/connections-card";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Aggressiveness } from "@/lib/store";
 
@@ -106,6 +107,7 @@ export default function SettingsPage() {
                 <>
                   <BusinessCard />
                   <DocumentsCard />
+                  <ConnectionsCard />
                 </>
               )}
 

@@ -8,6 +8,7 @@ import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import { cloudEnabled, supabase } from "@/lib/cloud/client";
 import { claimInvites, homeFor, myMemberships } from "@/lib/cloud/account";
+import { authHeader } from "@/lib/ai/client";
 import { formatPhone, toE164 } from "@/lib/cloud/phone";
 import { demoAllowed, leaveDemo } from "@/lib/cloud/demo";
 
@@ -101,7 +102,11 @@ function PhoneSignIn() {
       await claimInvites();
       const m = (await myMemberships())[0];
       const next = params.get("next");
-      if (!m) return router.replace("/signup");
+      if (!m) {
+        // Backroute's support team has no carrier of their own: their home is the support console.
+        const me = (await fetch("/api/support/me", { headers: await authHeader() }).then((r) => r.json()).catch(() => null)) as { support?: boolean } | null;
+        return router.replace(me?.support ? "/ops" : "/signup");
+      }
       const home = homeFor(m);
       // Back to the page they came from, if it's on their side of the app.
       router.replace(next && next.startsWith(home) ? next : home);

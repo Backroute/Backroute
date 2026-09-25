@@ -20,6 +20,12 @@ export function publicUrl(request: Request, path: string): string {
   return `${proto}://${host}${path}`;
 }
 
+/** An address Twilio can reach when there's no incoming request to take it from (the jobs). Needs PUBLIC_BASE_URL. */
+export function absoluteUrl(path: string): string | null {
+  const base = process.env.PUBLIC_BASE_URL?.replace(/\/$/, "");
+  return base ? `${base}${path}` : null;
+}
+
 /**
  * Checks that a webhook really came from Twilio: HMAC-SHA1 over the full URL plus the POST fields sorted by name,
  * keyed with the auth token (Twilio's documented scheme).
@@ -72,8 +78,9 @@ export async function sendSms(to: string, body: string): Promise<string | undefi
 export const canCallOut = () => twilioConfigured() && Boolean(process.env.TWILIO_FROM_NUMBER);
 
 /** Rings a driver. When they pick up, Twilio asks `url` what to say (and signs that request like any other). */
-export async function startCall(to: string, url: string): Promise<string | undefined> {
-  const data = await twilio("/Calls.json", { To: to, From: process.env.TWILIO_FROM_NUMBER!, Url: url, Method: "POST", Timeout: "25" });
+export async function startCall(to: string, url: string, opts: { machineDetection?: boolean } = {}): Promise<string | undefined> {
+  // Machine detection tells a person from voicemail (AnsweredBy), so the AI can leave a message instead of talking.
+  const data = await twilio("/Calls.json", { To: to, From: process.env.TWILIO_FROM_NUMBER!, Url: url, Method: "POST", Timeout: "25", ...(opts.machineDetection ? { MachineDetection: "Enable" } : {}) });
   return data.sid;
 }
 

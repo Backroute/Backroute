@@ -222,8 +222,20 @@ export default function CarrierOverviewPage() {
                     )}
                     <SourceTag source={e.source} />
                     <p className="text-sm leading-relaxed text-ink-800">{e.reason}</p>
-                    {e.draft ? (
+                    {e.draft && !(signedIn && e.status === "with_support") ? (
                       <DraftApproval escalation={e} />
+                    ) : signedIn && e.status === "with_support" ? (
+                      // A real account: Backroute's support team has it. The owner can still step in on an emergency.
+                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                        <p className="flex items-center gap-1.5 text-xs font-medium text-ink-500">
+                          <LifeBuoy className="h-3.5 w-3.5" /> Backroute support is on it. Nothing needed from you.
+                        </p>
+                        {e.complexity === "critical" && driver && (
+                          <Button size="sm" variant="outline" href={`tel:${driver.phone.replace(/[^\d+]/g, "")}`}>
+                            <Phone className="h-3.5 w-3.5" /> Call {driver.name.split(" ")[0]}
+                          </Button>
+                        )}
+                      </div>
                     ) : signedIn && e.complexity === "critical" ? (
                       // A real account: no simulated support desk. The owner calls the driver and closes it out.
                       <div className="mt-3 flex flex-wrap items-center gap-3">

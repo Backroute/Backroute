@@ -11,6 +11,9 @@ import { readBrokerEmail } from "./broker-mail";
 import { answerRateReply, bookIt, offersFromEmail, type Sender } from "./booking";
 import { sendOrQueue } from "./outbox";
 import { sendSetupPacket } from "./paperwork";
+import { checkBroker } from "./brokers";
+import { cancelLoad } from "./cancel";
+import { recordPayments } from "./money";
 import { dollarAmounts, onlyKnownPrices } from "./pricing";
 
 const ACTIVE = new Set(["negotiating", "rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery"]);
@@ -65,13 +68,16 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
         await save("loads", carrierId, updated as unknown as Item);
         const serious = reading.mismatches.filter((m) => m.serious).length;
         load = updated;
+        // The rate con names the broker's MC: check it against FMCSA (and it's how a new broker gets verified).
+        const onLoad = ctx.brokers.find((b) => b.id === load!.brokerId);
+        if (onLoad && reading.brokerMc) await checkBroker(ctx, onLoad, reading.brokerMc);
         // The broker's rate con for a load the AI asked for: it confirms the booking when it matches.
         if (load.stage === "negotiating" || load.stage === "offered") {
-          if (serious) await passToOwner(ctx, { reason: `${fromName}'s rate con for ${load.referenceNumber} doesn't match what was agreed: ${reading.summary}`, loadId: load.id, label: "I'll sort it", source: "email" });
+          if (serious) await passToOwner(ctx, { reason: `${fromName}'s rate con for ${load.referenceNumber} doesn't match what was agreed: ${reading.summary}`, loadId: load.id, label: "I'll sort it", source: "email", to: "decider" });
           else if (ctx.settings.autonomy !== "ask") {
             load = (await bookIt(ctx, load, reading.totalRate ?? undefined)).load;
             notes.push(`The rate con matched, so ${load.referenceNumber} is now booked and the driver has been told.`);
-          } else await passToOwner(ctx, { reason: `${fromName} sent the rate con for ${load.referenceNumber} and it matches. Open the load and tap Book it to put it on the truck.`, loadId: load.id, label: "Got it", source: "email" });
+          } else await passToOwner(ctx, { reason: `${fromName} sent the rate con for ${load.referenceNumber} and it matches. Open the load and tap Book it to put it on the truck.`, loadId: load.id, label: "Got it", source: "email", to: "owner" });
         }
         await addActivity(
           carrierId,
@@ -89,6 +95,7 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
           reason: `Rate con from ${fromName}${reading.loadNumber ? ` for load #${reading.loadNumber}` : ""}${reading.totalRate ? `, $${reading.totalRate.toLocaleString()}` : ""} doesn't match any load. Add the load on the Loads page to track it.`,
           label: "Got it",
           source: "email",
+          to: "decider",
         });
         notes.push(`${pdf.Name}: a rate con for a load we don't have (${reading.summary})`);
       }
@@ -105,8 +112,16 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
 
   const reading = await readBrokerEmail(email.Subject, text);
   if (reading?.kind === "setup_request") return sendSetupPacket(ctx, { ...sender, contactName: reading.contactName });
+  if (reading?.kind === "payment" && reading.payments.length) {
+    await recordPayments(ctx, reading.payments, fromName);
+    return;
+  }
+  if (reading?.kind === "cancellation") {
+    const target = byRef(reading.loadNumber) ?? load;
+    if (target) return cancelLoad(ctx, target, reading.cancelReason ?? "no reason given", from);
+  }
   if (reading?.kind === "load_offers" && reading.offers.length && !pdfs.length) {
-    const { added } = await offersFromEmail(ctx, reading.offers, sender);
+    const { added } = await offersFromEmail(ctx, reading.offers, sender, { company: reading.brokerCompany, mc: reading.brokerMc, phone: reading.brokerPhone, contact: reading.contactName });
     if (!added.length)
       await addActivity(carrierId, event({ type: "load_offered", message: `${fromName} sent ${reading.offers.length} load${reading.offers.length === 1 ? "" : "s"}; none fit a free truck`, detail: email.Subject, severity: "info" }));
     return;

@@ -149,3 +149,14 @@ export const DRIVER_SILENT: Record<Lang, (driver: string, ref: string) => string
   uk: (d, r) => `Backroute: ${d} не відповідає щодо вантажу ${r}. Це в розділі «Потрібне твоє рішення».`,
   fr: (d, r) => `Backroute : ${d} n'a pas répondu pour le voyage ${r}. C'est dans « Ça t'attend ».`,
 };
+
+/** The broker cancelled a load the driver was on or about to take. */
+export const LOAD_CANCELLED: Record<Lang, (ref: string, place: string) => string> = {
+  en: (r, p) => `Load ${r} to ${p} was cancelled by the broker. Don't go to the pickup. I'm finding your next load and will text you.`,
+  es: (r, p) => `El bróker canceló la carga ${r} a ${p}. No vayas a la recogida. Estoy buscando tu próxima carga y te aviso por mensaje.`,
+  pa: (r, p) => `ਬ੍ਰੋਕਰ ਨੇ ${p} ਵਾਲਾ ਲੋਡ ${r} ਰੱਦ ਕਰ ਦਿੱਤਾ ਹੈ। ਪਿਕਅੱਪ 'ਤੇ ਨਾ ਜਾਣਾ। ਮੈਂ ਤੁਹਾਡਾ ਅਗਲਾ ਲੋਡ ਲੱਭ ਰਿਹਾ ਹਾਂ, ਮੈਸੇਜ ਕਰਾਂਗਾ।`,
+  hi: (r, p) => `ब्रोकर ने ${p} वाला लोड ${r} रद्द कर दिया है। पिकअप पर मत जाइए। मैं आपका अगला लोड ढूँढ रहा हूँ, मैसेज करूँगा।`,
+  ru: (r, p) => `Брокер отменил груз ${r} в ${p}. На загрузку не езжай. Ищу тебе следующий груз, напишу.`,
+  uk: (r, p) => `Брокер скасував вантаж ${r} до ${p}. На завантаження не їдь. Шукаю тобі наступний вантаж, напишу.`,
+  fr: (r, p) => `Le courtier a annulé le voyage ${r} vers ${p}. Ne va pas au chargement. Je te cherche le prochain voyage et je t'écris.`,
+};

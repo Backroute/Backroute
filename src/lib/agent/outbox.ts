@@ -53,7 +53,7 @@ export async function sendOrQueue(ctx: CarrierContext, o: Outgoing): Promise<"se
 }
 
 async function queue(ctx: CarrierContext, o: Outgoing) {
-  const e = await passToOwner(ctx, { reason: o.why, loadId: o.loadId, label: LABEL[o.purpose], source: "email" });
+  const e = await passToOwner(ctx, { reason: o.why, loadId: o.loadId, label: LABEL[o.purpose], source: "email", to: "decider" });
   const withDraft: Escalation = {
     ...e,
     draft: { channel: "email", to: o.to, toName: o.toName, subject: o.subject, body: o.body, inReplyTo: o.inReplyTo, purpose: o.purpose, amount: o.amount, attachments: o.attachments },
@@ -71,6 +71,9 @@ const LABEL: Record<DraftPurpose, string> = {
   setup_packet: "Send the setup packet",
   invoice: "Send the invoice",
   detention: "Send the detention claim",
+  payment_reminder: "Send the payment reminder",
+  tonu: "Send the TONU claim",
+  eta_update: "Send the late notice",
 };
 
 const WHAT: Record<DraftPurpose, string> = {
@@ -81,6 +84,9 @@ const WHAT: Record<DraftPurpose, string> = {
   setup_packet: "Sent the setup packet to",
   invoice: "Sent the invoice to",
   detention: "Sent a detention claim to",
+  payment_reminder: "Reminded about payment:",
+  tonu: "Claimed truck-ordered-not-used from",
+  eta_update: "Told the broker the truck is running late:",
 };
 
 /** Sends a draft (now, or when the owner approves it) and records what it means for the load. */
@@ -126,6 +132,7 @@ async function afterSent(ctx: CarrierContext, loadId: string, draft: DraftMessag
     };
   } else if (p === "invoice" && load.invoice) next = { ...load, invoice: { ...load.invoice, sentAt: at, sentTo: draft.to } };
   else if (p === "detention") next = { ...load, detentionClaims: (load.detentionClaims ?? []).map((c) => (c.sentAt ? c : { ...c, sentAt: at })) };
+  else if (p === "payment_reminder" && load.invoice) next = { ...load, invoice: { ...load.invoice, remindedAt: [...(load.invoice.remindedAt ?? []), at] } };
   if (!next) return;
   next = { ...next, updatedAt: at };
   await save("loads", ctx.carrier.id, next as unknown as Item);

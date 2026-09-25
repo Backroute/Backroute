@@ -35,6 +35,7 @@ export async function sendSetupPacket(ctx: CarrierContext, sender: { from: strin
       reason: `${sender.fromName} asked for your setup papers. Upload ${missing.join(" and ")} in Settings → General → Your papers, and the AI will send them next time. Or send them yourself.`,
       label: "I'll send them",
       source: "email",
+      to: "owner",
     });
     return;
   }
@@ -220,5 +221,6 @@ export async function warnCoiExpiring(ctx: CarrierContext, now: number) {
     reason: days < 0 ? `Your insurance certificate on file expired on ${coi.expires_on}. Brokers won't book without a current one: upload the new one in Settings.` : `Your insurance certificate expires on ${coi.expires_on}. Upload the renewed one in Settings so setup packets stay current.`,
     label: "Got it",
     source: "email",
+    to: "owner",
   });
 }

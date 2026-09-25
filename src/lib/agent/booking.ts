@@ -4,13 +4,16 @@ import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import { estimateMiles, guessEquipment, makeBroker, makeLoad } from "../fleet";
 import { NEW_LOAD } from "../channels/phrases";
-import { sendSms, twilioConfigured } from "../channels/twilio";
+import { absoluteUrl, sendSms, twilioConfigured } from "../channels/twilio";
 import { formatAtStop, stopLocalToIso } from "../stop-time";
 import type { Broker, Load, Truck } from "../types";
 import type { OfferReading } from "./broker-mail";
 import { addActivity, logChannel, save, saveDriverMessage, type CarrierContext } from "./db";
 import { event, passToOwner, uid } from "./dispatcher";
 import { sendOrQueue } from "./outbox";
+import { askSupportAboutBroker, checkBroker } from "./brokers";
+import { callBroker } from "./broker-call";
+import { canMakePickup } from "./eld";
 import { answerBroker, askFor, floorFor } from "./pricing";
 import * as mail from "./templates";
 
@@ -24,18 +27,23 @@ const HOUR = 3600_000;
 const MAX_DEADHEAD = 300;
 
 export interface Sender {
+  /** The broker's email; empty for a load from a feed that gave only a phone number. */
   from: string;
   fromName: string;
   subject: string;
   messageId?: string;
+  /** Set when the loads came from a load feed rather than an email: its name. */
+  feed?: string;
 }
 
 /** The broker by their email, or a new one (the owner sees it on the Brokers page). */
-export async function brokerFor(ctx: CarrierContext, email: string, name: string): Promise<Broker> {
-  const found = ctx.brokers.find((b) => b.email?.toLowerCase() === email.toLowerCase());
+export async function brokerFor(ctx: CarrierContext, email: string, name: string, companyName?: string | null): Promise<Broker> {
+  const found = email
+    ? ctx.brokers.find((b) => b.email?.toLowerCase() === email.toLowerCase())
+    : ctx.brokers.find((b) => !!companyName && b.company.toLowerCase() === companyName.trim().toLowerCase());
   if (found) return found;
   const domain = email.split("@")[1]?.split(".").slice(-2, -1)[0];
-  const company = domain && !/gmail|yahoo|outlook|hotmail|icloud|aol/i.test(domain) ? domain.toUpperCase() : name;
+  const company = companyName?.trim() || (domain && !/gmail|yahoo|outlook|hotmail|icloud|aol/i.test(domain) ? domain.toUpperCase() : name);
   const broker = makeBroker(company, email);
   await save("records", ctx.carrier.id, broker as unknown as Item, "broker");
   ctx.brokers.push(broker);
@@ -43,7 +51,7 @@ export async function brokerFor(ctx: CarrierContext, email: string, name: string
 }
 
 /** The truck that can take a load soonest with the least empty driving, if any. */
-function bestTruck(ctx: CarrierContext, o: { equipment: Load["equipmentType"]; originCity: string; originState: string; pickupAt: number | null }) {
+function bestTruck(ctx: CarrierContext, o: { equipment: Load["equipmentType"]; originCity: string; originState: string; pickupAt: number | null; miles: number }) {
   let best: { truck: Truck; deadhead: number } | null = null;
   for (const truck of ctx.trucks) {
     if (!truck.driverId || truck.equipmentType !== o.equipment || truck.status === "maintenance" || truck.nextLoadId) continue;
@@ -58,6 +66,8 @@ function bestTruck(ctx: CarrierContext, o: { equipment: Load["equipmentType"]; o
     if (ctx.loads.some((l) => l.truckId === truck.id && l.stage === "negotiating")) continue;
     const deadhead = estimateMiles(from, { city: o.originCity, state: o.originState }) ?? 150;
     if (deadhead > MAX_DEADHEAD) continue;
+    // With an ELD connected: only a driver who has the hours to get there in time.
+    if (!busy && !canMakePickup(ctx.drivers.find((d) => d.id === truck.driverId), deadhead, o.miles, o.pickupAt, Date.now())) continue;
     if (!best || deadhead < best.deadhead) best = { truck, deadhead };
   }
   return best;
@@ -67,8 +77,14 @@ function bestTruck(ctx: CarrierContext, o: { equipment: Load["equipmentType"]; o
  * Loads a broker emailed: each one that fits a truck becomes an offer on the owner's dashboard. On "Within my rules"
  * or full autopilot, the AI asks to book the best one for each truck if it pays at least the owner's lowest rate.
  */
-export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[], sender: Sender): Promise<{ added: Load[]; asked: Load[] }> {
-  const broker = await brokerFor(ctx, sender.from, sender.fromName);
+export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[], sender: Sender, who: { company?: string | null; mc?: string | null; phone?: string | null; contact?: string | null } = {}): Promise<{ added: Load[]; asked: Load[] }> {
+  let broker = await brokerFor(ctx, sender.from, sender.fromName, who.company);
+  if ((who.phone && !broker.phone) || (who.contact && !broker.contact)) {
+    broker = { ...broker, phone: broker.phone || who.phone || "", contact: broker.contact || who.contact || "" };
+    await save("records", ctx.carrier.id, broker as unknown as Item, "broker");
+    ctx.brokers = ctx.brokers.map((b) => (b.id === broker.id ? broker : b));
+  }
+  if (!broker.authorityVerified || who.mc) broker = await checkBroker(ctx, broker, who.mc);
   const added: Load[] = [];
   for (const o of offers) {
     if (!o.originCity || !o.originState || !o.destinationCity || !o.destinationState) continue;
@@ -76,10 +92,13 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
     if (o.loadNumber && ctx.loads.some((l) => l.brokerId === broker.id && l.referenceNumber.toLowerCase() === o.loadNumber!.toLowerCase())) continue;
     const pickupAt = stopLocalToIso(o.pickupLocal, o.originState);
     const deliveryAt = stopLocalToIso(o.deliveryLocal, o.destinationState);
+    // The same load again (a feed read every round, a broker resending their list): once is enough.
+    const same = (l: Load) => l.brokerId === broker.id && l.lane.origin.toLowerCase() === o.originCity!.toLowerCase() && l.lane.destination.toLowerCase() === o.destinationCity!.toLowerCase() && (l.pickupAt ?? null) === (pickupAt ?? null);
+    if (!o.loadNumber && ctx.loads.some(same)) continue;
     if (pickupAt && Date.parse(pickupAt) < Date.now()) continue; // Already gone.
     const miles = o.miles ?? estimateMiles({ city: o.originCity, state: o.originState }, { city: o.destinationCity, state: o.destinationState });
     if (!miles) continue;
-    const fit = bestTruck(ctx, { equipment, originCity: o.originCity, originState: o.originState, pickupAt: pickupAt ? Date.parse(pickupAt) : null });
+    const fit = bestTruck(ctx, { equipment, originCity: o.originCity, originState: o.originState, pickupAt: pickupAt ? Date.parse(pickupAt) : null, miles });
     if (!fit) continue;
 
     const posted = o.rate ?? 0;
@@ -115,9 +134,9 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
       bookedRate: null,
       isChained: false,
       offerGroupId: `offers-${fit.truck.id}`,
-      source: `Email from ${broker.company}`,
-      brokerContactEmail: sender.from,
-      offerEmail: { subject: sender.subject, messageId: sender.messageId },
+      source: sender.feed ? `${sender.feed} · ${broker.company}` : `Email from ${broker.company}`,
+      ...(sender.from ? { brokerContactEmail: sender.from } : {}),
+      ...(sender.feed ? {} : { offerEmail: { subject: sender.subject, messageId: sender.messageId } }),
     };
     await save("loads", ctx.carrier.id, load as unknown as Item);
     ctx.loads.unshift(load);
@@ -131,7 +150,9 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
 
   // Within the rules, the AI asks for the best one per truck on its own.
   const asked: Load[] = [];
-  if (ctx.settings.autonomy !== "ask" && assessBroker(broker, ctx.settings.brokerOverrides).policy !== "block") {
+  const trusted = assessBroker(broker, ctx.settings.brokerOverrides).policy !== "block";
+  if (ctx.settings.autonomy !== "ask" && added.length && !trusted) await askSupportAboutBroker(ctx, broker, added[0].id);
+  if (ctx.settings.autonomy !== "ask" && trusted) {
     const byTruck = new Map<string, Load[]>();
     for (const l of added) byTruck.set(l.truckId!, [...(byTruck.get(l.truckId!) ?? []), l]);
     for (const group of byTruck.values()) {
@@ -154,7 +175,17 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
   const broker = ctx.brokers.find((b) => b.id === load.brokerId);
   const to = load.brokerContactEmail ?? broker?.email;
   if (!to) {
-    await passToOwner(ctx, { reason: `No email for ${broker?.company ?? "the broker"} on ${load.referenceNumber}: call them to book it at $${ask.toLocaleString()}.`, loadId: load.id, label: "I'll call", source: "email" });
+    // A broker who only works by phone: the AI calls them. With no phone either, support finds a way to reach them.
+    const floor = floorFor(load, ctx.settings);
+    const allowed = how.byOwner || (floor !== null && ask >= floor && ctx.settings.autonomy !== "ask");
+    const asking: Load = { ...load, stage: "negotiating", targetRate: ask, updatedAt: new Date().toISOString(), bookRequest: { ask, askedAt: new Date().toISOString(), status: "sent" } };
+    if (allowed && broker?.phone) {
+      await save("loads", ctx.carrier.id, asking as unknown as Item);
+      ctx.loads = ctx.loads.map((l) => (l.id === load.id ? asking : l));
+      const url = absoluteUrl(`/api/channels/voice/broker?carrier=${encodeURIComponent(ctx.carrier.id)}&load=${encodeURIComponent(load.id)}`);
+      if (await callBroker(ctx, asking, url)) return "sent" as const;
+    }
+    await passToOwner(ctx, { reason: `No email for ${broker?.company ?? "the broker"} on ${load.referenceNumber}${broker?.phone ? " and the AI couldn't call" : " or phone"}: reach them to book it at $${ask.toLocaleString()}.`, loadId: load.id, label: "Reached them", source: "email", to: "support" });
     return "queued" as const;
   }
   const at = new Date().toISOString();

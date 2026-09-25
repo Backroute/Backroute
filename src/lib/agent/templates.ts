@@ -95,3 +95,36 @@ The times are from our driver's app. Please approve ${money(f.amount)} in detent
 Thanks,
 ${signature(carrier, settings)}`;
 }
+
+export function paymentReminder(carrier: CarrierRow, settings: AgentSettings, load: Load, invoice: { number: string; amount: number; sentAt?: string }, daysLate: number, second: boolean) {
+  return `Hi,
+
+${second ? "Following up again on" : "A friendly reminder about"} invoice ${invoice.number} for load ${load.referenceNumber} (${lane(load)}), ${money(invoice.amount)}${invoice.sentAt ? `, sent ${invoice.sentAt.slice(0, 10)}` : ""}. It's ${daysLate} day${daysLate === 1 ? "" : "s"} past the payment terms.
+
+Could you let us know when it's scheduled to pay? If anything is missing on your side, reply and we'll send it right away.${settings.remitEmail ? `\n\nRemittance: ${settings.remitEmail}` : ""}
+
+Thanks,
+${signature(carrier, settings)}`;
+}
+
+export function tonuClaim(carrier: CarrierRow, settings: AgentSettings, load: Load, amount: number) {
+  return `Hi,
+
+Load ${load.referenceNumber} (${lane(load)}) was cancelled after our truck was dispatched to it. We're requesting truck ordered not used (TONU) of ${money(amount)}.
+
+Please confirm, and add it to a rate confirmation or tell us how you'd like it invoiced.
+
+Thanks,
+${signature(carrier, settings)}`;
+}
+
+export function etaUpdate(carrier: CarrierRow, settings: AgentSettings, load: Load, stop: "pickup" | "delivery", place: string, eta: string) {
+  return `Hi,
+
+Heads up on load ${load.referenceNumber}: our truck is running behind for the ${stop} in ${place}. Its current ETA is ${eta}, from its live location and the driver's hours.
+
+We'll keep you posted if that changes. Let us know if the ${stop === "pickup" ? "shipper" : "receiver"} needs a new appointment.
+
+Thanks,
+${signature(carrier, settings)}`;
+}

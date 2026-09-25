@@ -1,4 +1,5 @@
 import type { Load, LoadStage } from "./types";
+import { MORE_CITIES, STATE_CENTER } from "./us-places";
 
 export type LatLng = [number, number];
 
@@ -38,7 +39,20 @@ const CITY_COORDS: Record<string, LatLng> = {
 };
 
 export function cityCoords(city: string, state: string): LatLng | undefined {
-  return CITY_COORDS[`${city}, ${state}`];
+  const key = `${city}, ${state}`;
+  if (CITY_COORDS[key]) return CITY_COORDS[key];
+  // Real loads go anywhere: the wider list of freight cities, matched without caring about capitals or "St."/"Saint".
+  const want = key.toLowerCase().replace(/^st\.? /, "saint ");
+  const hit = Object.entries(MORE_CITIES).find(([k]) => k.toLowerCase().replace(/^st\.? /, "saint ") === want);
+  return hit?.[1];
+}
+
+/** A city's spot, or else the middle of its state: good for rough miles, never for telling a broker a truck is late. */
+export function roughCoords(city: string, state: string): { at: LatLng; exact: boolean } | undefined {
+  const exact = cityCoords(city.trim(), state.trim().toUpperCase());
+  if (exact) return { at: exact, exact: true };
+  const center = STATE_CENTER[state.trim().toUpperCase()];
+  return center ? { at: center, exact: false } : undefined;
 }
 
 /** Like cityCoords, but home bases around Dallas–Fort Worth (Plano, Irving, Arlington…) count as the metro. */

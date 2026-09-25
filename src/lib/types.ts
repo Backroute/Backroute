@@ -64,6 +64,11 @@ export interface Broker {
   tier: "preferred" | "standard" | "watch";
   /** Broker Shield AI: FMCSA authority check before the AI will negotiate with them. */
   authorityVerified: boolean;
+  /** Real accounts: the broker's MC number, and what the FMCSA check found and when. */
+  mc?: string;
+  legalName?: string;
+  verifiedAt?: string;
+  verifyNote?: string;
   fraudRisk: "low" | "medium" | "high";
   /** Payment history, from the carrier's own invoices plus the factoring partner's broker credit data. */
   avgDaysToPay: number;
@@ -117,6 +122,8 @@ export interface Driver {
   carrierId: string;
   hosStatus: HosStatus;
   hoursRemaining: number;
+  /** Real accounts with an ELD connected: the driver's hours clocks, and when they were read. */
+  hos?: { drive: number; shift: number; cycle: number; at: string; source: "samsara" | "motive" };
   cdl: string;
   rating: number;
   hireDate: string;
@@ -172,6 +179,8 @@ export interface Truck {
   currentCity: string;
   currentState: string;
   homeBase: string;
+  /** Real accounts with an ELD connected: where the truck actually is, and when that was read. */
+  position?: { lat: number; lon: number; at: string; description?: string; source: "samsara" | "motive" };
   currentLoadId: string | null;
   nextLoadId: string | null;
   /** A load this truck just delivered that the driver hasn't dismissed yet — keeps the "load complete"
@@ -522,6 +531,10 @@ export interface Escalation {
   draft?: DraftMessage;
   /** Where this came from, when it arrived by a real channel. */
   source?: MessageChannel;
+  /** The person on Backroute's support team who took it. */
+  supportAssignee?: string;
+  /** About a broker (e.g. one the AI couldn't verify), not a load. */
+  brokerId?: string;
 }
 
 /** How a message reached Backroute or left it: the app itself, or a real text, call or email. */
@@ -544,7 +557,7 @@ export interface DraftMessage {
   attachments?: { fileId: string; name: string }[];
 }
 
-export type DraftPurpose = "reply" | "book_request" | "counter" | "accept" | "setup_packet" | "invoice" | "detention";
+export type DraftPurpose = "reply" | "book_request" | "counter" | "accept" | "setup_packet" | "invoice" | "detention" | "payment_reminder" | "tonu" | "eta_update";
 
 export interface DriverMessage {
   id: string;
@@ -556,6 +569,8 @@ export interface DriverMessage {
   ai?: boolean;
   /** Came in or went out by text or on a call, not in the app. */
   channel?: MessageChannel;
+  /** Written by a person on Backroute's support team, not the AI. */
+  bySupport?: string;
 }
 
 /** Fleet-level chat — not tied to any one load, unlike negotiation messages. The carrier's equivalent
@@ -729,6 +744,10 @@ export interface LoadInvoice {
   sentAt?: string;
   sentTo?: string;
   paidAt?: string;
+  /** What the broker actually paid, when they said (it can be short). */
+  paidAmount?: number;
+  /** Payment reminders sent, oldest first. */
+  remindedAt?: string[];
 }
 
 export interface DetentionClaim {

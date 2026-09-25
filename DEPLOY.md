@@ -28,7 +28,7 @@ Keep them apart by running two Vercel projects from this same repository:
 With `NEXT_PUBLIC_DEMO=off`:
 
 - `/demo` says there's no demo, and the landing page and sign-in page have no demo links.
-- The sample-data Ops portal is closed.
+- `/ops` is the support team's console (for people on the support list), not the sample-data Ops portal.
 - A browser tab that was in the demo can't get back into it.
 
 It's built into the app, so redeploy after changing it.
@@ -80,6 +80,26 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - **Within my rules:** book requests, counters and acceptances at or over the lowest rate, invoices, detention claims with known terms, and setup packets go on their own. Replies the AI wrote itself wait.
   - **Full autopilot:** the AI's own replies go too, unless one names a price that isn't already in the conversation.
   - Whatever the setting, anything under the owner's lowest rate, a POD with a problem on it, or an unverified broker waits for the owner. The AI won't book on its own without a lowest rate per mile set.
+- **Your support team, not the carrier's dispatcher.** Anything the AI can't handle goes to Backroute's support team, at `/ops`, for every carrier at once. Examples: a breakdown, a driver who can't be reached, a broker who fails the check, a short payment, an email the AI couldn't answer.
+  - Each item comes with the carrier, load, driver, broker, how to reach them, and the texts, calls or emails it came from.
+  - Support can take it, call, text the driver from the dispatch number, send or fix the AI's draft, mark a broker as checked, hand it to the owner, or close it with a note the owner sees.
+  - Urgent ones (a crash, a missing driver on a late load) also text the support team's phones.
+  - The owner sees these items as "Backroute support is on it". Only the carrier's own decisions go to the owner, and on **Full autopilot** those go to support too, so the owner only hears about emergencies.
+- **Brokers are checked** before the AI books with them. The broker's MC number (from their email signature or rate con) is looked up with FMCSA: broker authority active, and the name on file matching the name and email domain they use. Someone posing as a real broker, or using a free email, is flagged, and support is asked to look. The AI won't book with a broker who doesn't pass.
+- **Getting paid:**
+  - Payment emails (ACH notices, remittances) mark invoices paid. A short payment goes to support.
+  - An invoice past its terms gets a polite reminder 3 days late, another at 13 days, then support calls the broker's accounts payable. Skipped when the carrier factors.
+- **Cancellations:** when a broker cancels, the load comes off the truck and the driver is told not to go, in their language. If the truck was already dispatched, a TONU claim is sent, using the rate con's amount, or $150 checked first. The truck's other offers come back, and within the rules the AI asks for the best one.
+- **The AI calls brokers:**
+  - When a book request gets no email answer in 30 minutes, the AI phones the broker. It does the same right away for a broker who only gave a phone number.
+  - It says it's an AI and that the call is transcribed, and asks the price the rules set.
+  - It counters or accepts only through the same rules as email, and can't be talked into another number. It leaves a short voicemail if nobody answers.
+  - The booking is still confirmed by the broker's rate con.
+- **Load feeds:** any list of loads a broker, shipper or load board publishes as JSON or CSV at a web address (Settings → General → ELD and load feeds). It's read every round, and the loads go through the same matching and booking as email. Format below.
+- **ELD (Samsara or Motive):**
+  - Truck locations and drivers' hours are read every round.
+  - The AI offers a truck only loads its driver has the hours to reach in time.
+  - It emails the broker as soon as a truck can't make an appointment, instead of 30 minutes after.
 - **Ask the AI** (dashboard) and driver **Messages** in the app are answered by the AI from the carrier's own data.
 - **Evening text:** at 6 PM Central the owner gets a text: what was delivered, what it made, how many trucks are rolling, and what needs them.
 - **The log:** every text, call and email in or out is listed in Settings, with what the AI did.
@@ -87,20 +107,21 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
 
 ## What it doesn't do yet
 
-Know these before real drivers rely on it. This is an AI dispatcher for the work that runs through email, texts and calls. It is not a full replacement for a dispatcher who works the phones with brokers and the load boards.
+The AI now does the day-to-day work of a dispatcher by email, text and phone. What's still out of its reach, or needs something from outside:
 
-- **No load boards.** It finds loads only in what brokers email the carrier. DAT, Truckstop and 123Loadboard need business agreements and paid API access; connecting one is a separate project.
-- **It doesn't call brokers.** Booking and negotiating are by email only. Many brokers book by phone. The owner still makes those calls, then adds the load (or forwards the rate con).
-- **No ELD or GPS.** It doesn't know where trucks are, or drivers' hours of service. Check-ins go by appointment times and what drivers say. A driver who is late without saying so is noticed 30 minutes after the appointment, not before.
-- **It doesn't verify brokers.** A new broker is treated as unverified, so the AI won't book with them by itself until the owner marks them OK on the Brokers page. Check authority and the contact yourself, since double brokering and fake-broker fraud are common.
-- **Detention pay isn't tracked.** The claim goes out, but whether the broker pays it, and adding it to the invoice, is up to the owner.
-- **Payments aren't tracked.** The invoice goes out, but there's no connection to the bank or the factoring company to see when it's paid.
+- **Load boards need an agreement.** DAT, Truckstop and 123Loadboard give API access only under a paid business agreement. Until then, loads come from broker emails and load feeds. With access, their results map onto the load-feed format.
+- **Calls are simple.** The AI can phone brokers about one load and handle a price back and forth. It doesn't make cold calls to find freight, or handle long negotiations with several loads on one call. Some brokers won't deal with an AI and hang up; those come back to email or to support.
+- **Emergencies need a person.** The AI tells a driver to call 911, alerts support and the owner, and keeps the load moving on paper. A person has to reach the driver, arrange a tow or repair, and deal with a claim.
+- **Where it guesses, it asks first:**
+  - a TONU amount the rate con doesn't give
+  - detention pay without the broker's terms
+  - a POD with a shortage written on it
+  - a new broker that fails the check
+- **Miles and ETAs:** they come from about 130 freight cities and each state's middle. For a town not on the list, miles are rough, and the AI doesn't send late notices from them. A mapping service would make both exact.
 - **Invoices are simple:** one page with the line-haul rate. Accessorials (lumper, detention, TONU) aren't added to them yet.
 - **Two screens editing the same load at once:** the last save wins, and that includes the AI's own changes.
 - **Driver edits to loads:** a driver can edit any detail of a load on their own truck, not just its stage.
-- **Removals:** when the office removes something, other open screens only see it after a reload.
 - **One carrier per person:** a person, or a driver's phone, in two carriers gets the first one.
-- **Ops portal:** `/ops` still shows demo data.
 
 ## Setting it up
 
@@ -110,7 +131,7 @@ them in chat. `.env.example` lists every variable.
 ### 1. Supabase: accounts and the database
 
 1. Create a project at supabase.com (region near your drivers, e.g. US East).
-2. In **SQL Editor**, run the files in `supabase/migrations/` in order: `20260924000000_core.sql`, `20260925000000_channels.sql`, then `20260926000000_dispatch.sql`. With the CLI instead: `supabase link`, then `supabase db push`.
+2. In **SQL Editor**, run the files in `supabase/migrations/` in order: `20260924000000_core.sql`, `20260925000000_channels.sql`, `20260926000000_dispatch.sql`, then `20260927000000_support.sql`. With the CLI instead: `supabase link`, then `supabase db push`.
 3. From **Project Settings → API**, set:
    - `NEXT_PUBLIC_SUPABASE_URL`: the Project URL.
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: the anon (or publishable) key.
@@ -159,16 +180,49 @@ Demo visitors keep the scripted replies unless you set `AI_IN_DEMO=on`. That all
    - **Any outside scheduler** (cron-job.org, a GitHub Actions schedule, your own server): every 10 minutes, send `GET https://YOUR-SITE/api/cron/dispatch` with the header `Authorization: Bearer YOUR-CRON_SECRET`.
 5. `NEXT_PUBLIC_` values are built into the app: redeploy after changing one.
 
-### 6. FMCSA (optional)
+### 6. FMCSA: checking brokers
 
-Get a free web key at https://mobile.fmcsa.dot.gov/QCDevsite/ and set `FMCSA_WEB_KEY`, for real MC lookups at sign-up.
+Get a free web key at https://mobile.fmcsa.dot.gov/QCDevsite/ and set `FMCSA_WEB_KEY`. It's used for MC lookups at sign-up, and for the AI's check of every broker before booking. Without it, every new broker waits for the support team.
+
+### 7. Your support team
+
+1. Each person signs in once at `/login` with their phone. They'll be sent to sign-up, since they have no fleet: just close it.
+2. In Supabase's **SQL Editor**, add them:
+   ```sql
+   insert into public.support_staff (user_id, name)
+   select id, 'Sam' from auth.users where phone = '13125550100';
+   ```
+   Use the phone number digits as Supabase stores them, with no plus sign.
+3. From then on, signing in takes them to `/ops`, the support console. Nobody can add themselves: the table can only be changed from the SQL Editor.
+4. Set `SUPPORT_PHONES` (e.g. `+13125550100,+13125550101`) for texts about urgent items.
+
+### 8. ELD and load feeds (per carrier)
+
+The owner connects these in **Settings → General → ELD and load feeds**. Keys are checked when added and kept on the server; nobody can read them back.
+
+- **Samsara:** an API token with read access to vehicles and hours of service.
+- **Motive:** an API key.
+- Trucks are matched by unit number, and drivers by name, so they need to match what's in the ELD.
+- **A load feed** is a web address that returns loads as JSON (an array, or `{ "loads": [...] }`) or CSV with a header row. Each load has:
+
+  | Field | What it is |
+  |---|---|
+  | `loadNumber` | The broker's load number |
+  | `originCity`, `originState`, `destinationCity`, `destinationState` | Required |
+  | `pickupLocal`, `deliveryLocal` | `YYYY-MM-DDTHH:mm` at the stop |
+  | `pickup`, `delivery` | Free-text windows |
+  | `equipment`, `rate`, `miles`, `weight` | |
+  | `brokerName`, `brokerEmail`, `brokerPhone`, `brokerMc` | An email or a phone is required |
+
+  A header (e.g. an API key) can be added for feeds that need one.
 
 ## Before real drivers: rules to get right
 
 - **Consent to texts.** Drivers must agree to get texts from the dispatch number. Get it in writing when you add them. STOP, START and HELP work, and STOP is recorded on the driver.
 - **AI disclosure.** Every call opens by saying it's the carrier's AI dispatcher.
+- **Calls to brokers.** The AI says at the start that it's an AI and that the call is transcribed. Check the rules for automated calls with your lawyer; these are business calls about a specific load, not marketing.
 - **Transcripts.** What a driver says on a call is turned into text and saved in the log. No audio is recorded. Several states require everyone's consent to record, so have a lawyer confirm whether saving transcripts needs a spoken notice in your states.
-- **Emergencies.** The AI tells a driver who reports a crash or injury to call 911 first, and puts it at the top of Needs you with a Call button. It's not an emergency service.
+- **Emergencies.** The AI tells a driver who reports a crash or injury to call 911 first. It alerts the support team by text and puts it at the top of their queue and of the owner's Needs you. It's not an emergency service, so make sure someone on the support team can always be reached.
 - **A dispatch agreement** with each carrier, saying Backroute writes to brokers on their behalf. Have a transportation lawyer review it.
 
 ## Costs, roughly
@@ -196,7 +250,10 @@ The code was run against local stand-ins that behave like the real services:
 
 **What the tests covered:**
 
-- **Access rules:** 56 checks. They cover the channel log and brokers, and that a driver sees only the files on their own truck's loads while only the server reads the AI's check-in records.
+- **Access rules:** 59 checks, including:
+  - the channel log and brokers
+  - that a driver sees only the files on their own truck's loads
+  - that only the server reads the AI's check-in records, the support team list, and carriers' ELD and feed keys (not even the owner can read a key back)
 - **Owner sign-up with a typed-in fleet:** no sample data saved.
 - **Adding a load from a rate con:** the appointment times are filled in and saved in the stop's time zone, and the load reaches the driver by text.
 - **A driver's text:** it marks the load loaded, and the reply goes back.
@@ -235,6 +292,33 @@ The code was run against local stand-ins that behave like the real services:
   - Tapping one sends the book request, raised to the floor if the floor went up.
   - The load page shows where the booking stands, and **book it** puts the load on the truck and texts the driver.
   - A company driver's app shows no broker offers.
+
+- **The support team:**
+  - What the AI hands off shows in the console across carriers, urgent first, with who to call and the thread.
+  - Support can take an item, text the driver, close it with a note the owner sees, or mark a broker checked.
+  - An owner can't open the console, and sees support items as handled.
+- **Broker checks:**
+  - Someone posing as a broker (inactive MC, free email) isn't booked with, and support is asked.
+  - A real broker passes FMCSA and is booked with automatically.
+- **Cancellations:**
+  - A booked load comes off the truck.
+  - A dispatched one also gets a TONU claim, and the driver is told not to go.
+- **Getting paid:**
+  - A payment email marks the invoice paid, and a short payment goes to support.
+  - A late invoice gets a reminder, a second one, then goes to support, each once.
+- **Calls to brokers:**
+  - An unanswered book request gets a call, which opens with the AI disclosure and the price.
+  - A lower offer is countered at the floor, and the AI can't be talked into a number the rules didn't accept.
+  - Agreement books it pending the rate con, and voicemail gets a short message.
+- **Load feeds:**
+  - A feed that refuses its key isn't saved, and bad rows are skipped.
+  - CSV with quoted commas works.
+  - Feed loads are matched like emailed ones, and a phone-only broker gets a call.
+- **ELD:**
+  - Samsara (two pages of vehicles) and Motive both connect, and a wrong key is refused.
+  - Trucks and drivers are matched, and unknown ones are listed.
+  - Location and hours are saved, and the broker gets one late notice when the truck can't make it.
+- **Full autopilot:** a decision the AI won't make goes to support, not the owner.
 
 **None of it has been run against the live services yet.** These are all untested:
 

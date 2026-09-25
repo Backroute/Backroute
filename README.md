@@ -31,18 +31,21 @@ Open [http://localhost:3000](http://localhost:3000). Visit `/carrier`, `/ops`, o
 The real version switches on from environment variables:
 
 - **Accounts:** sign-in by phone, and a fleet the owner types in, with no sample data.
-- **Loads:** added by hand, read off a rate con PDF, or found in what brokers email the carrier.
+- **Loads:** added by hand, read off a rate con PDF, or found in what brokers email and in load feeds.
 - **The AI:** runs on the server (Claude).
 - **Texts and calls:** a dispatch number drivers text and call (Twilio), in 7 languages.
 - **Check-ins:** the AI texts or calls drivers before appointments and follows up when they're late or go quiet.
-- **Broker email** (Postmark):
+- **Broker email and phone** (Postmark, Twilio):
   - book requests, counter-offers and setup packets
-  - invoices with the POD, and detention claims
+  - calls to brokers who don't answer an email
+  - invoices with the POD, detention and TONU claims, and payment reminders
   - priced by the owner's lowest rate per mile, which is enforced in code
-  - the autopilot setting decides what waits for the owner's OK
+  - every new broker checked with FMCSA before booking
+- **ELD and load feeds:** Samsara or Motive for truck locations and drivers' hours, and any JSON or CSV list of loads.
+- **Backroute support:** anything the AI can't handle goes to your support team's console at `/ops`, not to a dispatcher. On full autopilot the owner only hears about emergencies.
 - **Evening text:** an end-of-day text to the owner.
 
-It isn't a full replacement for a human dispatcher yet: no load boards, no calls to brokers, no ELD.
+Load boards (DAT, Truckstop) need a business agreement before they can be connected, and emergencies still need a person on the support team.
 
 `DEPLOY.md` covers the setup, the tests, and what isn't done yet. The server side is in `src/lib/agent`, `src/lib/channels` and `src/app/api`. The database schema and access rules are in `supabase/migrations/`.
 

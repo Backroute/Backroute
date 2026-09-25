@@ -11,6 +11,7 @@ import { PRIMARY_CARRIER_ID } from "../mock-data";
 import { LOAD_STAGE_LABEL, LOAD_STAGE_ORDER, type ActivityEvent, type Driver, type Escalation, type Load, type LoadStage, type MessageChannel } from "../types";
 import type { Item } from "../cloud/rows";
 import { addActivity, save, type CarrierContext } from "./db";
+import { alertSupport } from "./support";
 
 /**
  * The AI dispatcher on the server: one brain behind texts, calls and email. It reads the carrier's data, answers,
@@ -39,21 +40,34 @@ function event(p: Omit<ActivityEvent, "id" | "timestamp" | "carrierId">): Activi
   return { id: uid("act"), timestamp: now(), carrierId: ALIAS, ...p };
 }
 
-async function raise(ctx: CarrierContext, p: { reason: string; loadId?: string; critical?: boolean; label?: string; source: MessageChannel }) {
+/**
+ * Who takes something the AI hands off:
+ * - "owner": the carrier's own call (their papers, their pay decisions, approving on Ask me first).
+ * - "support": Backroute's support team, for anything outside what the AI can handle (a breakdown, a driver who
+ *   can't be reached, an email the AI couldn't answer). The owner sees it, marked as being handled.
+ * - "decider": the owner, unless they put the AI on full autopilot, and then support.
+ * Critical ones (a crash, a driver missing on a late load) also text the support team's phones.
+ */
+export type HandTo = "owner" | "support" | "decider";
+
+async function raise(ctx: CarrierContext, p: { reason: string; loadId?: string; critical?: boolean; label?: string; source: MessageChannel; to?: HandTo; brokerId?: string }) {
+  const to = p.to === "decider" ? (ctx.settings.autonomy === "full" ? "support" : "owner") : (p.to ?? "support");
   const escalation: Escalation = {
     id: uid("esc"),
     loadId: p.loadId ?? "",
     carrierId: ALIAS,
     reason: p.reason,
     createdAt: now(),
-    status: "open",
+    status: to === "support" ? "with_support" : "open",
     complexity: p.critical ? "critical" : "routine",
     recommendedAction: "approve",
     recommendedLabel: p.label ?? "Got it",
     source: p.source,
+    ...(p.brokerId ? { brokerId: p.brokerId } : {}),
   };
   await save("escalations", ctx.carrier.id, escalation as unknown as Item);
   ctx.escalations.unshift(escalation);
+  if (to === "support" && p.critical) await alertSupport(ctx.carrier.id, `Backroute support, urgent: ${ctx.carrier.name}. ${p.reason}`.slice(0, 600)).catch((e) => console.error("[support] alert failed", e));
   return escalation;
 }
 
@@ -129,7 +143,7 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: "sms" | "voic
       description: "Pass a message to the owner that needs a person: a question you can't answer from the data, a request for a call back, pay or time off.",
       inputSchema: z.object({ message: z.string() }),
       run: async ({ message }) => {
-        await raise(ctx, { reason: `${driver.name} says: ${message}`, loadId: current()?.id, label: "Got it", source: channel });
+        await raise(ctx, { reason: `${driver.name} says: ${message}`, loadId: current()?.id, label: "Got it", source: channel, to: "owner" });
         effects.done.push("Passed a message to the owner");
         return "Passed to the owner.";
       },
@@ -233,7 +247,7 @@ export async function brokerEmailDraft(ctx: CarrierContext, email: BrokerEmail):
       description: "Ask the owner to decide something in this email: a rate change, extra fees, a truck request, anything you shouldn't agree to yourself.",
       inputSchema: z.object({ reason: z.string() }),
       run: async ({ reason }) => {
-        await raise(ctx, { reason: `${email.fromName || email.from} (email): ${reason}`, loadId: email.load?.id, label: "I'll handle it", source: "email" });
+        await raise(ctx, { reason: `${email.fromName || email.from} (email): ${reason}`, loadId: email.load?.id, label: "I'll handle it", source: "email", to: "decider" });
         effects.done.push("Asked the owner to decide");
         return "The owner will decide. Tell the broker you'll confirm shortly.";
       },
