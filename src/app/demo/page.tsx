@@ -4,7 +4,8 @@ import Link from "next/link";
 import { ArrowRight, LayoutGrid, Smartphone, Sparkles } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { cloudEnabled } from "@/lib/cloud/client";
-import { exitDemo, startDemo } from "@/lib/cloud/demo";
+import { demoAllowed, exitDemo, startDemo } from "@/lib/cloud/demo";
+import { NotAvailable } from "@/components/cloud/not-available";
 
 const TOURS = [
   {
@@ -29,6 +30,7 @@ const TOURS = [
 
 /** The link to share with anyone: the whole product on a sample fleet, no account needed. */
 export default function DemoPage() {
+  if (!demoAllowed) return <NotAvailable title="No demo here" body="This is the real Backroute. Sign in to your account, or set up your fleet." link={{ href: "/login", label: "Sign in" }} />;
   return (
     <div className="min-h-screen bg-ink-50">
       <div className="mx-auto flex max-w-2xl flex-col gap-8 px-4 py-10 sm:py-16">

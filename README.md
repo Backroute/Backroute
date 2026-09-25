@@ -26,7 +26,7 @@ Open [http://localhost:3000](http://localhost:3000). Visit `/carrier`, `/ops`, o
 
 ## Demo and real version
 
-`/demo` is the link to share: the whole product on a sample fleet, no account, nothing saved or sent. A yellow bar on every demo screen says so.
+`/demo` is the link to share: the whole product on a sample fleet, no account, nothing saved or sent. A yellow bar on every demo screen says so. Run it as its own site; on the real site, `NEXT_PUBLIC_DEMO=off` removes the demo completely (DEPLOY.md, "Two sites").
 
 The real version switches on from environment variables:
 

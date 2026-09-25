@@ -8,7 +8,8 @@ import { Logo } from "@/components/shared/logo";
 import { cloudEnabled, supabase } from "@/lib/cloud/client";
 import { claimInvites, homeFor, myMemberships } from "@/lib/cloud/account";
 import { connect, NotSetUpError, signOut, useSyncStatus } from "@/lib/cloud/sync";
-import { inDemo } from "@/lib/cloud/demo";
+import { demoAllowed, inDemo } from "@/lib/cloud/demo";
+import { NotAvailable } from "./not-available";
 import { DemoBanner } from "./demo-banner";
 import { FleetForm } from "./fleet-form";
 import { useStore } from "@/lib/store";
@@ -21,6 +22,8 @@ type Area = "carrier" | "driver" | "signup";
  * and shows the sample fleet. With no Supabase keys everything is the demo.
  */
 export function CloudGate({ area, children }: { area: Area; children: React.ReactNode }) {
+  if (!cloudEnabled && !demoAllowed)
+    return <NotAvailable title="Not set up yet" body="This site has no demo, and accounts aren't switched on yet. Add the Supabase keys (see DEPLOY.md)." />;
   if (!cloudEnabled)
     return (
       <>

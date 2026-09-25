@@ -1,5 +1,7 @@
 "use client";
 
+import { demoAllowed } from "@/lib/cloud/demo";
+import { NotAvailable } from "@/components/cloud/not-available";
 import { BarChart3, Building2, LayoutGrid, Lock, Radio, ShieldAlert, Truck, Users } from "lucide-react";
 import { PortalShell, type NavItem } from "@/components/shared/portal-shell";
 import { TopBar } from "@/components/shared/top-bar";
@@ -20,6 +22,12 @@ const NAV: NavItem[] = [
 ];
 
 export default function OpsLayout({ children }: { children: React.ReactNode }) {
+  // Ops still runs on the sample world. On a real site without the demo, it's closed until it reads real data.
+  if (!demoAllowed) return <NotAvailable title="Ops isn't connected yet" body="The ops portal still shows sample data, so it's off on this site." />;
+  return <OpsShell>{children}</OpsShell>;
+}
+
+function OpsShell({ children }: { children: React.ReactNode }) {
   const escalations = useStore((s) => s.escalations);
   const activity = useStore((s) => s.activity);
   const carriers = useStore((s) => s.carriers);

@@ -9,7 +9,15 @@ import { cloudEnabled } from "./client";
  */
 const KEY = "backroute-demo";
 
+/**
+ * Whether this site has the demo at all. Set NEXT_PUBLIC_DEMO=off on the real site and the demo is gone: no /demo
+ * page, no demo links, no sample data, no simulation. Run the demo as its own site (no keys) for as long as you're
+ * showing it, then delete that site. Built into the app, so redeploy after changing it.
+ */
+export const demoAllowed = process.env.NEXT_PUBLIC_DEMO !== "off";
+
 export function inDemo(): boolean {
+  if (!demoAllowed) return false;
   if (!cloudEnabled) return true;
   try {
     return sessionStorage.getItem(KEY) === "1";

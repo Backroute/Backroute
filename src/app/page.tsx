@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { demoAllowed } from "@/lib/cloud/demo";
 import { ArrowUpRight, Mail, MessageCircle, MessageSquare, Phone, Radar, Truck } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
@@ -44,7 +45,7 @@ export default function Home() {
           <nav className="hidden items-center gap-8 text-sm font-medium text-ink-600 sm:flex">
             <a href="#product" className="hover:text-ink-950">Product</a>
             <a href="#pricing" className="hover:text-ink-950">Pricing</a>
-            <Link href="/demo" className="hover:text-ink-950">Demo</Link>
+            {demoAllowed && <Link href="/demo" className="hover:text-ink-950">Demo</Link>}
             <Link href="/driver" className="hover:text-ink-950">Drivers</Link>
           </nav>
           <div className="flex items-center gap-2">
@@ -70,9 +71,11 @@ export default function Home() {
               <Button href="/signup" size="lg" variant="secondary" className="!bg-white !text-ink-950 hover:!bg-white/90">
                 Get started <ArrowUpRight className="h-4 w-4" />
               </Button>
-              <Button href="/demo" size="lg" variant="outline" className="!border-white/25 !text-white hover:!border-white">
-                See the demo
-              </Button>
+              {demoAllowed && (
+                <Button href="/demo" size="lg" variant="outline" className="!border-white/25 !text-white hover:!border-white">
+                  See the demo
+                </Button>
+              )}
             </div>
           </div>
 
@@ -197,9 +200,11 @@ export default function Home() {
             <Button href="/signup" size="lg" variant="secondary" className="!bg-white !text-ink-950 hover:!bg-white/90">
               Get started <ArrowUpRight className="h-4 w-4" />
             </Button>
-            <Button href="/demo" size="lg" variant="outline" className="!border-white/25 !text-white hover:!border-white">
-              See the demo
-            </Button>
+            {demoAllowed && (
+              <Button href="/demo" size="lg" variant="outline" className="!border-white/25 !text-white hover:!border-white">
+                See the demo
+              </Button>
+            )}
           </div>
         </div>
       </section>

@@ -11,11 +11,29 @@ below switches on part of the real version, from environment variables only. The
 | [Postmark](https://postmarkapp.com) | Broker email in and out |
 | [Vercel](https://vercel.com) | Hosting, and the evening job |
 
-## The demo stays
+## Two sites: the demo and the real one
 
-Turning things on doesn't remove the demo. `your-site/demo` still opens the sample fleet for anyone, with no
-account, and nothing is saved or sent. A yellow bar on every demo screen says so. Share `/demo` with prospects and
-send real carriers to `/login` or `/signup`.
+Keep them apart by running two Vercel projects from this same repository:
+
+| | Demo site (e.g. `demo.yourdomain.com`) | Real site (e.g. `app.yourdomain.com`) |
+|---|---|---|
+| Keys | None | All the keys below |
+| `NEXT_PUBLIC_DEMO` | Leave unset | `off` |
+| What people see | The sample fleet with the AI running, a yellow "Demo" bar, nothing saved or sent | Sign-in, real fleets, real texts, calls and email. No demo page, no demo links, no sample data anywhere |
+
+- **Show the demo** by sharing the demo site. It can't text, call or email anyone, and it can't touch real accounts: it has no keys.
+- **Delete the demo** when you're done showing it by deleting the demo project in Vercel. The real site doesn't change.
+- **Bring it back** any time by creating the demo project again. The code stays in the repository.
+
+With `NEXT_PUBLIC_DEMO=off`:
+
+- `/demo` says there's no demo, and the landing page and sign-in page have no demo links.
+- The sample-data Ops portal is closed.
+- A browser tab that was in the demo can't get back into it.
+
+It's built into the app, so redeploy after changing it.
+
+You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset there: `/demo` then opens the sample fleet in a separate tab state, and signing in always leaves it. Two sites is cleaner.
 
 ## What the real version does
 

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { cloudEnabled, supabase } from "@/lib/cloud/client";
 import { claimInvites, homeFor, myMemberships } from "@/lib/cloud/account";
 import { formatPhone, toE164 } from "@/lib/cloud/phone";
-import { leaveDemo } from "@/lib/cloud/demo";
+import { demoAllowed, leaveDemo } from "@/lib/cloud/demo";
 
 /** Sign in with a phone number and a texted code: no passwords for drivers to forget. */
 export default function LoginPage() {
@@ -34,6 +34,13 @@ export default function LoginPage() {
 }
 
 function DemoNotice() {
+  if (!demoAllowed)
+    return (
+      <>
+        <h1 className="font-display text-2xl text-ink-950">Sign in</h1>
+        <p className="mt-1 text-sm text-ink-500">Sign-in isn&apos;t switched on for this site yet.</p>
+      </>
+    );
   return (
     <>
       <h1 className="font-display text-2xl text-ink-950">Sign in</h1>
@@ -138,12 +145,14 @@ function PhoneSignIn() {
             Set up your fleet
           </Link>
         </p>
-        <p className="mt-2 text-center text-xs text-ink-500">
-          Just looking?{" "}
-          <Link href="/demo" className="font-medium text-ink-950 underline">
-            See the demo
-          </Link>
-        </p>
+        {demoAllowed && (
+          <p className="mt-2 text-center text-xs text-ink-500">
+            Just looking?{" "}
+            <Link href="/demo" className="font-medium text-ink-950 underline">
+              See the demo
+            </Link>
+          </p>
+        )}
       </form>
     );
 
