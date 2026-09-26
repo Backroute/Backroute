@@ -11,6 +11,7 @@ import { readBrokerEmail } from "./broker-mail";
 import { answerRateReply, bookIt, offersFromEmail, type Sender } from "./booking";
 import { sendOrQueue } from "./outbox";
 import { sendSetupPacket } from "./paperwork";
+import { doubleBrokered, paymentScam } from "./fraud";
 import { checkBroker } from "./brokers";
 import { cancelLoad } from "./cancel";
 import { recordPayments } from "./money";
@@ -66,14 +67,18 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
         const saved: RateConPdfReading = { ...reading, fileName: pdf.Name, readAt: new Date().toISOString() };
         const updated: Load = { ...load, rateConReading: saved, updatedAt: saved.readAt };
         await save("loads", carrierId, updated as unknown as Item);
-        const serious = reading.mismatches.filter((m) => m.serious).length;
         load = updated;
-        // The rate con names the broker's MC: check it against FMCSA (and it's how a new broker gets verified).
+        // The rate con names the broker's MC: check it against FMCSA (and it's how a new broker gets verified). A
+        // different MC than the broker we booked with is how double brokering shows up: nothing moves until it's checked.
         const onLoad = ctx.brokers.find((b) => b.id === load!.brokerId);
-        if (onLoad && reading.brokerMc) await checkBroker(ctx, onLoad, reading.brokerMc);
+        const double = doubleBrokered(reading.brokerMc, onLoad);
+        if (double) await passToOwner(ctx, { reason: `Possible double brokering on ${load.referenceNumber}. ${double} Call ${onLoad!.company} on the number from FMCSA, not the one on the rate con, before the truck goes.`, loadId: load.id, critical: true, label: "Checked", source: "email", to: "support", brokerId: onLoad!.id });
+        else if (onLoad && reading.brokerMc) await checkBroker(ctx, onLoad, reading.brokerMc);
+        const serious = reading.mismatches.filter((m) => m.serious).length + (double ? 1 : 0);
         // The broker's rate con for a load the AI asked for: it confirms the booking when it matches.
         if (load.stage === "negotiating" || load.stage === "offered") {
-          if (serious) await passToOwner(ctx, { reason: `${fromName}'s rate con for ${load.referenceNumber} doesn't match what was agreed: ${reading.summary}`, loadId: load.id, label: "I'll sort it", source: "email", to: "decider" });
+          if (double) notes.push(`Not booked: ${double}`);
+          else if (serious) await passToOwner(ctx, { reason: `${fromName}'s rate con for ${load.referenceNumber} doesn't match what was agreed: ${reading.summary}`, loadId: load.id, label: "I'll sort it", source: "email", to: "decider" });
           else if (ctx.settings.autonomy !== "ask") {
             load = (await bookIt(ctx, load, reading.totalRate ?? undefined)).load;
             notes.push(`The rate con matched, so ${load.referenceNumber} is now booked and the driver has been told.`);
@@ -110,8 +115,20 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
     return;
   }
 
+  // Someone asking to change where money goes, or to confirm bank details: the AI doesn't answer, support checks.
+  if (paymentScam(`${email.Subject}\n${text}`)) {
+    await passToOwner(ctx, {
+      reason: `${fromName} <${from}> asked about bank or payment details ("${email.Subject}"). That's the most common way carriers get robbed. The AI didn't reply. Confirm by phone, using a number you already had, before changing anything.`,
+      label: "Checked",
+      source: "email",
+      to: "support",
+      critical: true,
+    });
+    return;
+  }
+
   const reading = await readBrokerEmail(email.Subject, text);
-  if (reading?.kind === "setup_request") return sendSetupPacket(ctx, { ...sender, contactName: reading.contactName });
+  if (reading?.kind === "setup_request") return sendSetupPacket(ctx, { ...sender, contactName: reading.contactName }, text);
   if (reading?.kind === "payment" && reading.payments.length) {
     await recordPayments(ctx, reading.payments, fromName);
     return;

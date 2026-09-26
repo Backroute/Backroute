@@ -69,5 +69,6 @@ export function memoryNote(loads: Load[], brokers: Broker[], load: Load): string
     );
   const lane = laneMemory(loads.filter((l) => l.id !== load.id), brokers, { originState: load.lane.originState, destState: load.lane.destState });
   if (lane.count) out.push(`On ${load.lane.originState}→${load.lane.destState} the carrier has hauled ${lane.count} load${lane.count === 1 ? "" : "s"} lately, about $${lane.avgRpm!.toFixed(2)} a mile (last: $${lane.last!.rate.toLocaleString()}).`);
+  if (load.market) out.push(`${load.market.source} has this lane at about $${load.market.rpm.toFixed(2)} a mile right now${load.market.high ? ` (up to $${load.market.high.toFixed(2)})` : ""}.`);
   return out.join(" ");
 }

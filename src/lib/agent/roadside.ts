@@ -245,3 +245,12 @@ export async function nextShop(ctx: CarrierContext, truck: Truck): Promise<boole
   await raise(ctx, { reason: `None of the shops the AI called could help truck ${truck.unitNumber} near ${r.where}. Find a shop or tow for the driver.`, loadId: r.loadId, critical: true, label: "Sorted", source: "voice", to: "support" });
   return false;
 }
+
+/** One turn of a call with a repair shop, by either kind of call: logged and answered. */
+export async function shopCallReply(ctx: CarrierContext, truck: Truck, callSid: string, said: string): Promise<{ reply: string; hangUp: boolean }> {
+  const key = `shop:${callSid}`;
+  await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "in", counterparty: key, body: said, data: { kind: "shop_call", truckId: truck.id } });
+  const result = await shopCallTurn(ctx, truck, said);
+  await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "out", counterparty: key, body: result.reply, data: { kind: "shop_call", truckId: truck.id } });
+  return result;
+}

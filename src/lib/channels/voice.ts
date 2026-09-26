@@ -3,7 +3,8 @@ import { aiConfigured } from "../ai/server";
 import { carrierById, driverByPhone, loadContext, logChannel, threadWith, addActivity } from "../agent/db";
 import { driverTurn, event, passToOwner } from "../agent/dispatcher";
 import { checkinText } from "../agent/checkins";
-import type { CheckinKind } from "../types";
+import type { CheckinKind, Driver } from "../types";
+import { streamTwiml, realtimeFor } from "./realtime";
 import { CHECKIN_CALL, DIDNT_HEAR, GOODBYE, GREETING, PASSED_ON_CALL, UNKNOWN_NUMBER } from "./phrases";
 import { publicUrl, say, sayAndListen, twiml } from "./twilio";
 
@@ -24,6 +25,7 @@ export async function answerCall(request: Request, params: Record<string, string
   const greeting = GREETING[lang](first, carrier?.name ?? "your carrier");
   await logChannel({ carrierId, channel: "voice", direction: "out", providerId: `${params.CallSid}:greeting`, driverId: driver.id, counterparty: callKey(params.CallSid), body: greeting });
   await addActivity(carrierId, event({ type: "call_started", message: `${first} called the dispatch line`, detail: "AI dispatcher answered", severity: "info" }));
+  if (realtimeFor(lang)) return streamTwiml({ kind: "driver", carrier: carrierId, ref: driver.id, callSid: params.CallSid, lang, opening: greeting });
   return twiml(sayAndListen(greeting, lang, publicUrl(request, "/api/channels/voice/turn")));
 }
 
@@ -41,6 +43,7 @@ export async function checkinCall(request: Request, params: Record<string, strin
   const lang = driver.prefs?.language ?? "en";
   const opening = `${CHECKIN_CALL[lang](driver.name.split(" ")[0], ctx.carrier.name)} ${checkinText(kind, load, driver)}`;
   await logChannel({ carrierId, channel: "voice", direction: "out", providerId: `${params.CallSid}:greeting`, driverId: driver.id, counterparty: callKey(params.CallSid), body: opening, data: { kind: "checkin", checkin: kind, loadId } });
+  if (realtimeFor(lang)) return streamTwiml({ kind: "driver", carrier: carrierId, ref: driver.id, callSid: params.CallSid, lang, opening });
   return twiml(sayAndListen(opening, lang, publicUrl(request, "/api/channels/voice/turn")));
 }
 
@@ -58,21 +61,28 @@ export async function nextTurn(request: Request, params: Record<string, string>,
     return twiml(sayAndListen(DIDNT_HEAR[lang], lang, `${turnUrl}?missed=1`));
   }
 
-  const key = callKey(params.CallSid);
+  const answer = await driverCallReply(carrierId, driver, params.CallSid, said, { confidence: params.Confidence });
+  return answer.hangUp ? twiml(`${say(answer.reply, lang)}<Hangup/>`) : twiml(sayAndListen(answer.reply, lang, turnUrl));
+}
+
+/** One turn of a driver's call, by either kind of call (turn-by-turn, or the voice server): logged, answered, acted on. */
+export async function driverCallReply(carrierId: string, driver: Driver, callSid: string, said: string, data: Record<string, unknown> = {}): Promise<{ reply: string; hangUp: boolean }> {
+  const lang = driver.prefs?.language ?? "en";
+  const key = callKey(callSid);
   const earlier = await threadWith(carrierId, "voice", key, 16);
-  await logChannel({ carrierId, channel: "voice", direction: "in", driverId: driver.id, counterparty: key, body: said, data: { confidence: params.Confidence } });
+  await logChannel({ carrierId, channel: "voice", direction: "in", driverId: driver.id, counterparty: key, body: said, data });
   const ctx = await loadContext(carrierId);
-  if (!ctx) return twiml(`${say(PASSED_ON_CALL[lang], lang)}<Hangup/>`);
+  if (!ctx) return { reply: PASSED_ON_CALL[lang], hangUp: true };
 
   const history = earlier.map((m) => ({ from: m.direction === "in" ? ("them" as const) : ("ai" as const), text: m.body ?? "" }));
   const result = aiConfigured() ? await driverTurn(ctx, driver, "voice", said, history) : { reply: "", effects: { done: [], failed: true } };
   if (result.effects.failed) {
     await passToOwner(ctx, { reason: `${driver.name} called and said: "${said}"`, label: "I'll call back", source: "voice" });
     await logChannel({ carrierId, channel: "voice", direction: "out", driverId: driver.id, counterparty: key, body: PASSED_ON_CALL[lang] });
-    return twiml(`${say(PASSED_ON_CALL[lang], lang)}<Hangup/>`);
+    return { reply: PASSED_ON_CALL[lang], hangUp: true };
   }
   await logChannel({ carrierId, channel: "voice", direction: "out", driverId: driver.id, counterparty: key, body: result.reply, data: { did: result.effects.done } });
   if (result.effects.done.length)
     await addActivity(carrierId, event({ type: "call_completed", message: `AI on the phone with ${driver.name.split(" ")[0]}`, detail: result.effects.done.join(" · "), severity: "info" }));
-  return result.effects.hangUp ? twiml(`${say(result.reply, lang)}<Hangup/>`) : twiml(sayAndListen(result.reply, lang, turnUrl));
+  return { reply: result.reply, hangUp: !!result.effects.hangUp };
 }

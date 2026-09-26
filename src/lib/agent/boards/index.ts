@@ -39,7 +39,9 @@ export function whereTrucksFree(ctx: Pick<CarrierContext, "trucks" | "loads" | "
     const home = driver?.homeBase?.split(",").map((s) => s.trim());
     const busy = ctx.loads.find((l) => l.id === truck.currentLoadId && ["dispatched", "at_pickup", "in_transit", "at_delivery"].includes(l.stage));
     let q: BoardQuery;
-    if (!busy) q = { originCity: truck.currentCity, originState: truck.currentState, radius: RADIUS, availableFrom: new Date(now).toISOString(), equipment: truck.equipmentType, towardState: home?.[1] };
+    // A truck the AI sent toward busier freight in the last day searches from where it's headed.
+    const to = truck.repositionTo && Date.parse(truck.repositionTo.at) > now - 24 * HOUR ? truck.repositionTo : null;
+    if (!busy) q = { originCity: to?.city ?? truck.currentCity, originState: to?.state ?? truck.currentState, radius: RADIUS, availableFrom: new Date(now).toISOString(), equipment: truck.equipmentType, towardState: home?.[1] };
     else {
       // Loaded: line up the reload near the delivery, for after it's done (if it delivers within a day and a half).
       const done = busy.deliveryAt ? Date.parse(busy.deliveryAt) + 2 * HOUR : null;

@@ -45,6 +45,10 @@ The real version switches on from environment variables:
 - **Breakdowns:** nearby shops found (Google Places), phoned one by one, the driver texted the one that can come, the broker told of the delay.
 - **Owner rules:** judgment calls the owner hands to the AI. After the owner sends 3 of the same kind unchanged, the AI offers to stop asking.
 - **Drivers:** a weekly check-in in their language, the owner told when someone's unhappy or long away from home, and optional weekly pay texts.
+- **Money and fraud:** market rates in pricing, invoices with detention, lumper and TONU, and QuickBooks-ready downloads. Double brokering, lookalike email domains and bank-detail scams are caught before money moves.
+- **Fleet planning:** truck routing, loads split across the whole fleet, idle trucks moved to where the freight is, slow docks remembered, check calls to brokers, and DOT, IFTA, UCR and 2290 deadlines.
+- **Natural phone calls:** with the voice server (`voice-server/`, run outside Vercel), the AI talks and listens at the same time, and stops when interrupted.
+- **Support team tools:** a playbook for each kind of hand-off, timers that turn red when an item is late, and the number to push down: hand-offs per truck per week.
 - **ELD and load feeds:** Samsara or Motive for truck locations and drivers' hours, and any JSON or CSV list of loads.
 - **Backroute support:** anything the AI can't handle goes to your support team's console at `/ops`, not to a dispatcher. On full autopilot the owner only hears about emergencies.
 - **Evening text:** an end-of-day text to the owner.

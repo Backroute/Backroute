@@ -187,6 +187,8 @@ export interface Truck {
   position?: { lat: number; lon: number; at: string; description?: string; source: "samsara" | "motive" };
   /** Real accounts: the AI's plan for this truck (now, next, home time), refreshed every dispatch round. */
   plan?: { lines: string[]; at: string };
+  /** Real accounts: the AI sent the truck empty toward busier freight; board searches start from there. */
+  repositionTo?: { city: string; state: string; at: string };
   /** Real accounts: a breakdown the AI is working on (shops found near the truck, and which one it's calling). */
   roadside?: Roadside;
   currentLoadId: string | null;
@@ -371,6 +373,8 @@ export interface LoadDocument {
   previewUrl?: string;
   /** What the AI pulled out of the document when it checked it. */
   aiNote?: string;
+  /** A lumper receipt: what was paid, read off the receipt. It's billed to the broker on the invoice. */
+  amount?: number;
 }
 
 /** The driver's on-site checklist for the stop they're at — what they've confirmed and when. */
@@ -471,6 +475,10 @@ export interface Load {
   cancellationReason?: string;
   /** Truck-Ordered-Not-Used fee owed by the broker when a truck was already dispatched or at pickup. */
   tonuFee?: number;
+  /** Real accounts: what the lane pays now, from the rate data service, when one is connected. */
+  market?: { rpm: number; high?: number; source: string };
+  /** Real accounts: when the TONU claim went to the broker (it's invoiced after). */
+  tonuClaimedAt?: string;
   /** On an offer: hours of driving from where it delivers back to the driver's home. */
   hoursHomeAfter?: number;
   /** On an offer: the whole day — pickup, delivery and the drive home — fits one shift. */
@@ -764,6 +772,9 @@ export interface RateConPdfReading {
   equipment: string | null;
   detention: string | null;
   paymentTerms: string | null;
+  /** The shipper and receiver names on the rate con: the AI remembers how long each keeps trucks. */
+  shipper?: string | null;
+  receiver?: string | null;
   finesAndFees: string[];
   mismatches: { item: string; agreed: string; onDoc: string; serious: boolean }[];
   otherConcerns: string[];
@@ -784,6 +795,8 @@ export type CheckinKind =
 export interface LoadInvoice {
   number: string;
   amount: number;
+  /** What the amount is made of: line haul, then detention, lumper or TONU. */
+  lines?: { label: string; amount: number }[];
   draftedAt: string;
   sentAt?: string;
   sentTo?: string;

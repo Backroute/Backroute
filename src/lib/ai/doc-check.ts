@@ -9,6 +9,7 @@ const Check = z.object({
   exceptions: z.array(z.string()),
   loadNumberSeen: z.string().nullable(),
   note: z.string(),
+  amount: z.number().nullable().describe("A lumper receipt: the total paid, in dollars. Otherwise null."),
 });
 export type DocCheck = z.infer<typeof Check>;
 
@@ -31,7 +32,7 @@ export async function checkStopDocument(kind: keyof typeof WHAT, bytes: Buffer, 
     ...FALLBACK,
     output_config: { effort: "medium", format: betaZodOutputFormat(Check) },
     system:
-      "You check trucking paperwork before it's billed. Say whether the file is the expected document, whether it's signed, and list any exceptions written on it (shortage, overage, damage, refused, 'subject to count'). Only report what you can see; if it's unreadable, say so in the note. Keep the note to one sentence.",
+      "You check trucking paperwork before it's billed. Say whether the file is the expected document, whether it's signed, and list any exceptions written on it (shortage, overage, damage, refused, 'subject to count'). Only report what you can see; if it's unreadable, say so in the note. Keep the note to one sentence. For a lumper receipt, give the total paid.",
     messages: [{ role: "user", content: [file, { type: "text", text: `Expected: the ${WHAT[kind]} for load ${loadRef}.` }] }],
   });
   if (response.stop_reason === "refusal") return null;

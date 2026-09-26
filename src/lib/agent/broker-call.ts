@@ -3,13 +3,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { BetaRunnableTool } from "@anthropic-ai/sdk/lib/tools/BetaRunnableTool";
-import { AI_MODEL, FALLBACK, claude } from "../ai/server";
+import { AI_MODEL, FALLBACK, aiConfigured, claude } from "../ai/server";
 import { inboundAddress } from "../channels/email";
 import { canCallOut, startCall } from "../channels/twilio";
 import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import type { Load } from "../types";
-import { addActivity, claimMark, logChannel, releaseMark, save, type CarrierContext } from "./db";
+import { addActivity, claimMark, logChannel, releaseMark, save, threadWith, type CarrierContext } from "./db";
 import { event, passToOwner } from "./dispatcher";
 import { answerBroker, floorFor } from "./pricing";
 import { askSupportAboutBroker, checkBroker } from "./brokers";
@@ -223,4 +223,22 @@ export async function followUpByPhone(ctx: CarrierContext, now: number, urlFor: 
     if (await callBroker(ctx, load, urlFor(load.id))) done.push(`${load.referenceNumber}: called the broker`);
   }
   return done;
+}
+
+const SORRY = "Sorry, I'll have someone from the office follow up by email. Thanks.";
+
+/** One turn of a call with a broker, by either kind of call: logged, answered inside the rules. */
+export async function brokerCallReply(ctx: CarrierContext, load: Load, callSid: string, said: string, data: Record<string, unknown> = {}): Promise<{ reply: string; hangUp: boolean }> {
+  const key = brokerCallKey(callSid);
+  const earlier = await threadWith(ctx.carrier.id, "voice", key, 16);
+  await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "in", counterparty: key, body: said, data: { kind: "broker_call", loadId: load.id, ...data } });
+  const history = earlier.map((m) => ({ from: m.direction === "in" ? ("them" as const) : ("ai" as const), text: m.body ?? "" }));
+  const result = aiConfigured() ? await brokerCallTurn(ctx, load, said, history) : { reply: "", hangUp: true, failed: true };
+  if (result.failed) {
+    await passToOwner(ctx, { reason: `The AI's call with the broker about ${load.referenceNumber} broke off after they said: "${said}". Follow up with them.`, loadId: load.id, label: "Followed up", source: "voice", to: "support" });
+    await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "out", counterparty: key, body: SORRY, data: { kind: "broker_call", loadId: load.id } });
+    return { reply: SORRY, hangUp: true };
+  }
+  await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "out", counterparty: key, body: result.reply, data: { kind: "broker_call", loadId: load.id } });
+  return { reply: result.reply, hangUp: result.hangUp };
 }

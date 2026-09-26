@@ -60,7 +60,7 @@ ${signature(carrier, settings)}`;
 export function setupPacket(carrier: CarrierRow, settings: AgentSettings, papers: string[], toName?: string) {
   return `${hello(toName)}
 
-Attached for your carrier setup: ${papers.join(", ")}.${settings.businessAddress ? `\n\nOur address: ${settings.businessAddress}` : ""}${settings.remitEmail ? `\nBilling and remittance: ${settings.remitEmail}` : ""}
+Attached for your carrier setup: ${papers.join(", ")}.${settings.setupProfiles?.length ? `\n\nOur setup profiles:\n${settings.setupProfiles.map((p) => `${p.name}: ${p.url}`).join("\n")}` : ""}${settings.businessAddress ? `\n\nOur address: ${settings.businessAddress}` : ""}${settings.remitEmail ? `\nBilling and remittance: ${settings.remitEmail}` : ""}
 
 Let us know if you need anything else to get us set up.
 
@@ -68,11 +68,14 @@ Thanks,
 ${signature(carrier, settings)}`;
 }
 
-export function invoiceEmail(carrier: CarrierRow, settings: AgentSettings, load: Load, number: string, amount: number, factoring: boolean, toName?: string) {
+export function invoiceEmail(carrier: CarrierRow, settings: AgentSettings, load: Load, number: string, amount: number, factoring: boolean, lines: { label: string; amount: number }[] = [], toName?: string) {
+  const tonu = load.stage === "cancelled";
   return `${hello(toName)}
 
-Attached are invoice ${number} and the signed proof of delivery for load ${load.referenceNumber}, ${lane(load)}.
-
+Attached ${tonu ? `is invoice ${number} for the truck ordered, not used on load ${load.referenceNumber}` : `are invoice ${number} and the signed proof of delivery for load ${load.referenceNumber}`}, ${lane(load)}.
+${lines.length > 1 ? `
+${lines.map((l) => `${l.label}: ${money(l.amount)}`).join("\n")}
+` : ""}
 Amount due: ${money(amount)}.${factoring ? "\n\nThis invoice is assigned to our factoring company. Please pay according to the notice of assignment on file." : settings.remitEmail ? `\n\nQuestions about payment: ${settings.remitEmail}` : ""}
 
 Thanks,
@@ -157,5 +160,15 @@ Our truck on load ${load.referenceNumber} (${lane(load)}) broke down near ${wher
 If the appointment needs to move, or you'd rather recover the load, let us know here.
 
 Thanks,
+${signature(carrier, settings)}`;
+}
+
+export function checkCall(carrier: CarrierRow, settings: AgentSettings, load: Load, u: { status: string; where: string; at: string; eta: string | null }) {
+  return `Check call for load ${load.referenceNumber} (${lane(load)}):
+
+${u.status}. Truck location: ${u.where} (GPS, ${u.at}).${u.eta ? `\nETA: ${u.eta}.` : ""}
+
+We'll send the next update in about 4 hours, or right away if anything changes.
+
 ${signature(carrier, settings)}`;
 }

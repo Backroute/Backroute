@@ -84,6 +84,8 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - Each item comes with the carrier, load, driver, broker, how to reach them, and the texts, calls or emails it came from.
   - Support can take it, call, text the driver from the dispatch number, send or fix the AI's draft, mark a broker as checked, hand it to the owner, or close it with a note the owner sees.
   - Urgent ones (a crash, a missing driver on a late load) also text the support team's phones.
+  - Each item shows its kind and a short playbook, for example emergency, possible fraud, breakdown, broker check or money. It turns red once it's late: 15 minutes for urgent items, 2 hours for the rest.
+  - The **Numbers** tab shows hand-offs to support per truck per week, by kind, how fast they're closed, and how many ran late. That's the number to push down.
   - The owner sees these items as "Backroute support is on it". Only the carrier's own decisions go to the owner, and on **Full autopilot** those go to support too, so the owner only hears about emergencies.
 - **Brokers are checked** before the AI books with them. The broker's MC number (from their email signature or rate con) is looked up with FMCSA: broker authority active, and the name on file matching the name and email domain they use. Someone posing as a real broker, or using a free email, is flagged, and support is asked to look. The AI won't book with a broker who doesn't pass.
 - **Getting paid:**
@@ -134,6 +136,26 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - A home-day request is noted and planned around.
   - The ELD notes when the truck was at the driver's home. After 3 weeks away, the owner is told.
   - If the owner turns it on, each driver gets a weekly text with their loads, miles and estimated pay before deductions.
+- **Market rates** (with a rate data service): the AI knows what the lane pays now. When the post is under the market, it opens at the market average, never past the top of the market's range. Offers show the market next to the post.
+- **Invoices with everything on them:**
+  - the line haul
+  - detention the broker was already sent a claim for
+  - a lumper the driver paid, read off the receipt photo (receipt attached)
+  - a claimed TONU is invoiced on its own, without a POD
+
+  The Downloads card in Settings exports invoices in QuickBooks Online's import columns, and each driver's pay per load.
+- **Fraud checks before money moves:**
+  - A rate con from a different MC than the broker the load was booked with (double brokering): the truck doesn't go until support confirms.
+  - An email from a domain one letter off a broker the carrier knows is treated as an impostor, even when it quotes the real broker's MC.
+  - An email asking to change bank or payment details, or to "verify" an account: the AI doesn't reply, and support confirms by phone.
+- **Check calls:** when the rate con asks for tracking, or the owner turns it on for every load, the broker gets a location and ETA email from the ELD every 4 hours.
+- **Carrier setup networks:** the carrier's MyCarrierPackets, Highway or RMIS profile links go out with every setup packet. A broker's portal invite goes to support to accept once.
+- **Truck routing** (HERE, truck mode): real road miles for loads posted without them, and ETAs by road for late notices and check calls. Without it, miles are estimated from city coordinates.
+- **The whole fleet at once:** when two loads both want the same nearest truck, it takes the better one and the other goes to the next free truck that can reach it.
+- **Moving an idle truck to the freight:** a truck that's sat empty 12 hours with nothing that fits is pointed at the nearest place the carrier's loads actually come from (at least 3 in 3 weeks). On full autopilot, within half the owner's empty-miles limit, the AI texts the driver to go. Otherwise it asks the owner. Board searches then run from there.
+- **Slow docks:** the AI remembers how long each shipper and receiver kept the carrier's trucks (from the rate con names and the driver's in and out taps). Drivers hear about a 3-hour-plus dock with the new load.
+- **Deadlines:** each truck's annual DOT inspection, the quarterly IFTA return, UCR and Form 2290. The owner is reminded ahead of each, once.
+- **Natural phone calls** (with the voice server running): the AI hears while it talks and stops when interrupted. Driver calls are covered in English, Spanish, French, Hindi, Russian and Ukrainian, and so are calls to brokers and repair shops. Punjabi calls keep taking turns.
 - **Ask the AI** (dashboard) and driver **Messages** in the app are answered by the AI from the carrier's own data.
 - **Evening text:** at 6 PM Central the owner gets a text: what was delivered, what it made, how many trucks are rolling, and what needs them.
 - **The log:** every text, call and email in or out is listed in Settings, with what the AI did.
@@ -147,9 +169,11 @@ The AI now does the day-to-day work of a dispatcher by email, text and phone. Wh
   - Truckstop is built from its public web-service reference.
   - DAT's developer documents are only open to partners, so the DAT addresses and fields must be checked against DAT's documents when access is granted. They're marked in `src/lib/agent/boards/dat.ts`.
   - Boards' terms usually limit how results are used; check them when signing.
-- **Calls take turns.** The AI and the broker (or shop) speak in turns through Twilio's speech recognition, so there's a short pause after each person speaks, and talking over each other doesn't work.
-  - A natural, interruptible voice needs an always-on server holding the call's audio stream (Twilio Media Streams with a realtime speech model). Vercel functions can't hold that open, so it would run on a separate small server. That's the next step for calls.
+- **Natural calls need the voice server running** (step 13). Without it, calls take turns through Twilio's speech recognition, with a short pause after each person speaks.
+  - Even with it, the AI answers in about a second or two, since each answer goes through the same checks as email.
+  - Punjabi calls always take turns.
   - Some brokers won't deal with an AI and hang up. Those come back to email or to support.
+- **Rate data and routing need their own accounts** (steps 11 and 12). The DAT and Greenscreens request formats must be checked against their documents when access is granted, the same as DAT's load board.
 - **Emergencies need a person.** For a crash, the AI tells the driver to call 911 and alerts support and the owner. A person reaches the driver, deals with the police report and the insurance claim, and approves any repair.
 - **Where it guesses, it asks first**, until the owner turns on the matching rule:
   - a TONU amount the rate con doesn't give
@@ -284,6 +308,38 @@ In Google Cloud:
 
 Without it, the AI still tells the owner and the broker about a breakdown, but a person has to find the shop.
 
+### 11. Market rates (optional)
+
+Set one of these:
+
+- **Greenscreens.ai:** `GREENSCREENS_API_KEY`
+- **DAT RateView:** `DAT_RATES_URL`, plus the DAT service account from step 9
+- **Any other rate API:**
+  - `RATES_API_URL`, with `{{originCity}}` etc. in it
+  - `RATES_API_HEADER`
+  - `RATES_RPM_PATH` and `RATES_HIGH_PATH`: where the numbers are in the answer
+
+Check the request format in `src/lib/agent/rates.ts` against the provider's documents first.
+
+### 12. HERE truck routing (optional)
+
+Create a HERE platform API key with Routing v8 and Geocoding, then set `HERE_API_KEY`.
+
+### 13. The voice server (for natural calls)
+
+`voice-server/` is a small Node service that holds each call's audio stream. It runs anywhere that keeps a process up: Fly.io, Render, Railway or a small VM, not Vercel.
+
+1. Deploy the `voice-server` folder (`npm install`, then `npm start`) with:
+   - `APP_URL`: this app's address
+   - `VOICE_SERVER_SECRET`: a long random string
+   - `DEEPGRAM_API_KEY`: speech to text
+   - `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`: the voice, one multilingual voice
+   - `PORT`, if the host needs it
+2. Give it a public `wss://` address. Its health check is at `/health`.
+3. In Vercel, set `VOICE_SERVER_URL` to that address and the same `VOICE_SERVER_SECRET`.
+
+Calls switch over as soon as both are set. Remove them to go back to turn-by-turn calls.
+
 ## Before real drivers: rules to get right
 
 - **Consent to texts.** Drivers must agree to get texts from the dispatch number. Get it in writing when you add them. STOP, START and HELP work, and STOP is recorded on the driver.
@@ -304,6 +360,9 @@ Without it, the AI still tells the owner and the broker about a breakdown, but a
 | Claude (Opus 5) | $5 per million input tokens and $25 per million output tokens: a few cents per text, chat answer or POD photo checked, and a little more per spoken turn, per broker email (it's read, then answered) or per rate con |
 | Google Places (breakdowns) | About 3–4 cents per search with phone numbers; one search per breakdown |
 | Load boards | Set by each board's agreement |
+| Rate data (Greenscreens, DAT RateView) | By subscription |
+| HERE routing | Free tier covers a small fleet; then a fraction of a cent per route |
+| Natural calls | Deepgram about 0.5 cents a minute, ElevenLabs a few cents a minute, and the voice server's host about $5–10 a month |
 | Check-in calls | Twilio's per-minute rate for outbound calls; most check-ins are texts |
 | The dispatcher's rounds | Every 10 minutes is about 4,300 short runs a month. Vercel Pro is $20 a month; an outside scheduler is free or close to it |
 
@@ -415,6 +474,29 @@ The code was run against local stand-ins that behave like the real services:
   - The weekly check-in goes in each driver's language, once a week, and the pay text matches their loads and miles.
   - An unhappy driver reaches the owner, and a home-day request is recorded.
   - The ELD's position at home is noted, and 25 days away tells the owner.
+- **Money and fraud:**
+  - The market rate raises the ask on an underpriced post.
+  - The invoice bills line haul, claimed detention and the lumper from the receipt, and a claimed TONU gets its own invoice.
+  - A rate con from another MC stops the booking, and support checks it.
+  - A lookalike domain quoting a real MC is flagged.
+  - A bank-details email gets no reply and goes to support.
+  - Tracking-required loads get a check call every 4 hours.
+  - A setup request gets the profile links, and portal invites go to support.
+- **Fleet:**
+  - Loads without miles get truck-route miles.
+  - Two loads for one nearest truck are split across two trucks.
+  - An idle truck is sent to the freight on full autopilot, or the owner is asked.
+  - A slow receiver is mentioned in the driver's new-load text.
+  - An inspection due in 10 days is flagged once.
+  - Invoices and driver pay download as CSV, and drivers can't download them.
+  - Support sees its numbers, and owners can't.
+- **Natural calls** (the voice server with speech stand-ins):
+  - The app hands the call's audio to the voice server with a signed set of parameters.
+  - The AI opens in its own voice.
+  - "I'm loaded" moves the load, and talking over the AI stops it.
+  - Goodbye ends the call.
+  - A stream with a wrong signature is shut, and the turn endpoint refuses callers without the secret.
+  - A Punjabi-speaking driver's call stays turn by turn.
 
 **None of it has been run against the live services yet.** These are all untested:
 

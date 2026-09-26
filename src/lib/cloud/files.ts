@@ -2,7 +2,7 @@ import { authHeader } from "../ai/client";
 
 export type FileKind = "w9" | "coi" | "authority" | "noa" | "bol" | "pod" | "lumper_receipt" | "other";
 
-export type Uploaded = { ok: true; id: string; status: "verified" | "check"; note: string | null } | { ok: false; reason: string };
+export type Uploaded = { ok: true; id: string; status: "verified" | "check"; note: string | null; amount?: number | null } | { ok: false; reason: string };
 
 const REASON: Record<string, string> = {
   too_large: "That file is over 10 MB.",
@@ -21,9 +21,9 @@ export async function uploadFile(kind: FileKind, file: File, extra: { loadId?: s
   if (extra.expiresOn) form.set("expiresOn", extra.expiresOn);
   try {
     const res = await fetch("/api/files", { method: "POST", headers: await authHeader(), body: form, signal: AbortSignal.timeout(90_000) });
-    const body = (await res.json().catch(() => ({}))) as { id?: string; status?: "verified" | "check"; note?: string | null; error?: string };
+    const body = (await res.json().catch(() => ({}))) as { id?: string; status?: "verified" | "check"; note?: string | null; amount?: number | null; error?: string };
     if (!res.ok || !body.id) return { ok: false, reason: REASON[body.error ?? ""] ?? "Didn't upload. Check the signal." };
-    return { ok: true, id: body.id, status: body.status ?? "verified", note: body.note ?? null };
+    return { ok: true, id: body.id, status: body.status ?? "verified", note: body.note ?? null, amount: body.amount ?? null };
   } catch {
     return { ok: false, reason: "Didn't upload. Check the signal." };
   }

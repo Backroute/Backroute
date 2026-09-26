@@ -24,7 +24,18 @@ const billTo = (ctx: CarrierContext, l: Load) => l.brokerContactEmail ?? brokerO
 // ─── Setup packet ────────────────────────────────────────────────────────────
 
 /** A broker asked for the carrier's papers: send what's on file, or tell the owner what's missing. */
-export async function sendSetupPacket(ctx: CarrierContext, sender: { from: string; fromName: string; subject: string; messageId?: string; contactName?: string | null }) {
+const SETUP_NETWORKS = /https?:\/\/[^\s>"]*(mycarrierpackets|rmis|registrymonitoring|highway\.com|carrierassure|carrier411|carrierok|trucker ?tools|assure)[^\s>"]*/i;
+
+export async function sendSetupPacket(ctx: CarrierContext, sender: { from: string; fromName: string; subject: string; messageId?: string; contactName?: string | null }, text = "") {
+  // An invite to the broker's onboarding portal needs someone to sign in and accept it: support does it once.
+  const invite = text.match(SETUP_NETWORKS)?.[0];
+  if (invite)
+    await passToOwner(ctx, {
+      reason: `${sender.fromName} wants ${ctx.carrier.name} set up through their onboarding portal: ${invite}. Complete it with the details and papers in Settings; the AI sent the papers by email too.`,
+      label: "Set up",
+      source: "email",
+      to: "support",
+    });
   const papers = await latestFiles(ctx.carrier.id, ["w9", "coi", "authority", "noa"]);
   const has = (k: string) => papers.find((p) => p.kind === k);
   const today = new Date().toISOString().slice(0, 10);
@@ -82,7 +93,20 @@ export async function confirmPhoneBooking(ctx: CarrierContext, load: Load, to: s
 
 // ─── Invoices ────────────────────────────────────────────────────────────────
 
-function invoicePdf(ctx: CarrierContext, load: Load, number: string, amount: number): Buffer {
+/**
+ * What goes on the invoice: the line haul, detention the broker was already sent a claim for, and a lumper the driver
+ * paid (read off the receipt). A cancelled load that was claimed as TONU is billed for that alone.
+ */
+export function invoiceLines(load: Load): { label: string; amount: number }[] {
+  if (load.stage === "cancelled") return load.tonuFee ? [{ label: "Truck ordered, not used (TONU)", amount: load.tonuFee }] : [];
+  const lines = [{ label: "Line haul, all in", amount: load.bookedRate ?? 0 }];
+  for (const c of load.detentionClaims ?? []) if (c.sentAt && c.amount > 0) lines.push({ label: `Detention at ${c.stop} (${Math.round(c.minutes / 6) / 10} hours, claimed ${c.sentAt.slice(0, 10)})`, amount: c.amount });
+  for (const d of load.documents) if (d.type === "lumper_receipt" && d.amount && d.fileId) lines.push({ label: "Lumper (receipt attached)", amount: d.amount });
+  return lines;
+}
+
+function invoicePdf(ctx: CarrierContext, load: Load, number: string, charges: { label: string; amount: number }[]): Buffer {
+  const amount = charges.reduce((s, l) => s + l.amount, 0);
   const broker = brokerOf(ctx, load);
   const s = ctx.settings;
   const lines: PdfLine[] = [
@@ -103,12 +127,11 @@ function invoicePdf(ctx: CarrierContext, load: Load, number: string, amount: num
     { text: `Delivery: ${load.lane.destination}, ${load.lane.destState} · ${load.deliveryAt ? formatAtStop(load.deliveryAt, load.lane.destState) : load.deliveryWindow}` },
     { text: `Equipment: ${load.equipmentType}` },
     { text: "Charges", bold: true, gap: 14 },
-    { text: `Line haul, all in` },
-    { text: `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`, x: 460, gap: -14.85 },
+    ...charges.flatMap((l) => [{ text: l.label }, { text: `$${l.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`, x: 460, gap: -14.85 }]),
     { text: "Total due", bold: true, gap: 8 },
     { text: `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`, bold: true, x: 460, gap: -14.85 },
     ...(s.factoringEmail ? [{ text: "This invoice is assigned to our factoring company. Pay according to the notice of assignment on file.", size: 9, gap: 18 }] : []),
-    { text: "Signed proof of delivery attached.", size: 9, gap: s.factoringEmail ? 2 : 18 },
+    ...(load.stage === "cancelled" ? [] : [{ text: "Signed proof of delivery attached.", size: 9, gap: s.factoringEmail ? 2 : 18 }]),
   ];
   return textPdf(lines);
 }
@@ -117,9 +140,11 @@ function invoicePdf(ctx: CarrierContext, load: Load, number: string, amount: num
 export async function sendInvoices(ctx: CarrierContext): Promise<string[]> {
   const done: string[] = [];
   for (const load of ctx.loads) {
-    if (load.stage !== "delivered" || load.invoice || !load.bookedRate) continue;
+    if (load.invoice) continue;
+    // A cancellation claimed as TONU is billed once the claim has gone out (no POD for a load that never moved).
+    if (load.stage === "cancelled" ? !load.tonuFee || !load.tonuClaimedAt : load.stage !== "delivered" || !load.bookedRate) continue;
     const pod = load.documents.find((d) => d.type === "pod" && d.fileId && d.status === "verified");
-    if (!pod) continue; // The check-ins ask the driver for it.
+    if (!pod && load.stage !== "cancelled") continue; // The check-ins ask the driver for it.
     if (!(await claimMark(ctx.carrier.id, load.id, "invoice"))) continue;
     try {
       const to = ctx.settings.factoringEmail ?? billTo(ctx, load);
@@ -129,24 +154,26 @@ export async function sendInvoices(ctx: CarrierContext): Promise<string[]> {
         continue;
       }
       const number = `INV-${load.referenceNumber}`.replace(/[^\w-]/g, "");
-      const amount = load.bookedRate;
-      const fileId = await storeFile(ctx.carrier.id, { kind: "invoice", name: `${number}.pdf`, contentType: "application/pdf", bytes: invoicePdf(ctx, load, number, amount), loadId: load.id });
+      const lines = invoiceLines(load);
+      const amount = lines.reduce((s, l) => s + l.amount, 0);
+      const fileId = await storeFile(ctx.carrier.id, { kind: "invoice", name: `${number}.pdf`, contentType: "application/pdf", bytes: invoicePdf(ctx, load, number, lines), loadId: load.id });
       const bol = load.documents.find((d) => d.type === "bol" && d.fileId);
-      const withInvoice: Load = { ...load, invoice: { number, amount, draftedAt: new Date().toISOString() }, updatedAt: new Date().toISOString() };
+      const lumper = load.documents.find((d) => d.type === "lumper_receipt" && d.amount && d.fileId);
+      const withInvoice: Load = { ...load, invoice: { number, amount, lines, draftedAt: new Date().toISOString() }, updatedAt: new Date().toISOString() };
       await save("loads", ctx.carrier.id, withInvoice as unknown as Item);
       ctx.loads = ctx.loads.map((l) => (l.id === load.id ? withInvoice : l));
       const result = await sendOrQueue(ctx, {
         purpose: "invoice",
         to,
         subject: mail.subjectFor(load, `Invoice ${number}`),
-        body: mail.invoiceEmail(ctx.carrier, ctx.settings, load, number, amount, !!ctx.settings.factoringEmail),
+        body: mail.invoiceEmail(ctx.carrier, ctx.settings, load, number, amount, !!ctx.settings.factoringEmail, lines),
         loadId: load.id,
         amount,
-        attachments: [{ fileId, name: `${number}.pdf` }, { fileId: pod.fileId!, name: pod.name }, ...(bol ? [{ fileId: bol.fileId!, name: bol.name }] : [])],
+        attachments: [{ fileId, name: `${number}.pdf` }, ...(pod ? [{ fileId: pod.fileId!, name: pod.name }] : []), ...(bol ? [{ fileId: bol.fileId!, name: bol.name }] : []), ...(lumper ? [{ fileId: lumper.fileId!, name: lumper.name }] : [])],
         // A POD with something written on it (a shortage, damage, no signature) waits for the owner.
-        withinRules: !pod.flagged,
+        withinRules: !pod?.flagged,
         rule: "invoice_noted_pod",
-        why: pod.flagged ? `Invoice ${number} for ${load.referenceNumber} is ready, but check the POD first: ${pod.aiNote ?? "the AI saw a problem on it"}.` : `Invoice ${number} for ${load.referenceNumber}, $${amount.toLocaleString()}, is ready to send with the POD.`,
+        why: pod?.flagged ? `Invoice ${number} for ${load.referenceNumber} is ready, but check the POD first: ${pod.aiNote ?? "the AI saw a problem on it"}.` : `Invoice ${number} for ${load.referenceNumber}, $${amount.toLocaleString()}, is ready to send${pod ? " with the POD" : ""}.`,
       });
       done.push(`${load.referenceNumber}: invoice ${result}`);
     } catch (error) {

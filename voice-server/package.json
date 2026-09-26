@@ -1,0 +1,9 @@
+{
+  "name": "backroute-voice-server",
+  "private": true,
+  "type": "module",
+  "description": "Always-on voice server for natural, interruptible AI phone calls (Twilio Media Streams).",
+  "scripts": { "start": "node server.mjs" },
+  "engines": { "node": ">=20" },
+  "dependencies": { "ws": "^8.18.0" }
+}

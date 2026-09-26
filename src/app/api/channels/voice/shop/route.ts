@@ -1,5 +1,6 @@
 import { loadContext, logChannel } from "@/lib/agent/db";
 import { nextShop, SHOP_VOICEMAIL, shopCallOpening } from "@/lib/agent/roadside";
+import { streamTwiml, realtimeFor } from "@/lib/channels/realtime";
 import { publicUrl, readTwilioWebhook, say, sayAndListen, twiml, twilioConfigured } from "@/lib/channels/twilio";
 
 export const maxDuration = 30;
@@ -23,5 +24,6 @@ export async function POST(request: Request) {
   }
   const opening = shopCallOpening(ctx, truck, truck.roadside);
   await logChannel({ carrierId, channel: "voice", direction: "out", providerId: `${params.CallSid}:greeting`, counterparty: key, body: opening, data: { kind: "shop_call", truckId: truck.id } });
+  if (realtimeFor("en")) return streamTwiml({ kind: "shop", carrier: carrierId, ref: truck.id, callSid: params.CallSid, lang: "en", opening });
   return twiml(sayAndListen(opening, "en", publicUrl(request, `/api/channels/voice/shop/turn?carrier=${encodeURIComponent(carrierId)}&truck=${encodeURIComponent(truck.id)}`)));
 }

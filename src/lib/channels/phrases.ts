@@ -203,3 +203,25 @@ export const WEEKLY_PAY: Record<Lang, (p: { loads: number; miles: string; pay: s
   uk: (p) => `Твій тиждень (${p.from}–${p.to}): вантажів ${p.loads}, ${p.miles} миль, близько ${p.pay} до відрахувань. Питання? Пиши сюди.`,
   fr: (p) => `Ta semaine (du ${p.from} au ${p.to}) : ${p.loads} voyage${p.loads === 1 ? "" : "s"}, ${p.miles} milles, environ ${p.pay} de paie avant retenues. Des questions ? Réponds ici.`,
 };
+
+/** The AI sends a truck empty toward busier freight (full autopilot, within the owner's empty-miles limit). */
+export const REPOSITION: Record<Lang, (p: { city: string; miles: number }) => string> = {
+  en: (p) => `Nothing's shipping near you that fits. Head empty to ${p.city} (about ${p.miles} miles): that's where most of our loads come from. I'll look for a load there while you drive.`,
+  es: (p) => `No hay carga cerca que sirva. Ve vacío a ${p.city} (unas ${p.miles} millas): de ahí salen la mayoría de nuestras cargas. Busco una mientras manejas.`,
+  pa: (p) => `ਨੇੜੇ ਕੋਈ ਢੁਕਵਾਂ ਲੋਡ ਨਹੀਂ। ਖਾਲੀ ${p.city} ਵੱਲ ਜਾਓ (ਲਗਭਗ ${p.miles} ਮੀਲ): ਸਾਡੇ ਜ਼ਿਆਦਾਤਰ ਲੋਡ ਉੱਥੋਂ ਨਿਕਲਦੇ ਹਨ। ਤੁਸੀਂ ਚਲਾਓ, ਮੈਂ ਲੋਡ ਲੱਭਦਾ ਹਾਂ।`,
+  hi: (p) => `आस-पास कोई सही लोड नहीं है। खाली ${p.city} की तरफ़ जाइए (लगभग ${p.miles} मील): हमारे ज़्यादातर लोड वहीं से निकलते हैं। आप चलाइए, मैं लोड ढूँढता हूँ।`,
+  ru: (p) => `Рядом подходящих грузов нет. Езжай порожняком в ${p.city} (около ${p.miles} миль): оттуда идёт больше всего наших грузов. Поищу груз, пока едешь.`,
+  uk: (p) => `Поруч підходящих вантажів немає. Їдь порожняком до ${p.city} (близько ${p.miles} миль): звідти йде найбільше наших вантажів. Пошукаю вантаж, поки їдеш.`,
+  fr: (p) => `Rien qui convient près de toi. Va à vide vers ${p.city} (environ ${p.miles} milles) : c'est de là que partent la plupart de nos voyages. Je cherche un chargement pendant que tu roules.`,
+};
+
+/** A shipper or receiver that usually keeps trucks waiting: the driver hears before they go. */
+export const SLOW_DOCK: Record<Lang, (p: { name: string; hours: string }) => string> = {
+  en: (p) => `Heads up: ${p.name} usually takes about ${p.hours} hours. Tap arrived and done in the app so the wait gets billed as detention.`,
+  es: (p) => `Ojo: ${p.name} suele tardar unas ${p.hours} horas. Marca llegada y salida en la app para cobrar la espera como detención.`,
+  pa: (p) => `ਧਿਆਨ ਦਿਓ: ${p.name} ਵਿੱਚ ਆਮ ਤੌਰ 'ਤੇ ਲਗਭਗ ${p.hours} ਘੰਟੇ ਲੱਗਦੇ ਹਨ। ਐਪ ਵਿੱਚ ਪਹੁੰਚਣ ਅਤੇ ਨਿਕਲਣ ਦਾ ਸਮਾਂ ਦਬਾਓ ਤਾਂ ਜੋ ਡਿਟੈਂਸ਼ਨ ਦੇ ਪੈਸੇ ਮਿਲਣ।`,
+  hi: (p) => `ध्यान दें: ${p.name} में आम तौर पर लगभग ${p.hours} घंटे लगते हैं। ऐप में पहुँचने और निकलने का समय दबाइए ताकि डिटेंशन का पैसा मिले।`,
+  ru: (p) => `Внимание: в ${p.name} обычно держат около ${p.hours} ч. Отмечай прибытие и отъезд в приложении, чтобы простой оплатили.`,
+  uk: (p) => `Увага: у ${p.name} зазвичай тримають близько ${p.hours} год. Відмічай прибуття і від'їзд у застосунку, щоб простій оплатили.`,
+  fr: (p) => `Attention : ${p.name} prend souvent environ ${p.hours} heures. Indique arrivée et départ dans l'appli pour facturer l'attente.`,
+};

@@ -21,7 +21,8 @@ export function planFor(ctx: Pick<CarrierContext, "loads" | "drivers">, truck: T
   const offered = ctx.loads.filter((l) => l.truckId === truck.id && l.stage === "offered").length;
   if (truck.status === "maintenance") lines.push("In the shop.");
   if (current) lines.push(`Now: ${current.referenceNumber} to ${current.lane.destination}, ${current.lane.destState}, delivering ${at(current.deliveryAt, current.lane.destState, current.deliveryWindow)}.`);
-  else if (truck.status !== "maintenance") lines.push(`Empty in ${truck.currentCity}, ${truck.currentState}.`);
+  else if (truck.status !== "maintenance")
+    lines.push(truck.repositionTo && Date.parse(truck.repositionTo.at) > now - 86400_000 ? `Empty, heading to ${truck.repositionTo.city}, ${truck.repositionTo.state} where the freight is.` : `Empty in ${truck.currentCity}, ${truck.currentState}.`);
   if (next) lines.push(`Next: ${next.referenceNumber}, ${next.lane.origin} → ${next.lane.destination}, ${next.stage === "negotiating" ? "waiting on the broker" : `picks up ${at(next.pickupAt, next.lane.originState, next.pickupWindow)}`}.`);
   else if (chasing) lines.push(`Next: asking ${chasing.lane.origin} → ${chasing.lane.destination} at $${(chasing.bookRequest?.ask ?? chasing.targetRate).toLocaleString()}, waiting on the broker.`);
   else if (truck.status !== "maintenance") {

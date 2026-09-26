@@ -3,7 +3,7 @@ import { assessBroker } from "../broker-policy";
 import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import { estimateMiles, guessEquipment, makeBroker, makeLoad } from "../fleet";
-import { NEW_LOAD } from "../channels/phrases";
+import { NEW_LOAD, SLOW_DOCK } from "../channels/phrases";
 import { absoluteUrl, sendSms, twilioConfigured } from "../channels/twilio";
 import { formatAtStop, stopLocalToIso } from "../stop-time";
 import type { Broker, Load, Truck } from "../types";
@@ -16,6 +16,10 @@ import { callBroker } from "./broker-call";
 import { canMakePickup } from "./eld";
 import { answerBroker, askFor, floorFor } from "./pricing";
 import { laneMemory } from "./memory";
+import { route } from "./routing";
+import { slowDocks } from "./facilities";
+import { lookalikeOf } from "./fraud";
+import { marketRate } from "./rates";
 import { homeTimeStatus } from "../home";
 import * as mail from "./templates";
 
@@ -46,16 +50,20 @@ export async function brokerFor(ctx: CarrierContext, email: string, name: string
   if (found) return found;
   const domain = email.split("@")[1]?.split(".").slice(-2, -1)[0];
   const company = companyName?.trim() || (domain && !/gmail|yahoo|outlook|hotmail|icloud|aol/i.test(domain) ? domain.toUpperCase() : name);
-  const broker = makeBroker(company, email);
+  let broker = makeBroker(company, email);
+  // Writing from a domain one letter off a broker the carrier already knows: treated as an impostor until checked.
+  const imitated = email ? lookalikeOf(email, ctx.brokers) : null;
+  if (imitated) broker = { ...broker, authorityVerified: false, fraudRisk: "high", verifyNote: `Writes from ${email.split("@")[1]}, which looks like ${imitated.company}'s ${imitated.email?.split("@")[1]} but isn't. Could be someone posing as them.` };
   await save("records", ctx.carrier.id, broker as unknown as Item, "broker");
   ctx.brokers.push(broker);
   return broker;
 }
 
 /** The truck that can take a load soonest with the least empty driving, if any. */
-function bestTruck(ctx: CarrierContext, o: { equipment: Load["equipmentType"]; originCity: string; originState: string; destinationState: string; pickupAt: number | null; miles: number }) {
+function bestTruck(ctx: CarrierContext, o: { equipment: Load["equipmentType"]; originCity: string; originState: string; destinationState: string; pickupAt: number | null; miles: number }, skip?: Set<string>) {
   let best: { truck: Truck; deadhead: number } | null = null;
   for (const truck of ctx.trucks) {
+    if (skip?.has(truck.id)) continue;
     if (!truck.driverId || truck.equipmentType !== o.equipment || truck.status === "maintenance" || truck.nextLoadId) continue;
     // States the driver said they won't run into.
     if (ctx.drivers.find((d) => d.id === truck.driverId)?.prefs?.avoidStates?.includes(o.destinationState)) continue;
@@ -100,14 +108,16 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
     const same = (l: Load) => l.brokerId === broker.id && l.lane.origin.toLowerCase() === o.originCity!.toLowerCase() && l.lane.destination.toLowerCase() === o.destinationCity!.toLowerCase() && (l.pickupAt ?? null) === (pickupAt ?? null);
     if (!o.loadNumber && ctx.loads.some(same)) continue;
     if (pickupAt && Date.parse(pickupAt) < Date.now()) continue; // Already gone.
-    const miles = o.miles ?? estimateMiles({ city: o.originCity, state: o.originState }, { city: o.destinationCity, state: o.destinationState });
+    // Truck routing (real road miles) when it's set up, the built-in estimate otherwise.
+    const miles = o.miles ?? (await route({ city: o.originCity, state: o.originState }, { city: o.destinationCity, state: o.destinationState }))?.miles ?? estimateMiles({ city: o.originCity, state: o.originState }, { city: o.destinationCity, state: o.destinationState });
     if (!miles) continue;
     const fit = bestTruck(ctx, { equipment, originCity: o.originCity, originState: o.originState, destinationState: o.destinationState, pickupAt: pickupAt ? Date.parse(pickupAt) : null, miles });
     if (!fit) continue;
 
     const posted = o.rate ?? 0;
     const draft = { lane: { miles }, listedRate: posted } as Pick<Load, "lane" | "listedRate">;
-    const ask = askFor(draft as Load, ctx.settings, laneMemory(ctx.loads, ctx.brokers, { originState: o.originState, destState: o.destinationState }));
+    const market = await marketRate({ originCity: o.originCity, originState: o.originState, destinationCity: o.destinationCity, destinationState: o.destinationState, equipment });
+    const ask = askFor(draft as Load, ctx.settings, laneMemory(ctx.loads, ctx.brokers, { originState: o.originState, destState: o.destinationState }), market);
     const base = makeLoad(
       {
         truckId: fit.truck.id,
@@ -139,6 +149,7 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
       isChained: false,
       offerGroupId: `offers-${fit.truck.id}`,
       source: sender.feed ? `${sender.feed} · ${broker.company}` : `Email from ${broker.company}`,
+      ...(market ? { market: { rpm: market.rpm, high: market.high, source: market.source } } : {}),
       ...(sender.from ? { brokerContactEmail: sender.from } : {}),
       ...(sender.feed ? {} : { offerEmail: { subject: sender.subject, messageId: sender.messageId } }),
     };
@@ -162,6 +173,27 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
     const byTruck = new Map<string, Load[]>();
     for (const l of added) byTruck.set(l.truckId!, [...(byTruck.get(l.truckId!) ?? []), l]);
     for (const group of byTruck.values()) {
+      const floor = (l: Load) => floorFor(l, ctx.settings);
+      const pick = pickForTruck(ctx, group.filter((l) => floor(l) !== null && l.targetRate >= floor(l)!));
+      if (pick) {
+        await requestBooking(ctx, pick, pick.targetRate, { byRules: true });
+        asked.push(pick);
+      }
+    }
+    // The whole fleet at once: a load that lost out on its nearest truck goes to the next free truck that can take it.
+    const taken = new Set(asked.map((l) => l.truckId!));
+    const leftover = new Map<string, Load[]>();
+    for (const l of added) {
+      const now = ctx.loads.find((x) => x.id === l.id);
+      if (!now || now.stage !== "declined" || asked.includes(l)) continue;
+      const alt = bestTruck(ctx, { equipment: l.equipmentType, originCity: l.lane.origin, originState: l.lane.originState, destinationState: l.lane.destState, pickupAt: l.pickupAt ? Date.parse(l.pickupAt) : null, miles: l.lane.miles }, taken);
+      if (!alt) continue;
+      const moved: Load = { ...now, stage: "offered", truckId: alt.truck.id, offerGroupId: `offers-${alt.truck.id}`, deadheadMiles: alt.deadhead, updatedAt: new Date().toISOString() };
+      await save("loads", ctx.carrier.id, moved as unknown as Item);
+      ctx.loads = ctx.loads.map((x) => (x.id === moved.id ? moved : x));
+      leftover.set(alt.truck.id, [...(leftover.get(alt.truck.id) ?? []), moved]);
+    }
+    for (const group of leftover.values()) {
       const floor = (l: Load) => floorFor(l, ctx.settings);
       const pick = pickForTruck(ctx, group.filter((l) => floor(l) !== null && l.targetRate >= floor(l)!));
       if (pick) {
@@ -333,13 +365,16 @@ export async function textNewLoad(ctx: CarrierContext, load: Load): Promise<bool
   const driver = ctx.drivers.find((d) => d.id === truck?.driverId);
   const to = driver ? toE164(driver.phone) : null;
   if (!driver || !to || driver.prefs?.smsOptOut) return false;
-  const text = NEW_LOAD[driver.prefs?.language ?? "en"]({
+  const lang = driver.prefs?.language ?? "en";
+  // A dock that usually keeps trucks 3 hours or more: the driver hears it with the load.
+  const slow = slowDocks(ctx.loads, load).map((f) => SLOW_DOCK[lang]({ name: f.name, hours: (Math.round(f.avgMinutes / 30) / 2).toString() }));
+  const text = [NEW_LOAD[lang]({
     ref: load.referenceNumber,
     from: `${load.lane.origin}, ${load.lane.originState}`,
     to: `${load.lane.destination}, ${load.lane.destState}`,
     pickup: load.pickupWindow,
     delivery: load.deliveryWindow,
-  });
+  }), ...slow].join(" ");
   const sid = await sendSms(to, text);
   await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: new Date().toISOString(), channel: "sms" });
   await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: to, body: text, data: { kind: "new_load", loadId: load.id } });

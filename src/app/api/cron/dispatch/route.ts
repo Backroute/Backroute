@@ -4,11 +4,13 @@ import { expireOffers, sendDetentionClaims, sendInvoices, warnCoiExpiring } from
 import { emailConfigured } from "@/lib/channels/email";
 import { chasePayments } from "@/lib/agent/money";
 import { followUpByPhone } from "@/lib/agent/broker-call";
-import { applyEld, lateNotices, readEld } from "@/lib/agent/eld";
+import { applyEld, checkCalls, lateNotices, readEld } from "@/lib/agent/eld";
 import { pullFeed, readFeed } from "@/lib/agent/feeds";
 import { integrationsFor, setStatus, type EldConfig, type FeedConfig } from "@/lib/agent/integrations";
 import { isBoard, runBoards } from "@/lib/agent/boards";
 import { offerCapacity } from "@/lib/agent/capacity";
+import { suggestRepositions } from "@/lib/agent/reposition";
+import { complianceReminders } from "@/lib/agent/compliance";
 import { refreshPlans } from "@/lib/agent/plan";
 import { trackHomeTime, weeklyCare } from "@/lib/agent/care";
 import { publicUrl, twilioConfigured } from "@/lib/channels/twilio";
@@ -68,10 +70,15 @@ export async function GET(request: Request) {
       }
       done.push(...(await runBoards(ctx, links.filter((l) => isBoard(l.kind)), now, (row, status) => setStatus(id, row.kind, status))));
       done.push(...(await offerCapacity(ctx, now)));
+      done.push(...(await suggestRepositions(ctx, now)));
+      done.push(...(await complianceReminders(ctx, now)));
       done.push(...(await trackHomeTime(ctx, now)));
       done.push(...(await weeklyCare(ctx, now)));
       await refreshPlans(ctx, now);
-      if (emailConfigured()) done.push(...(await lateNotices(ctx, now)));
+      if (emailConfigured()) {
+        done.push(...(await lateNotices(ctx, now)));
+        done.push(...(await checkCalls(ctx, now)));
+      }
       const expired = await expireOffers(ctx, now);
       if (expired) done.push(`${expired} old offer${expired === 1 ? "" : "s"} taken off the board`);
       await warnCoiExpiring(ctx, now);

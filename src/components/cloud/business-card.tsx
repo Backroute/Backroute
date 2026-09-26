@@ -21,13 +21,23 @@ export function BusinessCard() {
     remitEmail: settings.remitEmail ?? "",
     factoringEmail: settings.factoringEmail ?? "",
     minRpm: settings.minRpm ? settings.minRpm.toFixed(2) : "",
+    profiles: (settings.setupProfiles ?? []).map((p) => `${p.name}, ${p.url}`).join("\n"),
   }));
+  const profiles = f.profiles
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const url = line.match(/https?:\/\/\S+/)?.[0];
+      return url ? { name: line.replace(url, "").replace(/[,:\s-]+$/, "").trim() || new URL(url).hostname, url } : null;
+    });
   const [saved, setSaved] = useState(false);
   const rpm = Number(f.minRpm.replace(/[$\s]/g, ""));
   const bad = [
     f.minRpm && !(rpm >= 0.5 && rpm <= 20) && "a rate per mile between $0.50 and $20",
     f.remitEmail && !/^\S+@\S+\.\S+$/.test(f.remitEmail) && "a real billing email",
     f.factoringEmail && !/^\S+@\S+\.\S+$/.test(f.factoringEmail) && "a real factoring email",
+    profiles.some((p) => !p) && "a link (https://…) on each setup profile line",
   ].filter(Boolean);
 
   function save() {
@@ -37,6 +47,7 @@ export function BusinessCard() {
       remitEmail: f.remitEmail.trim() || undefined,
       factoringEmail: f.factoringEmail.trim() || undefined,
       minRpm: f.minRpm ? Math.round(rpm * 100) / 100 : undefined,
+      setupProfiles: profiles.filter((p): p is { name: string; url: string } => !!p),
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -74,6 +85,11 @@ export function BusinessCard() {
             Factoring company email (optional)
             <input className={input} type="email" placeholder="Leave empty if brokers pay you directly" value={f.factoringEmail} onChange={(e) => set({ factoringEmail: e.target.value })} />
             <span className="font-normal text-ink-500">If you factor, invoices and PODs go there instead of to the broker.</span>
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-ink-700 sm:col-span-2">
+            Carrier setup profiles (optional)
+            <textarea className={`${input} h-20`} placeholder={"MyCarrierPackets, https://mycarrierpackets.com/...\nHighway, https://highway.com/..."} value={f.profiles} onChange={(e) => set({ profiles: e.target.value })} />
+            <span className="font-normal text-ink-500">One per line. Brokers who onboard through these networks get the links along with your W-9 and insurance.</span>
           </label>
         </div>
         {bad.length > 0 && <p className="text-xs text-[var(--accent-danger)]">Needs {bad.join(", ")}.</p>}

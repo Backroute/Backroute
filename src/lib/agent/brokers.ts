@@ -1,4 +1,5 @@
 import "server-only";
+import { lookalikeOf } from "./fraud";
 import type { Item } from "../cloud/rows";
 import { lookupMc } from "../fmcsa-lookup";
 import type { Broker } from "../types";
@@ -46,15 +47,19 @@ export async function checkBroker(ctx: CarrierContext, broker: Broker, mc?: stri
     const active = rec.brokerAuthority === "A";
     const nameOk = sameCompany([rec.legalName, rec.dbaName ?? ""], broker.company, broker.email);
     const freeMail = !!broker.email && FREE_MAIL.test(broker.email);
-    const verified = active && nameOk;
+    // A real MC quoted from a domain that imitates a broker the carrier already works with: still an impostor.
+    const imitated = broker.email ? lookalikeOf(broker.email, ctx.brokers.filter((b) => b.id !== broker.id)) : null;
+    const verified = active && nameOk && !imitated;
     next = {
       ...broker,
       mc: number,
       legalName: rec.legalName,
       authorityVerified: verified,
-      fraudRisk: !active || !nameOk ? "high" : freeMail ? "medium" : "low",
+      fraudRisk: !active || !nameOk || imitated ? "high" : freeMail ? "medium" : "low",
       verifiedAt: at,
-      verifyNote: !active
+      verifyNote: imitated
+        ? `Quotes MC ${number} (${rec.legalName}) but writes from ${broker.email!.split("@")[1]}, which imitates ${imitated.company}'s ${imitated.email?.split("@")[1]}. Could be someone posing as them.`
+        : !active
         ? `MC ${number} (${rec.legalName}) has no active broker authority with FMCSA.`
         : !nameOk
           ? `MC ${number} belongs to ${rec.legalName}, which doesn't match "${broker.company}"${broker.email ? ` <${broker.email}>` : ""}. Could be someone posing as them.`

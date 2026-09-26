@@ -137,6 +137,7 @@ async function afterSent(ctx: CarrierContext, loadId: string, draft: DraftMessag
       bookRequest: { ...load.bookRequest, ask: draft.amount, askedAt: at, status: p === "accept" ? "accepted" : "sent", countered: load.bookRequest?.countered || p === "counter" },
     };
   } else if (p === "invoice" && load.invoice) next = { ...load, invoice: { ...load.invoice, sentAt: at, sentTo: draft.to } };
+  else if (p === "tonu") next = { ...load, tonuClaimedAt: at };
   else if (p === "detention") next = { ...load, detentionClaims: (load.detentionClaims ?? []).map((c) => (c.sentAt ? c : { ...c, sentAt: at })) };
   else if (p === "payment_reminder" && load.invoice) next = { ...load, invoice: { ...load.invoice, remindedAt: [...(load.invoice.remindedAt ?? []), at] } };
   if (!next) return;

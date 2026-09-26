@@ -38,6 +38,8 @@ export const Reading = z.object({
   equipment: z.string().nullable(),
   detention: z.string().nullable(),
   paymentTerms: z.string().nullable(),
+  shipper: z.string().nullable().describe("The pickup facility's company name, as printed."),
+  receiver: z.string().nullable().describe("The delivery facility's company name, as printed."),
   finesAndFees: z.array(z.string()),
   mismatches: z.array(z.object({ item: z.string(), agreed: z.string(), onDoc: z.string(), serious: z.boolean() })),
   otherConcerns: z.array(z.string()),

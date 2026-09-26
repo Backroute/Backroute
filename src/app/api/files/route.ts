@@ -42,10 +42,12 @@ export async function POST(request: Request) {
   const bytes = Buffer.from(await file.arrayBuffer());
   let note: string | null = null;
   let status: "verified" | "check" = "verified";
+  let amount: number | null = null;
   if (STOP_DOCS.has(kind.data) && aiConfigured()) {
     const check = await checkStopDocument(kind.data as "bol" | "pod" | "lumper_receipt", bytes, file.type, loadRef).catch(() => null);
     if (check) {
       note = check.exceptions.length ? `${check.note} Noted on it: ${check.exceptions.join("; ")}.` : check.note;
+      if (kind.data === "lumper_receipt" && check.amount && check.amount > 0 && check.amount < 5000) amount = Math.round(check.amount * 100) / 100;
       if (!check.isExpectedDocument || (kind.data !== "lumper_receipt" && !check.signed) || check.exceptions.length) status = "check";
     }
   }
@@ -55,7 +57,7 @@ export async function POST(request: Request) {
     .select("id")
     .single();
   if (error) return Response.json({ error: "save_failed" }, { status: 500 });
-  return Response.json({ id: row.id, status, note });
+  return Response.json({ id: row.id, status, note, amount });
 }
 
 /** The carrier's own paperwork on file (not the file contents). Office only. */

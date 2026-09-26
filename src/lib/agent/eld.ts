@@ -2,9 +2,10 @@ import "server-only";
 import type { Item } from "../cloud/rows";
 import { roadMiles, roughCoords } from "../trip-geo";
 import { formatAtStop } from "../stop-time";
-import type { Driver, HosStatus, Truck } from "../types";
+import type { Driver, HosStatus, Load, Truck } from "../types";
 import { claimMark, save, type CarrierContext } from "./db";
 import { sendOrQueue } from "./outbox";
+import { routedEta } from "./routing";
 import * as mail from "./templates";
 
 /**
@@ -191,7 +192,7 @@ export async function lateNotices(ctx: CarrierContext, now: number): Promise<str
     const truck = ctx.trucks.find((t) => t.id === load.truckId);
     const driver = ctx.drivers.find((d) => d.id === truck?.driverId);
     const [city, state] = stop === "pickup" ? [load.lane.origin, load.lane.originState] : [load.lane.destination, load.lane.destState];
-    const eta = truck ? etaTo(truck, driver, city, state, now) : null;
+    const eta = truck ? ((await routedEta(truck, driver, city, state, now)) ?? etaTo(truck, driver, city, state, now)) : null;
     if (!eta || eta <= Date.parse(due) + 30 * 60_000) continue;
     const to = load.brokerContactEmail ?? ctx.brokers.find((b) => b.id === load.brokerId)?.email;
     if (!to || !(await claimMark(ctx.carrier.id, load.id, `late_notice_${stop}`))) continue;
@@ -222,3 +223,45 @@ export function canMakePickup(driver: Driver | undefined, deadheadMiles: number,
   return arrive <= pickupAt;
 }
 
+
+/** The rate con asks for tracking or check calls (or the owner wants them on every load). */
+export function wantsCheckCalls(load: Load, always: boolean | undefined): boolean {
+  if (always) return true;
+  const r = load.rateConReading;
+  const text = [...(r?.otherConcerns ?? []), ...(r?.finesAndFees ?? []), r?.summary ?? ""].join(" ");
+  return /track|check.?call|macropoint|trucker ?tools|fourkites|project44|update(s)? every/i.test(text);
+}
+
+/**
+ * Check calls, the dispatcher's most repetitive job: while a load is rolling and the ELD knows where the truck is,
+ * the broker gets a short location and ETA email every 4 hours (only for brokers who asked for tracking).
+ */
+export async function checkCalls(ctx: CarrierContext, now: number): Promise<string[]> {
+  const done: string[] = [];
+  const slot = Math.floor(now / (4 * HOUR));
+  for (const load of ctx.loads) {
+    if (!["dispatched", "at_pickup", "in_transit", "at_delivery"].includes(load.stage) || !wantsCheckCalls(load, ctx.settings.checkCallEmails)) continue;
+    const truck = ctx.trucks.find((t) => t.id === load.truckId);
+    const pos = truck?.position;
+    const to = load.brokerContactEmail ?? ctx.brokers.find((b) => b.id === load.brokerId)?.email;
+    if (!truck || !pos || now - Date.parse(pos.at) > 30 * 60_000 || !to) continue;
+    if (!(await claimMark(ctx.carrier.id, load.id, `check_call:${slot}`))) continue;
+    const toPickup = load.stage === "dispatched";
+    const [city, state] = toPickup ? [load.lane.origin, load.lane.originState] : [load.lane.destination, load.lane.destState];
+    const drv = ctx.drivers.find((d) => d.id === truck.driverId);
+    const eta = (await routedEta(truck, drv, city, state, now)) ?? etaTo(truck, drv, city, state, now);
+    const where = pos.description ?? `${truck.currentCity}, ${truck.currentState}`;
+    const status = load.stage === "at_pickup" ? "At the shipper, loading" : load.stage === "at_delivery" ? "At the receiver, unloading" : toPickup ? `Heading to pickup in ${city}, ${state}` : `Loaded, heading to ${city}, ${state}`;
+    await sendOrQueue(ctx, {
+      purpose: "eta_update",
+      to,
+      subject: mail.subjectFor(load, "Check call"),
+      body: mail.checkCall(ctx.carrier, ctx.settings, load, { status, where, at: formatAtStop(pos.at, cityState(pos.description)?.state ?? state), eta: eta && (load.stage === "dispatched" || load.stage === "in_transit") ? formatAtStop(new Date(eta).toISOString(), state) : null }),
+      loadId: load.id,
+      withinRules: true,
+      why: `Send ${load.referenceNumber}'s check call (truck at ${where})?`,
+    });
+    done.push(`${load.referenceNumber}: check call`);
+  }
+  return done;
+}

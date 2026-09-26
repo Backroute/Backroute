@@ -9,6 +9,7 @@ import { TimeAgo } from "@/components/shared/time-ago";
 import { authHeader } from "@/lib/ai/client";
 import { formatPhone } from "@/lib/cloud/phone";
 import { signOut } from "@/lib/cloud/sync";
+import { handoffKind, PLAYBOOK, SLA_MINUTES } from "@/lib/support-playbooks";
 import type { Escalation } from "@/lib/types";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -55,7 +56,7 @@ async function act(body: Record<string, unknown>): Promise<string | null> {
  */
 export function SupportConsole() {
   const [q, setQ] = useState<Queue | null>(null);
-  const [tab, setTab] = useState<"queue" | "carriers">("queue");
+  const [tab, setTab] = useState<"queue" | "carriers" | "numbers">("queue");
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/support/queue", { headers: await authHeader() });
@@ -89,9 +90,9 @@ export function SupportConsole() {
           </div>
         </div>
         <div className="mx-auto flex max-w-5xl gap-1 px-4">
-          {(["queue", "carriers"] as const).map((t) => (
+          {(["queue", "carriers", "numbers"] as const).map((t) => (
             <button key={t} type="button" onClick={() => setTab(t)} className={cn("border-b-2 px-3 py-2 text-sm font-medium", tab === t ? "border-ink-950 text-ink-950" : "border-transparent text-ink-500")}>
-              {t === "queue" ? `Waiting on us${q ? ` (${q.items.length})` : ""}` : "Carriers"}
+              {t === "queue" ? `Waiting on us${q ? ` (${q.items.length})` : ""}` : t === "carriers" ? "Carriers" : "Numbers"}
             </button>
           ))}
         </div>
@@ -115,6 +116,7 @@ export function SupportConsole() {
             </div>
           </>
         )}
+        {q && tab === "numbers" && <Numbers />}
         {q && tab === "carriers" && (
           <div className="overflow-hidden rounded-2xl border border-line bg-white">
             {q.carriers.map((c) => (
@@ -143,6 +145,56 @@ export function SupportConsole() {
   );
 }
 
+interface Metrics {
+  trucks: number;
+  week: Window;
+  month: Window;
+}
+interface Window {
+  handoffs: number;
+  toOwner: number;
+  perTruckPerWeek: number;
+  byKind: Partial<Record<keyof typeof PLAYBOOK, number>>;
+  medianMinutesToClose: number | null;
+  late: number;
+}
+
+/** How much still needs people. Hand-offs per truck per week is the number to push down. */
+function Numbers() {
+  const [m, setM] = useState<Metrics | null>(null);
+  useEffect(() => {
+    void (async () => {
+      const res = await fetch("/api/support/metrics", { headers: await authHeader() }).catch(() => null);
+      if (res?.ok) setM((await res.json()) as Metrics);
+    })();
+  }, []);
+  if (!m) return <p className="text-sm text-ink-500">Loading</p>;
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      {(["week", "month"] as const).map((w) => (
+        <div key={w} className="rounded-2xl border border-line bg-white p-4">
+          <p className="text-sm font-semibold text-ink-950">Last {w === "week" ? "7" : "30"} days</p>
+          <p className="mt-2 text-3xl font-semibold text-ink-950">{m[w].perTruckPerWeek}</p>
+          <p className="text-xs text-ink-500">hand-offs to support per truck per week ({m.trucks} trucks)</p>
+          <p className="mt-3 text-sm text-ink-700">
+            {m[w].handoffs} to support · {m[w].toOwner} to owners · {m[w].late} late
+            {m[w].medianMinutesToClose !== null ? ` · closed in ${m[w].medianMinutesToClose} min (median)` : ""}
+          </p>
+          <ul className="mt-2 text-xs text-ink-600">
+            {Object.entries(m[w].byKind)
+              .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
+              .map(([k, n]) => (
+                <li key={k}>
+                  {PLAYBOOK[k as keyof typeof PLAYBOOK].label}: {n}
+                </li>
+              ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function QueueCard({ item, onDone }: { item: QueueItem; onDone: () => Promise<void> }) {
   const e = item.escalation;
   const [note, setNote] = useState("");
@@ -151,6 +203,10 @@ function QueueCard({ item, onDone }: { item: QueueItem; onDone: () => Promise<vo
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const base = { carrierId: item.carrier.id, escalationId: e.id };
+  const kind = handoffKind(e);
+  // Checked when the queue refreshes (every 20 seconds), which is plenty for a 15-minute target.
+  // eslint-disable-next-line react-hooks/purity
+  const late = (Date.now() - Date.parse(e.createdAt)) / 60000 > SLA_MINUTES(e);
   const run = async (name: string, body: Record<string, unknown>, after?: () => void) => {
     setBusy(name);
     setProblem(null);
@@ -171,6 +227,8 @@ function QueueCard({ item, onDone }: { item: QueueItem; onDone: () => Promise<vo
             </Badge>
           )}
           <span className="text-sm font-semibold text-ink-950">{item.carrier.name}</span>
+          <Badge tone="neutral">{PLAYBOOK[kind].label}</Badge>
+          {late && <Badge tone="danger">Late: over {SLA_MINUTES(e)} minutes</Badge>}
           {e.source && e.source !== "app" && <span className="text-[11px] uppercase tracking-wider text-ink-400">by {e.source === "sms" ? "text" : e.source === "voice" ? "call" : "email"}</span>}
         </div>
         <span className="text-xs text-ink-500">
@@ -179,6 +237,14 @@ function QueueCard({ item, onDone }: { item: QueueItem; onDone: () => Promise<vo
         </span>
       </div>
       <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink-800">{e.reason}</p>
+      <details className="mt-2 text-xs text-ink-600">
+        <summary className="cursor-pointer font-medium text-ink-800">Playbook: {PLAYBOOK[kind].label.toLowerCase()}</summary>
+        <ol className="mt-1 list-decimal pl-5">
+          {PLAYBOOK[kind].steps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+      </details>
 
       <div className="mt-3 grid gap-2 text-xs text-ink-600 sm:grid-cols-3">
         {item.load && (

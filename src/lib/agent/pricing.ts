@@ -17,7 +17,7 @@ export function floorFor(load: Pick<Load, "lane">, settings: Pick<AgentSettings,
  * What to ask a broker for a load they posted. Dispatchers ask a little over the posted rate; never under the floor.
  * Null when there's nothing to go on (no floor and no posted rate): the owner names the price.
  */
-export function askFor(load: Pick<Load, "lane" | "listedRate">, settings: Pick<AgentSettings, "minRpm">, lane?: { count: number; avgRpm: number | null }): number | null {
+export function askFor(load: Pick<Load, "lane" | "listedRate">, settings: Pick<AgentSettings, "minRpm">, lane?: { count: number; avgRpm: number | null }, market?: { rpm: number; high?: number } | null): number | null {
   const floor = floorFor(load, settings);
   const posted = load.listedRate > 0 ? load.listedRate : null;
   let ask: number | null = null;
@@ -29,6 +29,12 @@ export function askFor(load: Pick<Load, "lane" | "listedRate">, settings: Pick<A
     const usual = round25(lane.avgRpm * load.lane.miles);
     const cap = posted ? round25(posted * 1.15) : usual;
     ask = Math.max(ask ?? 0, Math.min(usual, cap));
+  }
+  // The market pays more than the post: open at the market average, never past the top of its range.
+  if (market?.rpm) {
+    const average = round25(market.rpm * load.lane.miles);
+    const top = market.high ? round25(market.high * load.lane.miles) : round25(average * 1.1);
+    ask = Math.max(ask ?? 0, Math.min(average, top));
   }
   return ask;
 }

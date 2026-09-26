@@ -698,6 +698,10 @@ export interface AgentSettings {
   maxDeadhead?: number;
   /** Real accounts: the AI's weekly how's-it-going text to each driver. On unless turned off. */
   driverCheckins?: boolean;
+  /** Real accounts: check-call emails to the broker every 4 hours on every load, not only when the rate con asks. */
+  checkCallEmails?: boolean;
+  /** Real accounts: the carrier's profiles on the carrier setup networks brokers use, sent with setup packets. */
+  setupProfiles?: { name: string; url: string }[];
   /** Real accounts: a weekly text to each driver with their loads, miles and estimated pay. Off unless turned on. */
   payTexts?: boolean;
 }
@@ -1802,7 +1806,7 @@ export const useStore = create<StoreState>((set, get) => ({
           if (!r.ok) return settle({ status: "failed", aiNote: r.reason }, `The ${DRIVER_DOC_LABEL[type]} didn't upload`, r.reason, "warning");
           const note = r.note ?? "Saved.";
           settle(
-            { status: "verified", fileId: r.id, aiNote: note, flagged: r.status === "check" },
+            { status: "verified", fileId: r.id, aiNote: note, flagged: r.status === "check", ...(r.amount ? { amount: r.amount } : {}) },
             r.status === "check" ? `Check the ${DRIVER_DOC_LABEL[type]}` : `${DRIVER_DOC_LABEL[type]} saved`,
             note,
             r.status === "check" ? "warning" : "success",

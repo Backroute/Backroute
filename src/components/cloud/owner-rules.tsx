@@ -50,6 +50,13 @@ export function OwnerRulesCard() {
           </div>
           <Switch checked={!!settings.payTexts} onChange={(on) => updateSettings({ payTexts: on })} label="Weekly pay text to drivers" />
         </div>
+        <div className="flex items-start justify-between gap-3 border-t border-line pt-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-ink-900">Check-call emails on every load</p>
+            <p className="text-xs text-ink-500">Location and ETA to the broker every 4 hours from the ELD. Without this, only brokers whose rate con asks for tracking get them.</p>
+          </div>
+          <Switch checked={!!settings.checkCallEmails} onChange={(on) => updateSettings({ checkCallEmails: on })} label="Check-call emails on every load" />
+        </div>
         <label className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink-900">
           Most empty miles to a pickup
           <input

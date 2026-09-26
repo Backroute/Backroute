@@ -150,6 +150,12 @@ export function LoadOfferCard({
       <p className={cn("flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium", dark ? "bg-white/10 text-white/80" : "bg-ink-50 text-ink-600")}>
         <Zap className="h-3 w-3 shrink-0" /> {highlight}
       </p>
+      {real && load.market && (
+        <p className={cn("text-[11px]", dark ? "text-white/60" : "text-ink-500")}>
+          Market: about {formatCurrency(Math.round(load.market.rpm * load.lane.miles))} (${load.market.rpm.toFixed(2)}/mi, {load.market.source})
+          {load.listedRate > 0 && load.listedRate < load.market.rpm * load.lane.miles * 0.9 ? " · posted under market" : ""}
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-2">
         <Stat label={real ? (load.listedRate > 0 ? `AI will ask (posted ${formatCurrency(load.listedRate)})` : "AI will ask") : load.lane.moveKind ? "Flat per move" : "Total offer"} value={formatCurrency(load.targetRate)} dark={dark} pulse={askState === "pending"} />

@@ -1,5 +1,5 @@
-import { loadContext, logChannel } from "@/lib/agent/db";
-import { nextShop, shopCallTurn } from "@/lib/agent/roadside";
+import { loadContext } from "@/lib/agent/db";
+import { nextShop, shopCallReply } from "@/lib/agent/roadside";
 import { publicUrl, readTwilioWebhook, say, sayAndListen, twiml, twilioConfigured } from "@/lib/channels/twilio";
 
 export const maxDuration = 30;
@@ -17,7 +17,6 @@ export async function POST(request: Request) {
   if (!ctx || !truck?.roadside) return twiml("<Hangup/>");
   const turnUrl = publicUrl(request, `/api/channels/voice/shop/turn?carrier=${encodeURIComponent(carrierId)}&truck=${encodeURIComponent(truck.id)}`);
   const said = (params.SpeechResult ?? "").trim();
-  const key = `shop:${params.CallSid}`;
   if (!said) {
     if (missed >= 1) {
       await nextShop(ctx, truck);
@@ -25,8 +24,6 @@ export async function POST(request: Request) {
     }
     return twiml(sayAndListen("Sorry, I didn't catch that. Can you help us today?", "en", `${turnUrl}&missed=1`));
   }
-  await logChannel({ carrierId, channel: "voice", direction: "in", counterparty: key, body: said, data: { kind: "shop_call", truckId: truck.id } });
-  const result = await shopCallTurn(ctx, truck, said);
-  await logChannel({ carrierId, channel: "voice", direction: "out", counterparty: key, body: result.reply, data: { kind: "shop_call", truckId: truck.id } });
+  const result = await shopCallReply(ctx, truck, params.CallSid, said);
   return result.hangUp ? twiml(`${say(result.reply, "en")}<Hangup/>`) : twiml(sayAndListen(result.reply, "en", `${turnUrl}&missed=${missed}`));
 }
