@@ -44,7 +44,7 @@ export async function receiveText(t: IncomingText): Promise<{ now?: string; late
         if (!ctx) return;
         const history = (await threadWith(owner.id, "sms", from, 12)).filter((m, i, all) => !(i === all.length - 1 && m.direction === "in" && m.body === body)).map((m) => ({ from: m.direction === "in" ? ("them" as const) : ("ai" as const), text: m.body ?? "" }));
         const result = aiConfigured() ? await ownerTurn(ctx, "sms", body, history) : { reply: "", effects: { done: [], failed: true } };
-        if (result.effects.failed) await passToOwner(ctx, { reason: `The owner texted: "${body}". The AI couldn't answer.`, label: "Answered", source: "sms", to: "support" });
+        if (result.effects.failed) await passToOwner(ctx, { reason: `The owner texted: "${body}". The AI couldn't answer (twice).`, label: "Answered", source: "sms", to: "support" });
         const text = result.reply || PASSED_ON_TEXT[ctx.settings.ownerLanguage ?? "en"];
         const sid = await textTo(ctx.carrier, from, text).catch((e) => {
           console.error("[sms] send failed", e);
@@ -92,7 +92,7 @@ export async function receiveText(t: IncomingText): Promise<{ now?: string; late
       const tracked = !media.length ? ((await trackingReply(ctx, driver, body).catch(() => null)) ?? (await claimStatementReply(ctx, driver, body).catch(() => null))) : null;
       const talk = !tracked && (!media.length || body.length > 40 || body.includes("?"));
       const result = talk && aiConfigured() ? await driverTurn(ctx, driver, "sms", body || "(sent a photo)", history) : { reply: "", effects: { done: [] as string[], failed: talk } };
-      if (result.effects.failed) await passToOwner(ctx, { reason: `${driver.name} texted: "${body}"`, label: "I'll answer", source: "sms" });
+      if (result.effects.failed) await passToOwner(ctx, { reason: `${driver.name} texted: "${body}". The AI couldn't answer (twice).`, label: "I'll answer", source: "sms", to: "support" });
       const text = [photos, tracked, result.reply].filter(Boolean).join(" ") || PASSED_ON_TEXT[lang];
       const sid = await textTo(ctx.carrier, from, text).catch((e) => {
         console.error("[sms] send failed", e);

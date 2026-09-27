@@ -4,7 +4,8 @@ import type { Item } from "../cloud/rows";
 import { lookupMc } from "../fmcsa-lookup";
 import type { Broker } from "../types";
 import { addActivity, claimMark, save, type CarrierContext } from "./db";
-import { event, passToOwner } from "./dispatcher";
+import { event, tellOwner } from "./dispatcher";
+import { sendOrQueue } from "./outbox";
 
 /**
  * Checking a broker the way a careful dispatcher does before the first load: their MC number against FMCSA (broker
@@ -72,15 +73,32 @@ export async function checkBroker(ctx: CarrierContext, broker: Broker, mc?: stri
   return next;
 }
 
-/** A broker the AI won't book with on its own: support is asked once to look into them. */
-export async function askSupportAboutBroker(ctx: CarrierContext, broker: Broker, loadId?: string) {
+/**
+ * A broker the AI won't book with on its own. With no MC number yet, the AI emails them for it (their answer is
+ * checked with FMCSA when it comes: lib/agent/email). One who failed the check isn't booked; the owner can mark them
+ * trusted if they know them. Nobody on the support team has to look.
+ */
+export async function untrustedBroker(ctx: CarrierContext, broker: Broker, loadId?: string) {
   if (!(await claimMark(ctx.carrier.id, `broker:${broker.id}`, "verify_needed"))) return;
-  await passToOwner(ctx, {
-    reason: `Check broker ${broker.company}${broker.email ? ` <${broker.email}>` : ""} before the AI books with them. ${broker.verifyNote ?? "No MC number yet: ask them for it."} If they check out, mark them trusted.`,
+  if (!broker.mc && broker.email && !broker.fraudRisk?.startsWith("high")) {
+    await sendOrQueue(ctx, {
+      purpose: "ack",
+      to: broker.email,
+      toName: broker.contact || undefined,
+      subject: `MC number for ${broker.company}`,
+      body: `Hi${broker.contact ? ` ${broker.contact}` : ""},\n\nThanks for the loads. Before we book, what's your MC number? We check every broker with FMCSA first.\n\nThanks,\n${ctx.carrier.name}`,
+      withinRules: true,
+      why: `Ask ${broker.company} for their MC number?`,
+    });
+    await tellOwner(ctx, { reason: `${broker.company} sent loads but no MC number. The AI asked them for it and checks it with FMCSA before booking.`, loadId, source: "email", brokerId: broker.id });
+    return;
+  }
+  await tellOwner(ctx, {
+    reason: `The AI isn't booking with ${broker.company}${broker.email ? ` <${broker.email}>` : ""}: ${broker.verifyNote ?? "they didn't pass the broker check."} If you know them, mark them trusted on the broker and the AI will book with them.`,
     loadId,
-    label: "Checked",
+    label: "Got it",
     source: "email",
-    to: "support",
     brokerId: broker.id,
+    severity: "warning",
   });
 }

@@ -4,7 +4,7 @@ import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import type { Driver, Load } from "../types";
 import { claimMark, logChannel, save, saveDriverMessage, type CarrierContext } from "./db";
-import { passToOwner, uid } from "./dispatcher";
+import { tellOwner, uid } from "./dispatcher";
 import { sendOrQueue } from "./outbox";
 
 /**
@@ -95,7 +95,11 @@ export async function trackingReply(ctx: CarrierContext, driver: Driver, said: s
   return `Thanks, tracking's on for ${load.referenceNumber}. I let the broker know.`;
 }
 
-/** Tracking asked for and not on: a reminder 2 hours before pickup, and at pickup the owner and broker hear. */
+/**
+ * Tracking asked for and not on: a reminder 2 hours before pickup. At pickup, the broker gets the driver's number to
+ * send the request again (the usual fix: the invite went to the wrong phone), the driver another text, and the owner
+ * a note.
+ */
 export async function trackingRounds(ctx: CarrierContext, now: number): Promise<string[]> {
   const done: string[] = [];
   for (const load of ctx.loads) {
@@ -107,8 +111,22 @@ export async function trackingRounds(ctx: CarrierContext, now: number): Promise<
       if (await text(ctx, driver, `${driver.name.split(" ")[0]}, tracking for ${load.referenceNumber} still isn't on. ${t.link ? `Tap ${t.link} and accept.` : `Accept the ${t.app ?? "tracking"} text.`} Reply YES when it's done.`, "tracking_remind", load.id)) done.push(`${load.referenceNumber}: tracking reminder`);
     }
     if (now >= pickup && now < pickup + 12 * 3600_000 && (await claimMark(ctx.carrier.id, load.id, "tracking_missing"))) {
-      await passToOwner(ctx, { reason: `${load.referenceNumber} needs ${t.app ?? "tracking"} and the driver hasn't confirmed it's on. Brokers can hold pay on untracked loads: check with ${driver?.name.split(" ")[0] ?? "the driver"}.`, loadId: load.id, label: "Sorted", source: "sms", to: "support" });
-      done.push(`${load.referenceNumber}: tracking not confirmed, support told`);
+      const broker = ctx.brokers.find((b) => b.id === load.brokerId);
+      const to = load.brokerContactEmail || broker?.email;
+      if (to && driver)
+        await sendOrQueue(ctx, {
+          purpose: "ack",
+          to,
+          toName: broker?.contact || undefined,
+          subject: `Tracking on ${load.referenceNumber}`,
+          body: `Hi${broker?.contact ? ` ${broker.contact}` : ""},\n\nOur driver on ${load.referenceNumber} hasn't been able to get ${t.app ?? "tracking"} going yet. Can you send the request again to ${driver.name.split(" ")[0]} at ${driver.phone}? We'll make sure it's accepted.\n\nThanks,\n${ctx.carrier.name}`,
+          loadId: load.id,
+          withinRules: true,
+          why: `Ask ${broker?.company ?? "the broker"} to resend the tracking request for ${load.referenceNumber}?`,
+        });
+      if (driver) await text(ctx, driver, `${driver.name.split(" ")[0]}, the broker is sending the ${t.app ?? "tracking"} request for ${load.referenceNumber} again. Accept it when it comes and reply YES.`, "tracking_resend", load.id);
+      await tellOwner(ctx, { reason: `${load.referenceNumber} needs ${t.app ?? "tracking"} and the driver hasn't confirmed it's on. The AI asked the broker to resend it and told the driver. Brokers can hold pay on untracked loads.`, loadId: load.id, source: "sms", severity: "warning" });
+      done.push(`${load.referenceNumber}: tracking not confirmed, broker asked to resend`);
     }
   }
   return done;

@@ -5,6 +5,7 @@ import type { LayoverClaim, Load, RateConPdfReading } from "../types";
 import { claimMark, releaseMark, save, type CarrierContext } from "./db";
 import { passToOwner } from "./dispatcher";
 import { sendOrQueue } from "./outbox";
+import { billTo } from "./paperwork";
 import * as mail from "./templates";
 
 /**
@@ -62,11 +63,11 @@ export async function sendLayoverClaims(ctx: CarrierContext, now: number): Promi
         await save("loads", ctx.carrier.id, next as unknown as Item);
         ctx.loads = ctx.loads.map((l) => (l.id === load.id ? next : l));
         const broker = ctx.brokers.find((b) => b.id === load.brokerId);
-        const to = load.brokerContactEmail ?? broker?.email;
+        const to = billTo(ctx, load);
         const state = h.stop === "pickup" ? load.lane.originState : load.lane.destState;
         const place = h.stop === "pickup" ? `${load.lane.origin}, ${load.lane.originState}` : `${load.lane.destination}, ${load.lane.destState}`;
         if (!to) {
-          await passToOwner(ctx, { reason: `${load.referenceNumber}: the truck has been held ${h.days} day${h.days === 1 ? "" : "s"} at ${h.stop}, $${amount} in layover, but there's no broker email to claim it.`, loadId: load.id, label: "I'll claim it", source: "email" });
+          await passToOwner(ctx, { reason: `${load.referenceNumber}: the truck has been held ${h.days} day${h.days === 1 ? "" : "s"} at ${h.stop}, $${amount} in layover, but there's no broker email to claim it.`, loadId: load.id, label: "Added", source: "email", to: "owner" });
           continue;
         }
         const body = `Hi${broker?.contact ? ` ${broker.contact}` : ""},

@@ -14,13 +14,14 @@ import { dryRun, event, passToOwner } from "./dispatcher";
 import { floorFor, spokenEmail } from "./pricing";
 import { ourNumber, ourNumbers, respond, withOurMove, withTheirOffer } from "./negotiation";
 import { estimateMiles } from "../fleet";
-import { askSupportAboutBroker, checkBroker } from "./brokers";
+import { checkBroker, untrustedBroker } from "./brokers";
 import { assessBroker } from "../broker-policy";
 import { confirmPhoneBooking, sendSetupPacket } from "./paperwork";
 import { brokerMemory, memoryNote } from "./memory";
 import { forCarrier } from "./scope";
 import { throughPhoneTree, WANT, type CallReply } from "../channels/ivr";
-import { when } from "./templates";
+import { subjectFor, when } from "./templates";
+import { sendOrQueue } from "./outbox";
 import { TRUCKING } from "../ai/prompts";
 
 /**
@@ -123,6 +124,29 @@ export const VOICEMAIL = (ctx: CarrierContext, load: Load) => {
 };
 
 /** Voicemail on a phone-only broker: one more call, on the next follow-up round. */
+/** A broker call the AI couldn't finish: an email picking it up where it stopped, or one more call. */
+async function followUpDroppedCall(ctx: CarrierContext, load: Load, said: string) {
+  if (!(await claimMark(ctx.carrier.id, load.id, "broker_call_dropped"))) return;
+  const broker = ctx.brokers.find((b) => b.id === load.brokerId);
+  const to = load.brokerContactEmail || broker?.email;
+  const ask = load.bookRequest?.ask ?? load.targetRate;
+  if (to) {
+    await sendOrQueue(ctx, {
+      purpose: "ack",
+      to,
+      toName: broker?.contact || undefined,
+      subject: subjectFor(load),
+      body: `Hi${broker?.contact ? ` ${broker.contact}` : ""},\n\nSorry, we got cut off on the phone. We'd still like ${load.referenceNumber} (${load.lane.origin}, ${load.lane.originState} to ${load.lane.destination}, ${load.lane.destState}) at $${ask.toLocaleString("en-US")} all in. Let us know and we'll send the truck.\n\nThanks,\n${ctx.carrier.name}`,
+      loadId: load.id,
+      amount: ask,
+      withinRules: true,
+      why: `The call with ${broker?.company ?? "the broker"} about ${load.referenceNumber} dropped after "${said.slice(0, 80)}". Follow up by email?`,
+    });
+    return;
+  }
+  await retryAfterVoicemail(ctx, load);
+}
+
 export async function retryAfterVoicemail(ctx: CarrierContext, load: Load) {
   const hasEmail = !!(load.brokerContactEmail || ctx.brokers.find((b) => b.id === load.brokerId)?.email);
   if (!hasEmail && (await claimMark(ctx.carrier.id, load.id, "broker_call_retry"))) await releaseMark(ctx.carrier.id, load.id, "broker_call");
@@ -274,7 +298,7 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
         if (!broker) return "No broker on this load.";
         const checked = await checkBroker(ctx, broker, mc);
         if (checked.authorityVerified) return "Checked with FMCSA: active broker authority. You can book at the accepted price.";
-        await askSupportAboutBroker(ctx, checked, current.id);
+        await untrustedBroker(ctx, checked, current.id);
         return "That MC doesn't check out with FMCSA. Don't book. Say the office will confirm by email, thank them, and end the call.";
       },
     }),
@@ -302,7 +326,8 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
       description: "Something the broker asked that you couldn't answer from the facts. The office follows up by email.",
       inputSchema: z.object({ question: z.string() }),
       run: async ({ question }) => {
-        await passToOwner(ctx, { reason: `${ctx.brokers.find((b) => b.id === current.brokerId)?.company ?? "The broker"} asked on the phone about ${current.referenceNumber}: "${question}". Answer them by email.`, loadId: current.id, label: "Answered", source: "voice", to: "support" });
+        // Something only the carrier knows (their own policy, a detail not on file): the owner's to answer.
+        await passToOwner(ctx, { reason: `${ctx.brokers.find((b) => b.id === current.brokerId)?.company ?? "The broker"} asked on the phone about ${current.referenceNumber}: "${question}". The AI didn't know; reply to them, or add it to your settings so it knows next time.`, loadId: current.id, label: "Answered", source: "voice", to: "owner" });
         return "Noted for the office. Tell them someone will email the answer shortly.";
       },
     }),
@@ -405,7 +430,8 @@ async function brokerCallAnswer(ctx: CarrierContext, load: Load, callSid: string
   const history = earlier.slice(-16).map((m) => ({ from: m.direction === "in" ? ("them" as const) : ("ai" as const), text: m.body ?? "" }));
   const result = aiConfigured() ? await brokerCallTurn(ctx, load, said, history) : { reply: "", hangUp: true, failed: true };
   if (result.failed) {
-    await passToOwner(ctx, { reason: `The AI's call with the broker about ${load.referenceNumber} broke off after they said: "${said}". Follow up with them.`, loadId: load.id, label: "Followed up", source: "voice", to: "support" });
+    // The AI lost its footing mid-call (after its retry): it follows up itself, by email if it has one, else by calling back.
+    await followUpDroppedCall(ctx, load, said);
     await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "out", counterparty: key, body: SORRY, data: { kind: "broker_call", loadId: load.id } });
     return { reply: SORRY, hangUp: true };
   }

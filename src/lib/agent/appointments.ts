@@ -10,7 +10,8 @@ import type { Item } from "../cloud/rows";
 import { formatAtStop, hourAtStop, isoToStopLocal, stopLocalToIso, zoneFor } from "../stop-time";
 import type { FacilityAppointment, Load } from "../types";
 import { addActivity, logChannel, save, saveDriverMessage, threadWith, type CarrierContext } from "./db";
-import { event, passToOwner, uid } from "./dispatcher";
+import { event, passToOwner, tellOwner, uid } from "./dispatcher";
+import { billTo } from "./paperwork";
 import { sendOrQueue } from "./outbox";
 import { forCarrier } from "./scope";
 import * as mail from "./templates";
@@ -66,21 +67,35 @@ export async function needAppointment(ctx: CarrierContext, load: Load, stop: Sto
   return `${stop} appointment to ${purpose}: calling when ${nameOf(saved, stop)} opens`;
 }
 
+/**
+ * The facility can't be reached (no number, three calls with no time) or won't set it by phone: the broker is asked
+ * to set it and send the time, the way a dispatcher hands it back to them. Their answer is read off their email
+ * (lib/agent/email), and the AI reminds them once if it doesn't come. Only when there's no broker email at all does
+ * the owner hear.
+ */
 async function giveUp(ctx: CarrierContext, load: Load, stop: Stop, why: string): Promise<string> {
   const appt = load.appointments?.[stop];
   if (!appt) return why;
-  await saveAppt(ctx, load, stop, { ...appt, status: "failed", note: why });
-  const phone = phoneOf(load, stop);
-  const what = appt.purpose === "move" ? `move the ${stop} appointment${appt.eta ? ` to ${formatAtStop(appt.eta, stateOf(load, stop))} or later (the truck's ETA)` : ""}` : `book a ${stop} appointment`;
-  await passToOwner(ctx, {
-    reason: `${load.referenceNumber}: the AI couldn't ${what} with ${nameOf(load, stop)} in ${cityOf(load, stop)} (${why}).${phone ? ` Their number: ${phone}.` : ""} Please call them.`,
+  const email = billTo(ctx, load);
+  const state = stateOf(load, stop);
+  const saved = await saveAppt(ctx, load, stop, { ...appt, status: email ? "broker" : "failed", note: why, brokerAskedAt: new Date().toISOString() });
+  if (!email) {
+    await passToOwner(ctx, { reason: `${load.referenceNumber}: the AI couldn't ${appt.purpose === "move" ? "move" : "book"} the ${stop} appointment with ${nameOf(load, stop)} (${why}), and there's no broker email to ask. ${phoneOf(load, stop) ? `Their number: ${phoneOf(load, stop)}.` : ""}`, loadId: load.id, label: "Set", source: "voice", to: "owner" });
+    return `${stop} appointment: owner told (${why})`;
+  }
+  const broker = ctx.brokers.find((b) => b.id === load.brokerId);
+  await sendOrQueue(ctx, {
+    purpose: "ack",
+    to: email,
+    toName: broker?.contact || undefined,
+    subject: mail.subjectFor(saved, "Appointment"),
+    body: `Hi${broker?.contact ? ` ${broker.contact}` : ""},\n\n${/they said/.test(why) ? `We called ${nameOf(load, stop)} about the ${stop} appointment on ${load.referenceNumber} and they said it has to come from you.` : `We couldn't reach ${nameOf(load, stop)} to ${appt.purpose === "move" ? "move" : "book"} the ${stop} appointment on ${load.referenceNumber}.`} Can you ${appt.purpose === "move" ? `move it to ${appt.eta ? formatAtStop(appt.eta, state) : "the next time open"} or later` : "set it"} and send us the time?\n\nThanks,\n${ctx.carrier.name}`,
     loadId: load.id,
-    label: "Set",
-    source: "voice",
-    to: "support",
-    critical: appt.purpose === "move",
+    withinRules: true,
+    why: `Ask ${broker?.company ?? "the broker"} to set the ${stop} appointment on ${load.referenceNumber}?`,
   });
-  return `${stop} appointment: support is calling (${why})`;
+  await tellOwner(ctx, { reason: `${load.referenceNumber}: ${nameOf(load, stop)} ${/they said/.test(why) ? "wants the broker to set" : "couldn't be reached about"} the ${stop} appointment, so the AI asked ${broker?.company ?? "the broker"} to set it.`, loadId: load.id, source: "voice" });
+  return `${stop} appointment: broker asked (${why})`;
 }
 
 /** Phones the facility; false when the call can't go out. */
@@ -179,14 +194,14 @@ export async function facilityCallTurn(ctx: CarrierContext, load: Load, stop: St
 }
 
 /** The facility gave a time: on the load, to the driver, to the broker. */
-export async function setAppointment(ctx: CarrierContext, load: Load, stop: Stop, iso: string, confirmation: string | null) {
+export async function setAppointment(ctx: CarrierContext, load: Load, stop: Stop, iso: string, confirmation: string | null, by: "facility" | "broker" = "facility") {
   const state = stateOf(load, stop);
   const when = formatAtStop(iso, state);
   const current = ctx.loads.find((l) => l.id === load.id) ?? load;
   const appt = current.appointments?.[stop] ?? { purpose: "book" as const, tries: 1, status: "calling" as const };
   const note = `${stop === "pickup" ? "Pickup" : "Delivery"} appointment ${when}${confirmation ? `, confirmation ${confirmation}` : ""}`;
   const saved = await saveAppt(ctx, current, stop, { ...appt, status: "set", at: iso, ...(confirmation ? { confirmation } : {}) }, stop === "pickup" ? { pickupAt: iso, pickupWindow: when, appointmentNote: note } : { deliveryAt: iso, deliveryWindow: when, appointmentNote: note });
-  await addActivity(ctx.carrier.id, event({ type: "check_call", loadId: load.id, message: `${stop === "pickup" ? "Pickup" : "Delivery"} appointment ${appt.purpose === "move" ? "moved" : "set"} for ${saved.referenceNumber}`, detail: `${when}${confirmation ? ` · confirmation ${confirmation}` : ""} · by phone with ${nameOf(saved, stop)}`, severity: "success" }));
+  await addActivity(ctx.carrier.id, event({ type: "check_call", loadId: load.id, message: `${stop === "pickup" ? "Pickup" : "Delivery"} appointment ${appt.purpose === "move" ? "moved" : "set"} for ${saved.referenceNumber}`, detail: `${when}${confirmation ? ` · confirmation ${confirmation}` : ""} · ${by === "broker" ? "set by the broker" : `by phone with ${nameOf(saved, stop)}`}`, severity: "success" }));
   const driver = driverOf(ctx, saved);
   const to = driver ? toE164(driver.phone) : null;
   if (driver && to && !driver.prefs?.smsOptOut && canText(ctx.carrier)) {
@@ -196,8 +211,9 @@ export async function setAppointment(ctx: CarrierContext, load: Load, stop: Stop
     await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid, driverId: driver.id, counterparty: to, body, data: { kind: "appointment_set", loadId: load.id } });
   }
   const broker = ctx.brokers.find((b) => b.id === saved.brokerId);
-  const email = saved.brokerContactEmail ?? broker?.email;
-  if (email)
+  const email = billTo(ctx, saved);
+  // The broker set it themselves: they don't need telling.
+  if (email && by === "facility")
     await sendOrQueue(ctx, {
       purpose: "ack",
       to: email,
@@ -210,26 +226,9 @@ export async function setAppointment(ctx: CarrierContext, load: Load, stop: Stop
     });
 }
 
-/** The facility won't set it by phone: the broker is asked to, and support follows it. */
+/** The facility won't set it by phone: the broker is asked to. */
 async function cantByPhone(ctx: CarrierContext, load: Load, stop: Stop, said: string) {
-  const appt = load.appointments?.[stop];
-  if (!appt) return;
-  await saveAppt(ctx, load, stop, { ...appt, status: "failed", note: `they said: "${said.slice(0, 160)}"` });
-  const broker = ctx.brokers.find((b) => b.id === load.brokerId);
-  const email = load.brokerContactEmail ?? broker?.email;
-  const state = stateOf(load, stop);
-  if (email)
-    await sendOrQueue(ctx, {
-      purpose: "ack",
-      to: email,
-      toName: broker?.contact || undefined,
-      subject: mail.subjectFor(load, "Appointment"),
-      body: `Hi${broker?.contact ? ` ${broker.contact}` : ""},\n\nWe called ${nameOf(load, stop)} to ${appt.purpose === "move" ? "move" : "book"} the ${stop} appointment on ${load.referenceNumber} and they said it has to come from you. Can you ${appt.purpose === "move" ? `move it to ${appt.eta ? formatAtStop(appt.eta, state) : "the next time open"} or later` : "set it"} and send us the time?\n\nThanks,\n${ctx.carrier.name}`,
-      loadId: load.id,
-      withinRules: true,
-      why: `Ask ${broker?.company ?? "the broker"} to set the ${stop} appointment on ${load.referenceNumber}?`,
-    });
-  await passToOwner(ctx, { reason: `${load.referenceNumber}: ${nameOf(load, stop)} wouldn't ${appt.purpose === "move" ? "move" : "set"} the ${stop} appointment by phone ("${said.slice(0, 140)}"). The AI asked the broker to. Make sure it gets set.`, loadId: load.id, label: "Set", source: "voice", to: "support" });
+  await giveUp(ctx, load, stop, `they said: "${said.slice(0, 160)}"`);
 }
 
 /** A call ended without a time (voicemail, no answer, hung up): tried again later, or support after three tries. */
@@ -258,6 +257,16 @@ export async function appointmentRounds(ctx: CarrierContext, now: number): Promi
         continue;
       }
       if (!appt) continue;
+      // Asked the broker two hours ago and no time yet: one reminder.
+      if (appt.status === "broker" && appt.brokerAskedAt && !appt.brokerRemindedAt && now - Date.parse(appt.brokerAskedAt) > 2 * 3600_000) {
+        const email = billTo(ctx, current);
+        if (email) {
+          await saveAppt(ctx, current, stop, { ...appt, brokerRemindedAt: new Date(now).toISOString() });
+          await sendOrQueue(ctx, { purpose: "ack", to: email, subject: mail.subjectFor(current, "Appointment"), body: `Hi,\n\nFollowing up on the ${stop} appointment for ${current.referenceNumber}: can you send us the time when it's set?\n\nThanks,\n${ctx.carrier.name}`, loadId: current.id, withinRules: true, why: `Remind the broker about the ${stop} appointment on ${current.referenceNumber}?` });
+          done.push(`${load.referenceNumber}: reminded the broker about the ${stop} appointment`);
+        }
+        continue;
+      }
       if (appt.status === "calling" && appt.lastCallAt && now - Date.parse(appt.lastCallAt) > CALL_OVER_MS) await facilityMissed(ctx, current, stop);
       const fresh = (ctx.loads.find((l) => l.id === load.id) ?? current).appointments?.[stop];
       if (fresh?.status !== "needed") continue;

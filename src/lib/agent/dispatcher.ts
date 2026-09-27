@@ -47,17 +47,19 @@ function event(p: Omit<ActivityEvent, "id" | "timestamp" | "carrierId">): Activi
 }
 
 /**
- * Who takes something the AI hands off:
- * - "owner": the carrier's own call (their papers, their pay decisions, approving on Ask me first).
- * - "support": Backroute's support team, for anything outside what the AI can handle (a breakdown, a driver who
- *   can't be reached, an email the AI couldn't answer). The owner sees it, marked as being handled.
- * - "decider": the owner, unless they put the AI on full autopilot, and then support.
- * Critical ones (a crash, a driver missing on a late load) also text the support team's phones.
+ * Who takes something the AI hands off. The AI finishes almost everything itself; what's left goes to:
+ * - "owner": the carrier's own call: their money (a price under their lowest, a claim to their insurer), their
+ *   papers, and approving on Ask me first.
+ * - "support": Backroute's support team, only for what software can't do: a safety emergency (a crash, a stranded
+ *   truck, a driver missing on a late load after the owner didn't answer), work on another company's website, our
+ *   own systems failing, or an owner who asks for a person. The owner sees it, marked as being handled.
+ * - "decider": a decision; the owner's. (On full autopilot the AI makes the ones it has rules for before this.)
+ * Critical ones also text the support team's phones.
  */
 export type HandTo = "owner" | "support" | "decider";
 
-async function raise(ctx: CarrierContext, p: { reason: string; loadId?: string; critical?: boolean; label?: string; source: MessageChannel; to?: HandTo; brokerId?: string }) {
-  const to = p.to === "decider" ? (ctx.settings.autonomy === "full" ? "support" : "owner") : (p.to ?? "support");
+async function raise(ctx: CarrierContext, p: { reason: string; loadId?: string; critical?: boolean; label?: string; source: MessageChannel; to: HandTo; brokerId?: string }) {
+  const to = p.to === "support" ? "support" : "owner";
   const escalation: Escalation = {
     id: uid("esc"),
     loadId: p.loadId ?? "",
@@ -144,12 +146,16 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: Talk, effects
           return said;
         }
         const load = current();
+        // A crash, an injury or danger is an emergency: the support team's phones ring, and the owner sees it. Anything
+        // else (running late, weather, a dock problem) is the owner's to know about; the AI keeps the broker posted.
+        const emergency = urgent || kind === "accident";
         await raise(ctx, {
           reason: `${driver.name} (${kind}): ${details}`,
           loadId: load?.id,
-          critical: urgent || kind === "accident",
+          critical: emergency,
           label: "I've handled it",
           source: sourceOf(channel),
+          to: emergency ? "support" : "owner",
         });
         await addActivity(ctx.carrier.id, event({ type: "incident", loadId: load?.id, message: `${first} reported a problem: ${kind}`, detail: details, severity: urgent ? "danger" : "warning" }));
         effects.done.push(`Told the owner: ${kind}`);
@@ -234,7 +240,22 @@ export interface Turn {
 }
 
 /** One reply to a driver, by text or on a call, with whatever the AI did along the way. */
-export async function driverTurn(ctx: CarrierContext, driver: Driver, channel: Talk, said: string, history: Turn[], dry?: { tool: string; input: unknown }[]): Promise<{ reply: string; effects: Effects }> {
+/**
+ * A turn that failed before doing anything (the AI service hiccuped, or gave no answer) is tried once more before a
+ * person is asked: most failures are a moment's outage, and a second try saves a hand-off. One that already did
+ * something isn't repeated, so nothing happens twice.
+ */
+async function again<T extends { effects: Effects }>(turn: () => Promise<T>): Promise<T> {
+  const first = await turn();
+  if (!first.effects.failed || first.effects.done.length) return first;
+  return turn();
+}
+
+export function driverTurn(ctx: CarrierContext, driver: Driver, channel: Talk, said: string, history: Turn[], dry?: { tool: string; input: unknown }[]): Promise<{ reply: string; effects: Effects }> {
+  return again(() => driverTurnOnce(ctx, driver, channel, said, history, dry));
+}
+
+async function driverTurnOnce(ctx: CarrierContext, driver: Driver, channel: Talk, said: string, history: Turn[], dry?: { tool: string; input: unknown }[]): Promise<{ reply: string; effects: Effects }> {
   const effects: Effects = { done: [] };
   const lang = LANG_INFO[driver.prefs?.language ?? "en"];
   const messages: Anthropic.Beta.BetaMessageParam[] = history.map((t) => ({ role: t.from === "them" ? "user" : "assistant", content: t.text }));
@@ -280,7 +301,11 @@ const OWNER_CHANNEL: Record<Talk, string> = {
  * The owner texts or calls the dispatch line: answers from the fleet data (what's moving, what needs them, money),
  * and anything that needs a person goes to Backroute support.
  */
-export async function ownerTurn(ctx: CarrierContext, channel: Talk, said: string, history: Turn[]): Promise<{ reply: string; effects: Effects }> {
+export function ownerTurn(ctx: CarrierContext, channel: Talk, said: string, history: Turn[]): Promise<{ reply: string; effects: Effects }> {
+  return again(() => ownerTurnOnce(ctx, channel, said, history));
+}
+
+async function ownerTurnOnce(ctx: CarrierContext, channel: Talk, said: string, history: Turn[]): Promise<{ reply: string; effects: Effects }> {
   const effects: Effects = { done: [] };
   const lang = LANG_INFO[ctx.settings.ownerLanguage ?? "en"];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -406,7 +431,11 @@ export interface BrokerEmail {
 }
 
 /** A reply to a broker's email, as a draft. Whether it's sent now or waits for the owner is the caller's call. */
-export async function brokerEmailDraft(ctx: CarrierContext, email: BrokerEmail): Promise<{ body: string | null; effects: Effects }> {
+export function brokerEmailDraft(ctx: CarrierContext, email: BrokerEmail): Promise<{ body: string | null; effects: Effects }> {
+  return again(() => brokerEmailDraftOnce(ctx, email));
+}
+
+async function brokerEmailDraftOnce(ctx: CarrierContext, email: BrokerEmail): Promise<{ body: string | null; effects: Effects }> {
   const effects: Effects = { done: [] };
   const tools = [
     betaZodTool({
@@ -460,4 +489,14 @@ export async function brokerEmailDraft(ctx: CarrierContext, email: BrokerEmail):
   }
 }
 
-export { ALIAS, event, uid, raise as passToOwner };
+/**
+ * Something the AI handled that the owner may want to know: always in the activity log, and on their Needs you list
+ * unless they're on full autopilot (where they asked not to be bothered with what's done).
+ */
+async function tellOwner(ctx: CarrierContext, p: { reason: string; loadId?: string; label?: string; source: MessageChannel; brokerId?: string; severity?: ActivityEvent["severity"] }) {
+  await addActivity(ctx.carrier.id, event({ type: "escalation", loadId: p.loadId, message: p.reason.slice(0, 140), detail: p.reason.length > 140 ? p.reason : undefined, severity: p.severity ?? "info" }));
+  if (ctx.settings.autonomy === "full") return null;
+  return raise(ctx, { reason: p.reason, loadId: p.loadId, label: p.label ?? "Got it", source: p.source, to: "owner", brokerId: p.brokerId });
+}
+
+export { ALIAS, event, uid, raise as passToOwner, tellOwner };

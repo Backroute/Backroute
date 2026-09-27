@@ -4,7 +4,8 @@ import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import { estimateMiles } from "../fleet";
 import type { Load, LoadChange, LoadStop } from "../types";
-import { addActivity, logChannel, save, saveDriverMessage, type CarrierContext } from "./db";
+import { addActivity, claimMark, logChannel, save, saveDriverMessage, type CarrierContext } from "./db";
+import { billTo } from "./paperwork";
 import { event, passToOwner, uid } from "./dispatcher";
 import { sendOrQueue } from "./outbox";
 import { route } from "./routing";
@@ -132,6 +133,22 @@ export async function changeReply(ctx: CarrierContext, load: Load, r: { agreed: 
   // Their number: fine if it still covers three quarters of what the change is worth.
   if (r.brokerRate !== null && r.brokerRate - rate >= c.extra * 0.75) {
     await agreeChange(ctx, load, r.brokerRate);
+    return true;
+  }
+  // Too little: the AI holds its number once, with the reason, the way a dispatcher would. Still too little after
+  // that, and it's the owner's call.
+  const to = billTo(ctx, load);
+  if (to && (await claimMark(ctx.carrier.id, load.id, "change_hold"))) {
+    await sendOrQueue(ctx, {
+      purpose: "change",
+      to,
+      subject: `Re: ${load.referenceNumber}`,
+      body: `Hi,\n\nWe can't do the ${c.kind === "reroute" ? "reroute" : "extra stop"} on ${load.referenceNumber} for${r.brokerRate ? ` $${r.brokerRate.toLocaleString("en-US")}` : " that"}: it's ${c.extraMiles} more miles${c.kind === "add_stop" ? " plus the stop" : ""}, so we need $${c.newTotal.toLocaleString("en-US")} all in. Let us know.\n\nThanks,\n${ctx.carrier.name}`,
+      loadId: load.id,
+      amount: c.newTotal,
+      withinRules: true,
+      why: `Hold at $${c.newTotal} for the change on ${load.referenceNumber}?`,
+    });
     return true;
   }
   if (r.brokerRate !== null || !r.agreed) {

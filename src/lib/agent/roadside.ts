@@ -164,14 +164,20 @@ export async function handleBreakdown(ctx: CarrierContext, driver: Driver, detai
   const done: string[] = [];
 
   let shops: RoadsideShop[] = [];
+  let towTried = false;
   if (placesConfigured()) {
     try {
       shops = await findShops(helpFor(details), where.near, where.text);
+      // No repair shop answers the search: towing is the next thing a dispatcher looks for.
+      if (!shops.length && helpFor(details) !== "heavy duty towing") {
+        shops = await findShops("heavy duty towing", where.near, where.text);
+        towTried = true;
+      }
     } catch (e) {
       console.error("[roadside] shop search failed", e);
     }
   }
-  let roadside: Roadside = { at: new Date(now).toISOString(), driverId: driver.id, loadId: load?.id, details, where: where.text, shops, calling: -1 };
+  let roadside: Roadside = { at: new Date(now).toISOString(), driverId: driver.id, loadId: load?.id, details, where: where.text, shops, calling: -1, ...(towTried ? { towTried } : {}) };
   let current: Truck = await saveRoadside(ctx, truck, roadside);
 
   let calling: string | null = null;
@@ -205,13 +211,16 @@ export async function handleBreakdown(ctx: CarrierContext, driver: Driver, detai
     }
   }
 
+  // A driver stranded with no help the AI could find is an emergency: support. Otherwise the AI is working it and
+  // the repair bill is the owner's.
   const noHelp = !shops.length;
   await raise(ctx, {
-    reason: `${driver.name} (breakdown): truck ${truck.unitNumber} broke down near ${where.text}${load ? ` on ${load.referenceNumber}` : ""}: ${details}.${done.length ? ` The AI ${done.join(", ")}.` : ""}${noHelp ? " It couldn't look up repair shops: find one for the driver." : " The repair bill needs your OK before the shop starts."}`,
+    reason: `${driver.name} (breakdown): truck ${truck.unitNumber} broke down near ${where.text}${load ? ` on ${load.referenceNumber}` : ""}: ${details}.${done.length ? ` The AI ${done.join(", ")}.` : ""}${noHelp ? " It couldn't find a repair shop or tow: find help for the driver." : " The repair bill needs your OK before the shop starts."}`,
     loadId: load?.id,
     label: "Sorted",
     source,
-    to: noHelp ? "decider" : "owner",
+    to: noHelp ? "support" : "owner",
+    critical: noHelp,
   });
   await addActivity(ctx.carrier.id, event({ type: "incident", loadId: load?.id, message: `Truck ${truck.unitNumber} broke down`, detail: `${where.text} · ${details}`, severity: "danger" }));
   return noHelp
@@ -276,8 +285,20 @@ export async function nextShop(ctx: CarrierContext, truck: Truck): Promise<boole
   if (!r || r.found) return false;
   const i = r.calling + 1;
   if (i < r.shops.length && (await callShop(ctx, truck, r, i))) return true;
+  // Every repair shop said no: heavy-duty towing near the truck, called the same way, before a person is needed.
+  if (!r.towTried && placesConfigured()) {
+    const pos = truck.position && Date.now() - Date.parse(truck.position.at) < 2 * 3600_000 ? { lat: truck.position.lat, lon: truck.position.lon } : null;
+    const tows = await findShops("heavy duty towing", pos, r.where).catch(() => [] as RoadsideShop[]);
+    const fresh = tows.filter((t) => !r.shops.some((s) => s.phone === t.phone));
+    if (fresh.length) {
+      const next = await saveRoadside(ctx, truck, { ...r, shops: fresh, calling: -1, towTried: true });
+      const driver = ctx.drivers.find((d) => d.id === r.driverId);
+      if (driver) await textDriver(ctx, driver, `No repair shop could come. Calling tow companies near you now: ${fresh.map((t) => `${t.name}: ${t.phone}`).join("; ")}`, "roadside_tow");
+      if (await callShop(ctx, next, next.roadside!, 0)) return true;
+    }
+  }
   await saveRoadside(ctx, truck, { ...r, exhausted: true });
-  await raise(ctx, { reason: `None of the shops the AI called could help truck ${truck.unitNumber} near ${r.where}. Find a shop or tow for the driver.`, loadId: r.loadId, critical: true, label: "Sorted", source: "voice", to: "support" });
+  await raise(ctx, { reason: `None of the repair shops or tow companies the AI called could help truck ${truck.unitNumber} near ${r.where}. Find help for the driver.`, loadId: r.loadId, critical: true, label: "Sorted", source: "voice", to: "support" });
   return false;
 }
 

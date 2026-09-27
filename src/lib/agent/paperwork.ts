@@ -19,7 +19,8 @@ const FREE_HOURS = 2;
 const DEFAULT_DETENTION_PER_HOUR = 50;
 
 const brokerOf = (ctx: CarrierContext, l: Load) => ctx.brokers.find((b) => b.id === l.brokerId);
-const billTo = (ctx: CarrierContext, l: Load) => l.brokerContactEmail ?? brokerOf(ctx, l)?.email ?? null;
+// Where the broker gets paperwork: the contact on the load, the broker on file, or the address on their rate con.
+export const billTo = (ctx: CarrierContext, l: Load) => l.brokerContactEmail || brokerOf(ctx, l)?.email || l.rateConReading?.brokerEmail || null;
 
 // ─── Setup packet ────────────────────────────────────────────────────────────
 
@@ -27,9 +28,12 @@ const billTo = (ctx: CarrierContext, l: Load) => l.brokerContactEmail ?? brokerO
 const SETUP_NETWORKS = /https?:\/\/[^\s>"]*(mycarrierpackets|rmis|registrymonitoring|highway\.com|carrierassure|carrier411|carrierok|trucker ?tools|assure)[^\s>"]*/i;
 
 export async function sendSetupPacket(ctx: CarrierContext, sender: { from: string; fromName: string; subject: string; messageId?: string; contactName?: string | null }, text = "") {
-  // An invite to the broker's onboarding portal needs someone to sign in and accept it: support does it once.
+  // An invite to the broker's onboarding portal. When the carrier already has a profile on that network (Settings),
+  // the packet email points them to it and that's it. Otherwise someone has to sign in and fill it out: support.
   const invite = text.match(SETUP_NETWORKS)?.[0];
-  if (invite)
+  const network = invite?.match(SETUP_NETWORKS)?.[1]?.toLowerCase().replace(/\s+/g, "");
+  const onFile = network && ctx.settings.setupProfiles?.some((p) => `${p.name} ${p.url}`.toLowerCase().replace(/\s+/g, "").includes(network.replace(/\.com$/, "")));
+  if (invite && !onFile)
     await passToOwner(ctx, {
       reason: `${sender.fromName} wants ${ctx.carrier.name} set up through their onboarding portal: ${invite}. Complete it with the details and papers in Settings; the AI sent the papers by email too.`,
       label: "Set up",
@@ -176,7 +180,7 @@ export async function sendInvoices(ctx: CarrierContext): Promise<string[]> {
       const to = ctx.settings.factoringEmail ?? billTo(ctx, load);
       const broker = brokerOf(ctx, load);
       if (!to) {
-        await passToOwner(ctx, { reason: `${load.referenceNumber} delivered and the POD is in, but there's no email to bill ${broker?.company ?? "the broker"}. Add their email on the load or send the invoice yourself.`, loadId: load.id, label: "I'll bill it", source: "email" });
+        await passToOwner(ctx, { reason: `${load.referenceNumber} delivered and the POD is in, but there's no email anywhere to bill ${broker?.company ?? "the broker"}. Add their email on the load and the AI sends it.`, loadId: load.id, label: "Added", source: "email", to: "owner" });
         continue;
       }
       const number = `INV-${load.referenceNumber}`.replace(/[^\w-]/g, "");
@@ -265,7 +269,7 @@ export async function sendDetentionClaims(ctx: CarrierContext, now: number): Pro
         await save("loads", ctx.carrier.id, withClaim as unknown as Item);
         ctx.loads = ctx.loads.map((l) => (l.id === load.id ? withClaim : l));
         if (!to) {
-          await passToOwner(ctx, { reason: `${load.referenceNumber}: ${Math.round(d.minutes / 6) / 10} hours at ${d.stop}, about $${amount} in detention, but there's no broker email to claim it.`, loadId: load.id, label: "I'll claim it", source: "email" });
+          await passToOwner(ctx, { reason: `${load.referenceNumber}: ${Math.round(d.minutes / 6) / 10} hours at ${d.stop}, about $${amount} in detention, but there's no broker email to claim it. Add their email on the load.`, loadId: load.id, label: "Added", source: "email", to: "owner" });
           continue;
         }
         const result = await sendOrQueue(ctx, {

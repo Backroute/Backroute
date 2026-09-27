@@ -114,6 +114,16 @@ Thanks,
 ${signature(carrier, settings)}`;
 }
 
+/** The broker sent an appointment time: got it, the driver has it. */
+export function holdingThanks(carrier: CarrierRow, settings: AgentSettings, load: Load, toName?: string) {
+  return `${hello(toName)}
+
+Got it, thanks. The appointment is on ${load.referenceNumber} and the driver has it.
+
+Thanks,
+${signature(carrier, settings)}`;
+}
+
 /** Their rate con matched and the load is booked: who's coming and when. */
 export function rateConThanks(carrier: CarrierRow, settings: AgentSettings, load: Load, who: { unit?: string; driver?: string }, toName?: string, signed = false) {
   return `${hello(toName)}

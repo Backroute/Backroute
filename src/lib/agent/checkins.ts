@@ -133,7 +133,9 @@ export async function runCheckins(ctx: CarrierContext, marks: Map<string, { at: 
 
       const reason = OWNER_REASON[kind]?.(driver.name, load);
       if (reason) {
-        await passToOwner(ctx, { reason, loadId: load.id, critical: kind !== "pod_silent", label: "I've reached them", source: "sms" });
+        // The owner first (they're texted too, below): they know the driver. If they haven't picked it up within the
+        // hour, the support team takes it (lib/agent/stuck).
+        await passToOwner(ctx, { reason, loadId: load.id, critical: kind !== "pod_silent", label: "I've reached them", source: "sms", to: "owner" });
         const owner = ctx.carrier.owner_phone ? toE164(ctx.carrier.owner_phone) : null;
         // A driver who can't be reached on a late load is treated like a safety alert: the owner gets it whatever the
         // notification setting. A missing POD only comes by text if they asked for texts.

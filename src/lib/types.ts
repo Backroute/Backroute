@@ -232,6 +232,8 @@ export interface Roadside {
   found?: { shop: string; phone: string; eta: string | null };
   /** Every shop said no or didn't answer. */
   exhausted?: boolean;
+  /** The AI moved on to heavy-duty towing after the repair shops. */
+  towTried?: boolean;
 }
 
 /** One checklist item in a DVIR (Driver Vehicle Inspection Report). */
@@ -854,7 +856,11 @@ export interface LoadInvoice {
 export interface FacilityAppointment {
   /** Book a time the rate con says to call for, or move one the truck will miss. */
   purpose: "book" | "move";
-  status: "needed" | "calling" | "set" | "failed";
+  /** "broker": the facility can't be reached or won't set it by phone, so the broker was asked to (and chased). */
+  status: "needed" | "calling" | "set" | "broker" | "failed";
+  /** When the broker was asked, and reminded. */
+  brokerAskedAt?: string;
+  brokerRemindedAt?: string;
   /** For a move: when the truck will really get there (ISO). */
   eta?: string;
   tries: number;

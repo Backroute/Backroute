@@ -10,9 +10,9 @@ import { formatAtStop, stopLocalToIso } from "../stop-time";
 import type { Broker, Load, Truck } from "../types";
 import type { OfferReading } from "./broker-mail";
 import { addActivity, claimMark, logChannel, save, saveDriverMessage, type CarrierContext } from "./db";
-import { answerBrokerQuestion, event, passToOwner, uid } from "./dispatcher";
+import { answerBrokerQuestion, event, passToOwner, tellOwner, uid } from "./dispatcher";
 import { sendOrQueue } from "./outbox";
-import { askSupportAboutBroker, checkBroker } from "./brokers";
+import { checkBroker, untrustedBroker } from "./brokers";
 import { checkCredit } from "./credit";
 import { callBroker, truckAt } from "./broker-call";
 import { canMakePickup } from "./eld";
@@ -184,7 +184,7 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
   // A board poster with a phone and no MC yet: the AI calls, asks for the MC and checks it before agreeing to book.
   const checkOnCall = !broker.mc && !!broker.phone && !broker.email && !!sender.feed;
   const trusted = assessBroker(broker, ctx.settings.brokerOverrides).policy !== "block" || checkOnCall;
-  if (ctx.settings.autonomy !== "ask" && added.length && !trusted) await askSupportAboutBroker(ctx, broker, added[0].id);
+  if (ctx.settings.autonomy !== "ask" && added.length && !trusted) await untrustedBroker(ctx, broker, added[0].id);
   if (ctx.settings.autonomy !== "ask" && trusted) {
     const byTruck = new Map<string, Load[]>();
     for (const l of added) byTruck.set(l.truckId!, [...(byTruck.get(l.truckId!) ?? []), l]);
@@ -257,7 +257,7 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
     broker = credit.broker;
     if (credit.blocked) {
       if (await claimMark(ctx.carrier.id, load.id, "credit_hold"))
-        await passToOwner(ctx, { reason: `The AI didn't ask to book ${load.referenceNumber}: ${credit.why}. Brokers like that pay late or not at all. Book it yourself from the load if you still want it.`, loadId: load.id, label: "Got it", source: "email", to: "decider", brokerId: broker.id });
+        await tellOwner(ctx, { reason: `The AI didn't ask to book ${load.referenceNumber}: ${credit.why}. Brokers like that pay late or not at all. Book it yourself from the load if you still want it.`, loadId: load.id, label: "Got it", source: "email", brokerId: broker.id, severity: "warning" });
       return "queued" as const;
     }
     if (credit.surchargePct && !load.surchargePct) {
@@ -291,7 +291,16 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
       const url = absoluteUrl(`/api/channels/voice/broker?carrier=${encodeURIComponent(ctx.carrier.id)}&load=${encodeURIComponent(load.id)}`);
       if (await callBroker(ctx, asking, url)) return "sent" as const;
     }
-    await passToOwner(ctx, { reason: `No email for ${broker?.company ?? "the broker"} on ${load.referenceNumber}${broker?.phone ? " and the AI couldn't call" : " or phone"}: reach them to book it at $${ask.toLocaleString()}.`, loadId: load.id, label: "Reached them", source: "email", to: "support" });
+    // No way to reach them: the owner asked for this one, so it's theirs to reach; otherwise the AI lets it go and
+    // the truck stays free for the next load.
+    if (how.byOwner) {
+      await passToOwner(ctx, { reason: `No email for ${broker?.company ?? "the broker"} on ${load.referenceNumber}${broker?.phone ? " and the AI couldn't get through by phone" : " and no phone"}. Reach them to book it at $${ask.toLocaleString()}.`, loadId: load.id, label: "Reached them", source: "email", to: "owner" });
+      return "queued" as const;
+    }
+    const gone: Load = { ...load, stage: "declined", updatedAt: new Date().toISOString() };
+    await save("loads", ctx.carrier.id, gone as unknown as Item);
+    ctx.loads = ctx.loads.map((l) => (l.id === load.id ? gone : l));
+    await tellOwner(ctx, { reason: `Let ${load.referenceNumber} from ${broker?.company ?? "a broker"} go: no email${broker?.phone ? " and no answer by phone" : " or phone"} to book it with.`, loadId: load.id, source: "email" });
     return "queued" as const;
   }
   const at = new Date().toISOString();

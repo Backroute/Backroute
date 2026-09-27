@@ -7,9 +7,9 @@ import { agreedTerms } from "../rate-con-terms";
 import type { Item } from "../cloud/rows";
 import type { Load, RateConPdfReading } from "../types";
 import { addActivity, claimMark, loadContext, save, storeFile, threadWith } from "./db";
-import { brokerEmailDraft, event, passToOwner } from "./dispatcher";
+import { brokerEmailDraft, event, passToOwner, tellOwner } from "./dispatcher";
 import { readBrokerEmail } from "./broker-mail";
-import { answerRateReply, bookIt, offersFromEmail, type Sender } from "./booking";
+import { answerRateReply, bookIt, offersFromEmail, requestBooking, type Sender } from "./booking";
 import { sendOrQueue } from "./outbox";
 import * as mail from "./templates";
 import { sendSetupPacket } from "./paperwork";
@@ -19,9 +19,11 @@ import { cancelLoad } from "./cancel";
 import { recordPayments } from "./money";
 import { PORTAL_SIGNING, signRateCon } from "./sign";
 import { askDriverToTrack, trackingNeed } from "./tracking";
-import { dollarAmounts, onlyKnownPrices } from "./pricing";
+import { dollarAmounts, floorFor, onlyKnownPrices } from "./pricing";
 import { answerChange, changeReply } from "./changes";
 import { CLAIM_EMAIL, claimLoad, openClaim } from "./claims";
+import { setAppointment } from "./appointments";
+import { stopLocalToIso } from "../stop-time";
 
 const ACTIVE = new Set(["negotiating", "rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery"]);
 
@@ -102,7 +104,14 @@ async function handle(carrierId: string, email: InboundEmail) {
         // different MC than the broker we booked with is how double brokering shows up: nothing moves until it's checked.
         const onLoad = ctx.brokers.find((b) => b.id === load!.brokerId);
         const double = doubleBrokered(reading.brokerMc, onLoad);
-        if (double) await passToOwner(ctx, { reason: `Possible double brokering on ${load.referenceNumber}. ${double} Call ${onLoad!.company} on the number from FMCSA, not the one on the rate con, before the truck goes.`, loadId: load.id, critical: true, label: "Checked", source: "email", to: "support", brokerId: onLoad!.id });
+        // Nothing is booked on it. The broker we dealt with is asked, at the address we already had, to send their own
+        // rate con; the owner is told. A real mix-up gets fixed by their answer; a double broker gets nothing.
+        if (double) {
+          await passToOwner(ctx, { reason: `Possible double brokering on ${load.referenceNumber}. ${double} The AI didn't book it and asked ${onLoad!.company} at the address you already had to send a rate con from their own company.`, loadId: load.id, label: "Got it", source: "email", to: "owner", brokerId: onLoad!.id });
+          const known = onLoad!.email && onLoad!.email.toLowerCase() !== from ? onLoad!.email : load.brokerContactEmail;
+          if (known && (await claimMark(carrierId, load.id, "double_ask")))
+            await sendOrQueue(ctx, { purpose: "ack", to: known, toName: onLoad!.contact || undefined, subject: mail.subjectFor(load, "Rate con"), body: `Hi${onLoad!.contact ? ` ${onLoad!.contact}` : ""},\n\nWe got a rate con for ${load.referenceNumber} from ${from} that shows a different broker (${reading.brokerMc ?? "another MC"}), not ${onLoad!.company}. We won't run it as is. If the load is yours, please send the rate con from ${onLoad!.company}.\n\nThanks,\n${ctx.carrier.name}`, loadId: load.id, withinRules: true, why: `Ask ${onLoad!.company} to confirm ${load.referenceNumber}?` });
+        }
         else if (onLoad && reading.brokerMc) await checkBroker(ctx, onLoad, reading.brokerMc);
         const serious = reading.mismatches.filter((m) => m.serious).length + (double ? 1 : 0);
         // A revised rate con for a change we priced (an added stop, a reroute): its total is their answer.
@@ -118,7 +127,7 @@ async function handle(carrierId: string, email: InboundEmail) {
             const problems = reading.mismatches.filter((m) => m.serious).map((m) => `${m.item}: we agreed ${m.agreed}, the rate con says ${m.onDoc}`);
             await sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: mail.rateConFix(ctx.carrier, ctx.settings, load, problems, fromName), inReplyTo: sender.messageId, loadId: load.id, withinRules: true, why: `Ask ${fromName} to fix the rate con for ${load.referenceNumber}?` });
             replied = true;
-            await passToOwner(ctx, { reason: `${fromName}'s rate con for ${load.referenceNumber} doesn't match what was agreed: ${reading.summary} The AI asked them for a corrected one.`, loadId: load.id, label: "I'll sort it", source: "email", to: "decider" });
+            await tellOwner(ctx, { reason: `${fromName}'s rate con for ${load.referenceNumber} doesn't match what was agreed: ${reading.summary} The AI asked them for a corrected one and books it when that comes.`, loadId: load.id, label: "Got it", source: "email", severity: "warning" });
           } else {
             if (ctx.settings.autonomy !== "ask") {
               load = (await bookIt(ctx, load, reading.totalRate ?? undefined)).load;
@@ -137,7 +146,12 @@ async function handle(carrierId: string, email: InboundEmail) {
             const portal = PORTAL_SIGNING.test(text) && /https?:\/\//.test(text);
             const signed = booked && !portal ? await signRateCon(ctx, load, Buffer.from(pdf.Content, "base64"), isPhoto(pdf) ? pdf.ContentType : "application/pdf") : null;
             if (signed) load = ctx.loads.find((l) => l.id === load!.id) ?? load;
-            else if (booked && portal) await passToOwner(ctx, { reason: `${fromName} wants the rate con for ${load.referenceNumber} signed in their online portal. The AI doesn't log in to other companies' systems: sign it from the link in their email.`, loadId: load.id, label: "Signed", source: "email", to: "support" });
+            else if (booked && portal) {
+              // Their portal: first ask for it as a PDF by email (most brokers will); if they insist, support signs it there.
+              if (await claimMark(carrierId, load.id, "portal_pdf_ask"))
+                await sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: `Hi${fromName ? ` ${fromName.split(" ")[0]}` : ""},\n\nCould you email the rate con for ${load.referenceNumber} as a PDF? We sign and send it straight back.\n\nThanks,\n${ctx.carrier.name}`, inReplyTo: sender.messageId, loadId: load.id, withinRules: true, why: `Ask ${fromName} for the rate con as a PDF?` });
+              else await passToOwner(ctx, { reason: `${fromName} needs the rate con for ${load.referenceNumber} signed in their online portal (they didn't send a PDF when asked). Sign it from the link in their email.`, loadId: load.id, label: "Signed", source: "email", to: "support" });
+            }
             else if (booked && !ctx.settings.rateConSigner?.name && (await claimMark(carrierId, `carrier:${carrierId}`, "no_signer"))) await passToOwner(ctx, { reason: `The AI booked ${load.referenceNumber} on a matching rate con but can't sign it for you yet. In Settings → Your rules, add who signs rate cons, and the AI will sign and return them.`, loadId: load.id, label: "Added", source: "email", to: "owner" });
             await sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: mail.rateConThanks(ctx.carrier, ctx.settings, load, who, fromName, !!signed), inReplyTo: sender.messageId, loadId: load.id, attachments: signed ? [signed] : undefined, withinRules: true, why: `Thank ${fromName} for the rate con on ${load.referenceNumber}?` });
             replied = true;
@@ -176,35 +190,40 @@ async function handle(carrierId: string, email: InboundEmail) {
     !suspect() &&
     sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: mail.holding(ctx.carrier, ctx.settings, load?.referenceNumber ?? null, fromName), inReplyTo: sender.messageId, loadId: load?.id, withinRules: true, why: `Tell ${fromName} you'll get back to them?` });
 
-  // No answer and no action: support checks it by phone, on the number the carrier already had.
+  // The impostor gets no answer and nothing they ask is done. The real broker hears about it (at the address we
+  // already had), and the owner is told.
   async function impostorEmail() {
     const real = lookalikeOf(from, ctx!.brokers.filter((b) => b.email?.toLowerCase() !== from));
+    const domain = from.split("@")[1] ?? from;
+    if (real?.email && (await claimMark(carrierId, `broker:${real.id}`, `impostor:${domain}`)))
+      await sendOrQueue(ctx!, { purpose: "ack", to: real.email, toName: real.contact || undefined, subject: `Someone is emailing as ${real.company}`, body: `Hi${real.contact ? ` ${real.contact}` : ""},\n\nHeads up: we got an email from ${from}, which looks like your address but isn't. We didn't act on it. If it wasn't you, you may want to warn other carriers.\n\nThanks,\n${ctx!.carrier.name}`, withinRules: true, why: `Warn ${real.company} that someone is using a lookalike address?` });
     await passToOwner(ctx!, {
-      reason: `${fromName} <${from}> emailed "${email.Subject}" from an address that imitates ${real?.company ?? "a broker you work with"}'s${real?.email ? ` (${real.email})` : ""}. The AI didn't answer or act on it. Call ${real?.company ?? "them"} on the number you already have before doing anything it asks.`,
+      reason: `${fromName} <${from}> emailed "${email.Subject}" from an address that imitates ${real?.company ?? "a broker you work with"}'s${real?.email ? ` (${real.email})` : ""}. The AI didn't answer or act on it${real?.email ? `, and warned ${real.company}` : ""}. Don't do anything it asks.`,
       loadId: load?.id,
-      label: "Checked",
+      label: "Got it",
       source: "email",
-      to: "support",
-      critical: true,
+      to: "owner",
       brokerId: real?.id,
     });
   }
 
   if (!aiConfigured()) {
     if (impostor) return impostorEmail();
-    await passToOwner(ctx, { reason: `New email from ${fromName}: "${email.Subject}"`, loadId: load?.id, label: "I'll answer", source: "email" });
+    await passToOwner(ctx, { reason: `New email from ${fromName}: "${email.Subject}"`, loadId: load?.id, label: "I'll answer", source: "email", to: "support" });
     await holdingReply();
     return;
   }
 
-  // Someone asking to change where money goes, or to confirm bank details: the AI doesn't answer, support checks.
+  // Someone asking to change where money goes, or to confirm bank details: nothing is changed or shared. They get the
+  // carrier's standing answer (payment details never change by email), and the owner is told.
   if (paymentScam(`${email.Subject}\n${text}`)) {
+    if (!suspect() && (await claimMark(carrierId, `broker:${from}`, `bank:${new Date().toISOString().slice(0, 10)}`)))
+      await sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: `Hi,\n\nWe don't share, confirm or change payment or bank details by email. Our payment details are on our invoices${ctx.settings.factoringEmail ? " and our notice of assignment" : ""}. For anything about them, please call our office.\n\nThanks,\n${ctx.carrier.name}`, inReplyTo: sender.messageId, withinRules: true, why: `Tell ${fromName} payment details don't change by email?` });
     await passToOwner(ctx, {
-      reason: `${fromName} <${from}> asked about bank or payment details ("${email.Subject}"). That's the most common way carriers get robbed. The AI didn't reply. Confirm by phone, using a number you already had, before changing anything.`,
-      label: "Checked",
+      reason: `${fromName} <${from}> asked about bank or payment details ("${email.Subject}"). That's the most common way carriers get robbed. The AI changed nothing and told them it isn't done by email. If they call, confirm who they are on a number you already had.`,
+      label: "Got it",
       source: "email",
-      to: "support",
-      critical: true,
+      to: "owner",
     });
     return;
   }
@@ -223,6 +242,19 @@ async function handle(carrierId: string, email: InboundEmail) {
     await save("records", carrierId, next as unknown as Item, "broker");
     ctx.brokers = ctx.brokers.map((b) => (b.id === next.id ? next : b));
   }
+  // A broker the AI couldn't book with for want of an MC number sends it: checked with FMCSA, and if it passes, the
+  // AI asks to book their best load that's still open.
+  const unverified = writer && !writer.authorityVerified && reading?.brokerMc && !impostor ? writer : null;
+  if (unverified) {
+    const checked = await checkBroker(ctx, unverified, reading!.brokerMc);
+    if (checked.authorityVerified && ctx.settings.autonomy !== "ask") {
+      const open = ctx.loads.filter((l) => l.brokerId === checked.id && l.stage === "offered" && l.truckId && (floorFor(l, ctx.settings) ?? Infinity) <= l.targetRate).sort((a, b) => b.targetRate - a.targetRate)[0];
+      if (open) {
+        await requestBooking(ctx, open, open.targetRate, { byRules: true });
+        if (reading?.kind === "other") return;
+      }
+    }
+  }
   if (reading?.kind === "setup_request") return sendSetupPacket(ctx, { ...sender, contactName: reading.contactName }, text);
   if (reading?.kind === "payment" && reading.payments.length) {
     await recordPayments(ctx, reading.payments, fromName);
@@ -238,6 +270,17 @@ async function handle(carrierId: string, email: InboundEmail) {
     if (target) {
       const amounts = dollarAmounts(text);
       await openClaim(ctx, target, { source: "broker", details: text.replace(/\s+/g, " ").trim().slice(0, 400), amount: amounts.length ? Math.max(...amounts) : null, claimant: from, claimantName: reading?.contactName ?? undefined, subject: email.Subject, inReplyTo: sender.messageId });
+      return;
+    }
+  }
+  // The broker sent an appointment time (one the AI asked them to set, or one they moved): on the load and to the driver.
+  if (reading?.kind === "appointment" && reading.appointmentStop && reading.appointmentLocal && !suspect()) {
+    const target = byRef(reading.loadNumber) ?? load;
+    const state = target ? (reading.appointmentStop === "pickup" ? target.lane.originState : target.lane.destState) : "";
+    const iso = target ? stopLocalToIso(reading.appointmentLocal, state) : null;
+    if (target && iso && ["booked", "rate_confirmed", "dispatched", "at_pickup", "in_transit"].includes(target.stage)) {
+      await setAppointment(ctx, target, reading.appointmentStop, iso, reading.appointmentConfirmation, "broker");
+      await sendOrQueue(ctx, { purpose: "ack", to: from, toName: reading.contactName ?? undefined, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: mail.holdingThanks(ctx.carrier, ctx.settings, target, reading.contactName ?? undefined), inReplyTo: sender.messageId, loadId: target.id, withinRules: true, why: `Thank ${fromName} for the appointment on ${target.referenceNumber}?` });
       return;
     }
   }
@@ -276,7 +319,7 @@ async function handle(carrierId: string, email: InboundEmail) {
   const thread = (await threadWith(carrierId, "email", from, 8)).filter((m) => !(m.direction === "in" && m.body === text));
   const draft = await brokerEmailDraft(ctx, { from, fromName, subject: email.Subject, text, attachmentNotes: notes, thread, load });
   if (draft.effects.failed) {
-    await passToOwner(ctx, { reason: `New email from ${fromName}: "${email.Subject}". The AI couldn't write a reply, so it told them someone will get back to them.`, loadId: load?.id, label: "I'll answer", source: "email" });
+    await passToOwner(ctx, { reason: `New email from ${fromName}: "${email.Subject}". The AI couldn't write a reply (twice), so it told them someone will get back to them.`, loadId: load?.id, label: "I'll answer", source: "email", to: "support" });
     await holdingReply();
     return;
   }

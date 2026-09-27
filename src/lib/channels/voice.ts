@@ -85,7 +85,7 @@ async function driverCallAnswer(carrierId: string, driver: Driver, callSid: stri
   const history = earlier.map((m) => ({ from: m.direction === "in" ? ("them" as const) : ("ai" as const), text: m.body ?? "" }));
   const result = aiConfigured() ? await driverTurn(ctx, driver, "voice", said, history) : { reply: "", effects: { done: [], failed: true } };
   if (result.effects.failed) {
-    await passToOwner(ctx, { reason: `${driver.name} called and said: "${said}"`, label: "I'll call back", source: "voice" });
+    await passToOwner(ctx, { reason: `${driver.name} called and said: "${said}". The AI couldn't answer (twice).`, label: "I'll call back", source: "voice", to: "support" });
     await logChannel({ carrierId, channel: "voice", direction: "out", driverId: driver.id, counterparty: key, body: PASSED_ON_CALL[lang] });
     return { reply: PASSED_ON_CALL[lang], hangUp: true };
   }
