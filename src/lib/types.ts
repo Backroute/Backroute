@@ -494,10 +494,29 @@ export interface Load {
   /** Real accounts: pickup and delivery appointment times, for check-ins and detention. */
   pickupAt?: string;
   deliveryAt?: string;
+  /** What's in the trailer, as the broker said it. */
+  commodity?: string;
+  hazmat?: boolean;
+  /** Appointment times (or first come, first served), as the broker said them on the phone. */
+  appointmentNote?: string;
   /** Who at the broker to email about this load (from their email or the rate con). */
   brokerContactEmail?: string;
   /** The AI asked the broker to book this load: the price it asked, and where that stands. */
-  bookRequest?: { ask: number; askedAt: string; status: "drafted" | "sent" | "accepted" | "declined"; countered?: boolean; brokerOffer?: number };
+  bookRequest?: {
+    ask: number;
+    askedAt: string;
+    status: "drafted" | "sent" | "accepted" | "declined";
+    countered?: boolean;
+    brokerOffer?: number;
+    /** The first number we asked; counters come down from it. */
+    opening?: number;
+    /** How many times we've countered (up to 3). */
+    rounds?: number;
+    /** The back-and-forth: every number either side named, by email or on the phone. */
+    history?: { by: "us" | "them"; amount: number; at: string; via: "email" | "phone" }[];
+    /** We walked away (too far under the owner's lowest after three counters), leaving the door open. */
+    passedAt?: string;
+  };
   /** The broker's email this load came from, so the book request answers it in the same thread. */
   offerEmail?: { subject: string; messageId?: string };
   invoice?: LoadInvoice;
@@ -609,7 +628,7 @@ export interface DraftMessage {
  */
 export type OwnerRule = "tonu_default" | "detention_default" | "invoice_noted_pod" | "replies";
 
-export type DraftPurpose = "reply" | "book_request" | "counter" | "accept" | "setup_packet" | "invoice" | "detention" | "payment_reminder" | "tonu" | "eta_update" | "capacity";
+export type DraftPurpose = "reply" | "book_request" | "counter" | "accept" | "setup_packet" | "invoice" | "detention" | "payment_reminder" | "tonu" | "eta_update" | "capacity" | "pass";
 
 export interface DriverMessage {
   id: string;

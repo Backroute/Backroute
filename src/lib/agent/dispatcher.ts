@@ -9,7 +9,7 @@ import { driverSnapshot, ownerSnapshot } from "../ai/snapshot";
 import { LANG_INFO } from "../lang/pack";
 import { PRIMARY_CARRIER_ID } from "../mock-data";
 import { memoryNote } from "./memory";
-import { handleBreakdown } from "./roadside";
+import { NEARBY, findNearby, handleBreakdown } from "./roadside";
 import { recordFeedback } from "./care";
 import { LOAD_STAGE_LABEL, LOAD_STAGE_ORDER, type ActivityEvent, type Driver, type Escalation, type Load, type LoadStage, type MessageChannel } from "../types";
 import type { Item } from "../cloud/rows";
@@ -165,6 +165,18 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: "sms" | "voic
       },
     }),
     betaZodTool({
+      name: "find_nearby",
+      description: "Find the closest truck parking, truck stop, diesel, CAT scale, truck wash, repair shop or tire shop near the driver.",
+      inputSchema: z.object({
+        kind: z.enum(Object.keys(NEARBY) as [keyof typeof NEARBY, ...(keyof typeof NEARBY)[]]),
+        where: z.string().optional().describe("Where the driver says they are, if they said."),
+      }),
+      run: async ({ kind, where }) => {
+        effects.done.push(`Looked up ${NEARBY[kind]} nearby`);
+        return findNearby(ctx, driver, kind, where);
+      },
+    }),
+    betaZodTool({
       name: "tell_owner",
       description: "Pass a message to the owner that needs a person: a question you can't answer from the data, a request for a call back, pay or time off.",
       inputSchema: z.object({ message: z.string() }),
@@ -196,7 +208,7 @@ const CHANNEL_NOTES = {
 };
 
 const ACTING = `
-You can act with your tools. When the driver tells you they've arrived, are loaded, or reached delivery, update the load. When they report a problem, report it. When they need a person, tell the owner. Only say you did something after the tool says it's done.`;
+You can act with your tools. When the driver tells you they've arrived, are loaded, or reached delivery, update the load. When they report a problem, report it. When they need parking, fuel, a scale, a wash or a shop, find it nearby. When they need a person, tell the owner. Only say you did something after the tool says it's done.`;
 
 export interface Turn {
   from: "them" | "ai";

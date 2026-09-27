@@ -25,7 +25,8 @@ const ACTIVE = new Set(["negotiating", "rate_confirmed", "booked", "dispatched",
  * - A rate con attached is read and checked against its load. When it confirms a load the AI asked for and matches,
  *   the load is booked onto its truck (on "Within my rules" or full autopilot; on "Ask me first" the owner taps Book it).
  * - Loads offered: each that fits a truck goes on the owner's board, and within the rules the AI asks to book the best.
- * - An answer to our price: taken, countered once at the owner's lowest, or passed to the owner (lib/agent/pricing).
+ * - An answer to our price: taken, countered (up to three times), passed on politely, or passed to the owner
+ *   (lib/agent/negotiation).
  * - A request for setup papers: the packet goes out with the carrier's W-9, insurance certificate and authority.
  * - Anything else: the AI writes a reply, which waits for the owner unless autopilot is on full.
  */
@@ -143,7 +144,7 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
       await addActivity(carrierId, event({ type: "load_offered", message: `${fromName} sent ${reading.offers.length} load${reading.offers.length === 1 ? "" : "s"}; none fit a free truck`, detail: email.Subject, severity: "info" }));
     return;
   }
-  if (reading?.kind === "rate_reply" && load?.stage === "negotiating") {
+  if (reading?.kind === "rate_reply" && (load?.stage === "negotiating" || (load?.stage === "declined" && load.bookRequest?.passedAt))) {
     const handled = await answerRateReply(ctx, load, { brokerRate: reading.brokerRate, agreed: reading.agreedToOurRate, contactName: reading.contactName }, sender);
     if (handled !== false) return;
   }

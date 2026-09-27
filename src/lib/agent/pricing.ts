@@ -3,7 +3,7 @@ import type { Load } from "../types";
 
 /**
  * The money rules, in code rather than in the AI's instructions, so a broker's email can't talk the AI below them:
- * the AI reads the numbers, and these decide what to ask, take, or pass to the owner.
+ * the AI reads the numbers, and these decide what to ask. What to answer a broker's number is lib/agent/negotiation.
  */
 
 const round25 = (n: number) => Math.ceil(n / 25) * 25;
@@ -37,20 +37,6 @@ export function askFor(load: Pick<Load, "lane" | "listedRate">, settings: Pick<A
     ask = Math.max(ask ?? 0, Math.min(average, top));
   }
   return ask;
-}
-
-export type Answer = { action: "accept"; amount: number } | { action: "counter"; amount: number } | { action: "owner"; why: string };
-
-/**
- * A broker answered our ask with a number. At or above the floor: take it. Below: counter once at the floor.
- * Below again, or no floor set: the owner decides. The AI never agrees to less than the floor.
- */
-export function answerBroker(offer: number, load: Pick<Load, "lane">, settings: Pick<AgentSettings, "minRpm">, counteredBefore: boolean): Answer {
-  const floor = floorFor(load, settings);
-  if (!floor) return { action: "owner", why: `No lowest rate per mile is set, so the AI won't agree to $${offer.toLocaleString()} on its own.` };
-  if (offer >= floor) return { action: "accept", amount: offer };
-  if (!counteredBefore) return { action: "counter", amount: floor };
-  return { action: "owner", why: `The broker's $${offer.toLocaleString()} is under your lowest ($${floor.toLocaleString()} at $${settings.minRpm!.toFixed(2)}/mile), after one counter.` };
 }
 
 /** Dollar amounts written in a message, e.g. "$2,450", "$ 75" or "$2450.00". */

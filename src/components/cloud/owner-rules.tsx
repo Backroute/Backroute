@@ -68,8 +68,40 @@ export function OwnerRulesCard() {
           />
           <span className="text-xs font-normal text-ink-500">The AI won&apos;t take a load further away than this.</span>
         </label>
+        <div className="flex flex-col gap-2 border-t border-line pt-3">
+          <p className="text-xs text-ink-500">What the AI asks every broker to put on the rate con:</p>
+          <DollarField label="Detention per hour, after 2 hours free" value={settings.detentionPerHour ?? 50} min={25} max={200} onSave={(n) => updateSettings({ detentionPerHour: n })} />
+          <DollarField label="Truck ordered, not used (TONU)" value={settings.tonuFee ?? 150} min={50} max={1000} onSave={(n) => updateSettings({ tonuFee: n })} />
+        </div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-ink-900">We haul hazmat</p>
+            <p className="text-xs text-ink-500">Off: the AI won&apos;t book a load the broker says is hazmat, and asks you.</p>
+          </div>
+          <Switch checked={!!settings.hazmat} onChange={(on) => updateSettings({ hazmat: on })} label="We haul hazmat" />
+        </div>
       </CardContent>
     </Card>
+  );
+}
+
+function DollarField({ label, value, min, max, onSave }: { label: string; value: number; min: number; max: number; onSave: (n: number) => void }) {
+  const [text, setText] = useState(String(value));
+  const n = Number(text);
+  return (
+    <label className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink-900">
+      {label}
+      <span className="flex items-center gap-1">
+        $
+        <input
+          className="w-20 rounded-xl border border-line bg-white px-3 py-1.5 text-sm outline-none focus:border-ink-400"
+          inputMode="numeric"
+          value={text}
+          onChange={(e) => setText(e.target.value.replace(/\D/g, ""))}
+          onBlur={() => n >= min && n <= max && n !== value && onSave(n)}
+        />
+      </span>
+    </label>
   );
 }
 

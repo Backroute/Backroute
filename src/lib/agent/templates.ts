@@ -1,6 +1,7 @@
 import type { CarrierRow } from "./db";
 import type { AgentSettings } from "../store";
 import type { Load } from "../types";
+import { termsLine } from "./negotiation";
 
 /**
  * The dispatcher's standard emails. They're written from templates, not by the AI, so the price in each one is
@@ -20,18 +21,28 @@ export const subjectFor = (l: Load, what?: string) => `${what ? `${what}: ` : ""
 export function bookRequest(carrier: CarrierRow, settings: AgentSettings, load: Load, ask: number, toName?: string) {
   return `${hello(toName)}
 
-We'd like to book load ${load.referenceNumber}, ${lane(load)}, picking up ${load.pickupWindow}. We have a ${load.equipmentType.toLowerCase()} ready for it.
+We can cover ${load.referenceNumber}, ${lane(load)}, picking up ${load.pickupWindow}. Our ${load.equipmentType.toLowerCase()} is ready for it.
 
-Our rate is ${money(ask)} all in. If that works, please send the rate confirmation to this address and we'll dispatch.
+Our rate is ${money(ask)} all in. ${termsLine(settings)}
+
+If that works, send the rate con here and we'll dispatch.
 
 Thanks,
 ${signature(carrier, settings)}`;
 }
 
-export function counter(carrier: CarrierRow, settings: AgentSettings, load: Load, amount: number, toName?: string) {
+/** Our counter, worded for where the haggling is: coming down, holding, or our last number. */
+export function counter(carrier: CarrierRow, settings: AgentSettings, load: Load, amount: number, toName?: string, how: { final?: boolean; held?: boolean; reason?: string } = { final: true }) {
+  const line = how.held
+    ? `We're staying at ${money(amount)} all in on ${load.referenceNumber} (${lane(load)}).`
+    : how.final
+      ? `The best we can do on ${load.referenceNumber} (${lane(load)}) is ${money(amount)} all in.`
+      : `Thanks for coming back to us. We can come down to ${money(amount)} all in on ${load.referenceNumber} (${lane(load)}).`;
   return `${hello(toName)}
 
-Thanks for getting back to us. The best we can do on ${load.referenceNumber} (${lane(load)}) is ${money(amount)} all in. If that works, send the rate confirmation and we'll dispatch right away.
+${line}${how.reason ? ` ${how.reason}` : ""}
+
+If that works, send the rate con and we'll dispatch right away.
 
 Thanks,
 ${signature(carrier, settings)}`;
@@ -40,7 +51,21 @@ ${signature(carrier, settings)}`;
 export function accept(carrier: CarrierRow, settings: AgentSettings, load: Load, amount: number, toName?: string) {
   return `${hello(toName)}
 
-${money(amount)} all in works for us on ${load.referenceNumber} (${lane(load)}). Please send the rate confirmation to this address and we'll dispatch the truck.
+${money(amount)} all in works for us on ${load.referenceNumber} (${lane(load)}). ${termsLine(settings)}
+
+Send the rate con here and we'll dispatch the truck.
+
+Thanks,
+${signature(carrier, settings)}`;
+}
+
+/** Walking away, politely, with the door left open. */
+export function pass(carrier: CarrierRow, settings: AgentSettings, load: Load, ours: number, theirs: number, toName?: string) {
+  return `${hello(toName)}
+
+Thanks for working with us on ${load.referenceNumber}. We can't make ${money(theirs)} work; ${money(ours)} all in is as low as we can go on ${lane(load)}.
+
+If anything changes, reply here and we'll jump on it.
 
 Thanks,
 ${signature(carrier, settings)}`;
@@ -49,7 +74,7 @@ ${signature(carrier, settings)}`;
 export function phoneBooked(carrier: CarrierRow, settings: AgentSettings, load: Load, amount: number, papers: string[], toName?: string) {
   return `${hello(toName)}
 
-Confirming what we agreed on the phone: load ${load.referenceNumber}, ${lane(load)}, picking up ${load.pickupWindow}, at ${money(amount)} all in.
+Confirming what we agreed on the phone: load ${load.referenceNumber}, ${lane(load)}, picking up ${load.pickupWindow}, at ${money(amount)} all in. ${termsLine(settings)}
 
 Please send the rate confirmation to this address and we'll dispatch.${papers.length ? ` Our carrier packet is attached: ${papers.join(", ")}.` : ""}
 

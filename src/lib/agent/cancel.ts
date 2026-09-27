@@ -32,7 +32,7 @@ export async function cancelLoad(ctx: CarrierContext, load: Load, reason: string
   if (["cancelled", "delivered", "in_transit", "at_delivery", "declined"].includes(load.stage)) return;
   const at = new Date().toISOString();
   const wasRolling = ROLLING.has(load.stage);
-  const tonu = wasRolling ? (tonuOnRateCon(load) ?? DEFAULT_TONU) : 0;
+  const tonu = wasRolling ? (tonuOnRateCon(load) ?? ctx.settings.tonuFee ?? DEFAULT_TONU) : 0;
   const cancelled: Load = { ...load, stage: "cancelled", cancellationReason: `Broker cancelled: ${reason}`, tonuFee: tonu || undefined, updatedAt: at };
   await save("loads", ctx.carrier.id, cancelled as unknown as Item);
   ctx.loads = ctx.loads.map((l) => (l.id === load.id ? cancelled : l));

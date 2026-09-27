@@ -52,10 +52,15 @@ export function BookingCard({ load, broker }: { load: Load; broker?: Broker }) {
               <p className="text-ink-900">
                 Asked {formatCurrency(req.ask)}
                 {req.brokerOffer && req.brokerOffer !== req.ask ? ` · broker offered ${formatCurrency(req.brokerOffer)}` : ""}
-                {req.countered ? " · countered once" : ""}
+                {req.rounds ? ` · countered ${req.rounds === 1 ? "once" : `${req.rounds} times`}` : req.countered ? " · countered once" : ""}
               </p>
+              {req.history && req.history.length > 1 && (
+                <p className="text-xs text-ink-500">
+                  {req.history.map((h) => `${h.by === "us" ? "Us" : "Them"} ${formatCurrency(h.amount)}`).join(" → ")}
+                </p>
+              )}
               <p className="text-xs text-ink-500">
-                {pending ? STATUS[req.status] : load.bookedRate ? `Booked at ${formatCurrency(load.bookedRate)}` : STATUS[req.status]} · {formatDateTime(req.askedAt)}
+                {req.passedAt ? "We passed: too far under your lowest. If they come back with more, the AI picks it up." : pending ? STATUS[req.status] : load.bookedRate ? `Booked at ${formatCurrency(load.bookedRate)}` : STATUS[req.status]} · {formatDateTime(req.askedAt)}
               </p>
             </div>
           </div>

@@ -45,7 +45,13 @@ interface PlacesAnswer {
   }[];
 }
 
+type Place = Omit<RoadsideShop, "phone"> & { phone?: string };
+
 export async function findShops(what: string, near: { lat: number; lon: number } | null, whereText: string): Promise<RoadsideShop[]> {
+  return (await searchPlaces(what, near, whereText)).filter((p): p is RoadsideShop => !!p.phone).slice(0, 3);
+}
+
+async function searchPlaces(what: string, near: { lat: number; lon: number } | null, whereText: string): Promise<Place[]> {
   const body = near
     ? { textQuery: what, maxResultCount: 8, locationBias: { circle: { center: { latitude: near.lat, longitude: near.lon }, radius: 50000 } } }
     : { textQuery: `${what} near ${whereText}`, maxResultCount: 8 };
@@ -63,18 +69,45 @@ export async function findShops(what: string, near: { lat: number; lon: number }
   if (!res.ok) throw new Error(`Places ${res.status}`);
   const data = (await res.json()) as PlacesAnswer;
   return (data.places ?? [])
-    .filter((p) => p.displayName?.text && p.nationalPhoneNumber)
+    .filter((p) => p.displayName?.text)
     .map((p) => ({
       name: p.displayName!.text!,
       address: p.formattedAddress ?? "",
-      phone: p.nationalPhoneNumber!,
+      phone: p.nationalPhoneNumber,
       rating: p.rating,
       openNow: p.currentOpeningHours?.openNow,
       miles: near && p.location?.latitude !== undefined && p.location.longitude !== undefined ? Math.round(roadMiles([near.lat, near.lon], [p.location.latitude, p.location.longitude])) : undefined,
     }))
     // Open now first, then nearest, then best rated.
-    .sort((a, b) => Number(b.openNow === true) - Number(a.openNow === true) || (a.miles ?? 999) - (b.miles ?? 999) || (b.rating ?? 0) - (a.rating ?? 0))
-    .slice(0, 3);
+    .sort((a, b) => Number(b.openNow === true) - Number(a.openNow === true) || (a.miles ?? 999) - (b.miles ?? 999) || (b.rating ?? 0) - (a.rating ?? 0));
+}
+
+/** What a driver can ask the AI to find near the truck, and what that is in a map search. */
+export const NEARBY = {
+  parking: "truck parking",
+  truck_stop: "truck stop",
+  fuel: "diesel truck stop",
+  scale: "CAT scale",
+  wash: "truck wash",
+  repair: "semi truck repair",
+  tires: "semi truck tire repair",
+} as const;
+
+/** The closest few of something a driver needs (parking, fuel, a scale...), for the AI to read out or text. */
+export async function findNearby(ctx: CarrierContext, driver: Driver, kind: keyof typeof NEARBY, said: string | undefined): Promise<string> {
+  if (!placesConfigured()) return "Can't search maps here. Tell the driver you can't look it up right now and suggest their truck stop app.";
+  const truck = ctx.trucks.find((t) => t.id === driver.truckId || t.secondDriverId === driver.id);
+  const where = truck ? whereIs(truck, said, Date.now()) : { near: null, text: said ?? "" };
+  if (!where.text && !where.near) return "Ask the driver where they are (highway and exit, or town).";
+  let found: Place[] = [];
+  try {
+    found = (await searchPlaces(NEARBY[kind], where.near, where.text)).slice(0, 3);
+  } catch (e) {
+    console.error("[nearby] search failed", e);
+    return "The map search didn't answer. Say you couldn't look it up right now.";
+  }
+  if (!found.length) return `Nothing found near ${where.text}. Say so.`;
+  return `Near ${where.text}: ${found.map((p) => [p.name, p.address, p.miles !== undefined ? `${p.miles} miles` : null, p.openNow === true ? "open now" : p.openNow === false ? "closed now" : null, p.phone].filter(Boolean).join(", ")).join("; ")}. Give the driver the closest one or two. Parking fills up at night: if it's late, say to call ahead where there's a phone.`;
 }
 
 /** Where the truck is: a fresh ELD position beats what the driver said, which beats the last known city. */

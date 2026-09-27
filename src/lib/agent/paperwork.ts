@@ -215,7 +215,7 @@ export async function sendDetentionClaims(ctx: CarrierContext, now: number): Pro
       if (!(await claimMark(ctx.carrier.id, load.id, `detention_${d.stop}`))) continue;
       try {
         const to = billTo(ctx, load);
-        const perHour = terms.perHour ?? DEFAULT_DETENTION_PER_HOUR;
+        const perHour = terms.perHour ?? ctx.settings.detentionPerHour ?? DEFAULT_DETENTION_PER_HOUR;
         const amount = Math.round(((d.minutes - freeHours * 60) / 60) * perHour);
         const state = d.stop === "pickup" ? load.lane.originState : load.lane.destState;
         const claim: DetentionClaim = { stop: d.stop, minutes: d.minutes, amount, draftedAt: new Date(now).toISOString() };

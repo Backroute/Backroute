@@ -11,7 +11,8 @@ import type { Item } from "../cloud/rows";
 import type { Load } from "../types";
 import { addActivity, claimMark, logChannel, releaseMark, save, threadWith, type CarrierContext } from "./db";
 import { event, passToOwner } from "./dispatcher";
-import { answerBroker, floorFor } from "./pricing";
+import { floorFor } from "./pricing";
+import { ourNumbers, respond, withOurMove, withTheirOffer } from "./negotiation";
 import { askSupportAboutBroker, checkBroker } from "./brokers";
 import { assessBroker } from "../broker-policy";
 import { confirmPhoneBooking } from "./paperwork";
@@ -25,6 +26,22 @@ import { memoryNote } from "./memory";
  */
 
 const money = (n: number) => `${n.toLocaleString("en-US")} dollars`;
+
+/** The most a truck like ours can legally carry, roughly (80,000 lbs gross less the truck and trailer). */
+const MAX_LBS: Record<Load["equipmentType"], number> = { "Dry Van": 45000, Reefer: 43500, Flatbed: 48000, Container: 44000 };
+
+/** Why the freight is too heavy for our truck, or null when it fits. */
+export function overweight(load: Pick<Load, "weight" | "equipmentType">): string | null {
+  const max = MAX_LBS[load.equipmentType] ?? 45000;
+  return load.weight > max ? `at ${load.weight.toLocaleString("en-US")} pounds it's over what our ${load.equipmentType.toLowerCase()} can legally carry (about ${max.toLocaleString("en-US")}).` : null;
+}
+
+/** What we know about the freight, so the AI asks only for what's missing. */
+function freightNote(load: Load): string {
+  const known = [load.commodity ? `commodity ${load.commodity}` : null, load.weight ? `${load.weight.toLocaleString("en-US")} pounds` : null, load.appointmentNote ? `appointments: ${load.appointmentNote}` : null].filter(Boolean);
+  const missing = [!load.commodity && "commodity", !load.weight && "weight", !load.appointmentNote && "appointments"].filter(Boolean);
+  return `${known.length ? ` Known: ${known.join(", ")}.` : ""}${missing.length ? ` Still to ask: ${missing.join(", ")}.` : ""}`;
+}
 
 export const brokerCallKey = (callSid: string) => `broker-call:${callSid}`.toLowerCase();
 
@@ -43,7 +60,7 @@ export async function callBroker(ctx: CarrierContext, load: Load, url: string | 
 /** What the AI says when the broker picks up. Written out, not generated, so the price is exactly the ask. */
 export function brokerCallOpening(ctx: CarrierContext, load: Load): string {
   const ask = load.bookRequest?.ask ?? load.targetRate;
-  return `Hi, this is the AI dispatcher for ${ctx.carrier.name}${ctx.carrier.mc ? `, MC ${ctx.carrier.mc.replace(/\D/g, "").split("").join(" ")}` : ""}. This call is transcribed. I'm calling about your load ${load.referenceNumber}, ${load.lane.origin}, ${load.lane.originState} to ${load.lane.destination}, ${load.lane.destState}, picking up ${load.pickupWindow}. We have a ${load.equipmentType.toLowerCase()} ready. Our rate is ${money(ask)} all in. Can we book it?`;
+  return `Hi, this is the AI dispatcher for ${ctx.carrier.name}${ctx.carrier.mc ? `, MC ${ctx.carrier.mc.replace(/\D/g, "").split("").join(" ")}` : ""}. This call is transcribed. I'm calling on your load ${load.referenceNumber}, ${load.lane.origin}, ${load.lane.originState} to ${load.lane.destination}, ${load.lane.destState}, picking up ${load.pickupWindow}. We've got a ${load.equipmentType.toLowerCase()} ready for it, and we'd run it for ${money(ask)} all in. Can we lock it in?`;
 }
 
 export const VOICEMAIL = (ctx: CarrierContext, load: Load) => {
@@ -61,16 +78,25 @@ export async function retryAfterVoicemail(ctx: CarrierContext, load: Load) {
   if (!hasEmail && (await claimMark(ctx.carrier.id, load.id, "broker_call_retry"))) await releaseMark(ctx.carrier.id, load.id, "broker_call");
 }
 
-const BROKER_CALL = `You're on a phone call with a freight broker, for a small trucking carrier, about one load. You already told them who you are, that you're an AI, and the carrier's price. Your words are read out by a voice: one or two short spoken sentences, no lists or symbols, say numbers the way people say them.
+const BROKER_CALL = `You're a truck dispatcher on the phone with a freight broker, booking one load for a small carrier. You already said who you are, that you're an AI, that the call is transcribed, and our price. Talk like an experienced dispatcher: friendly, quick, confident, a little casual ("yeah", "gotcha", "I hear you"). Your words are spoken by a voice: one or two short sentences a turn, no lists or symbols, say numbers the way people say them ("twenty-one fifty").
 
-Rules:
-- When the broker names any price, call broker_offer with it before you answer, and say what it tells you. Never agree to or suggest a number yourself.
-- When the broker agrees to book at a price the tools accepted, call booked, then tell them to email the rate confirmation and that you'll dispatch when it arrives.
-- If you don't have the broker's MC number yet (the tools will say), ask for it and call broker_mc before agreeing to book.
-- After booking, if the tools ask for an email address, get it, read it back, and call broker_email.
-- If the load is already covered or cancelled, call not_available.
-- Don't discuss anything but this load. Anything you can't answer: say someone from the office will follow up by email.
-- When the call is done, say a short goodbye and call hang_up.`;
+How you work the price:
+- Every time the broker names a price, call broker_offer with it first, then say what it tells you in your own words, with the reason it gives. Never name, agree to or hint at a number yourself; the tools decide every number.
+- Don't give up the rate you were told in one go, and don't sound desperate. If they push, acknowledge them ("I hear you") and restate the number with the reason.
+- If the broker asks what your best is, call broker_offer with their last number (or our ask if they haven't named one) and say what it tells you.
+- When the broker agrees to a price the tools gave you, call booked.
+
+Before you book, like any dispatcher, get the details you don't have: what's the commodity, the weight, and are the pickup and delivery appointments set. Call load_details with what they say. If it says we can't haul it, say so politely.
+
+After booking:
+- If you don't have their MC number yet (the tools will say), ask for it and call broker_mc.
+- If the tools ask for an email address, get it, read it back, and call broker_email.
+- Ask them to send the rate con, and mention detention and TONU should be on it.
+
+Other things:
+- If the load is covered or cancelled, call not_available.
+- Stick to this load. Anything you can't answer, say someone from the office will follow up by email.
+- When you're done, say a short goodbye and call hang_up.`;
 
 export interface CallTurnResult {
   reply: string;
@@ -87,32 +113,36 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
     await save("loads", ctx.carrier.id, current as unknown as Item);
     ctx.loads = ctx.loads.map((l) => (l.id === current.id ? current : l));
   };
-  // Prices the rules accepted on this call; "booked" only takes one of these. Earlier turns count: our standing ask
-  // (a counter becomes the ask) and a broker offer that was at or over the floor.
-  const floorNow = floorFor(current, ctx.settings);
-  const offered = current.bookRequest?.brokerOffer;
-  const accepted = new Set<number>([current.bookRequest?.ask ?? current.targetRate, ...(offered && floorNow !== null && offered >= floorNow ? [offered] : [])]);
+  // Prices the rules accepted; "booked" only takes one of these. Earlier turns count: our ask and every number we've
+  // said (a counter becomes the ask), and offers the rules took on this call.
+  const accepted = new Set<number>(ourNumbers(current.bookRequest, current.targetRate));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tools: BetaRunnableTool<any>[] = [
     betaZodTool({
       name: "broker_offer",
-      description: "The broker named a price (all-in total, dollars). Returns what the carrier's rules say to answer.",
+      description: "The broker named a price (all-in total, dollars), or asked for our best. Returns what the carrier's rules say to answer, and a reason to give.",
       inputSchema: z.object({ amount: z.number().positive() }),
       run: async ({ amount }) => {
-        const answer = answerBroker(amount, current, ctx.settings, !!current.bookRequest?.countered);
-        const before = current.bookRequest ?? { ask: current.targetRate, askedAt: new Date().toISOString(), status: "sent" as const };
-        await persist({ bookRequest: { ...before, brokerOffer: amount, countered: before.countered || answer.action === "counter", ...(answer.action === "counter" ? { ask: answer.amount } : {}) } });
-        if (answer.action === "accept") {
+        const ours = current.bookRequest?.ask ?? current.targetRate;
+        const move = respond(amount, current, ctx.settings);
+        const request = withOurMove(withTheirOffer(current.bookRequest, ours, amount, "phone"), move, "phone");
+        await persist({ bookRequest: request, ...(move.action === "counter" ? { targetRate: move.amount } : {}), ...(move.action === "pass" ? { stage: "declined" as const } : {}) });
+        if (move.action === "accept") {
           accepted.add(amount);
-          return `Accept: ${amount} dollars is fine. Agree to book at ${amount}.`;
+          return `Accept: ${amount} dollars works. Agree and book it at ${amount}.`;
         }
-        if (answer.action === "counter") {
-          accepted.add(answer.amount);
-          return `Counter: say the best you can do is ${answer.amount} dollars all in. If they agree to ${answer.amount}, book it.`;
+        if (move.action === "counter") {
+          accepted.add(move.amount);
+          const say = move.held ? `hold at ${move.amount} dollars all in; they haven't moved` : move.final ? `say the best you can do is ${move.amount} dollars all in` : `say you can come down to ${move.amount} dollars all in`;
+          return `Counter: ${say}. Reason to give: ${move.reason} If they agree to ${move.amount}, book it.`;
         }
-        await passToOwner(ctx, { reason: `${ctx.brokers.find((b) => b.id === current.brokerId)?.company ?? "The broker"} offered $${amount.toLocaleString()} by phone on ${current.referenceNumber}. ${answer.why}`, loadId: current.id, label: "Decided", source: "voice", to: "decider" });
-        return `Don't agree. Say you have to check with the office and will email back shortly.`;
+        if (move.action === "pass") {
+          await addActivity(ctx.carrier.id, event({ type: "call_completed", loadId: current.id, message: `Passed on ${current.referenceNumber} at $${amount.toLocaleString()}`, detail: `Our lowest was $${move.amount.toLocaleString()}`, severity: "info" }));
+          return `Pass: say you can't make ${amount} work, ${move.amount} is as low as you can go, and to call or email if that changes. Then say goodbye and call hang_up.`;
+        }
+        await passToOwner(ctx, { reason: `${ctx.brokers.find((b) => b.id === current.brokerId)?.company ?? "The broker"} offered $${amount.toLocaleString()} by phone on ${current.referenceNumber}. ${move.why}`, loadId: current.id, label: "Decided", source: "voice", to: "decider" });
+        return `Don't agree. Say you have to run it by the office and will email back shortly.`;
       },
     }),
     betaZodTool({
@@ -122,13 +152,44 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
       run: async ({ amount }) => {
         const floor = floorFor(current, ctx.settings);
         if (!accepted.has(amount) || (floor !== null && amount < floor)) return `Not booked: ${amount} wasn't accepted by the rules. Don't agree to it; call broker_offer with it.`;
+        const tooHeavy = overweight(current);
+        if (tooHeavy) return `Not booked: ${tooHeavy} Say so politely, thank them, and end the call.`;
         const broker = ctx.brokers.find((b) => b.id === current.brokerId);
         if (broker && assessBroker(broker, ctx.settings.brokerOverrides).policy === "block")
           return broker.mc ? "Not booked: this broker didn't pass the check. Say the office will confirm by email and end the call." : "Not booked yet: this broker isn't checked. Ask for their MC number and call broker_mc with it first.";
         await persist({ stage: "negotiating", targetRate: amount, bookRequest: { ...(current.bookRequest ?? { askedAt: new Date().toISOString() }), ask: amount, brokerOffer: amount, status: "accepted" } as Load["bookRequest"] });
         await addActivity(ctx.carrier.id, event({ type: "call_completed", loadId: current.id, message: `Broker agreed on the phone: $${amount.toLocaleString()}`, detail: `${current.referenceNumber} · waiting on their rate con`, severity: "success" }));
-        if (broker && !broker.email) return "Booked, pending the rate con. Ask for the email address to send our confirmation and carrier packet to, and call broker_email with it.";
-        return "Booked, pending the rate con. Ask them to email the rate confirmation.";
+        const terms = "Ask them to put detention and TONU on the rate con.";
+        if (broker && !broker.email) return `Booked, pending the rate con. Ask for the email address to send our confirmation and carrier packet to, and call broker_email with it. ${terms}`;
+        return `Booked, pending the rate con. Ask them to email the rate confirmation. ${terms}`;
+      },
+    }),
+    betaZodTool({
+      name: "load_details",
+      description: "What the broker said about the freight: commodity, weight in pounds, hazmat, and whether appointments are set. Checks it fits our truck.",
+      inputSchema: z.object({
+        commodity: z.string().optional(),
+        weightLbs: z.number().positive().optional(),
+        hazmat: z.boolean().optional(),
+        appointments: z.string().optional().describe("Pickup and delivery appointment times, or first-come-first-served, as they said it"),
+      }),
+      run: async ({ commodity, weightLbs, hazmat, appointments }) => {
+        await persist({
+          ...(commodity ? { commodity } : {}),
+          ...(weightLbs ? { weight: weightLbs } : {}),
+          ...(hazmat !== undefined ? { hazmat } : {}),
+          ...(appointments ? { appointmentNote: appointments } : {}),
+        });
+        const tooHeavy = overweight(current);
+        if (tooHeavy) {
+          await persist({ stage: "declined", bookRequest: current.bookRequest ? { ...current.bookRequest, status: "declined" } : undefined });
+          return `We can't haul it: ${tooHeavy} Tell them politely, thank them, and end the call.`;
+        }
+        if (current.hazmat && !ctx.settings.hazmat) {
+          await passToOwner(ctx, { reason: `${current.referenceNumber} is hazmat${commodity ? ` (${commodity})` : ""}. The AI didn't book it: is the truck and driver set up for hazmat?`, loadId: current.id, label: "Decided", source: "voice", to: "owner" });
+          return "Hazmat: don't book. Say you need to check hazmat with the office and will email back.";
+        }
+        return "Noted. It fits our truck.";
       },
     }),
     betaZodTool({
@@ -194,7 +255,7 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
       output_config: { effort: "low" },
       system: [
         { type: "text", text: BROKER_CALL, cache_control: { type: "ephemeral" } },
-        { type: "text", text: `Carrier: ${ctx.carrier.name}. Load ${current.referenceNumber}: ${current.lane.origin}, ${current.lane.originState} to ${current.lane.destination}, ${current.lane.destState}, ${current.lane.miles} miles, pickup ${current.pickupWindow}, delivery ${current.deliveryWindow}, ${current.equipmentType}. Our ask: ${current.bookRequest?.ask ?? current.targetRate} dollars all in.${memoryNote(ctx.loads, ctx.brokers, current) ? ` ${memoryNote(ctx.loads, ctx.brokers, current)} Use history only to sound informed; prices still come from the tools.` : ""}` },
+        { type: "text", text: `Carrier: ${ctx.carrier.name}. Load ${current.referenceNumber}: ${current.lane.origin}, ${current.lane.originState} to ${current.lane.destination}, ${current.lane.destState}, ${current.lane.miles} miles, pickup ${current.pickupWindow}, delivery ${current.deliveryWindow}, ${current.equipmentType}. Our ask: ${current.bookRequest?.ask ?? current.targetRate} dollars all in.${freightNote(current)}${memoryNote(ctx.loads, ctx.brokers, current) ? ` ${memoryNote(ctx.loads, ctx.brokers, current)} Use history only to sound informed; prices still come from the tools.` : ""}` },
       ],
       messages,
       tools,

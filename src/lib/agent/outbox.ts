@@ -4,6 +4,7 @@ import type { Item } from "../cloud/rows";
 import type { DraftMessage, DraftPurpose, Escalation, Load, OwnerRule } from "../types";
 import { addActivity, filesById, logChannel, save, type CarrierContext } from "./db";
 import { event, passToOwner } from "./dispatcher";
+import { roundsOf } from "./negotiation";
 
 /**
  * Every email the AI sends for a carrier goes through here, and the autopilot setting decides whether it goes now or
@@ -79,6 +80,7 @@ const LABEL: Record<DraftPurpose, string> = {
   tonu: "Send the TONU claim",
   eta_update: "Send the late notice",
   capacity: "Tell them the truck is free",
+  pass: "Pass on it politely",
 };
 
 const WHAT: Record<DraftPurpose, string> = {
@@ -93,6 +95,7 @@ const WHAT: Record<DraftPurpose, string> = {
   tonu: "Claimed truck-ordered-not-used from",
   eta_update: "Told the broker the truck is running late:",
   capacity: "Told a broker about a free truck:",
+  pass: "Passed on a load from",
 };
 
 /** Sends a draft (now, or when the owner approves it) and records what it means for the load. */
@@ -130,12 +133,25 @@ async function afterSent(ctx: CarrierContext, loadId: string, draft: DraftMessag
   let next: Load | null = null;
   const p = draft.purpose;
   if ((p === "book_request" || p === "counter" || p === "accept") && draft.amount) {
+    const before = load.bookRequest;
     next = {
       ...load,
       stage: load.stage === "offered" ? "negotiating" : load.stage,
       targetRate: draft.amount,
-      bookRequest: { ...load.bookRequest, ask: draft.amount, askedAt: at, status: p === "accept" ? "accepted" : "sent", countered: load.bookRequest?.countered || p === "counter" },
+      bookRequest: {
+        ...before,
+        ask: draft.amount,
+        askedAt: at,
+        status: p === "accept" ? "accepted" : "sent",
+        countered: before?.countered || p === "counter",
+        opening: p === "book_request" ? draft.amount : (before?.opening ?? before?.ask ?? draft.amount),
+        ...(p === "counter" ? { rounds: roundsOf(before) + 1 } : {}),
+        ...(p === "book_request" ? {} : { history: [...(before?.history ?? []), { by: "us" as const, amount: draft.amount, at, via: "email" as const }] }),
+      },
     };
+  } else if (p === "pass" && load.bookRequest) {
+    // Walked away: the truck is free for other loads. If the broker comes back with a better number, it's heard.
+    next = { ...load, stage: "declined", bookRequest: { ...load.bookRequest, status: "declined", passedAt: at } };
   } else if (p === "invoice" && load.invoice) next = { ...load, invoice: { ...load.invoice, sentAt: at, sentTo: draft.to } };
   else if (p === "tonu") next = { ...load, tonuClaimedAt: at };
   else if (p === "detention") next = { ...load, detentionClaims: (load.detentionClaims ?? []).map((c) => (c.sentAt ? c : { ...c, sentAt: at })) };

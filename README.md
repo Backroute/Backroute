@@ -36,7 +36,7 @@ The real version switches on from environment variables:
 - **Texts and calls:** a dispatch number drivers text and call (Twilio), in 7 languages.
 - **Check-ins:** the AI texts or calls drivers before appointments and follows up when they're late or go quiet.
 - **Broker email and phone** (Postmark, Twilio):
-  - book requests, counter-offers and setup packets
+  - book requests, multi-round counter-offers with reasons, detention and TONU terms, and setup packets
   - calls to brokers who don't answer an email, and to board posters who only list a phone (the MC is checked on the call)
   - invoices with the POD, detention and TONU claims, and payment reminders
   - priced by the owner's lowest rate per mile, which is enforced in code

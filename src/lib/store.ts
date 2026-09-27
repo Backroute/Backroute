@@ -704,6 +704,12 @@ export interface AgentSettings {
   setupProfiles?: { name: string; url: string }[];
   /** Real accounts: a weekly text to each driver with their loads, miles and estimated pay. Off unless turned on. */
   payTexts?: boolean;
+  /** Real accounts: the detention the AI asks brokers for, per hour after 2 hours free (default $50). */
+  detentionPerHour?: number;
+  /** Real accounts: the truck-ordered-not-used fee the AI asks for (default $150). */
+  tonuFee?: number;
+  /** Real accounts: the carrier hauls hazmat (the AI won't book it otherwise). */
+  hazmat?: boolean;
 }
 
 export interface LiveMetrics {

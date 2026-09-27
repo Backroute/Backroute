@@ -14,7 +14,8 @@ import { sendOrQueue } from "./outbox";
 import { askSupportAboutBroker, checkBroker } from "./brokers";
 import { callBroker } from "./broker-call";
 import { canMakePickup } from "./eld";
-import { answerBroker, askFor, floorFor } from "./pricing";
+import { askFor, floorFor } from "./pricing";
+import { ourNumbers, respond, withTheirOffer } from "./negotiation";
 import { laneMemory } from "./memory";
 import { route } from "./routing";
 import { slowDocks } from "./facilities";
@@ -273,53 +274,64 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
   });
 }
 
-/** The broker answered our price. The rules pick the answer; the email is a template with exactly that number. */
+/**
+ * The broker answered our price. The haggling rules (lib/agent/negotiation) pick the answer; the email is a template
+ * with exactly that number and a reason for it.
+ */
 export async function answerRateReply(ctx: CarrierContext, load: Load, reply: { brokerRate: number | null; agreed: boolean; contactName: string | null }, sender: Sender) {
   const broker = ctx.brokers.find((b) => b.id === load.brokerId);
   const at = new Date().toISOString();
-  if (reply.agreed && (!reply.brokerRate || reply.brokerRate >= (load.bookRequest?.ask ?? 0))) {
-    const updated: Load = { ...load, updatedAt: at, bookRequest: { ...load.bookRequest!, status: "accepted", brokerOffer: reply.brokerRate ?? load.bookRequest?.ask } };
+  if (load.stage === "declined") {
+    // We'd passed on it and they came back. Only worth hearing while the truck is still free.
+    const truck = ctx.trucks.find((t) => t.id === load.truckId);
+    const busy = !truck || truck.status !== "available" || ctx.loads.some((l) => l.id !== load.id && l.truckId === truck.id && ["negotiating", "booked", "rate_confirmed", "dispatched"].includes(l.stage));
+    if (busy || !load.bookRequest?.passedAt) return false;
+    load = { ...load, stage: "negotiating", bookRequest: { ...load.bookRequest, status: "sent" } };
+  }
+  const ours = load.bookRequest?.ask ?? load.targetRate;
+  if (reply.agreed && (!reply.brokerRate || ourNumbers(load.bookRequest, ours).includes(reply.brokerRate) || reply.brokerRate >= ours)) {
+    const amount = reply.brokerRate ?? ours;
+    const updated: Load = { ...load, updatedAt: at, targetRate: amount, bookRequest: { ...load.bookRequest!, ask: amount, status: "accepted", brokerOffer: amount } };
     await save("loads", ctx.carrier.id, updated as unknown as Item);
-    await addActivity(ctx.carrier.id, event({ type: "negotiation_email", loadId: load.id, message: `${broker?.company ?? "Broker"} agreed to $${(load.bookRequest?.ask ?? 0).toLocaleString()}`, detail: `${load.referenceNumber} · waiting on their rate con`, severity: "success" }));
+    ctx.loads = ctx.loads.map((l) => (l.id === load.id ? updated : l));
+    await addActivity(ctx.carrier.id, event({ type: "negotiation_email", loadId: load.id, message: `${broker?.company ?? "Broker"} agreed to $${amount.toLocaleString()}`, detail: `${load.referenceNumber} · waiting on their rate con`, severity: "success" }));
     return;
   }
   if (!reply.brokerRate) return false; // Nothing to decide on: the AI's own reply handles it.
-  const answer = answerBroker(reply.brokerRate, load, ctx.settings, !!load.bookRequest?.countered);
-  const withOffer: Load = { ...load, updatedAt: at, bookRequest: { ...(load.bookRequest ?? { ask: reply.brokerRate, askedAt: at, status: "sent" }), brokerOffer: reply.brokerRate } };
+  const offer = reply.brokerRate;
+  const move = respond(offer, load, ctx.settings);
+  if (move.action === "pass" && load.bookRequest?.passedAt) return false; // Already passed; nothing more to say.
+  const withOffer: Load = { ...load, updatedAt: at, bookRequest: withTheirOffer(load.bookRequest, ours, offer, "email") };
   await save("loads", ctx.carrier.id, withOffer as unknown as Item);
   ctx.loads = ctx.loads.map((l) => (l.id === load.id ? withOffer : l));
   const subject = /^re:/i.test(sender.subject) ? sender.subject : `Re: ${sender.subject}`;
   const name = reply.contactName ?? undefined;
-  if (answer.action === "owner") {
-    // Below the owner's lowest: they decide. The acceptance is ready to send if they want it.
-    await sendOrQueue(ctx, {
-      purpose: "accept",
-      to: sender.from,
-      toName: name,
-      subject,
-      body: mail.accept(ctx.carrier, ctx.settings, withOffer, reply.brokerRate, name),
-      inReplyTo: sender.messageId,
-      loadId: load.id,
-      amount: reply.brokerRate,
-      withinRules: false,
-      why: `${broker?.company ?? "The broker"} offered $${reply.brokerRate.toLocaleString()} on ${load.referenceNumber}. ${answer.why} Send this to take it, or don't send to pass.`,
-    });
+  const company = broker?.company ?? "The broker";
+  const base = { to: sender.from, toName: name, subject, inReplyTo: sender.messageId, loadId: load.id };
+  if (move.action === "owner") {
+    // Just under the owner's lowest: they decide. The acceptance is ready to send if they want it.
+    await sendOrQueue(ctx, { ...base, purpose: "accept", body: mail.accept(ctx.carrier, ctx.settings, withOffer, offer, name), amount: offer, withinRules: false, why: `${company} offered $${offer.toLocaleString()} on ${load.referenceNumber}. ${move.why} Send this to take it, or don't send to pass.` });
     return true;
   }
+  if (move.action === "pass") {
+    await sendOrQueue(ctx, { ...base, purpose: "pass", body: mail.pass(ctx.carrier, ctx.settings, withOffer, move.amount, offer, name), amount: move.amount, withinRules: true, why: `${move.why} Pass on it, leaving the door open at $${move.amount.toLocaleString()}?` });
+    await addActivity(ctx.carrier.id, event({ type: "negotiation_email", loadId: load.id, message: `Walking away from ${company}'s $${offer.toLocaleString()}`, detail: `${load.referenceNumber} · our lowest is $${move.amount.toLocaleString()}`, severity: "info" }));
+    return true;
+  }
+  const body =
+    move.action === "accept"
+      ? mail.accept(ctx.carrier, ctx.settings, withOffer, move.amount, name)
+      : mail.counter(ctx.carrier, ctx.settings, withOffer, move.amount, name, { final: move.final, held: move.held, reason: move.reason });
   await sendOrQueue(ctx, {
-    purpose: answer.action,
-    to: sender.from,
-    toName: name,
-    subject,
-    body: (answer.action === "accept" ? mail.accept : mail.counter)(ctx.carrier, ctx.settings, withOffer, answer.amount, name),
-    inReplyTo: sender.messageId,
-    loadId: load.id,
-    amount: answer.amount,
+    ...base,
+    purpose: move.action,
+    body,
+    amount: move.amount,
     withinRules: true,
     why:
-      answer.action === "accept"
-        ? `${broker?.company ?? "The broker"} offered $${reply.brokerRate.toLocaleString()} on ${load.referenceNumber}, at or over your lowest. Accept it?`
-        : `${broker?.company ?? "The broker"} offered $${reply.brokerRate.toLocaleString()} on ${load.referenceNumber}, under your lowest. Counter at $${answer.amount.toLocaleString()}?`,
+      move.action === "accept"
+        ? `${company} offered $${offer.toLocaleString()} on ${load.referenceNumber}, within your numbers. Accept it?`
+        : `${company} offered $${offer.toLocaleString()} on ${load.referenceNumber}. Counter at $${move.amount.toLocaleString()}${move.final ? " (our last number)" : ""}?`,
   });
   return true;
 }
