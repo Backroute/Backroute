@@ -60,7 +60,8 @@ export async function receiveText(t: IncomingText): Promise<{ now?: string; late
   if (!fresh) return {}; // Twilio retried a text we already have.
 
   const word = body.toUpperCase();
-  if (STOP.has(word) || START.has(word)) {
+  // "Yes" is START only from someone who opted out; otherwise it's an answer (to a tracking request, say).
+  if (STOP.has(word) || (START.has(word) && (word !== "YES" || driver.prefs?.smsOptOut))) {
     // Twilio blocks texts to a number that sent STOP and confirms it itself; this keeps the app in step.
     const updated: Driver = { ...driver, prefs: { ...driver.prefs, smsOptOut: STOP.has(word) } };
     await save("drivers", carrierId, updated as unknown as Item);

@@ -66,7 +66,7 @@ export async function checkCredit(ctx: CarrierContext, broker: Broker, now = Dat
   let b = broker;
   const own = ownDaysToPay(ctx.loads, b.id);
   const stale = !b.credit || now - Date.parse(b.credit.at) > FRESH;
-  if (stale && (creditConfigured() || own !== null)) {
+  if (stale && ((creditConfigured() && b.mc) || own !== null)) {
     const found = b.mc ? await creditLookup(b.mc) : null;
     // What the carrier's own invoices show beats the service's average once there are a couple.
     const daysToPay = own ?? found?.daysToPay ?? null;

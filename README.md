@@ -41,6 +41,15 @@ The real version switches on from environment variables:
   - invoices with the POD, detention and TONU claims, and payment reminders
   - priced by the owner's lowest rate per mile, which is enforced in code
   - every new broker checked with FMCSA before booking
+- **After booking, like a dispatcher:**
+  - signs a matching rate con in the name of the person the owner authorized, and sends it back
+  - gets the driver on the broker's tracking app (Macropoint, Trucker Tools, FourKites...)
+  - phones shippers and receivers to book or move dock appointments
+  - prices added stops and reroutes before saying yes
+  - claims layover when a truck is held overnight
+  - checks each broker's credit before booking
+  - sends the factoring company the full invoice packet
+  - runs cargo claims: acknowledgment, the driver's statement and photos, and a claim file for the insurer
 - **Smarter booking:** asks what the carrier usually gets on a lane, remembers each broker, plans around drivers' home time, and emails brokers when a truck will be free. Each truck has a plan on the Fleet page.
 - **Breakdowns:** nearby shops found (Google Places), phoned one by one, the driver texted the one that can come, the broker told of the delay.
 - **Owner rules:** judgment calls the owner hands to the AI. After the owner sends 3 of the same kind unchanged, the AI offers to stop asking.

@@ -230,7 +230,7 @@ async function handle(carrierId: string, email: InboundEmail) {
   }
   // A cargo claim (damage, a shortage): acknowledged in writing, and the claim file started.
   if (CLAIM_EMAIL.test(`${email.Subject}\n${text}`) && !suspect()) {
-    const target = claimLoad(byRef(reading?.loadNumber) ?? load);
+    const target = claimLoad(load) ?? claimLoad(byRef(reading?.loadNumber));
     if (target) {
       const amounts = dollarAmounts(text);
       await openClaim(ctx, target, { source: "broker", details: text.replace(/\s+/g, " ").trim().slice(0, 400), amount: amounts.length ? Math.max(...amounts) : null, claimant: from, claimantName: reading?.contactName ?? undefined, subject: email.Subject, inReplyTo: sender.messageId });

@@ -215,6 +215,15 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - It reads the columns by name ("Linehaul", "Pickup City", "Customer", "Load #"...), shows what it found and what it skipped and why, and imports on the owner's OK.
   - The brokers and finished loads it adds give the AI lane prices and broker habits from day one.
   - Importing the same sheet twice doesn't double it, and nothing is invoiced or texted for old loads.
+- **The rest of a dispatcher's paperwork and phone work:**
+  - **Signing the rate con:** in Settings → Your rules → Rate cons, the owner names who's authorized to sign. When a broker's rate con matches what was agreed on a load the AI booked, the AI adds a signature page (the load, the rate, the terms, the signer's name and the time) and sends the signed copy back with its thanks. Both the broker's copy and the signed one are kept on the load. A rate con that doesn't match is sent back for a fix, never signed. A broker who wants it signed in their own portal (DocuSign and the like) goes to support: the AI doesn't log in to other companies' systems. With no signer named, the owner is asked once to add one.
+  - **The broker's tracking app:** when the rate con or the broker's email asks for Macropoint, Trucker Tools, FourKites, project44 or the like, the driver is texted what to accept, with the link when there is one. "Yes" back turns it on and tells the broker. Not on 2 hours before pickup, the driver gets a reminder; still not on at pickup, support is told.
+  - **Dock appointments by phone:** a rate con that says to call for an appointment gets a call to the shipper or receiver (their number from the rate con) to book one, in their working hours, up to three tries. A truck that will miss its appointment gets a call to move it, before the late notice goes to the broker. The time they give goes on the load, the driver is texted it and the broker hears. It goes through their phone menu (receiving, shipping, scheduling), answers the usual questions from the load (load number, weight, what it is), and a facility that says the broker has to set it gets the broker asked by email and support told.
+  - **Layover:** a truck held overnight at a stop it reached on time is claimed a day's layover per day, while it's still waiting, at the rate con's layover terms or the owner's rate (default $250). That stop gets no hourly detention on top, and the layover goes on the invoice. Without the broker's terms it waits for the owner's OK, like detention.
+  - **Broker credit:** before asking to book, the AI checks the broker's credit: a credit service by MC number (step 14) and, once a broker has paid a couple of invoices, how long they really took. Under the owner's lowest score (default 70 of 100), or 60+ days to pay, it doesn't book on its own and says why. Slower than 40 days, it asks 4% more.
+  - **Changes after booking:** a broker adding a stop or sending the truck somewhere else gets a price first: the extra miles at what the load pays a mile (never under the owner's lowest) plus stop pay (default $75 a stop). Their yes, or a revised rate con at the new total, puts it on the load, the driver hears, and it goes on the invoice. A lower number that covers most of it is taken; less goes to the owner.
+  - **Factoring:** with a factoring email set, each delivered load's packet goes to the factor the way they want it: a schedule of accounts on top, then the invoice, the (signed) rate con, the signed POD and BOL, and any receipts billed. A load with no rate con on file still goes, and the owner is asked to send it.
+  - **Cargo claims:** a broker's claim email (damage, a shortage, OS&D) is acknowledged in writing with what they still need to send (the written amount, the commercial invoice, the noted POD, photos). The driver is asked what happened while it's fresh, and their answer and any damage photos they text go in the claim file. A POD with damage or a shortage written on it starts the file before anyone asks. The file (the load, the times from the driver's app, what the BOL and POD say, the statement) goes to the cargo insurer's claims email once the owner OKs it. Paying a claim or filing it with insurance is always the owner's call.
 - **Drivers can ask for what's near them:** truck parking, a truck stop, diesel, a CAT scale, a truck wash, a repair or tire shop, by text or on a call (needs the Places key from the breakdown step).
 - **Evening text:** at 6 PM Central the owner gets a text: what was delivered, what it made, how many trucks are rolling, and what needs them.
 - **The log:** every text, call and email in or out is listed in Settings, with what the AI did.
@@ -223,6 +232,7 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - Texts, emails and calls that didn't go straight out (held in practice mode, or waiting to be sent again after a provider outage) are readable by the carrier's office only, and only the server writes them (`20260930000000_outbound.sql`).
   - A screen's save of a load carries only what it changed, merged into the current row (`20261001000000_merge_edits.sql`).
   - What each carrier costs to run is server-only: no one who signs in can read or change it (`20261002000000_usage.sql`).
+  - The signed rate con, the factoring schedule, claim files and damage photos are kept with the load's other files (`20261003000000_paperwork_kinds.sql`).
 
 ## What it doesn't do yet
 
@@ -242,7 +252,11 @@ The AI now does the day-to-day work of a dispatcher by email, text and phone. Wh
   - a TONU amount the rate con doesn't give
   - detention pay without the broker's terms
   - a POD with a shortage written on it
-  - A new broker that fails the check always waits.
+  - layover pay without the broker's terms
+  - sending a claim file to the insurer
+  - A new broker that fails the check, or whose credit is under the owner's lowest, always waits.
+- **Broker portals need a person:** signing a rate con in DocuSign or a broker's own site, accepting a setup invite, or booking a dock time in an online scheduling portal. The AI hands these to support with the link.
+- **Credit scores need a credit service** (step 14). Until one is set, the AI only has the carrier's own payment history, which starts empty.
 - **Miles and ETAs without a routing account** (step 12) come from about 130 freight cities and each state's middle. For a town not on the list, miles are rough, and the AI doesn't send late notices from them.
 - **Negotiation is by rules, not instinct.** The AI haggles in steps with reasons, and adjusts to each broker's history. But it doesn't read a broker's mood, bluff about other loads, or trade favors across loads the way a long-time dispatcher might. Every number comes from the rules, on purpose, so it can't be talked below the owner's lowest.
 - **Two screens editing the same thing at once:** loads merge field by field (above). For a truck, a driver or a Needs you item, the last save still wins.
@@ -402,6 +416,18 @@ Create a HERE platform API key with Routing v8 and Geocoding, then set `HERE_API
 3. In Vercel, set `VOICE_SERVER_URL` to that address and the same `VOICE_SERVER_SECRET`.
 
 Calls switch over as soon as both are set. Remove them to go back to turn-by-turn calls.
+
+### 14. Broker credit (optional)
+
+Any credit service that answers by MC number: the factoring company's broker check, or a freight credit bureau. Set:
+
+- `CREDIT_API_URL`, with `{{mc}}` in it
+- `CREDIT_API_HEADER` ("Name: value", for the key)
+- `CREDIT_SCORE_PATH` and `CREDIT_DAYS_PATH`: where the score and the days to pay are in the answer (default `score` and `daysToPay`)
+- `CREDIT_SCORE_MAX`: the service's top score, if it isn't 100
+- `CREDIT_API_NAME`: the name shown on broker checks
+
+Without it, the AI goes by what the carrier's own invoices show once a broker has paid a couple.
 
 ## Before real drivers: rules to get right
 
