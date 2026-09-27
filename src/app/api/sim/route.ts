@@ -1,8 +1,10 @@
 import { z } from "zod";
-import { admin, dbConfigured, driverByPhone, loadContext, logChannel, ownerByPhone, save } from "@/lib/agent/db";
+import { admin, dbConfigured, driverByPhone, loadContext, logChannel, ownerByPhone, save, type CarrierContext } from "@/lib/agent/db";
+import { forCarrier } from "@/lib/agent/scope";
 import { brokerCallOpening } from "@/lib/agent/broker-call";
 import { decideItem } from "@/lib/agent/decide";
 import { handleInboundEmail } from "@/lib/agent/email";
+import { importHistory } from "@/lib/agent/history";
 import { runRounds } from "@/lib/agent/rounds";
 import type { Item } from "@/lib/cloud/rows";
 import { plainText, type InboundEmail } from "@/lib/channels/email";
@@ -61,6 +63,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("state"), carrier: z.string() }),
   z.object({ action: z.literal("decide"), carrier: z.string(), escalationId: z.string(), send: z.boolean(), body: z.string().optional() }),
   z.object({ action: z.literal("teardown"), carrier: z.string() }),
+  z.object({ action: z.literal("import"), carrier: z.string(), csv: z.string().max(5_000_000) }),
   z.object({
     action: z.literal("play"),
     partner: z.object({ role: z.enum(["broker", "driver", "owner", "shop"]), channel: z.enum(["email", "sms", "call"]), persona: z.string().max(3000), secret: z.string().max(3000), language: z.string().optional() }),
@@ -89,6 +92,10 @@ export async function POST(request: Request) {
   if (!ctx) return Response.json({ error: "not_found" }, { status: 404 });
   if (!ctx.settings.sandbox) return Response.json({ error: "not_in_sandbox" }, { status: 403 });
 
+  return forCarrier(ctx.carrier.id, () => act(a, ctx));
+}
+
+async function act(a: Exclude<z.infer<typeof Body>, { action: "setup" | "play" | "judge" }>, ctx: CarrierContext): Promise<Response> {
   switch (a.action) {
     case "email": {
       const email: InboundEmail = {
@@ -138,6 +145,8 @@ export async function POST(request: Request) {
       if (!escalation) return Response.json({ error: "not_found" }, { status: 404 });
       return Response.json({ escalation: await decideItem(ctx, escalation, a.send, a.body) });
     }
+    case "import":
+      return Response.json(await importHistory(ctx, a.csv));
     case "teardown": {
       const { error } = await admin().from("carriers").delete().eq("id", ctx.carrier.id);
       return Response.json({ ok: !error });
@@ -151,7 +160,7 @@ async function setup(a: Extract<z.infer<typeof Body>, { action: "setup" }>) {
   const settings: Partial<AgentSettings> = { autonomy: "rules", minRpm: 2.5, rateFloorPct: 96, ownerLanguage: "en", dailyText: false, ...(a.settings as Partial<AgentSettings>), sandbox: true };
   const { data: row, error } = await admin()
     .from("carriers")
-    .insert({ id, name: a.name, mc: "MC 900001", dot: "DOT 9000001", owner_operator: a.fleet.length === 1 && !!settings.ownerOperator, owner_phone: a.ownerPhone ?? null, settings })
+    .insert({ id, name: a.name, mc: "MC 900001", dot: "DOT 9000001", owner_operator: a.fleet.length === 1 && !!settings.ownerOperator, owner_phone: a.ownerPhone ? `1${a.ownerPhone.replace(/\D/g, "").slice(-10)}` : null, settings })
     .select("inbound_key")
     .single();
   if (error) return { error: error.message };

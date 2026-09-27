@@ -18,10 +18,13 @@ import { floorFor } from "./pricing";
  *   being ready on time), a different one each round when there's more than one, the way people don't repeat
  *   themselves.
  * - When the two numbers are close (within about 12%) after a round, it offers to meet in the middle.
+ * - With a broker who usually comes up a long way (10% or more from their first number, lib/agent/memory), it comes
+ *   down in smaller steps: they'll move, so it doesn't have to as fast.
  */
 
 export const MAX_COUNTERS = 3;
 const STEPS = [0.3, 0.6, 0.85];
+const PATIENT = [0.15, 0.4, 0.7];
 
 const round25 = (n: number) => Math.ceil(n / 25) * 25;
 const money = (n: number) => `$${n.toLocaleString("en-US")}`;
@@ -72,7 +75,7 @@ export function reasonFor(load: ReasonLoad, amount: number, round = 1, now = Dat
  * The broker named a price (on the phone or by email). What the AI answers, from where the haggling stands.
  * `before` is the book request as it was before this offer.
  */
-export function respond(offer: number, load: ReasonLoad & Pick<Load, "targetRate" | "bookRequest">, settings: Pick<AgentSettings, "minRpm">, now = Date.now()): Move {
+export function respond(offer: number, load: ReasonLoad & Pick<Load, "targetRate" | "bookRequest">, settings: Pick<AgentSettings, "minRpm">, now = Date.now(), broker?: { movePct: number | null } | null): Move {
   const req = load.bookRequest;
   const floor = floorFor(load, settings);
   if (!floor) return { action: "owner", why: `No lowest rate per mile is set, so the AI won't agree to ${money(offer)} on its own.` };
@@ -96,7 +99,8 @@ export function respond(offer: number, load: ReasonLoad & Pick<Load, "targetRate
 
   const target = Math.max(targetFor(load, settings) ?? floor, floor);
   const end = Math.max(target, offer);
-  let next = round25(opening - STEPS[rounds] * (opening - end));
+  const steps = (broker?.movePct ?? 0) >= 0.1 ? PATIENT : STEPS;
+  let next = round25(opening - steps[rounds] * (opening - end));
   next = Math.max(floor, Math.min(next, ours));
   // Our next step would meet them: take their number (when it's one the owner allows).
   if (offer >= floor && next - offer <= Math.max(50, next * 0.03)) return { action: "accept", amount: offer };

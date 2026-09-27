@@ -4,6 +4,7 @@ import { AI_MODEL, FALLBACK, authorize, claude, deny, json } from "@/lib/ai/serv
 import { DRIVER_SYSTEM, OWNER_SYSTEM, READ_ONLY } from "@/lib/ai/prompts";
 import { dbConfigured, loadContext } from "@/lib/agent/db";
 import { driverTurn, ownerTurn } from "@/lib/agent/dispatcher";
+import { forCarrier } from "@/lib/agent/scope";
 import { caller } from "@/lib/agent/user";
 
 const Body = z.object({
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
     const turns = history.map((m) => ({ from: m.from === "user" ? ("them" as const) : ("ai" as const), text: m.text }));
     const driver = who.me.role === "driver" ? ctx.drivers.find((d) => d.id === who.me.driverId) : undefined;
     if (who.me.role === "driver" && !driver) return json({ error: "not_found" }, 404);
-    const result = driver ? await driverTurn(ctx, driver, "chat", question, turns) : await ownerTurn(ctx, "chat", question, turns);
+    const result = await forCarrier(ctx.carrier.id, () => (driver ? driverTurn(ctx, driver, "chat", question, turns) : ownerTurn(ctx, "chat", question, turns)));
     if (result.effects.failed || !result.reply) return json({ error: "ai_error" }, 502);
     return json({ reply: result.reply, who: access.who, did: result.effects.done });
   }

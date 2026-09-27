@@ -13,30 +13,62 @@ export function floorFor(load: Pick<Load, "lane">, settings: Pick<AgentSettings,
   return settings.minRpm ? round25(settings.minRpm * load.lane.miles) : null;
 }
 
+/** How a broker has dealt with this carrier before (lib/agent/memory), for pricing the next load with them. */
+export interface BrokerHabits {
+  /** Loads hauled for them, and what they paid on average per mile. */
+  booked: number;
+  avgRpm: number | null;
+  /** How often they took our first number as it was, and how often they pushed back. */
+  tookOurAsk: number;
+  countered: number;
+}
+
 /**
- * What to ask a broker for a load they posted. Dispatchers ask a little over the posted rate; never under the floor.
- * Null when there's nothing to go on (no floor and no posted rate): the owner names the price.
+ * What to open at for a load a broker posted. A dispatcher opens with room to come down, the way people haggle: a bit
+ * over a post that already pays, and well over the carrier's lowest when the post is under it, so the counters
+ * (lib/agent/negotiation) have somewhere to go. With no posted rate, the floor plus a quarter. Never under the floor,
+ * and never past the top of what the lane pays today when a rate service knows it.
+ *
+ * Then what this carrier knows: what it got on this lane before, what the market says, and how this broker deals (what
+ * they've paid before; a broker who always says yes to the first number is being asked too little; one who always
+ * pushes back expects room). Null when there's nothing to go on (no floor and no posted rate): the owner names the price.
  */
-export function askFor(load: Pick<Load, "lane" | "listedRate">, settings: Pick<AgentSettings, "minRpm">, lane?: { count: number; avgRpm: number | null }, market?: { rpm: number; high?: number } | null): number | null {
+export function askFor(
+  load: Pick<Load, "lane" | "listedRate">,
+  settings: Pick<AgentSettings, "minRpm">,
+  lane?: { count: number; avgRpm: number | null },
+  market?: { rpm: number; high?: number } | null,
+  broker?: BrokerHabits | null,
+): number | null {
   const floor = floorFor(load, settings);
   const posted = load.listedRate > 0 ? load.listedRate : null;
   let ask: number | null = null;
-  if (posted && floor) ask = Math.max(floor, round25(posted * 1.05));
-  else if (posted) ask = round25(posted * 1.05);
-  else if (floor) ask = round25(floor * 1.12);
+  if (posted && floor) ask = posted >= floor ? round25(Math.max(posted * 1.08, posted + 75)) : round25(Math.max(floor * 1.12, posted * 1.2));
+  else if (posted) ask = round25(Math.max(posted * 1.08, posted + 75));
+  else if (floor) ask = round25(floor * 1.25);
   // The carrier has hauled this lane for more, more than once: ask for what it usually gets, up to 15% over the post.
   if (lane?.avgRpm && lane.count >= 2) {
     const usual = round25(lane.avgRpm * load.lane.miles);
     const cap = posted ? round25(posted * 1.15) : usual;
     ask = Math.max(ask ?? 0, Math.min(usual, cap));
   }
-  // The market pays more than the post: open at the market average, never past the top of its range.
+  // This broker has paid more before, on loads we hauled for them: at least that, up to 20% over the post.
+  if (broker?.avgRpm && broker.booked >= 2) {
+    const paid = round25(broker.avgRpm * load.lane.miles);
+    ask = Math.max(ask ?? 0, Math.min(paid, posted ? round25(posted * 1.2) : paid));
+  }
+  if (ask && broker) {
+    // Says yes to our first number every time: we've been asking too little. Always pushes back: leave room.
+    if (broker.tookOurAsk >= 2 && broker.countered === 0) ask = round25(ask * 1.05);
+    else if (broker.countered >= 2 && broker.tookOurAsk === 0) ask = round25(ask * 1.04);
+  }
   if (market?.rpm) {
     const average = round25(market.rpm * load.lane.miles);
     const top = market.high ? round25(market.high * load.lane.miles) : round25(average * 1.1);
-    ask = Math.max(ask ?? 0, Math.min(average, top));
+    // The market pays more than we'd ask: open at its average. Asking past its top just loses the load.
+    ask = Math.min(Math.max(ask ?? 0, average), top);
   }
-  return ask;
+  return ask && floor ? Math.max(ask, floor) : ask;
 }
 
 /**

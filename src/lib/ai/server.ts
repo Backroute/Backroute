@@ -1,6 +1,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
+import { meteredFetch } from "./usage";
 
 /**
  * The real AI (Claude), server side only: the API key never reaches a browser. Off unless ANTHROPIC_API_KEY is set,
@@ -14,7 +15,7 @@ export const aiConfigured = () => Boolean(process.env.ANTHROPIC_API_KEY);
 
 let client: Anthropic | null = null;
 export function claude(): Anthropic {
-  client ??= new Anthropic();
+  client ??= new Anthropic({ fetch: meteredFetch });
   return client;
 }
 

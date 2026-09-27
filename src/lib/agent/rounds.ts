@@ -7,6 +7,7 @@ import { trackHomeTime, weeklyCare } from "./care";
 import { runCheckins } from "./checkins";
 import { complianceReminders } from "./compliance";
 import { marksFor, type CarrierContext } from "./db";
+import { forCarrier } from "./scope";
 import { applyEld, checkCalls, lateNotices, readEld } from "./eld";
 import { pullFeed, readFeed } from "./feeds";
 import { integrationsFor, setStatus, type EldConfig, type FeedConfig } from "./integrations";
@@ -21,7 +22,11 @@ import { suggestRepositions } from "./reposition";
  * ELD and load feeds, telling brokers early when a truck will be late, and clearing old offers off the board.
  * `base` is the app's public address, for the calls Twilio places (null in sandbox, where nothing is dialed).
  */
-export async function runRounds(ctx: CarrierContext, now: number, base: string | null): Promise<string[]> {
+export function runRounds(ctx: CarrierContext, now: number, base: string | null): Promise<string[]> {
+  return forCarrier(ctx.carrier.id, () => rounds(ctx, now, base));
+}
+
+async function rounds(ctx: CarrierContext, now: number, base: string | null): Promise<string[]> {
   const id = ctx.carrier.id;
   const url = (path: string) => `${base ?? ""}${path}`;
   const done: string[] = [];

@@ -5,6 +5,7 @@ import { driverTurn, ownerTurn, passToOwner, uid } from "../agent/dispatcher";
 import { driverPhotos } from "../agent/photos";
 import type { Item } from "../cloud/rows";
 import type { Driver, DriverMessage } from "../types";
+import { forCarrier } from "../agent/scope";
 import { textTo } from "./out";
 import { PASSED_ON_TEXT, SMS_HELP, UNKNOWN_NUMBER } from "./phrases";
 
@@ -36,7 +37,7 @@ export async function receiveText(t: IncomingText): Promise<{ now?: string; late
     const fresh = await logChannel({ carrierId: owner.id, channel: "sms", direction: "in", providerId: messageSid, counterparty: from, body, data: { kind: "owner_text" } });
     if (!fresh) return {};
     return {
-      later: async () => {
+      later: () => forCarrier(owner.id, async () => {
         const ctx = await loadContext(owner.id);
         if (!ctx) return;
         const history = (await threadWith(owner.id, "sms", from, 12)).filter((m, i, all) => !(i === all.length - 1 && m.direction === "in" && m.body === body)).map((m) => ({ from: m.direction === "in" ? ("them" as const) : ("ai" as const), text: m.body ?? "" }));
@@ -48,7 +49,7 @@ export async function receiveText(t: IncomingText): Promise<{ now?: string; late
           return null;
         });
         await logChannel({ carrierId: owner.id, channel: "sms", direction: "out", providerId: sid ?? null, counterparty: from, body: text, data: { kind: "owner_text" } });
-      },
+      }),
     };
   }
   const { carrierId, driver } = found;
@@ -73,7 +74,7 @@ export async function receiveText(t: IncomingText): Promise<{ now?: string; late
   await saveDriverMessage(carrierId, incoming);
 
   return {
-    later: async () => {
+    later: () => forCarrier(carrierId, async () => {
       const ctx = await loadContext(carrierId);
       if (!ctx) return;
       const history = (await driverThread(carrierId, driver.id, 13))
@@ -93,6 +94,6 @@ export async function receiveText(t: IncomingText): Promise<{ now?: string; late
       });
       await saveDriverMessage(carrierId, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: new Date().toISOString(), channel: "sms", ai: !result.effects.failed });
       await logChannel({ carrierId, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: from, body: text, data: { did: result.effects.done } });
-    },
+    }),
   };
 }

@@ -34,5 +34,46 @@ export async function GET(request: Request) {
       late,
     };
   };
-  return Response.json({ trucks: truckCount, week: window(7), month: window(30) });
+  return Response.json({ trucks: truckCount, week: window(7), month: window(30), costs: await costs(trucks ?? []) });
+}
+
+// What things cost, for the estimate: set these to Backroute's real rates. Defaults are rough list prices in dollars.
+const price = (name: string, fallback: number) => Number(process.env[name] ?? "") || fallback;
+
+/**
+ * What each carrier cost to run this month, estimated: the AI's tokens (counted as they happen, lib/ai/usage), plus
+ * texts, emails and call turns from the channel log. For pricing, and for spotting a carrier that costs far more than
+ * it should (a runaway loop, a chatty broker).
+ */
+async function costs(trucks: { carrier_id: string }[]) {
+  const db = admin();
+  const month = new Date().toISOString().slice(0, 7);
+  const start = `${month}-01T00:00:00Z`;
+  const [{ data: usage }, { data: carriers }, { data: log }] = await Promise.all([
+    db.from("usage").select("carrier_id, ai_calls, input_tokens, output_tokens").eq("month", month),
+    db.from("carriers").select("id, name"),
+    db.from("channel_messages").select("carrier_id, channel").eq("direction", "out").gte("created_at", start).limit(100000),
+  ]);
+  const inPer = price("COST_AI_INPUT_PER_MTOK", 5) / 1e6;
+  const outPer = price("COST_AI_OUTPUT_PER_MTOK", 25) / 1e6;
+  const per = { sms: price("COST_PER_TEXT", 0.0083), email: price("COST_PER_EMAIL", 0.0012), voice: price("COST_PER_CALL_TURN", 0.02) };
+  const rows = new Map<string, { carrier: string; trucks: number; aiCalls: number; ai: number; texts: number; emails: number; callTurns: number; total: number }>();
+  const row = (id: string) => {
+    if (!rows.has(id)) rows.set(id, { carrier: carriers?.find((c) => c.id === id)?.name ?? (id === "unattributed" ? "Not tied to a carrier" : id), trucks: trucks.filter((t) => t.carrier_id === id).length, aiCalls: 0, ai: 0, texts: 0, emails: 0, callTurns: 0, total: 0 });
+    return rows.get(id)!;
+  };
+  for (const u of usage ?? []) {
+    const r = row(u.carrier_id as string);
+    r.aiCalls += u.ai_calls as number;
+    r.ai += (u.input_tokens as number) * inPer + (u.output_tokens as number) * outPer;
+  }
+  for (const m of log ?? []) {
+    const r = row(m.carrier_id as string);
+    if (m.channel === "sms") r.texts++;
+    else if (m.channel === "email") r.emails++;
+    else r.callTurns++;
+  }
+  return [...rows.values()]
+    .map((r) => ({ ...r, ai: Math.round(r.ai * 100) / 100, total: Math.round((r.ai + r.texts * per.sms + r.emails * per.email + r.callTurns * per.voice) * 100) / 100 }))
+    .sort((a, b) => b.total - a.total);
 }

@@ -1,4 +1,5 @@
 import "server-only";
+import { forCarrier } from "../agent/scope";
 import { aiConfigured } from "../ai/server";
 import { brokerCallBack, carrierById, driverByPhone, loadContext, logChannel, ownerByPhone, threadWith, addActivity } from "../agent/db";
 import { brokerCallBackOpening, brokerCallKey } from "../agent/broker-call";
@@ -69,7 +70,11 @@ export async function nextTurn(request: Request, params: Record<string, string>,
 }
 
 /** One turn of a driver's call, by either kind of call (turn-by-turn, or the voice server): logged, answered, acted on. */
-export async function driverCallReply(carrierId: string, driver: Driver, callSid: string, said: string, data: Record<string, unknown> = {}): Promise<{ reply: string; hangUp: boolean }> {
+export function driverCallReply(carrierId: string, driver: Driver, callSid: string, said: string, data: Record<string, unknown> = {}): Promise<{ reply: string; hangUp: boolean }> {
+  return forCarrier(carrierId, () => driverCallAnswer(carrierId, driver, callSid, said, data));
+}
+
+async function driverCallAnswer(carrierId: string, driver: Driver, callSid: string, said: string, data: Record<string, unknown>): Promise<{ reply: string; hangUp: boolean }> {
   const lang = driver.prefs?.language ?? "en";
   const key = callKey(callSid);
   const earlier = await threadWith(carrierId, "voice", key, 16);
@@ -133,7 +138,11 @@ export async function ownerNextTurn(request: Request, params: Record<string, str
 }
 
 /** One turn of the owner's call, by either kind of call (turn-by-turn, or the voice server): logged and answered. */
-export async function ownerCallReply(carrierId: string, callSid: string, said: string, data: Record<string, unknown> = {}): Promise<{ reply: string; hangUp: boolean }> {
+export function ownerCallReply(carrierId: string, callSid: string, said: string, data: Record<string, unknown> = {}): Promise<{ reply: string; hangUp: boolean }> {
+  return forCarrier(carrierId, () => ownerCallAnswer(carrierId, callSid, said, data));
+}
+
+async function ownerCallAnswer(carrierId: string, callSid: string, said: string, data: Record<string, unknown>): Promise<{ reply: string; hangUp: boolean }> {
   const key = callKey(callSid);
   const earlier = await threadWith(carrierId, "voice", key, 16);
   await logChannel({ carrierId, channel: "voice", direction: "in", counterparty: key, body: said, data: { kind: "owner_call", ...data } });

@@ -1,6 +1,7 @@
 import { loadContext } from "@/lib/agent/db";
-import { brokerCallReply } from "@/lib/agent/broker-call";
-import { publicUrl, readTwilioWebhook, say, sayAndListen, twiml, twilioConfigured } from "@/lib/channels/twilio";
+import { brokerCallReply, retryAfterVoicemail } from "@/lib/agent/broker-call";
+import { MAX_HOLDS } from "@/lib/channels/ivr";
+import { listen, press, publicUrl, readTwilioWebhook, say, sayAndListen, twiml, twilioConfigured } from "@/lib/channels/twilio";
 
 export const maxDuration = 30;
 
@@ -16,9 +17,20 @@ export async function POST(request: Request) {
   const load = ctx?.loads.find((l) => l.id === url.searchParams.get("load"));
   if (!ctx || !load) return twiml("<Hangup/>");
   const turnUrl = publicUrl(request, `/api/channels/voice/broker/turn?carrier=${encodeURIComponent(carrierId)}&load=${encodeURIComponent(load.id)}`);
+  const hold = Number(url.searchParams.get("hold") ?? 0);
   const said = (params.SpeechResult ?? "").trim();
-  if (!said) return missed >= 1 ? twiml(`${say("I'll follow up by email. Thanks.", "en")}<Hangup/>`) : twiml(sayAndListen("Sorry, I didn't catch that.", "en", `${turnUrl}&missed=1`));
+  if (!said) {
+    // On hold (music isn't speech): keep waiting quietly, up to about ten minutes.
+    if (hold > 0 && hold < MAX_HOLDS) return twiml(listen("en", `${turnUrl}&hold=${hold + 1}`));
+    if (hold >= MAX_HOLDS) {
+      await retryAfterVoicemail(ctx, load);
+      return twiml("<Hangup/>");
+    }
+    return missed >= 1 ? twiml(`${say("I'll follow up by email. Thanks.", "en")}<Hangup/>`) : twiml(sayAndListen("Sorry, I didn't catch that.", "en", `${turnUrl}&missed=1`));
+  }
 
   const result = await brokerCallReply(ctx, load, params.CallSid, said, { confidence: params.Confidence });
-  return result.hangUp ? twiml(`${say(result.reply, "en")}<Hangup/>`) : twiml(sayAndListen(result.reply, "en", turnUrl));
+  if (result.digits) return twiml(`${press(result.digits)}${listen("en", `${turnUrl}&hold=1`)}`);
+  if (result.hold) return twiml(listen("en", `${turnUrl}&hold=${hold + 1}`));
+  return result.hangUp ? twiml(`${result.reply ? say(result.reply, "en") : ""}<Hangup/>`) : twiml(sayAndListen(result.reply, "en", turnUrl));
 }

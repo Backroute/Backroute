@@ -21,13 +21,18 @@ function distance(a: string, b: string): number {
 /** The name part of a domain: "dispatch.acme-freight.co" → "acmefreight". */
 const core = (domain: string) => (domain.toLowerCase().split(".").slice(-2, -1)[0] ?? "").replace(/[^a-z0-9]/g, "");
 
-/** A known broker whose email domain this one imitates, if any. Same domain, or a free mail address, isn't a lookalike. */
+/**
+ * A known broker whose email domain this one imitates, if any. Same domain, or a free mail address, isn't a lookalike.
+ * Only brokers we'd trust count as the real one: an impostor already on file (high risk) doesn't make the broker it
+ * imitated look like a lookalike of the impostor.
+ */
 export function lookalikeOf(email: string, brokers: Broker[]): Broker | null {
   const domain = email.split("@")[1]?.toLowerCase();
   if (!domain || FREE.test(domain)) return null;
   const mine = core(domain);
   if (mine.length < 5) return null;
   for (const b of brokers) {
+    if (b.fraudRisk === "high") continue;
     const theirs = b.email?.split("@")[1]?.toLowerCase();
     if (!theirs || theirs === domain || FREE.test(theirs)) continue;
     const other = core(theirs);
@@ -48,6 +53,8 @@ export function doubleBrokered(mcOnRateCon: string | null | undefined, broker: B
 export function paymentScam(text: string): boolean {
   return (
     /\b(change|update|new|changed)\b[^.\n]{0,40}\b(bank|banking|ach|routing|account number|remit(tance)?|payment) (details|info|information|instructions|account)\b/i.test(text) ||
-    /\b(verify|confirm|re-?enter)\b[^.\n]{0,30}\b(bank|account|password|login|credentials)\b/i.test(text)
+    /\b(verify|confirm|re-?enter)\b[^.\n]{0,30}\b(bank|account|password|login|credentials)\b/i.test(text) ||
+    // Asking a carrier to email its bank account: real brokers take that through their setup portal, not a reply.
+    /\b(send|reply with|email|provide|give|need)\b[^.\n]{0,60}\b(bank account|routing number|account and routing|banking (details|info(rmation)?)|voided check)\b/i.test(text)
   );
 }

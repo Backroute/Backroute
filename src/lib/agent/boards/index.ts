@@ -16,7 +16,11 @@ import type { Board, BoardQuery } from "./types";
  */
 
 const HOUR = 3600_000;
+// A truck empty now or within a few hours is searched every round (good loads go in minutes); one free later, every
+// 30 minutes.
 const SEARCH_EVERY = 30 * 60_000;
+const SEARCH_URGENT = 5 * 60_000;
+const URGENT_WITHIN = 6 * HOUR;
 const RADIUS = 150;
 
 export const isBoard = (kind: string) => kind === "truckstop" || kind === "dat" || kind.startsWith("board:");
@@ -62,10 +66,9 @@ function postComment(ctx: CarrierContext): string | undefined {
   return `Call ${pretty} and ask for ${ctx.carrier.name}. Our dispatch answers 24/7.`;
 }
 
-/** One round on the carrier's boards: search for each free truck (every 30 minutes), post trucks (once a day). */
+/** One round on the carrier's boards: search for each free truck (every round when it's empty soon, else every 30 minutes), post trucks (once a day). */
 export async function runBoards(ctx: CarrierContext, rows: IntegrationRow[], now: number, onStatus: (row: IntegrationRow, status: string) => Promise<void>): Promise<string[]> {
   const done: string[] = [];
-  const slot = Math.floor(now / SEARCH_EVERY);
   const day = new Date(now).toISOString().slice(0, 10);
   for (const row of rows) {
     const board = boardFor(row);
@@ -77,6 +80,8 @@ export async function runBoards(ctx: CarrierContext, rows: IntegrationRow[], now
       let found = 0;
       let added = 0;
       for (const { truck, q } of whereTrucksFree(ctx, now)) {
+        const urgent = Date.parse(q.availableFrom) - now <= URGENT_WITHIN;
+        const slot = urgent ? `u${Math.floor(now / SEARCH_URGENT)}` : `${Math.floor(now / SEARCH_EVERY)}`;
         if (!(await claimMark(ctx.carrier.id, `truck:${truck.id}`, `board_search:${row.kind}:${slot}`))) continue;
         // A post with no phone or email has no one to book it with.
         const loads = (await board.search(q)).filter((l) => l.brokerEmail || l.brokerPhone);

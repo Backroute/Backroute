@@ -52,6 +52,11 @@ The real version switches on from environment variables:
 - **ELD and load feeds:** Samsara or Motive for truck locations and drivers' hours, and any JSON or CSV list of loads.
 - **Backroute support:** anything the AI can't handle goes to your support team's console at `/ops`, not to a dispatcher. On full autopilot the owner only hears about emergencies.
 - **Evening text:** an end-of-day text to the owner.
+- **Before real carriers:**
+  - **Practice mode:** the AI does everything but sends nothing, and shows what it would have sent.
+  - **Simulated brokers and drivers:** `eval/sim.mjs` runs whole conversations and scores the money and the manners.
+  - **History import:** a CSV of past loads, so pricing starts from what each lane and broker paid.
+- **Holds up:** messages retried through provider outages, stale screens can't undo newer changes to a load, stuck work goes to a person, and the support console shows what each carrier costs to run.
 
 Each load board switches on when Backroute's partner login for it is set. Emergencies still need a person on the support team.
 

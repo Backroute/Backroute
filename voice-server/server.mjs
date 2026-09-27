@@ -27,6 +27,8 @@ const DG_URL = process.env.DEEPGRAM_URL ?? "wss://api.deepgram.com/v1/listen";
 const EL_BASE = (process.env.ELEVENLABS_BASE ?? "https://api.elevenlabs.io").replace(/\/$/, "");
 const VOICE = process.env.ELEVENLABS_VOICE_ID ?? "";
 const SILENCE_MS = 12000;
+// On hold (after the app pressed a key on a phone menu, or someone said "hold on"): wait quietly this long before giving up.
+const HOLD_MS = 10 * 60_000;
 const KEYTERMS = ["reefer", "dry van", "flatbed", "rate con", "BOL", "POD", "lumper", "detention", "TONU", "deadhead", "bobtail", "drop and hook", "MC number", "weigh station", "blowout", "34 reset"];
 
 /** The same signature the app puts on the stream's parameters. */
@@ -51,6 +53,7 @@ class Call {
     this.marks = 0;
     this.silence = null;
     this.reprompted = false;
+    this.holding = false;
   }
 
   send(obj) {
@@ -65,9 +68,11 @@ class Call {
       log("refused a stream with a bad signature");
       return this.twilio.close();
     }
-    this.params = { ...p, callSid };
+    this.holding = p.hold === "1";
+    const { hold: _hold, ...rest } = p;
+    this.params = { ...rest, callSid };
     this.listen();
-    await this.say(p.opening ?? "Hello.");
+    await this.say(this.holding ? "" : (p.opening ?? "Hello."));
   }
 
   listen() {
@@ -112,6 +117,9 @@ class Call {
         signal: AbortSignal.timeout(25000),
       });
       const answer = res.ok ? await res.json() : { reply: "Sorry, I'm having trouble on my end. Someone from the office will call you back.", hangUp: true };
+      // The app pressed a key on their phone menu: Twilio moves the call to a new stream, this one is done.
+      if (answer.redirected) return;
+      this.holding = !!answer.hold;
       if (answer.hangUp) this.ending = true;
       await this.say(answer.reply);
     } catch (e) {
@@ -161,6 +169,14 @@ class Call {
 
   startSilenceTimer() {
     this.stopSilenceTimer();
+    if (this.holding) {
+      // Hold music isn't speech: nothing to answer, and no "are you still there?". Give up after a long while.
+      this.silence = setTimeout(() => {
+        this.ending = true;
+        this.twilio.close();
+      }, HOLD_MS);
+      return;
+    }
     this.silence = setTimeout(() => {
       if (this.reprompted) {
         this.ending = true;

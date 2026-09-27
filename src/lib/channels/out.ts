@@ -114,17 +114,26 @@ export const wentOut = (id: string | null | undefined) => !!id && !id.startsWith
  * The dispatcher's rounds: sends again what failed, oldest first, with backoff. Gives up on a text after 30 minutes
  * and an email after a day, and says so, so support can see it.
  */
-export async function retryOutbound(now = Date.now(), limit = 50): Promise<{ sent: number; gaveUp: number }> {
+export interface GaveUp {
+  carrierId: string;
+  channel: "sms" | "email";
+  recipient: string;
+  subject: string | null;
+  body: string | null;
+}
+
+export async function retryOutbound(now = Date.now(), limit = 50): Promise<{ sent: number; gaveUp: GaveUp[] }> {
   const { data, error } = await admin().from("outbound").select("id, carrier_id, channel, recipient, subject, body, data, attempts, created_at").eq("status", "retry").lte("next_at", new Date(now).toISOString()).order("created_at").limit(limit);
   if (error) throw error;
   let sent = 0;
-  let gaveUp = 0;
+  const gaveUp: GaveUp[] = [];
+  const lost = (row: Record<string, unknown>) => gaveUp.push({ carrierId: row.carrier_id as string, channel: row.channel as "sms" | "email", recipient: row.recipient as string, subject: (row.subject as string) ?? null, body: (row.body as string) ?? null });
   for (const row of data ?? []) {
     const channel = row.channel as "sms" | "email";
     const age = now - Date.parse(row.created_at as string);
     if (age > FRESH_FOR[channel]) {
       await admin().from("outbound").update({ status: "gave_up", next_at: null }).eq("id", row.id);
-      gaveUp++;
+      lost(row);
       continue;
     }
     try {
@@ -139,7 +148,7 @@ export async function retryOutbound(now = Date.now(), limit = 50): Promise<{ sen
       const attempts = (row.attempts as number) + 1;
       if (!retriable(e)) {
         await admin().from("outbound").update({ status: "gave_up", attempts, last_error: reason(e), next_at: null }).eq("id", row.id);
-        gaveUp++;
+        lost(row);
         continue;
       }
       const wait = BACKOFF[Math.min(attempts, BACKOFF.length - 1)];

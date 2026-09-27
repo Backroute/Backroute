@@ -17,7 +17,9 @@ import { estimateMiles } from "../fleet";
 import { askSupportAboutBroker, checkBroker } from "./brokers";
 import { assessBroker } from "../broker-policy";
 import { confirmPhoneBooking, sendSetupPacket } from "./paperwork";
-import { memoryNote } from "./memory";
+import { brokerMemory, memoryNote } from "./memory";
+import { forCarrier } from "./scope";
+import { throughPhoneTree, WANT, type CallReply } from "../channels/ivr";
 import { when } from "./templates";
 import { TRUCKING } from "../ai/prompts";
 
@@ -141,6 +143,7 @@ Rules:
 - Answer questions about the truck, the driver and the company only from the facts you're given. If you don't have it, say you'll confirm by email. Never make anything up.
 - If they ask for our carrier packet or setup papers, call send_packet.
 - If they ask something about this load you can't answer from the facts (their rules, a detail you don't have), say the office will confirm by email, then call follow_up with the question so someone does.
+- If you went through their phone menu or hold, or someone new picks up after a transfer, say who you are and which load you're calling about again, in one sentence.
 - Stick to this load.
 
 ${TRUCKING}`;
@@ -179,7 +182,7 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
         const amount = rate !== undefined ? Math.round(rate * current.lane.miles) : said;
         if (!amount) return "Ask them what the number is.";
         const ours = current.bookRequest?.ask ?? current.targetRate;
-        const move = respond(amount, current, ctx.settings);
+        const move = respond(amount, current, ctx.settings, Date.now(), current.brokerId ? brokerMemory(ctx.loads, current.brokerId) : null);
         const request = withOurMove(withTheirOffer(current.bookRequest, ours, amount, "phone"), move, "phone");
         await persist({ bookRequest: request, ...(move.action === "counter" ? { targetRate: move.amount } : {}), ...(move.action === "pass" ? { stage: "declined" as const } : {}) });
         if (move.action === "accept") {
@@ -365,12 +368,17 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
   }
 }
 
-/** Book requests nobody answered by email in 30 minutes, to brokers with a phone number: the AI calls. */
+/**
+ * Book requests nobody answered by email, to brokers with a phone number: the AI calls. After 30 minutes, or 10 when
+ * the load picks up within a day (it won't stay on the board long).
+ */
 export async function followUpByPhone(ctx: CarrierContext, now: number, urlFor: (loadId: string) => string | null): Promise<string[]> {
   const done: string[] = [];
   for (const load of ctx.loads) {
     const req = load.bookRequest;
-    if (load.stage !== "negotiating" || req?.status !== "sent" || Date.parse(req.askedAt) > now - 30 * 60_000 || Date.parse(req.askedAt) < now - 6 * 3600_000) continue;
+    const soon = !!load.pickupAt && Date.parse(load.pickupAt) - now < 24 * 3600_000;
+    const wait = (soon ? 10 : 30) * 60_000;
+    if (load.stage !== "negotiating" || req?.status !== "sent" || Date.parse(req.askedAt) > now - wait || Date.parse(req.askedAt) < now - 6 * 3600_000) continue;
     if (load.pickupAt && Date.parse(load.pickupAt) < now) continue;
     if (await callBroker(ctx, load, urlFor(load.id))) done.push(`${load.referenceNumber}: called the broker`);
   }
@@ -380,11 +388,21 @@ export async function followUpByPhone(ctx: CarrierContext, now: number, urlFor: 
 const SORRY = "Sorry, I'll have someone from the office follow up by email. Thanks.";
 
 /** One turn of a call with a broker, by either kind of call: logged, answered inside the rules. */
-export async function brokerCallReply(ctx: CarrierContext, load: Load, callSid: string, said: string, data: Record<string, unknown> = {}): Promise<{ reply: string; hangUp: boolean }> {
+export function brokerCallReply(ctx: CarrierContext, load: Load, callSid: string, said: string, data: Record<string, unknown> = {}): Promise<CallReply> {
+  return forCarrier(ctx.carrier.id, () => brokerCallAnswer(ctx, load, callSid, said, data));
+}
+
+async function brokerCallAnswer(ctx: CarrierContext, load: Load, callSid: string, said: string, data: Record<string, unknown>): Promise<CallReply> {
   const key = brokerCallKey(callSid);
-  const earlier = await threadWith(ctx.carrier.id, "voice", key, 16);
+  const earlier = await threadWith(ctx.carrier.id, "voice", key, 40);
+  // Their phone menu and hold, before any person: press the right key, wait quietly.
+  const tree = await throughPhoneTree(said, WANT.broker, earlier, (direction, body, extra) => logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction, counterparty: key, body, data: { kind: "broker_call", loadId: load.id, ...data, ...extra } }));
+  if (tree) {
+    if (tree.hangUp) await retryAfterVoicemail(ctx, load);
+    return tree;
+  }
   await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "in", counterparty: key, body: said, data: { kind: "broker_call", loadId: load.id, ...data } });
-  const history = earlier.map((m) => ({ from: m.direction === "in" ? ("them" as const) : ("ai" as const), text: m.body ?? "" }));
+  const history = earlier.slice(-16).map((m) => ({ from: m.direction === "in" ? ("them" as const) : ("ai" as const), text: m.body ?? "" }));
   const result = aiConfigured() ? await brokerCallTurn(ctx, load, said, history) : { reply: "", hangUp: true, failed: true };
   if (result.failed) {
     await passToOwner(ctx, { reason: `The AI's call with the broker about ${load.referenceNumber} broke off after they said: "${said}". Follow up with them.`, loadId: load.id, label: "Followed up", source: "voice", to: "support" });

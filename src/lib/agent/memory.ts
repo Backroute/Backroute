@@ -41,6 +41,8 @@ export interface BrokerMemory {
   cancelled: number;
   avgRpm: number | null;
   lanes: string[];
+  /** On deals we closed after haggling: how far they came up from their first number, on average (0.1 = 10%). */
+  movePct: number | null;
 }
 
 export function brokerMemory(loads: Load[], brokerId: string): BrokerMemory {
@@ -49,6 +51,13 @@ export function brokerMemory(loads: Load[], brokerId: string): BrokerMemory {
   const rpms = booked.map((l) => l.bookedRate! / l.lane.miles);
   const answered = theirs.filter((l) => l.bookRequest && (l.bookRequest.status === "accepted" || l.bookRequest.brokerOffer));
   const lanes = [...new Set(booked.map((l) => `${l.lane.originState}→${l.lane.destState}`))].slice(0, 5);
+  const moves = theirs
+    .filter((l) => l.bookRequest?.status === "accepted" && (l.bookRequest.history ?? []).some((h) => h.by === "them"))
+    .map((l) => {
+      const h = l.bookRequest!.history!;
+      const first = h.find((x) => x.by === "them")!.amount;
+      return first > 0 ? (h.at(-1)!.amount - first) / first : 0;
+    });
   return {
     booked: booked.length,
     tookOurAsk: answered.filter((l) => l.bookRequest!.status === "accepted" && !l.bookRequest!.countered && (l.bookRequest!.brokerOffer ?? l.bookRequest!.ask) >= l.bookRequest!.ask).length,
@@ -56,6 +65,7 @@ export function brokerMemory(loads: Load[], brokerId: string): BrokerMemory {
     cancelled: theirs.filter((l) => l.stage === "cancelled").length,
     avgRpm: rpms.length ? Math.round((rpms.reduce((a, b) => a + b, 0) / rpms.length) * 100) / 100 : null,
     lanes,
+    movePct: moves.length ? Math.round((moves.reduce((a, b) => a + b, 0) / moves.length) * 1000) / 1000 : null,
   };
 }
 
@@ -65,7 +75,7 @@ export function memoryNote(loads: Load[], brokers: Broker[], load: Load): string
   const b = load.brokerId ? brokerMemory(loads, load.brokerId) : null;
   if (b && (b.booked || b.countered || b.cancelled))
     out.push(
-      `History with this broker: ${b.booked} load${b.booked === 1 ? "" : "s"} hauled${b.avgRpm ? ` at about $${b.avgRpm.toFixed(2)} a mile` : ""}${b.lanes.length ? ` (${b.lanes.join(", ")})` : ""}; they took our first number ${b.tookOurAsk} time${b.tookOurAsk === 1 ? "" : "s"} and pushed back ${b.countered}${b.cancelled ? `; cancelled on us ${b.cancelled} time${b.cancelled === 1 ? "" : "s"}` : ""}.`,
+      `History with this broker: ${b.booked} load${b.booked === 1 ? "" : "s"} hauled${b.avgRpm ? ` at about $${b.avgRpm.toFixed(2)} a mile` : ""}${b.lanes.length ? ` (${b.lanes.join(", ")})` : ""}; they took our first number ${b.tookOurAsk} time${b.tookOurAsk === 1 ? "" : "s"} and pushed back ${b.countered}${b.movePct ? `; when they haggle they usually come up about ${Math.round(b.movePct * 100)}% from their first number` : ""}${b.cancelled ? `; cancelled on us ${b.cancelled} time${b.cancelled === 1 ? "" : "s"}` : ""}.`,
     );
   const lane = laneMemory(loads.filter((l) => l.id !== load.id), brokers, { originState: load.lane.originState, destState: load.lane.destState });
   if (lane.count) out.push(`On ${load.lane.originState}→${load.lane.destState} the carrier has hauled ${lane.count} load${lane.count === 1 ? "" : "s"} lately, about $${lane.avgRpm!.toFixed(2)} a mile (last: $${lane.last!.rate.toLocaleString()}).`);

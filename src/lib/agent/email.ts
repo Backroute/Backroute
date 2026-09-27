@@ -1,4 +1,5 @@
 import "server-only";
+import { forCarrier } from "./scope";
 import { aiConfigured } from "../ai/server";
 import { readRateConPdf } from "../ai/rate-con-reader";
 import { messageIdHeader, plainText, type InboundEmail } from "../channels/email";
@@ -31,7 +32,11 @@ const ACTIVE = new Set(["negotiating", "rate_confirmed", "booked", "dispatched",
  * - A request for setup papers: the packet goes out with the carrier's W-9, insurance certificate and authority.
  * - Anything else: the AI writes a reply, which waits for the owner unless autopilot is on full.
  */
-export async function handleInboundEmail(carrierId: string, email: InboundEmail) {
+export function handleInboundEmail(carrierId: string, email: InboundEmail) {
+  return forCarrier(carrierId, () => handle(carrierId, email));
+}
+
+async function handle(carrierId: string, email: InboundEmail) {
   const ctx = await loadContext(carrierId);
   if (!ctx) return;
   const from = (email.FromFull?.Email ?? email.From).toLowerCase();
@@ -50,12 +55,21 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
   // Someone posing as a broker (a lookalike address, or already marked high risk) gets no automatic note: support
   // deals with them.
   const suspect = () => !!lookalikeOf(from, ctx.brokers.filter((b) => b.email?.toLowerCase() !== from)) || ctx.brokers.some((b) => b.email?.toLowerCase() === from && b.fraudRisk === "high");
+  // Someone writing from an address that imitates a broker we know: decided once, before anything in the email is
+  // acted on. Their rate con, cancellation, "works for us", setup request or payment notice changes nothing, and they
+  // get no reply of any kind; only their load offers go through, to be flagged there. (A broker we deal with who only
+  // failed a check is different: their news about our loads still counts, they just get no automatic notes.)
+  const impostor = !!lookalikeOf(from, ctx.brokers.filter((b) => b.email?.toLowerCase() !== from));
   // Set when the email has had its answer from a template (a rate con thanks or fix), so the AI doesn't write another.
   let replied = false;
   // PDFs, and photos big enough to be a document (not a logo in someone's signature).
   const isPhoto = (a: { ContentType: string; ContentLength: number }) => /^image\/(jpeg|png|webp|gif)$/.test(a.ContentType) && a.ContentLength >= 60 * 1024;
   const pdfs = (email.Attachments ?? []).filter((a) => (a.ContentType === "application/pdf" || /\.pdf$/i.test(a.Name) || isPhoto(a)) && a.ContentLength <= 10 * 1024 * 1024);
   for (const pdf of pdfs) {
+    if (impostor) {
+      notes.push(`${pdf.Name}: not opened, the sender's address imitates a broker we know or is marked high risk`);
+      continue;
+    }
     if (!aiConfigured()) {
       notes.push(`${pdf.Name}: not read (the AI isn't switched on)`);
       continue;
@@ -138,7 +152,22 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
     !suspect() &&
     sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: mail.holding(ctx.carrier, ctx.settings, load?.referenceNumber ?? null, fromName), inReplyTo: sender.messageId, loadId: load?.id, withinRules: true, why: `Tell ${fromName} you'll get back to them?` });
 
+  // No answer and no action: support checks it by phone, on the number the carrier already had.
+  async function impostorEmail() {
+    const real = lookalikeOf(from, ctx!.brokers.filter((b) => b.email?.toLowerCase() !== from));
+    await passToOwner(ctx!, {
+      reason: `${fromName} <${from}> emailed "${email.Subject}" from an address that imitates ${real?.company ?? "a broker you work with"}'s${real?.email ? ` (${real.email})` : ""}. The AI didn't answer or act on it. Call ${real?.company ?? "them"} on the number you already have before doing anything it asks.`,
+      loadId: load?.id,
+      label: "Checked",
+      source: "email",
+      to: "support",
+      critical: true,
+      brokerId: real?.id,
+    });
+  }
+
   if (!aiConfigured()) {
+    if (impostor) return impostorEmail();
     await passToOwner(ctx, { reason: `New email from ${fromName}: "${email.Subject}"`, loadId: load?.id, label: "I'll answer", source: "email" });
     await holdingReply();
     return;
@@ -157,6 +186,7 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
   }
 
   const reading = await readBrokerEmail(email.Subject, text);
+  if (impostor && reading?.kind !== "load_offers") return impostorEmail();
   // Remember the language the broker writes in, so what we send goes in it (lib/agent/outbox).
   const writer = ctx.brokers.find((b) => b.email?.toLowerCase() === from);
   const lang = reading?.language?.toLowerCase().slice(0, 2);
@@ -195,6 +225,7 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
     if (handled !== false) return;
   }
 
+  if (impostor) return impostorEmail();
   const thread = (await threadWith(carrierId, "email", from, 8)).filter((m) => !(m.direction === "in" && m.body === text));
   const draft = await brokerEmailDraft(ctx, { from, fromName, subject: email.Subject, text, attachmentNotes: notes, thread, load });
   if (draft.effects.failed) {

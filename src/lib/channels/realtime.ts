@@ -29,12 +29,27 @@ export function validVoiceToken(kind: string, carrier: string, ref: string, call
   return want.length === got.length && crypto.timingSafeEqual(want, got);
 }
 
-/** TwiML that hands the call's audio to the voice server; when the server closes the stream, the call ends. */
-export function streamTwiml(p: { kind: CallKind; carrier: string; ref: string; callSid: string; lang: Lang; opening: string }): Response {
+interface StreamParams {
+  kind: CallKind;
+  carrier: string;
+  ref: string;
+  callSid: string;
+  lang: Lang;
+  opening: string;
+  /** Start listening quietly, as on hold (after pressing a key on a phone menu). */
+  hold?: boolean;
+}
+
+/** The TwiML that hands the call's audio to the voice server (after `before`, e.g. a key press); when the server closes the stream, the call ends. */
+export function streamXml(p: StreamParams, before = ""): string {
   const url = `${process.env.VOICE_SERVER_URL!.replace(/\/$/, "")}/stream`;
-  const params = { kind: p.kind, carrier: p.carrier, ref: p.ref, lang: p.lang, opening: p.opening.slice(0, 480), token: voiceToken(p.kind, p.carrier, p.ref, p.callSid) };
+  const params = { kind: p.kind, carrier: p.carrier, ref: p.ref, lang: p.lang, opening: p.opening.slice(0, 480), hold: p.hold ? "1" : "", token: voiceToken(p.kind, p.carrier, p.ref, p.callSid) };
   const inner = Object.entries(params)
     .map(([k, v]) => `<Parameter name="${k}" value="${xml(v)}"/>`)
     .join("");
-  return new Response(`<?xml version="1.0" encoding="UTF-8"?><Response><Connect><Stream url="${xml(url)}">${inner}</Stream></Connect><Hangup/></Response>`, { headers: { "content-type": "text/xml" } });
+  return `<?xml version="1.0" encoding="UTF-8"?><Response>${before}<Connect><Stream url="${xml(url)}">${inner}</Stream></Connect><Hangup/></Response>`;
+}
+
+export function streamTwiml(p: StreamParams): Response {
+  return new Response(streamXml(p), { headers: { "content-type": "text/xml" } });
 }

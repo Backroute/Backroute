@@ -180,12 +180,49 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
 - **Photos:** a driver can text a photo of the BOL, the signed POD or a lumper receipt. It's stored and checked like an upload in the app and put on their load, and a clean POD finishes the delivery so the invoice can go out. A broker's photo of a rate con by email is read like a PDF.
 - **How people really talk:** the AI knows trucking talk (bobtail, deadhead, 34 reset, lumper, TONU, "what's your 20") and what phone transcription does to it ("real fur" is reefer). It handles typos, texting shorthand, all caps, emoji and mixed languages. Phone lines listen for trucking words (Twilio speech hints, Deepgram key terms). A price written as "2,300 dollars" or "$2.3k" is caught by the same guard as "$2,300".
 - **Measuring it:** `eval/` generates about 900,000 different messages from 24 things drivers, brokers and broker emails say. They come with typos, shorthand, voice-transcript errors and 7 languages, each marked with what a dispatcher would do. `node eval/run.mjs --n 300` sends a sample to the real AI (dry run: nothing saved or sent) and scores it by intent and by how it was typed. Set `EVAL_SECRET` on the app and in your shell first; the endpoint doesn't exist without it.
+- **Practice mode (a shadow week):** in Settings → Phone, text and email, an owner can switch on practice mode. The AI reads their broker email (forward a copy to the carrier's address) and does its whole job: booking, haggling, check-ins, invoices. But nothing leaves: no text, email or call goes out. Each one is kept, shown in Settings as "what the AI would have sent", and a black bar on every screen says practice mode is on. The owner keeps dispatching as they do today and compares. It's the no-risk way to try Backroute before letting it talk to anyone.
+- **Simulated brokers and drivers:** `node eval/sim.mjs` plays a week of a small fleet's dispatch work against the real app. It runs whole conversations, by email, text and phone, on practice carriers it makes and deletes, so nothing leaves and no real carrier is touched. The scenarios:
+  - brokers who lowball, rush, won't name a price, add a stop after agreeing, write in Spanish, or pose as a known broker to get bank details;
+  - a brokerage phone menu with hold and a transfer;
+  - drivers running late, broken down on the interstate, stuck at a dock, or angry about pay;
+  - the owner checking in.
+
+  Each broker has a hidden most-they'll-pay. With the AI on, the AI plays the other side and a veteran-dispatcher judge scores each conversation. Without it, each follows its script. Hard rules are checked in code:
+  - never under the carrier's lowest rate;
+  - never less than the broker already offered;
+  - nothing sent to an impostor;
+  - no internal words.
+
+  The run reports how much of what brokers would really pay the AI got, and exits with an error if a hard rule broke. Set `EVAL_SECRET` on the app and in your shell. It uses the app's own AI key.
+- **Negotiation that opens with room and knows each broker:**
+  - **Opening:** a bit over a post that already pays (about 8%), and well over the carrier's lowest when the post is under it. It never goes past the top of what the lane pays when a rate service knows it.
+  - **Broker history:** it asks at least what this broker has paid on loads the carrier hauled for them (up to 20% over the post). It adds a little with a broker who always takes the first number, and leaves room with one who always pushes back.
+  - **Pace:** with a broker who usually comes up 10% or more from their first number, it comes down in smaller steps.
+- **Phone menus and hold, on the AI's calls to brokers and repair shops:**
+  - "For carrier sales, press 2" gets a 2. A shop's menu gets road service, a language menu gets English, and anything else gets the operator.
+  - It waits quietly through hold music and "please hold" (up to about ten minutes), then says who it is again when a person picks up.
+  - A menu that keeps looping gets the operator, then a hang-up and the usual follow-up.
+  - On natural calls the key press goes into the live call.
+- **Fast on load boards:**
+  - A truck that's empty now or within six hours is searched every round, not every 30 minutes.
+  - When it's empty now and the board load lists a phone number, the AI calls the poster instead of emailing, the way dispatchers cover a load before someone else does. The email is the fallback.
+  - An unanswered book request on a load picking up within a day gets a call after 10 minutes instead of 30.
+- **Provider outages don't lose messages:** a text or email that fails because Twilio or Postmark is down is kept and sent again by the dispatcher's rounds, with backoff. It gives up once it's too old to make sense (a text after 30 minutes, an email after a day), and support is then asked to reach the person another way. A bad number or address isn't retried. Calls aren't retried either; each call already falls back to a text or email. Everything goes out through one place (`src/lib/channels/out.ts`), and a lint rule stops code from calling the providers directly.
+- **Stuck work gets a person:** besides messages that couldn't be delivered, an urgent support item nobody has taken after 15 minutes texts the support team again, once.
+- **Two screens on one load:** a screen saves only the fields the person changed, and the database merges them into the current load. An owner fixing a pickup time on a copy from a minute ago can't undo the negotiation, rate con or invoice the AI recorded in that minute.
+- **What each carrier costs to run:** every AI call's tokens are counted against the carrier it was for. The support console's Numbers tab shows this month per carrier: AI, texts, emails and call turns, the estimated total and the cost per truck. Set the `COST_*` rates (see `.env.example`) to your own.
+- **Bring your history:** in Settings, the owner uploads a spreadsheet of the past year's loads (CSV from a TMS, QuickBooks or their own sheet).
+  - It reads the columns by name ("Linehaul", "Pickup City", "Customer", "Load #"...), shows what it found and what it skipped and why, and imports on the owner's OK.
+  - The brokers and finished loads it adds give the AI lane prices and broker habits from day one.
+  - Importing the same sheet twice doesn't double it, and nothing is invoiced or texted for old loads.
 - **Drivers can ask for what's near them:** truck parking, a truck stop, diesel, a CAT scale, a truck wash, a repair or tire shop, by text or on a call (needs the Places key from the breakdown step).
 - **Evening text:** at 6 PM Central the owner gets a text: what was delivered, what it made, how many trucks are rolling, and what needs them.
 - **The log:** every text, call and email in or out is listed in Settings, with what the AI did.
 - **Access rules in the database:** they decide who sees what, so it isn't only the app hiding things. See `supabase/migrations/`.
   - A driver's app can change only the trip on their own truck's loads: the stage along the trip, times, documents and stops. The rate, broker, invoice and rate con stay as the office and the AI set them, even when a phone saves an old copy (`20260929000000_driver_edits.sql`).
   - Texts, emails and calls that didn't go straight out (held in practice mode, or waiting to be sent again after a provider outage) are readable by the carrier's office only, and only the server writes them (`20260930000000_outbound.sql`).
+  - A screen's save of a load carries only what it changed, merged into the current row (`20261001000000_merge_edits.sql`).
+  - What each carrier costs to run is server-only: no one who signs in can read or change it (`20261002000000_usage.sql`).
 
 ## What it doesn't do yet
 
@@ -207,8 +244,9 @@ The AI now does the day-to-day work of a dispatcher by email, text and phone. Wh
   - a POD with a shortage written on it
   - A new broker that fails the check always waits.
 - **Miles and ETAs without a routing account** (step 12) come from about 130 freight cities and each state's middle. For a town not on the list, miles are rough, and the AI doesn't send late notices from them.
-- **Negotiation is by rules, not instinct.** The AI haggles in steps with reasons, but it doesn't read a broker's mood, bluff about other loads, or trade favors across loads the way a long-time dispatcher might. Every number comes from the rules, on purpose, so it can't be talked below the owner's lowest.
-- **Two screens editing the same load at once:** the last save wins, and that includes the AI's own changes.
+- **Negotiation is by rules, not instinct.** The AI haggles in steps with reasons, and adjusts to each broker's history. But it doesn't read a broker's mood, bluff about other loads, or trade favors across loads the way a long-time dispatcher might. Every number comes from the rules, on purpose, so it can't be talked below the owner's lowest.
+- **Two screens editing the same thing at once:** loads merge field by field (above). For a truck, a driver or a Needs you item, the last save still wins.
+- **The simulator's scores with the real AI haven't been measured yet.** It needs the app running with `ANTHROPIC_API_KEY` and `EVAL_SECRET`. The scripted runs check the money rules and the plumbing; only the AI-played runs say how human it sounds.
 - **One carrier per person:** a person, or a driver's phone, in two carriers gets the first one.
 
 ## Setting it up
@@ -219,7 +257,7 @@ them in chat. `.env.example` lists every variable.
 ### 1. Supabase: accounts and the database
 
 1. Create a project at supabase.com (region near your drivers, e.g. US East).
-2. In **SQL Editor**, run the files in `supabase/migrations/` in order: `20260924000000_core.sql`, `20260925000000_channels.sql`, `20260926000000_dispatch.sql`, `20260927000000_support.sql`, `20260928000000_boards.sql`, `20260929000000_driver_edits.sql`, then `20260930000000_outbound.sql`. With the CLI instead: `supabase link`, then `supabase db push`.
+2. In **SQL Editor**, run the files in `supabase/migrations/` in order: `20260924000000_core.sql`, `20260925000000_channels.sql`, `20260926000000_dispatch.sql`, `20260927000000_support.sql`, `20260928000000_boards.sql`, `20260929000000_driver_edits.sql`, `20260930000000_outbound.sql`, `20261001000000_merge_edits.sql`, then `20261002000000_usage.sql`. With the CLI instead: `supabase link`, then `supabase db push`.
 3. From **Project Settings → API**, set:
    - `NEXT_PUBLIC_SUPABASE_URL`: the Project URL.
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: the anon (or publishable) key.
@@ -372,6 +410,7 @@ Calls switch over as soon as both are set. Remove them to go back to turn-by-tur
 - **Calls to brokers.** The AI says at the start that it's an AI and that the call is transcribed. Check the rules for automated calls with your lawyer; these are business calls about a specific load, not marketing.
 - **Transcripts.** What a driver says on a call is turned into text and saved in the log. No audio is recorded. Several states require everyone's consent to record, so have a lawyer confirm whether saving transcripts needs a spoken notice in your states.
 - **Emergencies.** The AI tells a driver who reports a crash or injury to call 911 first. It alerts the support team by text and puts it at the top of their queue and of the owner's Needs you. It's not an emergency service, so make sure someone on the support team can always be reached.
+- **Practice before it talks to anyone.** Run `node eval/sim.mjs` against the real deployment (with the AI on) and read the misses. Then give each new carrier a shadow week in practice mode and go through "what the AI would have sent" with them before turning it off.
 - **A dispatch agreement** with each carrier, saying Backroute writes to brokers on their behalf. Have a transportation lawyer review it.
 
 ## Costs, roughly
@@ -391,7 +430,7 @@ Calls switch over as soon as both are set. Remove them to go back to turn-by-tur
 | Check-in calls | Twilio's per-minute rate for outbound calls; most check-ins are texts |
 | The dispatcher's rounds | Every 10 minutes is about 4,300 short runs a month. Vercel Pro is $20 a month; an outside scheduler is free or close to it |
 
-Check each provider's current prices.
+Check each provider's current prices. The support console's Numbers tab estimates each carrier's monthly cost from what it actually used; set the `COST_*` rates to match your contracts.
 
 ## How it was tested
 
@@ -525,6 +564,26 @@ The code was run against local stand-ins that behave like the real services:
   - Goodbye ends the call.
   - A stream with a wrong signature is shut, and the turn endpoint refuses callers without the secret.
   - A Punjabi-speaking driver's call stays turn by turn.
+- **Practice mode and outages:**
+  - In practice mode a driver's text, a broker's setup request and the dispatcher's rounds all run, but nothing is texted, emailed or called. The owner can read what was held.
+  - The simulator refuses real carriers, even one in practice mode, and is hidden without its secret.
+  - With Twilio down, the AI's reply is kept and sent on the next round. With Postmark down, the setup packet waits and then goes with its attachments.
+  - A text held up for an hour is given up on and handed to support.
+  - An urgent item nobody has taken in 15 minutes texts support again, once.
+- **Phone menus:**
+  - "For carrier sales, press 2" presses 2. It waits quietly through hold and talks again when a person picks up.
+  - Five other ways menus are read out get the right key: dispatch, carrier services, English, "if you're a carrier", or the operator.
+  - A looping menu gets the operator, then a hang-up.
+  - A repair shop's menu gets road service.
+- **History import:**
+  - A dry run finds the columns and says what it skipped, and saves nothing. Only the owner can import.
+  - Imported loads are finished history, dated when they ran. Importing twice doesn't double them.
+  - The next load from that broker on that lane is priced from what they paid.
+  - Nothing is invoiced or texted for old loads.
+- **The simulated week** (`eval/sim.mjs`, scripted): every scenario runs with no hard rule broken, and the money captured stays at 90% or more of what brokers would really pay.
+- **Access rules:**
+  - A stale copy saving one field of a load changes only that field.
+  - What carriers cost to run is server-only.
 
 **None of it has been run against the live services yet.** These are all untested:
 

@@ -125,6 +125,23 @@ export function sayAndListen(text: string, lang: Lang, action: string) {
   return `<Gather input="speech" language="${VOICE[lang].speech}" speechTimeout="auto" actionOnEmptyResult="true"${tuned} action="${xml(action)}" method="POST">${say(text, lang)}</Gather>`;
 }
 
+/**
+ * Listens without saying anything: after pressing a key on a phone menu, and while on hold. Waits up to `seconds` for
+ * someone to speak (hold music isn't speech), then posts to `action` either way.
+ */
+export function listen(lang: Lang, action: string, seconds = 30) {
+  const tuned = lang === "en" ? ` speechModel="phone_call" enhanced="true" hints="${xml(SPEECH_HINTS.join(", "))}"` : "";
+  return `<Gather input="speech" language="${VOICE[lang].speech}" timeout="${seconds}" speechTimeout="auto" actionOnEmptyResult="true"${tuned} action="${xml(action)}" method="POST"></Gather>`;
+}
+
+/** Presses keys on the other side's phone menu ("w" waits half a second first, so the menu has finished talking). */
+export const press = (digits: string) => `<Play digits="w${xml(digits.replace(/[^0-9*#w]/g, ""))}"/>`;
+
+/** Replaces what a live call is doing with new TwiML (a key press on a menu during a natural call). */
+export async function updateCall(callSid: string, twimlXml: string) {
+  await twilio(`/Calls/${encodeURIComponent(callSid)}.json`, { Twiml: twimlXml });
+}
+
 /** A photo or file a driver texted (MMS), from Twilio's media store. Only Twilio's own addresses are fetched. */
 export async function twilioMedia(url: string): Promise<{ bytes: Buffer; contentType: string } | null> {
   if (!url.startsWith(`${base()}/`) && !url.startsWith(`${API}/`)) return null;

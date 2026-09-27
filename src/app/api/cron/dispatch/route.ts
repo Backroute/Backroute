@@ -1,5 +1,6 @@
 import { admin, dbConfigured, loadContext } from "@/lib/agent/db";
 import { runRounds } from "@/lib/agent/rounds";
+import { flagStuck } from "@/lib/agent/stuck";
 import { retryOutbound } from "@/lib/channels/out";
 import { publicUrl } from "@/lib/channels/twilio";
 
@@ -20,7 +21,8 @@ export async function GET(request: Request) {
   try {
     const retried = await retryOutbound(now);
     if (retried.sent) done.push(`${retried.sent} held-up message${retried.sent === 1 ? "" : "s"} sent`);
-    if (retried.gaveUp) done.push(`${retried.gaveUp} message${retried.gaveUp === 1 ? "" : "s"} too old to send`);
+    if (retried.gaveUp.length) done.push(`${retried.gaveUp.length} message${retried.gaveUp.length === 1 ? "" : "s"} too old to send`);
+    done.push(...(await flagStuck(retried.gaveUp, now)));
   } catch (e) {
     console.error("[cron] retrying messages failed", e);
   }

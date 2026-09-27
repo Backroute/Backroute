@@ -24,6 +24,7 @@ import { BusinessCard, DocumentsCard } from "@/components/cloud/business-card";
 import { OwnerRulesCard } from "@/components/cloud/owner-rules";
 import { ExportsCard } from "@/components/cloud/exports-card";
 import { ConnectionsCard } from "@/components/cloud/connections-card";
+import { HistoryCard } from "@/components/cloud/history-card";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Aggressiveness } from "@/lib/store";
 
@@ -111,6 +112,7 @@ export default function SettingsPage() {
                   <OwnerRulesCard />
                   <DocumentsCard />
                   <ConnectionsCard />
+                  <HistoryCard />
                   <ExportsCard />
                 </>
               )}

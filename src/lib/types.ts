@@ -434,6 +434,8 @@ export interface Load {
   referenceNumber: string;
   stage: LoadStage;
   source: string;
+  /** Real accounts: a finished load from the carrier's own history (Settings, Bring your history), for pricing only. */
+  imported?: boolean;
   brokerId: string;
   lane: Lane;
   equipmentType: EquipmentType;

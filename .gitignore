@@ -44,3 +44,4 @@ next-env.d.ts
 # voice server dependencies
 /voice-server/node_modules
 eval/results.json
+eval/sim-results.json

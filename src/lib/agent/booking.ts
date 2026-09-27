@@ -5,7 +5,7 @@ import type { Item } from "../cloud/rows";
 import { estimateMiles, guessEquipment, makeBroker, makeLoad } from "../fleet";
 import { NEW_LOAD, SLOW_DOCK } from "../channels/phrases";
 import { absoluteUrl } from "../channels/twilio";
-import { canText, textTo } from "../channels/out";
+import { canCall, canText, textTo } from "../channels/out";
 import { formatAtStop, stopLocalToIso } from "../stop-time";
 import type { Broker, Load, Truck } from "../types";
 import type { OfferReading } from "./broker-mail";
@@ -17,7 +17,7 @@ import { callBroker, truckAt } from "./broker-call";
 import { canMakePickup } from "./eld";
 import { askFor, floorFor } from "./pricing";
 import { ourNumbers, respond, withTheirOffer } from "./negotiation";
-import { laneMemory } from "./memory";
+import { brokerMemory, laneMemory } from "./memory";
 import { route } from "./routing";
 import { slowDocks } from "./facilities";
 import { lookalikeOf } from "./fraud";
@@ -59,6 +59,12 @@ export async function brokerFor(ctx: CarrierContext, email: string, name: string
   await save("records", ctx.carrier.id, broker as unknown as Item, "broker");
   ctx.brokers.push(broker);
   return broker;
+}
+
+/** A truck with nothing on it right now: no load it's hauling or heading to. */
+function emptyNow(ctx: Pick<CarrierContext, "trucks" | "loads">, truckId: string | null): boolean {
+  const truck = ctx.trucks.find((t) => t.id === truckId);
+  return !!truck && truck.status === "available" && !ctx.loads.some((l) => l.truckId === truck.id && ["booked", "rate_confirmed", "dispatched", "at_pickup", "in_transit", "at_delivery"].includes(l.stage));
 }
 
 /** The truck that can take a load soonest with the least empty driving, if any. */
@@ -119,7 +125,7 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
     const posted = o.rate ?? 0;
     const draft = { lane: { miles }, listedRate: posted } as Pick<Load, "lane" | "listedRate">;
     const market = await marketRate({ originCity: o.originCity, originState: o.originState, destinationCity: o.destinationCity, destinationState: o.destinationState, equipment });
-    const ask = askFor(draft as Load, ctx.settings, laneMemory(ctx.loads, ctx.brokers, { originState: o.originState, destState: o.destinationState }), market);
+    const ask = askFor(draft as Load, ctx.settings, laneMemory(ctx.loads, ctx.brokers, { originState: o.originState, destState: o.destinationState }), market, brokerMemory(ctx.loads, broker.id));
     const base = makeLoad(
       {
         truckId: fit.truck.id,
@@ -179,7 +185,7 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
       const floor = (l: Load) => floorFor(l, ctx.settings);
       const pick = pickForTruck(ctx, group.filter((l) => floor(l) !== null && l.targetRate >= floor(l)!));
       if (pick) {
-        await requestBooking(ctx, pick, pick.targetRate, { byRules: true });
+        await requestBooking(ctx, pick, pick.targetRate, { byRules: true, callFirst: !!sender.feed && emptyNow(ctx, pick.truckId) });
         asked.push(pick);
       }
     }
@@ -236,9 +242,23 @@ export function pickForTruck(ctx: Pick<CarrierContext, "trucks" | "drivers">, lo
  * Ask the broker to book a load at a price: from the owner's tap (they chose it) or from the rules. The others offered
  * to that truck are set aside, the way picking one load passes on the rest.
  */
-export async function requestBooking(ctx: CarrierContext, load: Load, ask: number, how: { byRules?: boolean; byOwner?: boolean }) {
+export async function requestBooking(ctx: CarrierContext, load: Load, ask: number, how: { byRules?: boolean; byOwner?: boolean; callFirst?: boolean }) {
   const broker = ctx.brokers.find((b) => b.id === load.brokerId);
   const to = load.brokerContactEmail ?? broker?.email;
+  // A truck sitting empty and a board load with a phone number: call now, the way dispatchers cover a load before
+  // someone else does. The email is the fallback when the call can't go.
+  if (how.callFirst && to && broker?.phone && canCall(ctx.carrier)) {
+    const floor = floorFor(load, ctx.settings);
+    if (how.byOwner || (floor !== null && ask >= floor && ctx.settings.autonomy !== "ask")) {
+      const at = new Date().toISOString();
+      const asking: Load = { ...load, stage: "negotiating", targetRate: ask, updatedAt: at, bookRequest: { ask, askedAt: at, status: "sent" } };
+      await save("loads", ctx.carrier.id, asking as unknown as Item);
+      ctx.loads = ctx.loads.map((l) => (l.id === load.id ? asking : l));
+      const url = absoluteUrl(`/api/channels/voice/broker?carrier=${encodeURIComponent(ctx.carrier.id)}&load=${encodeURIComponent(load.id)}`);
+      if (await callBroker(ctx, asking, url)) return "sent" as const;
+      load = asking;
+    }
+  }
   if (!to) {
     // A broker who only works by phone: the AI calls them. With no phone either, support finds a way to reach them.
     const floor = floorFor(load, ctx.settings);
@@ -308,7 +328,7 @@ export async function answerRateReply(ctx: CarrierContext, load: Load, reply: { 
   }
   if (!reply.brokerRate) return false; // Nothing to decide on: the AI's own reply handles it.
   const offer = reply.brokerRate;
-  const move = respond(offer, load, ctx.settings);
+  const move = respond(offer, load, ctx.settings, Date.now(), load.brokerId ? brokerMemory(ctx.loads, load.brokerId) : null);
   if (move.action === "pass" && load.bookRequest?.passedAt) return false; // Already passed; nothing more to say.
   const withOffer: Load = { ...load, updatedAt: at, bookRequest: withTheirOffer(load.bookRequest, ours, offer, "email") };
   await save("loads", ctx.carrier.id, withOffer as unknown as Item);

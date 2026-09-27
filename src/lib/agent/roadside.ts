@@ -5,11 +5,13 @@ import { AI_MODEL, FALLBACK, aiConfigured, claude } from "../ai/server";
 import { SHOP_CAN_HELP, SHOPS_NEAR } from "../channels/phrases";
 import { absoluteUrl } from "../channels/twilio";
 import { callTo, canCall, canEmail, sandboxed, textTo } from "../channels/out";
+import { throughPhoneTree, WANT, type CallReply } from "../channels/ivr";
+import { forCarrier } from "./scope";
 import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import { placeCoords, roadMiles } from "../trip-geo";
 import type { Driver, Load, MessageChannel, Roadside, RoadsideShop, Truck } from "../types";
-import { addActivity, claimMark, logChannel, save, saveDriverMessage, type CarrierContext } from "./db";
+import { addActivity, claimMark, logChannel, save, saveDriverMessage, threadWith, type CarrierContext } from "./db";
 import { event, passToOwner as raise, uid } from "./dispatcher";
 import { sendOrQueue } from "./outbox";
 import * as mail from "./templates";
@@ -280,8 +282,19 @@ export async function nextShop(ctx: CarrierContext, truck: Truck): Promise<boole
 }
 
 /** One turn of a call with a repair shop, by either kind of call: logged and answered. */
-export async function shopCallReply(ctx: CarrierContext, truck: Truck, callSid: string, said: string): Promise<{ reply: string; hangUp: boolean }> {
+export function shopCallReply(ctx: CarrierContext, truck: Truck, callSid: string, said: string): Promise<CallReply> {
+  return forCarrier(ctx.carrier.id, () => shopCallAnswer(ctx, truck, callSid, said));
+}
+
+async function shopCallAnswer(ctx: CarrierContext, truck: Truck, callSid: string, said: string): Promise<CallReply> {
   const key = `shop:${callSid}`;
+  // A shop's phone menu ("for road service, press 2") and hold, before anyone picks up.
+  const earlier = await threadWith(ctx.carrier.id, "voice", key, 40);
+  const tree = await throughPhoneTree(said, WANT.shop, earlier, (direction, body, extra) => logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction, counterparty: key, body, data: { kind: "shop_call", truckId: truck.id, ...extra } }));
+  if (tree) {
+    if (tree.hangUp) await nextShop(ctx, truck);
+    return tree;
+  }
   await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "in", counterparty: key, body: said, data: { kind: "shop_call", truckId: truck.id } });
   const result = await shopCallTurn(ctx, truck, said);
   await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "out", counterparty: key, body: result.reply, data: { kind: "shop_call", truckId: truck.id } });

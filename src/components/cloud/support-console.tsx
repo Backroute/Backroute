@@ -149,6 +149,7 @@ interface Metrics {
   trucks: number;
   week: Window;
   month: Window;
+  costs?: CarrierCost[];
 }
 interface Window {
   handoffs: number;
@@ -157,6 +158,17 @@ interface Window {
   byKind: Partial<Record<keyof typeof PLAYBOOK, number>>;
   medianMinutesToClose: number | null;
   late: number;
+}
+
+interface CarrierCost {
+  carrier: string;
+  trucks: number;
+  aiCalls: number;
+  ai: number;
+  texts: number;
+  emails: number;
+  callTurns: number;
+  total: number;
 }
 
 /** How much still needs people. Hand-offs per truck per week is the number to push down. */
@@ -170,27 +182,76 @@ function Numbers() {
   }, []);
   if (!m) return <p className="text-sm text-ink-500">Loading</p>;
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      {(["week", "month"] as const).map((w) => (
-        <div key={w} className="rounded-2xl border border-line bg-white p-4">
-          <p className="text-sm font-semibold text-ink-950">Last {w === "week" ? "7" : "30"} days</p>
-          <p className="mt-2 text-3xl font-semibold text-ink-950">{m[w].perTruckPerWeek}</p>
-          <p className="text-xs text-ink-500">hand-offs to support per truck per week ({m.trucks} trucks)</p>
-          <p className="mt-3 text-sm text-ink-700">
-            {m[w].handoffs} to support · {m[w].toOwner} to owners · {m[w].late} late
-            {m[w].medianMinutesToClose !== null ? ` · closed in ${m[w].medianMinutesToClose} min (median)` : ""}
-          </p>
-          <ul className="mt-2 text-xs text-ink-600">
-            {Object.entries(m[w].byKind)
-              .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
-              .map(([k, n]) => (
-                <li key={k}>
-                  {PLAYBOOK[k as keyof typeof PLAYBOOK].label}: {n}
-                </li>
+    <div className="flex flex-col gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        {(["week", "month"] as const).map((w) => (
+          <div key={w} className="rounded-2xl border border-line bg-white p-4">
+            <p className="text-sm font-semibold text-ink-950">Last {w === "week" ? "7" : "30"} days</p>
+            <p className="mt-2 text-3xl font-semibold text-ink-950">{m[w].perTruckPerWeek}</p>
+            <p className="text-xs text-ink-500">hand-offs to support per truck per week ({m.trucks} trucks)</p>
+            <p className="mt-3 text-sm text-ink-700">
+              {m[w].handoffs} to support · {m[w].toOwner} to owners · {m[w].late} late
+              {m[w].medianMinutesToClose !== null ? ` · closed in ${m[w].medianMinutesToClose} min (median)` : ""}
+            </p>
+            <ul className="mt-2 text-xs text-ink-600">
+              {Object.entries(m[w].byKind)
+                .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
+                .map(([k, n]) => (
+                  <li key={k}>
+                    {PLAYBOOK[k as keyof typeof PLAYBOOK].label}: {n}
+                  </li>
+                ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <Costs rows={m.costs ?? []} />
+    </div>
+  );
+}
+
+const usd = (n: number) => `$${n.toFixed(2)}`;
+
+/** What each carrier cost to run this month, estimated from the AI's tokens and the texts, emails and calls it sent. */
+function Costs({ rows }: { rows: CarrierCost[] }) {
+  return (
+    <div className="rounded-2xl border border-line bg-white p-4">
+      <p className="text-sm font-semibold text-ink-950">Cost to run, this month</p>
+      <p className="text-xs text-ink-500">Estimates: the AI&apos;s tokens, and texts, emails and call turns sent. Set the COST_* rates in the environment to Backroute&apos;s own.</p>
+      {!rows.length ? (
+        <p className="mt-2 text-sm text-ink-500">Nothing yet this month.</p>
+      ) : (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <thead className="text-xs text-ink-500">
+              <tr>
+                <th className="py-1 font-medium">Carrier</th>
+                <th className="py-1 font-medium">AI</th>
+                <th className="py-1 font-medium">Texts</th>
+                <th className="py-1 font-medium">Emails</th>
+                <th className="py-1 font-medium">Call turns</th>
+                <th className="py-1 font-medium">Total</th>
+                <th className="py-1 font-medium">Per truck</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {rows.map((r) => (
+                <tr key={r.carrier}>
+                  <td className="py-1.5 text-ink-900">{r.carrier}</td>
+                  <td className="py-1.5 text-ink-700">
+                    {usd(r.ai)} <span className="text-xs text-ink-400">({r.aiCalls})</span>
+                  </td>
+                  <td className="py-1.5 text-ink-700">{r.texts}</td>
+                  <td className="py-1.5 text-ink-700">{r.emails}</td>
+                  <td className="py-1.5 text-ink-700">{r.callTurns}</td>
+                  <td className="py-1.5 font-medium text-ink-950">{usd(r.total)}</td>
+                  <td className="py-1.5 text-ink-700">{r.trucks ? usd(r.total / r.trucks) : "·"}</td>
+                </tr>
               ))}
-          </ul>
+            </tbody>
+          </table>
         </div>
-      ))}
+      )}
     </div>
   );
 }

@@ -116,6 +116,23 @@ let conn: Connection | null = null;
 
 const itemKey = (s: Spec, id: string) => `${specKey(s)}/${id}`;
 
+/**
+ * The fields of a load this screen changed since it last had it (added, edited or removed), for the database to merge
+ * into the current row instead of replacing it (supabase/migrations/20261001000000_merge_edits.sql). Null for a load
+ * this screen never had: that one goes in whole.
+ */
+export function changedFields(baseJson: string | undefined, item: Item): string[] | null {
+  if (!baseJson) return null;
+  let base: Record<string, unknown>;
+  try {
+    base = JSON.parse(baseJson) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const keys = new Set([...Object.keys(base), ...Object.keys(item).filter((k) => (item as Record<string, unknown>)[k] !== undefined)]);
+  return [...keys].filter((k) => stable((item as Record<string, unknown>)[k]) !== stable(base[k]));
+}
+
 function remember(c: Connection, s: Spec, item: Item, json = stable(item)) {
   c.last.set(itemKey(s, item.id), { ref: item, json });
   let ids = c.known.get(specKey(s));
@@ -303,7 +320,12 @@ async function flush(c: Connection) {
       };
 
       const now = new Date().toISOString();
-      const rowOf = (i: Item) => rowFor(spec.table, spec.kind, c.carrierId, i, now);
+      const rowOf = (i: Item) => {
+        const row = rowFor(spec.table, spec.kind, c.carrierId, i, now);
+        // A load: only what this screen changed, merged into the current row by the database.
+        const changed = spec.table === "loads" ? changedFields(previous.get(i.id)?.json, i) : null;
+        return changed ? { ...row, data: { ...row.data, _changed: changed } } : row;
+      };
       for (let n = 0; n < changed.length; n += 200) {
         const chunk = changed.slice(n, n + 200);
         if (how === "update") {
