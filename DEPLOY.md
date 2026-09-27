@@ -607,6 +607,20 @@ The code was run against local stand-ins that behave like the real services:
   - The next load from that broker on that lane is priced from what they paid.
   - Nothing is invoiced or texted for old loads.
 - **The simulated week** (`eval/sim.mjs`, scripted): every scenario runs with no hard rule broken, and the money captured stays at 90% or more of what brokers would really pay.
+- **The rest of a dispatcher's job** (49 checks):
+  - **Rate con:** a matching one is signed (the broker's pages plus a signature page) and sent back, and both copies are kept on the load.
+  - **Tracking:** the driver is texted the Macropoint link. Their "yes" turns it on, and the broker is told.
+  - **Dock appointments, by phone:**
+    - A delivery appointment is booked through the receiver's phone menu (it presses "receiving"). Their question is answered, and the time and confirmation number go on the load, to the driver and to the broker.
+    - A pickup move the facility won't make by phone goes to the broker and to support.
+    - Voicemail is tried again later.
+  - **Layover:** a truck held overnight is claimed at the rate con's layover rate, with no hourly detention on top. A late truck claims nothing.
+  - **Broker credit:** a broker under the lowest credit score isn't asked to book, and the owner is told why. A slow payer is asked 4% more.
+  - **Changes after booking:**
+    - An added stop is priced from the extra miles plus stop pay. The broker's yes puts it on the load, and the driver hears.
+    - A reroute is agreed by a revised rate con at the new total.
+  - **Factoring:** the packet has the schedule, the invoice, the rate con and the POD. It covers the line haul, the layover and the agreed extra stop.
+  - **Cargo claim:** it's acknowledged in writing with what the claimant must send. The driver's account goes in the file, and the claim file waits for the owner's OK before going to the insurer.
 - **Access rules:**
   - A stale copy saving one field of a load changes only that field.
   - What carriers cost to run is server-only.
