@@ -66,7 +66,9 @@ export async function signRateCon(ctx: CarrierContext, load: Load, original: Buf
   const bytes = Buffer.from(await doc.save());
   const name = `${load.referenceNumber || "rate-con"}-signed.pdf`.replace(/[^\w.-]+/g, "-");
   const fileId = await storeFile(ctx.carrier.id, { kind: "rate_con_signed", name, contentType: "application/pdf", bytes, loadId: load.id, note: `Signed by ${signer.name}` });
-  const signed: Load = { ...load, rateConSignedAt: now.toISOString(), rateConSignedBy: signer.name, updatedAt: now.toISOString() };
+  // On the load as it is now (the tracking request or anything else saved since the caller read it stays).
+  const current = ctx.loads.find((l) => l.id === load.id) ?? load;
+  const signed: Load = { ...current, rateConSignedAt: now.toISOString(), rateConSignedBy: signer.name, updatedAt: now.toISOString() };
   await save("loads", ctx.carrier.id, signed as unknown as Item);
   ctx.loads = ctx.loads.map((l) => (l.id === load.id ? signed : l));
   return { fileId, name };

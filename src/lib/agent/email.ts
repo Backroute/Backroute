@@ -96,6 +96,7 @@ async function handle(carrierId: string, email: InboundEmail) {
         const saved: RateConPdfReading = { ...reading, fileName: pdf.Name, readAt: new Date().toISOString() };
         const updated: Load = { ...load, rateConReading: saved, updatedAt: saved.readAt };
         await save("loads", carrierId, updated as unknown as Item);
+        ctx.loads = ctx.loads.map((l) => (l.id === updated.id ? updated : l));
         load = updated;
         // The rate con names the broker's MC: check it against FMCSA (and it's how a new broker gets verified). A
         // different MC than the broker we booked with is how double brokering shows up: nothing moves until it's checked.
@@ -128,7 +129,10 @@ async function handle(carrierId: string, email: InboundEmail) {
             const who = booked && truck ? { unit: truck.unitNumber, driver: ctx.drivers.find((d) => d.id === truck.driverId)?.name.split(" ")[0] } : {};
             // The rate con asks for a tracking app: the driver is told what to accept.
             const tracking = booked ? trackingNeed(`${[...reading.otherConcerns, ...reading.finesAndFees, reading.summary].join(" ")}\n${text}`) : null;
-            if (tracking) await askDriverToTrack(ctx, load, tracking);
+            if (tracking) {
+              await askDriverToTrack(ctx, load, tracking);
+              load = ctx.loads.find((l) => l.id === load!.id) ?? load;
+            }
             // Booked on a matching rate con: signed and sent back, the way the broker needs it before the truck rolls.
             const portal = PORTAL_SIGNING.test(text) && /https?:\/\//.test(text);
             const signed = booked && !portal ? await signRateCon(ctx, load, Buffer.from(pdf.Content, "base64"), isPhoto(pdf) ? pdf.ContentType : "application/pdf") : null;
