@@ -25,6 +25,8 @@ export interface TruckPosting {
   availableAt: string;
   destinationState?: string;
   ratePerMile?: number;
+  /** What brokers see on the post: who to call (the AI's line, and which carrier to ask for). */
+  comments?: string;
 }
 
 export class BoardError extends Error {}

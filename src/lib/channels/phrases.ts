@@ -239,5 +239,5 @@ export const OWNER_GREETING: Record<Lang, (carrier: string) => string> = {
 
 /** Someone the line doesn't know: take a message for Backroute support. English and Spanish, like UNKNOWN_NUMBER. */
 export const WHO_IS_CALLING =
-  "This is Backroute's AI dispatch line. This call is transcribed. Who's calling, and what can I help you with? / Esta es la línea de despacho de Backroute. ¿Quién llama y en qué le puedo ayudar?";
+  "This is Backroute's AI dispatch line. This call is transcribed. Who's calling, and which carrier is it for? / Esta es la línea de despacho de Backroute. ¿Quién llama y para qué transportista?";
 export const MESSAGE_TAKEN = "Thanks, I've passed that on. Someone will call you back shortly. / Gracias, ya pasé el mensaje. Le llamarán pronto.";

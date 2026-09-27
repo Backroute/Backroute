@@ -3,12 +3,12 @@ import { dbConfigured, loadContext } from "@/lib/agent/db";
 import { brokerCallReply } from "@/lib/agent/broker-call";
 import { shopCallReply } from "@/lib/agent/roadside";
 import { validVoiceToken } from "@/lib/channels/realtime";
-import { driverCallReply } from "@/lib/channels/voice";
+import { driverCallReply, ownerCallReply } from "@/lib/channels/voice";
 
 export const maxDuration = 30;
 
 const Body = z.object({
-  kind: z.enum(["driver", "broker", "shop"]),
+  kind: z.enum(["driver", "broker", "shop", "owner"]),
   carrier: z.string().min(1),
   ref: z.string().min(1),
   callSid: z.string().min(1),
@@ -37,6 +37,7 @@ export async function POST(request: Request) {
     if (!driver) return Response.json({ reply: "Sorry, I can't find you on file. Please call your carrier.", hangUp: true });
     return Response.json(await driverCallReply(b.carrier, driver, b.callSid, b.said, { realtime: true }));
   }
+  if (b.kind === "owner") return Response.json(await ownerCallReply(b.carrier, b.callSid, b.said, { realtime: true }));
   if (b.kind === "broker") {
     const load = ctx.loads.find((l) => l.id === b.ref);
     if (!load) return Response.json({ reply: "Sorry, I'll follow up by email. Thanks.", hangUp: true });

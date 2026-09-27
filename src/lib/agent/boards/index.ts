@@ -53,6 +53,15 @@ export function whereTrucksFree(ctx: Pick<CarrierContext, "trucks" | "loads" | "
   return out;
 }
 
+/** On the carrier's truck posts: brokers call the AI's line and ask for the carrier (unless the owner wants the calls). */
+function postComment(ctx: CarrierContext): string | undefined {
+  const line = process.env.TWILIO_FROM_NUMBER;
+  if (ctx.settings.postContact === "owner" || !line) return undefined;
+  const d = line.replace(/\D/g, "").slice(-10);
+  const pretty = d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : line;
+  return `Call ${pretty} and ask for ${ctx.carrier.name}. Our dispatch answers 24/7.`;
+}
+
 /** One round on the carrier's boards: search for each free truck (every 30 minutes), post trucks (once a day). */
 export async function runBoards(ctx: CarrierContext, rows: IntegrationRow[], now: number, onStatus: (row: IntegrationRow, status: string) => Promise<void>): Promise<string[]> {
   const done: string[] = [];
@@ -77,7 +86,7 @@ export async function runBoards(ctx: CarrierContext, rows: IntegrationRow[], now
         added += await pullFeed(ctx, loads.slice(0, 25), board.name);
         const wantsPosting = (row.config as TruckstopConfig | DatConfig).postTrucks;
         if (wantsPosting && board.postTruck && (await claimMark(ctx.carrier.id, `truck:${truck.id}`, `board_post:${row.kind}:${day}`)))
-          await board.postTruck({ unitNumber: truck.unitNumber, equipment: truck.equipmentType, originCity: q.originCity, originState: q.originState, availableAt: q.availableFrom, destinationState: q.towardState, ratePerMile: ctx.settings.minRpm });
+          await board.postTruck({ unitNumber: truck.unitNumber, equipment: truck.equipmentType, originCity: q.originCity, originState: q.originState, availableAt: q.availableFrom, destinationState: q.towardState, ratePerMile: ctx.settings.minRpm, comments: postComment(ctx) });
       }
       if (added) done.push(`${added} load${added === 1 ? "" : "s"} from ${board.name}`);
       await onStatus(row, `Connected · last search ${new Date(now).toISOString().slice(11, 16)} UTC, ${found} load${found === 1 ? "" : "s"} seen`);

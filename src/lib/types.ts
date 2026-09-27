@@ -50,6 +50,8 @@ export type EquipmentType = "Dry Van" | "Reefer" | "Flatbed" | "Container";
 
 export interface Broker {
   id: string;
+  /** Real accounts: the language the broker writes in (ISO code, e.g. "fr"), so our emails go in it too. */
+  language?: string;
   /** Set on brokers a carrier added themselves (with a load); the sample brokers have none. */
   carrierId?: string;
   company: string;

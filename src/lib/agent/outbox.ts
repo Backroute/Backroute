@@ -5,6 +5,7 @@ import type { DraftMessage, DraftPurpose, Escalation, Load, OwnerRule } from "..
 import { addActivity, filesById, logChannel, save, type CarrierContext } from "./db";
 import { event, passToOwner } from "./dispatcher";
 import { roundsOf } from "./negotiation";
+import { translateEmail } from "../ai/translate";
 
 /**
  * Every email the AI sends for a carrier goes through here, and the autopilot setting decides whether it goes now or
@@ -48,8 +49,9 @@ export function goesNow(settings: Pick<CarrierContext["settings"], "autonomy" | 
   return settings.autonomy === "rules" && (o.purpose !== "reply" || on("replies"));
 }
 
-/** Sends it, or leaves it for the owner. */
-export async function sendOrQueue(ctx: CarrierContext, o: Outgoing): Promise<"sent" | "queued"> {
+/** Sends it, or leaves it for the owner. To a broker who writes in another language, it goes in theirs. */
+export async function sendOrQueue(ctx: CarrierContext, original: Outgoing): Promise<"sent" | "queued"> {
+  const o = await inTheirLanguage(ctx, original);
   if (emailConfigured() && (o.ownerAsked || goesNow(ctx.settings, o))) {
     await deliver(ctx, { channel: "email", to: o.to, toName: o.toName, subject: o.subject, body: o.body, inReplyTo: o.inReplyTo, purpose: o.purpose, amount: o.amount, attachments: o.attachments }, o.loadId, { auto: true });
     return "sent";
@@ -67,6 +69,18 @@ async function queue(ctx: CarrierContext, o: Outgoing) {
   await save("escalations", ctx.carrier.id, withDraft as unknown as Item);
   const i = ctx.escalations.findIndex((x) => x.id === e.id);
   if (i >= 0) ctx.escalations[i] = withDraft;
+}
+
+/**
+ * A broker who writes in French or Spanish gets our emails in it. The AI's own replies are already written in their
+ * language; template emails are translated, with every amount and reference checked (lib/ai/translate).
+ */
+async function inTheirLanguage(ctx: CarrierContext, o: Outgoing): Promise<Outgoing> {
+  if (o.purpose === "reply") return o;
+  const lang = ctx.brokers.find((b) => b.email?.toLowerCase() === o.to.toLowerCase())?.language;
+  if (!lang || lang === "en") return o;
+  const body = await translateEmail(o.body, lang);
+  return body ? { ...o, body } : o;
 }
 
 const LABEL: Record<DraftPurpose, string> = {

@@ -157,6 +157,14 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
   }
 
   const reading = await readBrokerEmail(email.Subject, text);
+  // Remember the language the broker writes in, so what we send goes in it (lib/agent/outbox).
+  const writer = ctx.brokers.find((b) => b.email?.toLowerCase() === from);
+  const lang = reading?.language?.toLowerCase().slice(0, 2);
+  if (writer && lang && /^[a-z]{2}$/.test(lang) && (writer.language ?? "en") !== lang) {
+    const next = { ...writer, language: lang };
+    await save("records", carrierId, next as unknown as Item, "broker");
+    ctx.brokers = ctx.brokers.map((b) => (b.id === next.id ? next : b));
+  }
   if (reading?.kind === "setup_request") return sendSetupPacket(ctx, { ...sender, contactName: reading.contactName }, text);
   if (reading?.kind === "payment" && reading.payments.length) {
     await recordPayments(ctx, reading.payments, fromName);

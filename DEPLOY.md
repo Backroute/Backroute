@@ -172,7 +172,10 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - On the phone, brokers asking for the carrier packet get it by email. Questions the AI can't answer are noted and support follows up by email.
   - A broker calling back the number the AI called them from reaches the AI, which picks up about that load.
   - The owner can call or text the dispatch line: the AI answers from the fleet data in the owner's language, and passes anything that needs a person to support.
+  - A broker who saw a carrier's truck on a load board calls the dispatch line. The post says to call it and ask for the carrier; the owner can switch that back to their own number in Settings → Your rules. The front desk finds the carrier, takes the load down (lanes, time, equipment, weight, company, MC), checks it fits a truck, and works the price on the same call.
   - Anyone else who calls hears who it is and is asked who's calling; the message goes to the support team's phones.
+  - Brokers who write in French or Spanish (or another language) get our emails in theirs. Template emails are translated, and every amount, load number and MC is checked to have come through exactly; if anything differs, the English goes. The AI's own replies are written in the broker's language.
+  - The owner's calls go through the voice server too, when it's running.
 - **One AI, however people reach it.** A driver's text, call or message in the app, and the owner's text, call or message in the app, all go to the same AI with the same tools. So "I'm loaded" moves the load whichever way it's said. In the app's chat the owner can also answer what's waiting ("send it", "don't"); by text or phone they're pointed to the app, because a phone number can't prove it's them.
 - **Photos:** a driver can text a photo of the BOL, the signed POD or a lumper receipt. It's stored and checked like an upload in the app and put on their load, and a clean POD finishes the delivery so the invoice can go out. A broker's photo of a rate con by email is read like a PDF.
 - **How people really talk:** the AI knows trucking talk (bobtail, deadhead, 34 reset, lumper, TONU, "what's your 20") and what phone transcription does to it ("real fur" is reefer). It handles typos, texting shorthand, all caps, emoji and mixed languages. Phone lines listen for trucking words (Twilio speech hints, Deepgram key terms). A price written as "2,300 dollars" or "$2.3k" is caught by the same guard as "$2,300".
@@ -181,6 +184,7 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
 - **Evening text:** at 6 PM Central the owner gets a text: what was delivered, what it made, how many trucks are rolling, and what needs them.
 - **The log:** every text, call and email in or out is listed in Settings, with what the AI did.
 - **Access rules in the database:** they decide who sees what, so it isn't only the app hiding things. See `supabase/migrations/`.
+  - A driver's app can change only the trip on their own truck's loads: the stage along the trip, times, documents and stops. The rate, broker, invoice and rate con stay as the office and the AI set them, even when a phone saves an old copy (`20260929000000_driver_edits.sql`).
 
 ## What it doesn't do yet
 
@@ -202,11 +206,8 @@ The AI now does the day-to-day work of a dispatcher by email, text and phone. Wh
   - a POD with a shortage written on it
   - A new broker that fails the check always waits.
 - **Miles and ETAs without a routing account** (step 12) come from about 130 freight cities and each state's middle. For a town not on the list, miles are rough, and the AI doesn't send late notices from them.
-- **Brokers who call in about a posted truck** reach the owner's number on the board post. The dispatch line answers drivers, the owner, and brokers calling back the AI; anyone else can leave a message.
-- **Owner calls are turn by turn** (a short pause after each person speaks), even with the voice server running.
 - **Negotiation is by rules, not instinct.** The AI haggles in steps with reasons, but it doesn't read a broker's mood, bluff about other loads, or trade favors across loads the way a long-time dispatcher might. Every number comes from the rules, on purpose, so it can't be talked below the owner's lowest.
 - **Two screens editing the same load at once:** the last save wins, and that includes the AI's own changes.
-- **Driver edits to loads:** a driver can edit any detail of a load on their own truck, not just its stage.
 - **One carrier per person:** a person, or a driver's phone, in two carriers gets the first one.
 
 ## Setting it up
@@ -217,7 +218,7 @@ them in chat. `.env.example` lists every variable.
 ### 1. Supabase: accounts and the database
 
 1. Create a project at supabase.com (region near your drivers, e.g. US East).
-2. In **SQL Editor**, run the files in `supabase/migrations/` in order: `20260924000000_core.sql`, `20260925000000_channels.sql`, `20260926000000_dispatch.sql`, then `20260927000000_support.sql`. With the CLI instead: `supabase link`, then `supabase db push`.
+2. In **SQL Editor**, run the files in `supabase/migrations/` in order: `20260924000000_core.sql`, `20260925000000_channels.sql`, `20260926000000_dispatch.sql`, `20260927000000_support.sql`, `20260928000000_boards.sql`, then `20260929000000_driver_edits.sql`. With the CLI instead: `supabase link`, then `supabase db push`.
 3. From **Project Settings → API**, set:
    - `NEXT_PUBLIC_SUPABASE_URL`: the Project URL.
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: the anon (or publishable) key.

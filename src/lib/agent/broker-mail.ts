@@ -34,6 +34,7 @@ const Reading = z.object({
   cancelReason: z.string().nullable(),
   brokerRpm: z.number().nullable(),
   question: z.string().nullable(),
+  language: z.string().nullable(),
 });
 export type BrokerMailReading = z.infer<typeof Reading>;
 export type OfferReading = z.infer<typeof Offer>;
@@ -48,7 +49,7 @@ Pick the kind:
 - cancellation: the broker is cancelling a load that was booked. Set loadNumber, and cancelReason in a few words.
 - other: anything else.
 
-Only report what the email says; use null for anything it doesn't. Rates are all-in totals in US dollars (if the email gives a rate per mile and the miles, multiply). For pickupLocal and deliveryLocal give YYYY-MM-DDTHH:mm in the stop's local time, only when the email shows the date (today is ${today}). States are two-letter codes. loadNumber is the broker's load or reference number the email is about. contactName is the sender's first name if they sign it. brokerCompany, brokerMc and brokerPhone are the brokerage's name, MC number and the sender's phone number as written in the email or signature, null if not there. brokerRpm is a rate per mile the broker names without the miles (e.g. "2.80 a mile"), else null. question is anything the broker asks besides the price (where the truck is, when it can get there, the MC, equipment, anything else), in a short sentence; null if they don't ask.`;
+Only report what the email says; use null for anything it doesn't. Rates are all-in totals in US dollars (if the email gives a rate per mile and the miles, multiply). For pickupLocal and deliveryLocal give YYYY-MM-DDTHH:mm in the stop's local time, only when the email shows the date (today is ${today}). States are two-letter codes. loadNumber is the broker's load or reference number the email is about. contactName is the sender's first name if they sign it. brokerCompany, brokerMc and brokerPhone are the brokerage's name, MC number and the sender's phone number as written in the email or signature, null if not there. brokerRpm is a rate per mile the broker names without the miles (e.g. "2.80 a mile"), else null. language is the two-letter ISO code of the language the email is written in (en, fr, es...). question is anything the broker asks besides the price (where the truck is, when it can get there, the MC, equipment, anything else), in a short sentence; null if they don't ask.`;
 
 /** What a broker's email is and the facts in it. Null when the AI isn't available or declines. */
 export async function readBrokerEmail(subject: string, text: string): Promise<BrokerMailReading | null> {

@@ -3,12 +3,12 @@ import { aiConfigured } from "../ai/server";
 import { brokerCallBack, carrierById, driverByPhone, loadContext, logChannel, ownerByPhone, threadWith, addActivity } from "../agent/db";
 import { brokerCallBackOpening, brokerCallKey } from "../agent/broker-call";
 import { toE164 } from "../cloud/phone";
-import { alertSupport } from "../agent/support";
+import { deskOpening } from "./desk";
 import { driverTurn, event, ownerTurn, passToOwner } from "../agent/dispatcher";
 import { checkinText } from "../agent/checkins";
 import type { CheckinKind, Driver, Lang } from "../types";
 import { streamTwiml, realtimeFor } from "./realtime";
-import { CHECKIN_CALL, DIDNT_HEAR, GOODBYE, GREETING, MESSAGE_TAKEN, OWNER_GREETING, PASSED_ON_CALL, WHO_IS_CALLING } from "./phrases";
+import { CHECKIN_CALL, DIDNT_HEAR, GOODBYE, GREETING, OWNER_GREETING, PASSED_ON_CALL } from "./phrases";
 import { publicUrl, say, sayAndListen, twiml } from "./twilio";
 
 /**
@@ -94,8 +94,8 @@ export async function driverCallReply(carrierId: string, driver: Driver, callSid
 
 /**
  * Not a driver: the owner (the AI answers from the fleet data), a broker calling back the number the AI called them
- * from (the call picks up about that load), or anyone else (the AI takes a message for support). Nobody gets a
- * recording and a hang-up.
+ * from (the call picks up about that load), or anyone else (the front desk: which carrier, then the load or a
+ * message; lib/channels/desk). Nobody gets a recording and a hang-up.
  */
 async function otherCaller(request: Request, params: Record<string, string>) {
   const from = params.From ?? "";
@@ -104,6 +104,7 @@ async function otherCaller(request: Request, params: Record<string, string>) {
     const lang = (owner.settings.ownerLanguage ?? "en") as Lang;
     const greeting = OWNER_GREETING[lang](owner.name);
     await logChannel({ carrierId: owner.id, channel: "voice", direction: "out", providerId: `${params.CallSid}:greeting`, counterparty: callKey(params.CallSid), body: greeting, data: { kind: "owner_call" } });
+    if (realtimeFor(lang)) return streamTwiml({ kind: "owner", carrier: owner.id, ref: owner.id, callSid: params.CallSid, lang, opening: greeting });
     return twiml(sayAndListen(greeting, lang, publicUrl(request, "/api/channels/voice/owner/turn")));
   }
   const back = await brokerCallBack(toE164(from) ?? from);
@@ -116,10 +117,10 @@ async function otherCaller(request: Request, params: Record<string, string>) {
     if (realtimeFor("en")) return streamTwiml({ kind: "broker", carrier: ctx.carrier.id, ref: load.id, callSid: params.CallSid, lang: "en", opening });
     return twiml(sayAndListen(opening, "en", publicUrl(request, `/api/channels/voice/broker/turn?carrier=${encodeURIComponent(ctx.carrier.id)}&load=${encodeURIComponent(load.id)}`)));
   }
-  return twiml(sayAndListen(WHO_IS_CALLING, "en", publicUrl(request, "/api/channels/voice/message")));
+  return deskOpening(request);
 }
 
-/** The owner's call, one turn at a time. */
+/** The owner's call, one turn at a time (Twilio's speech recognition). */
 export async function ownerNextTurn(request: Request, params: Record<string, string>, missed: number) {
   const owner = await ownerByPhone(params.From ?? "");
   if (!owner) return twiml("<Hangup/>");
@@ -127,23 +128,23 @@ export async function ownerNextTurn(request: Request, params: Record<string, str
   const turnUrl = publicUrl(request, "/api/channels/voice/owner/turn");
   const said = (params.SpeechResult ?? "").trim();
   if (!said) return missed >= 1 ? twiml(`${say(GOODBYE[lang], lang)}<Hangup/>`) : twiml(sayAndListen(DIDNT_HEAR[lang], lang, `${turnUrl}?missed=1`));
-  const key = callKey(params.CallSid);
-  const earlier = await threadWith(owner.id, "voice", key, 16);
-  await logChannel({ carrierId: owner.id, channel: "voice", direction: "in", counterparty: key, body: said, data: { kind: "owner_call" } });
-  const ctx = await loadContext(owner.id);
+  const result = await ownerCallReply(owner.id, params.CallSid, said);
+  return result.hangUp ? twiml(`${say(result.reply, lang)}<Hangup/>`) : twiml(sayAndListen(result.reply, lang, turnUrl));
+}
+
+/** One turn of the owner's call, by either kind of call (turn-by-turn, or the voice server): logged and answered. */
+export async function ownerCallReply(carrierId: string, callSid: string, said: string, data: Record<string, unknown> = {}): Promise<{ reply: string; hangUp: boolean }> {
+  const key = callKey(callSid);
+  const earlier = await threadWith(carrierId, "voice", key, 16);
+  await logChannel({ carrierId, channel: "voice", direction: "in", counterparty: key, body: said, data: { kind: "owner_call", ...data } });
+  const ctx = await loadContext(carrierId);
+  const lang = (ctx?.settings.ownerLanguage ?? "en") as Lang;
   const history = earlier.map((m) => ({ from: m.direction === "in" ? ("them" as const) : ("ai" as const), text: m.body ?? "" }));
   const result = ctx && aiConfigured() ? await ownerTurn(ctx, "voice", said, history) : { reply: "", effects: { done: [], failed: true } as { done: string[]; failed?: boolean; hangUp?: boolean } };
   if (result.effects.failed) {
     if (ctx) await passToOwner(ctx, { reason: `The owner called and said: "${said}". The AI couldn't answer.`, label: "Called back", source: "voice", to: "support" });
-    return twiml(`${say(PASSED_ON_CALL[lang], lang)}<Hangup/>`);
+    return { reply: PASSED_ON_CALL[lang], hangUp: true };
   }
-  await logChannel({ carrierId: owner.id, channel: "voice", direction: "out", counterparty: key, body: result.reply, data: { kind: "owner_call" } });
-  return result.effects.hangUp ? twiml(`${say(result.reply, lang)}<Hangup/>`) : twiml(sayAndListen(result.reply, lang, turnUrl));
-}
-
-/** Someone the line doesn't know left a message: it goes to Backroute support's phones. */
-export async function takeMessage(params: Record<string, string>) {
-  const said = (params.SpeechResult ?? "").trim();
-  if (said) await alertSupport(null, `Call to the dispatch line from ${params.From ?? "unknown"}: "${said.slice(0, 400)}"`).catch((e) => console.error("[voice] message alert failed", e));
-  return twiml(`${say(MESSAGE_TAKEN, "en")}<Hangup/>`);
+  await logChannel({ carrierId, channel: "voice", direction: "out", counterparty: key, body: result.reply, data: { kind: "owner_call" } });
+  return { reply: result.reply, hangUp: !!result.effects.hangUp };
 }

@@ -90,7 +90,7 @@ function bestTruck(ctx: CarrierContext, o: { equipment: Load["equipmentType"]; o
  * Loads a broker emailed: each one that fits a truck becomes an offer on the owner's dashboard. On "Within my rules"
  * or full autopilot, the AI asks to book the best one for each truck if it pays at least the owner's lowest rate.
  */
-export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[], sender: Sender, who: { company?: string | null; mc?: string | null; phone?: string | null; contact?: string | null } = {}): Promise<{ added: Load[]; asked: Load[] }> {
+export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[], sender: Sender, who: { company?: string | null; mc?: string | null; phone?: string | null; contact?: string | null } = {}, opts: { onCall?: boolean } = {}): Promise<{ added: Load[]; asked: Load[] }> {
   let broker = await brokerFor(ctx, sender.from, sender.fromName, who.company);
   if ((who.phone && !broker.phone) || (who.contact && !broker.contact)) {
     broker = { ...broker, phone: broker.phone || who.phone || "", contact: broker.contact || who.contact || "" };
@@ -164,8 +164,9 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
       event({ type: "load_offered", message: `${added.length} load${added.length === 1 ? "" : "s"} from ${broker.company} fit your trucks`, detail: added.map((l) => `${l.lane.origin} → ${l.lane.destination}`).join(" · "), severity: "info" }),
     );
 
-  // Within the rules, the AI asks for the best one per truck on its own.
+  // Within the rules, the AI asks for the best one per truck on its own (unless the broker is on the phone already).
   const asked: Load[] = [];
+  if (opts.onCall) return { added, asked };
   // A board poster with a phone and no MC yet: the AI calls, asks for the MC and checks it before agreeing to book.
   const checkOnCall = !broker.mc && !!broker.phone && !broker.email && !!sender.feed;
   const trusted = assessBroker(broker, ctx.settings.brokerOverrides).policy !== "block" || checkOnCall;

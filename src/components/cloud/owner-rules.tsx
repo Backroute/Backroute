@@ -80,6 +80,13 @@ export function OwnerRulesCard() {
           </div>
           <Switch checked={!!settings.hazmat} onChange={(on) => updateSettings({ hazmat: on })} label="We haul hazmat" />
         </div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-ink-900">Brokers who see my truck posts call the AI</p>
+            <p className="text-xs text-ink-500">Your posts on the load boards say to call the dispatch line and ask for you. Off: they call you.</p>
+          </div>
+          <Switch checked={settings.postContact !== "owner"} onChange={(on) => updateSettings({ postContact: on ? "ai" : "owner" })} label="Brokers who see my truck posts call the AI" />
+        </div>
       </CardContent>
     </Card>
   );

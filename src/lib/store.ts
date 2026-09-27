@@ -710,6 +710,8 @@ export interface AgentSettings {
   tonuFee?: number;
   /** Real accounts: the carrier hauls hazmat (the AI won't book it otherwise). */
   hazmat?: boolean;
+  /** Real accounts: who brokers reach from the carrier's truck posts: the AI's line (default) or the owner. */
+  postContact?: "ai" | "owner";
 }
 
 export interface LiveMetrics {

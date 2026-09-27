@@ -104,6 +104,15 @@ export async function ownerByPhone(phone: string): Promise<CarrierRow | null> {
   return (data?.[0] as CarrierRow | undefined) ?? null;
 }
 
+/** Carriers whose name matches what a caller said ("Titan", "Titan Freight"), for the shared dispatch line. */
+export async function carriersNamed(name: string): Promise<CarrierRow[]> {
+  const q = name.replace(/\b(llc|inc|co|corp|ltd|trucking|transport|logistics)\b\.?/gi, "").replace(/[%_,.]/g, " ").trim().replace(/\s+/g, " ");
+  if (q.length < 3) return [];
+  const { data, error } = await admin().from("carriers").select("id, name, mc, owner_operator, owner_phone, inbound_key, settings").ilike("name", `%${q}%`).limit(3);
+  if (error) throw error;
+  return (data ?? []) as CarrierRow[];
+}
+
 /** A broker calling back the number the AI called them from: which carrier and load that call was about. */
 export async function brokerCallBack(phone: string): Promise<{ carrierId: string; loadId: string } | null> {
   const { data, error } = await admin()

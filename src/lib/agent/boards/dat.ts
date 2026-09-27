@@ -123,6 +123,7 @@ export function datBoard(userEmail: string): Board {
           destination: t.destinationState ? { area: { states: [t.destinationState] } } : { open: {} },
           availability: { earliestWhen: t.availableAt, latestWhen: new Date(Date.parse(t.availableAt) + 86400_000).toISOString() },
           referenceId: t.unitNumber,
+          ...(t.comments ? { comments: [{ comment: t.comments }] } : {}),
         }),
       })) as { assetId?: string };
       return posted.assetId ?? null;
