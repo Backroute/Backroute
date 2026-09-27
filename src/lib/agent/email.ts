@@ -12,7 +12,7 @@ import { answerRateReply, bookIt, offersFromEmail, type Sender } from "./booking
 import { sendOrQueue } from "./outbox";
 import * as mail from "./templates";
 import { sendSetupPacket } from "./paperwork";
-import { doubleBrokered, paymentScam } from "./fraud";
+import { doubleBrokered, lookalikeOf, paymentScam } from "./fraud";
 import { checkBroker } from "./brokers";
 import { cancelLoad } from "./cancel";
 import { recordPayments } from "./money";
@@ -47,6 +47,9 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
     (broker ? ctx.loads.filter((l) => l.brokerId === broker.id && ACTIVE.has(l.stage)).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0] : undefined);
 
   const notes: string[] = [];
+  // Someone posing as a broker (a lookalike address, or already marked high risk) gets no automatic note: support
+  // deals with them.
+  const suspect = () => !!lookalikeOf(from, ctx.brokers.filter((b) => b.email?.toLowerCase() !== from)) || ctx.brokers.some((b) => b.email?.toLowerCase() === from && b.fraudRisk === "high");
   // Set when the email has had its answer from a template (a rate con thanks or fix), so the AI doesn't write another.
   let replied = false;
   const pdfs = (email.Attachments ?? []).filter((a) => (a.ContentType === "application/pdf" || /\.pdf$/i.test(a.Name)) && a.ContentLength <= 10 * 1024 * 1024);
@@ -129,7 +132,8 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
   // The rate con was the whole email: it's been answered.
   if (replied && !text.includes("?")) return;
 
-  const holdingReply = () =>
+  const holdingReply = async () =>
+    !suspect() &&
     sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: mail.holding(ctx.carrier, ctx.settings, load?.referenceNumber ?? null, fromName), inReplyTo: sender.messageId, loadId: load?.id, withinRules: true, why: `Tell ${fromName} you'll get back to them?` });
 
   if (!aiConfigured()) {
@@ -165,7 +169,7 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
     if (!added.length) {
       await addActivity(carrierId, event({ type: "load_offered", message: `${fromName} sent ${reading.offers.length} load${reading.offers.length === 1 ? "" : "s"}; none fit a free truck`, detail: email.Subject, severity: "info" }));
       // A quick "not today, here's what we run", once a day per broker, so they keep sending the right freight.
-      if (await claimMark(carrierId, `broker:${from}`, `nofit:${new Date().toISOString().slice(0, 10)}`)) {
+      if (!suspect() && (await claimMark(carrierId, `broker:${from}`, `nofit:${new Date().toISOString().slice(0, 10)}`))) {
         const plural: Record<string, string> = { "Dry Van": "dry vans", Reefer: "reefers", Flatbed: "flatbeds", Container: "container chassis" };
         const equipment = [...new Set(ctx.trucks.map((t) => plural[t.equipmentType] ?? t.equipmentType.toLowerCase()))];
         const around = [...new Set(ctx.trucks.map((t) => `${t.currentCity}, ${t.currentState}`))].slice(0, 3);
