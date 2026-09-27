@@ -1,7 +1,7 @@
 import "server-only";
 import { assessBroker } from "../broker-policy";
 import { homeTimeStatus } from "../home";
-import { emailConfigured } from "../channels/email";
+import { canEmail } from "../channels/out";
 import { formatAtStop } from "../stop-time";
 import { whereTrucksFree } from "./boards";
 import { claimMark, type CarrierContext } from "./db";
@@ -19,7 +19,7 @@ const DAY = 86400_000;
 const PER_TRUCK = 4;
 
 export async function offerCapacity(ctx: CarrierContext, now: number): Promise<string[]> {
-  if (ctx.settings.autonomy === "ask" || !emailConfigured()) return [];
+  if (ctx.settings.autonomy === "ask" || !canEmail(ctx.carrier)) return [];
   const done: string[] = [];
   const day = new Date(now).toISOString().slice(0, 10);
   for (const { truck, q } of whereTrucksFree(ctx, now)) {

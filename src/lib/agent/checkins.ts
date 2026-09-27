@@ -2,7 +2,7 @@ import "server-only";
 import { LANG_INFO } from "../lang/pack";
 import { toE164 } from "../cloud/phone";
 import { CHECKIN, DRIVER_SILENT } from "../channels/phrases";
-import { canCallOut, sendSms, startCall } from "../channels/twilio";
+import { callTo, canCall, textTo } from "../channels/out";
 import { formatAtStop, hourAtStop } from "../stop-time";
 import type { CheckinKind, Driver, Load, LoadStage } from "../types";
 import { addActivity, claimMark, heardFrom, logChannel, releaseMark, saveDriverMessage, type CarrierContext } from "./db";
@@ -116,16 +116,16 @@ export async function runCheckins(ctx: CarrierContext, marks: Map<string, { at: 
       const text = checkinText(kind, load, driver);
       const first = driver.name.split(" ")[0];
       const stopState = kind.startsWith("pickup") || kind === "before_pickup" ? load.lane.originState : load.lane.destState;
-      const callOk = canCallOut() && !!phone && (driver.prefs?.noCallsBefore === undefined || hourAtStop(stopState, now) >= driver.prefs.noCallsBefore);
+      const callOk = canCall(ctx.carrier) && !!phone && (driver.prefs?.noCallsBefore === undefined || hourAtStop(stopState, now) >= driver.prefs.noCallsBefore);
 
       if (silent || driver.prefs?.smsOptOut) {
         if (callOk) {
-          const sid = await startCall(phone!, callUrl(load.id, kind));
+          const sid = await callTo(ctx.carrier, phone!, callUrl(load.id, kind), { kind: "checkin", ref: `${load.id}:${kind}`, opening: text });
           await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "out", providerId: sid ? `${sid}:dial` : null, driverId: driver.id, counterparty: phone, body: `Calling ${first}: ${text}`, data: { kind: "checkin", checkin: kind, loadId: load.id } });
           done.push(`${load.referenceNumber}: called ${first} (${kind})`);
         }
       } else if (phone) {
-        const sid = await sendSms(phone, text);
+        const sid = await textTo(ctx.carrier, phone, text);
         await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: new Date(now).toISOString(), channel: "sms", ai: true });
         await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: phone, body: text, data: { kind: "checkin", checkin: kind, loadId: load.id } });
         done.push(`${load.referenceNumber}: texted ${first} (${kind})`);
@@ -139,7 +139,7 @@ export async function runCheckins(ctx: CarrierContext, marks: Map<string, { at: 
         // notification setting. A missing POD only comes by text if they asked for texts.
         if (owner && (kind !== "pod_silent" || ctx.settings.notifySms)) {
           const note = DRIVER_SILENT[ctx.settings.ownerLanguage ?? "en"](first, load.referenceNumber);
-          const sid = await sendSms(owner, note);
+          const sid = await textTo(ctx.carrier, owner, note);
           await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, counterparty: owner, body: note, data: { kind: "owner_alert", loadId: load.id } });
         }
         done.push(`${load.referenceNumber}: told the owner (${kind})`);

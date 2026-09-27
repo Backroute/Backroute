@@ -1,5 +1,5 @@
 import "server-only";
-import { emailConfigured, sendEmail } from "../channels/email";
+import { canEmail, emailTo } from "../channels/out";
 import type { Item } from "../cloud/rows";
 import type { DraftMessage, DraftPurpose, Escalation, Load, OwnerRule } from "../types";
 import { addActivity, filesById, logChannel, save, type CarrierContext } from "./db";
@@ -52,7 +52,7 @@ export function goesNow(settings: Pick<CarrierContext["settings"], "autonomy" | 
 /** Sends it, or leaves it for the owner. To a broker who writes in another language, it goes in theirs. */
 export async function sendOrQueue(ctx: CarrierContext, original: Outgoing): Promise<"sent" | "queued"> {
   const o = await inTheirLanguage(ctx, original);
-  if (emailConfigured() && (o.ownerAsked || goesNow(ctx.settings, o))) {
+  if (canEmail(ctx.carrier) && (o.ownerAsked || goesNow(ctx.settings, o))) {
     await deliver(ctx, { channel: "email", to: o.to, toName: o.toName, subject: o.subject, body: o.body, inReplyTo: o.inReplyTo, purpose: o.purpose, amount: o.amount, attachments: o.attachments }, o.loadId, { auto: true });
     return "sent";
   }
@@ -119,7 +119,7 @@ const WHAT: Record<DraftPurpose, string> = {
 export async function deliver(ctx: CarrierContext, draft: DraftMessage, loadId: string | undefined, how: { auto?: boolean; approved?: boolean }) {
   const ids = (draft.attachments ?? []).map((a) => a.fileId);
   const files = (await filesById(ctx.carrier.id, ids)).sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
-  const id = await sendEmail({
+  const id = await emailTo(ctx.carrier, {
     to: draft.to,
     subject: draft.subject ?? "",
     text: draft.body,

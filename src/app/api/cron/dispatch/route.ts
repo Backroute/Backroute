@@ -1,87 +1,37 @@
-import { admin, dbConfigured, loadContext, marksFor } from "@/lib/agent/db";
-import { runCheckins } from "@/lib/agent/checkins";
-import { expireOffers, sendDetentionClaims, sendInvoices, warnCoiExpiring } from "@/lib/agent/paperwork";
-import { emailConfigured } from "@/lib/channels/email";
-import { chasePayments } from "@/lib/agent/money";
-import { followUpByPhone } from "@/lib/agent/broker-call";
-import { applyEld, checkCalls, lateNotices, readEld } from "@/lib/agent/eld";
-import { pullFeed, readFeed } from "@/lib/agent/feeds";
-import { integrationsFor, setStatus, type EldConfig, type FeedConfig } from "@/lib/agent/integrations";
-import { isBoard, runBoards } from "@/lib/agent/boards";
-import { offerCapacity } from "@/lib/agent/capacity";
-import { suggestRepositions } from "@/lib/agent/reposition";
-import { complianceReminders } from "@/lib/agent/compliance";
-import { refreshPlans } from "@/lib/agent/plan";
-import { trackHomeTime, weeklyCare } from "@/lib/agent/care";
-import { publicUrl, twilioConfigured } from "@/lib/channels/twilio";
+import { admin, dbConfigured, loadContext } from "@/lib/agent/db";
+import { runRounds } from "@/lib/agent/rounds";
+import { retryOutbound } from "@/lib/channels/out";
+import { publicUrl } from "@/lib/channels/twilio";
 
 export const maxDuration = 300;
 
 /**
- * The AI dispatcher's rounds, every few minutes: check-ins with drivers and following up when they go quiet,
- * invoices once the POD is in, detention claims, payment reminders, calling brokers who didn't answer, reading the
- * ELD and load feeds, telling brokers early when a truck will be late, and clearing old offers off the board.
- * Needs a scheduler that runs more than once a day (see DEPLOY.md). It sends CRON_SECRET as a bearer token.
+ * The AI dispatcher's rounds, every few minutes, for every carrier (lib/agent/rounds), after sending again anything
+ * a provider outage held up. Needs a scheduler that runs more than once a day (see DEPLOY.md). It sends CRON_SECRET
+ * as a bearer token.
  */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
   if (!dbConfigured()) return Response.json({ done: [], reason: "not_set_up" });
 
-  const { data: carriers, error } = await admin().from("carriers").select("id");
-  if (error) return Response.json({ error: error.message }, { status: 500 });
   const now = Date.now();
-  const callUrl = (loadId: string, kind: string) => publicUrl(request, `/api/channels/voice/checkin?load=${encodeURIComponent(loadId)}&kind=${kind}`);
   const done: string[] = [];
+  try {
+    const retried = await retryOutbound(now);
+    if (retried.sent) done.push(`${retried.sent} held-up message${retried.sent === 1 ? "" : "s"} sent`);
+    if (retried.gaveUp) done.push(`${retried.gaveUp} message${retried.gaveUp === 1 ? "" : "s"} too old to send`);
+  } catch (e) {
+    console.error("[cron] retrying messages failed", e);
+  }
+
+  const { data: carriers, error } = await admin().from("carriers").select("id");
+  if (error) return Response.json({ error: error.message, done }, { status: 500 });
+  const base = publicUrl(request, "");
   for (const { id } of carriers ?? []) {
     try {
       const ctx = await loadContext(id);
-      if (!ctx) continue;
-      if (twilioConfigured()) {
-        done.push(...(await runCheckins(ctx, await marksFor(id), now, callUrl)));
-        done.push(...(await followUpByPhone(ctx, now, (loadId) => publicUrl(request, `/api/channels/voice/broker?carrier=${encodeURIComponent(id)}&load=${encodeURIComponent(loadId)}`))));
-      }
-      if (emailConfigured()) {
-        done.push(...(await sendInvoices(ctx)));
-        done.push(...(await sendDetentionClaims(ctx, now)));
-        done.push(...(await chasePayments(ctx, now)));
-      }
-      // Connections, in order: the ELD first (where trucks are, drivers' hours), then load feeds and load boards,
-      // which search from where the trucks now are.
-      const links = await integrationsFor(id);
-      for (const link of links.filter((l) => l.kind === "samsara" || l.kind === "motive")) {
-        const kind = link.kind as "samsara" | "motive";
-        try {
-          const applied = await applyEld(ctx, kind, await readEld(kind, (link.config as EldConfig).apiKey));
-          await setStatus(id, kind, `Connected · ${applied.trucks} trucks, ${applied.drivers} drivers updated`);
-        } catch (e) {
-          await setStatus(id, kind, `Not working: ${e instanceof Error ? e.message : "error"}`);
-        }
-      }
-      for (const link of links.filter((l) => l.kind === "load_feed")) {
-        try {
-          const cfg = link.config as FeedConfig;
-          const added = await pullFeed(ctx, await readFeed(cfg), cfg.name ?? "Load feed");
-          if (added) done.push(`${added} load${added === 1 ? "" : "s"} from ${cfg.name ?? "the load feed"}`);
-          await setStatus(id, "load_feed", `Connected · last read ${new Date(now).toISOString().slice(11, 16)} UTC`);
-        } catch (e) {
-          await setStatus(id, "load_feed", `Not working: ${e instanceof Error ? e.message : "error"}`);
-        }
-      }
-      done.push(...(await runBoards(ctx, links.filter((l) => isBoard(l.kind)), now, (row, status) => setStatus(id, row.kind, status))));
-      done.push(...(await offerCapacity(ctx, now)));
-      done.push(...(await suggestRepositions(ctx, now)));
-      done.push(...(await complianceReminders(ctx, now)));
-      done.push(...(await trackHomeTime(ctx, now)));
-      done.push(...(await weeklyCare(ctx, now)));
-      await refreshPlans(ctx, now);
-      if (emailConfigured()) {
-        done.push(...(await lateNotices(ctx, now)));
-        done.push(...(await checkCalls(ctx, now)));
-      }
-      const expired = await expireOffers(ctx, now);
-      if (expired) done.push(`${expired} old offer${expired === 1 ? "" : "s"} taken off the board`);
-      await warnCoiExpiring(ctx, now);
+      if (ctx) done.push(...(await runRounds(ctx, now, ctx.settings.sandbox ? null : base)));
     } catch (e) {
       console.error("[cron] dispatch rounds failed for", id, e);
     }

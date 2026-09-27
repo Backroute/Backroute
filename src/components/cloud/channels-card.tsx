@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Check, Copy, Mail, MessageSquare, Minus, Phone, Sparkles, Sunset } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { authHeader } from "@/lib/ai/client";
 import { formatPhone } from "@/lib/cloud/phone";
@@ -12,8 +13,11 @@ import { cn } from "@/lib/utils";
 interface Status {
   channels: { ai: boolean; server: boolean; sms: boolean; voice: boolean; email: boolean; dailyText: boolean; number: string | null };
   inboundEmail?: string | null;
-  log?: { channel: "sms" | "voice" | "email"; direction: "in" | "out"; counterparty: string | null; body: string | null; created_at: string; data: { subject?: string } }[];
+  log?: { channel: "sms" | "voice" | "email"; direction: "in" | "out"; counterparty: string | null; body: string | null; created_at: string; data: { subject?: string }; provider_id?: string | null }[];
+  outbound?: { channel: "sms" | "voice" | "email"; recipient: string; subject: string | null; body: string | null; status: "held" | "retry" | "gave_up"; data: { kind?: string }; created_at: string }[];
 }
+
+const who = (to: string | null | undefined) => (!to ? "" : to.startsWith("call:") ? "Call" : to.includes("@") ? to : formatPhone(to));
 
 const ICON = { sms: MessageSquare, voice: Phone, email: Mail };
 
@@ -23,6 +27,8 @@ const ICON = { sms: MessageSquare, voice: Phone, email: Mail };
  */
 export function ChannelsCard() {
   const carrierId = useStore((s) => s.session.carrierId);
+  const practice = useStore((s) => !!s.settings.sandbox);
+  const updateSettings = useStore((s) => s.actions.updateSettings);
   const [status, setStatus] = useState<Status | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -61,6 +67,7 @@ export function ChannelsCard() {
         <CardDescription>How the AI dispatcher reaches your drivers and brokers. It says it&apos;s an AI, and anything it would promise a broker waits for your OK.</CardDescription>
       </CardHeader>
       <CardContent className="!pt-3 flex flex-col gap-4">
+        <PracticeMode on={practice} onChange={(on) => updateSettings({ sandbox: on })} held={(status?.outbound ?? []).filter((m) => m.status === "held")} />
         <ul className="flex flex-col divide-y divide-line rounded-2xl border border-line">
           {rows.map((r) => (
             <li key={r.label} className="flex items-center justify-between gap-3 px-4 py-3">
@@ -103,12 +110,13 @@ export function ChannelsCard() {
             <ul className="mt-1.5 flex flex-col gap-1.5">
               {status.log.slice(0, 20).map((m, n) => {
                 const Icon = ICON[m.channel];
-                const who = m.counterparty?.startsWith("call:") ? "Call" : m.counterparty?.includes("@") ? m.counterparty : m.counterparty ? formatPhone(m.counterparty) : "";
+                const held = !!m.provider_id?.startsWith("held:");
                 return (
                   <li key={n} className="flex items-start gap-2 text-xs">
                     <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-400" />
                     <span className="min-w-0 flex-1 text-ink-700">
-                      <span className="font-medium text-ink-900">{m.direction === "in" ? who : `AI → ${who}`}</span>{" "}
+                      <span className="font-medium text-ink-900">{m.direction === "in" ? who(m.counterparty) : `AI → ${who(m.counterparty)}`}</span>{" "}
+                      {held && <span className="mr-1 rounded bg-ink-100 px-1 py-0.5 text-[10px] font-medium text-ink-600">not sent: practice</span>}
                       <span className="text-ink-500">{m.data?.subject ? `${m.data.subject}: ` : ""}{(m.body ?? "").slice(0, 140)}</span>
                     </span>
                     <span className="shrink-0 text-ink-400">
@@ -120,7 +128,80 @@ export function ChannelsCard() {
             </ul>
           )}
         </div>
+        <Undelivered items={(status?.outbound ?? []).filter((m) => m.status !== "held")} />
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Practice mode: the AI reads everything and decides as usual, but nothing leaves. What it would have sent shows
+ * here, so an owner can compare it with what they actually did before letting it talk to anyone.
+ */
+function PracticeMode({ on, onChange, held }: { on: boolean; onChange: (on: boolean) => void; held: NonNullable<Status["outbound"]> }) {
+  return (
+    <div className={cn("rounded-2xl border px-4 py-3", on ? "border-ink-900" : "border-line")}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-ink-900">Practice mode</p>
+          <p className="text-xs text-ink-500">
+            The AI reads your broker email and does its whole job, but sends nothing: no texts, emails or calls. Keep dispatching as you do today and compare.
+          </p>
+        </div>
+        <Switch checked={on} onChange={onChange} label="Practice mode" />
+      </div>
+      {on && (
+        <div className="mt-3">
+          <p className="text-xs font-medium text-ink-700">What the AI would have sent</p>
+          {!held.length ? (
+            <p className="mt-1.5 text-xs text-ink-400">Nothing yet. Forward your broker emails to the address below and it starts working.</p>
+          ) : (
+            <ul className="mt-1.5 flex flex-col gap-2">
+              {held.slice(0, 15).map((m, n) => {
+                const Icon = ICON[m.channel];
+                return (
+                  <li key={n} className="flex items-start gap-2 text-xs">
+                    <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-400" />
+                    <span className="min-w-0 flex-1 text-ink-700">
+                      <span className="font-medium text-ink-900">{m.channel === "voice" ? `Would call ${who(m.recipient)}` : `To ${who(m.recipient)}`}</span>{" "}
+                      <span className="whitespace-pre-line text-ink-500">{m.subject ? `${m.subject}: ` : ""}{(m.body ?? "").slice(0, 400)}</span>
+                    </span>
+                    <span className="shrink-0 text-ink-400">
+                      <TimeAgo iso={m.created_at} />
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Texts and emails a provider outage held up: being sent again, or too old to still send. */
+function Undelivered({ items }: { items: NonNullable<Status["outbound"]> }) {
+  if (!items.length) return null;
+  return (
+    <div>
+      <p className="text-xs font-medium text-ink-700">Not delivered yet</p>
+      <ul className="mt-1.5 flex flex-col gap-1.5">
+        {items.slice(0, 10).map((m, n) => (
+          <li key={n} className="flex items-start gap-2 text-xs">
+            <span className={cn("shrink-0 rounded px-1 py-0.5 text-[10px] font-medium", m.status === "retry" ? "bg-ink-100 text-ink-600" : "bg-red-50 text-red-700")}>
+              {m.status === "retry" ? "sending again" : "not sent"}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-ink-600">
+              To {who(m.recipient)}: {m.subject ? `${m.subject}: ` : ""}
+              {(m.body ?? "").slice(0, 120)}
+            </span>
+            <span className="shrink-0 text-ink-400">
+              <TimeAgo iso={m.created_at} />
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

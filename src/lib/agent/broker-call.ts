@@ -5,7 +5,7 @@ import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { BetaRunnableTool } from "@anthropic-ai/sdk/lib/tools/BetaRunnableTool";
 import { AI_MODEL, FALLBACK, aiConfigured, claude } from "../ai/server";
 import { inboundAddress } from "../channels/email";
-import { canCallOut, startCall } from "../channels/twilio";
+import { callTo, canCall, sandboxed } from "../channels/out";
 import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import type { Load } from "../types";
@@ -52,9 +52,9 @@ export const brokerCallKey = (callSid: string) => `broker-call:${callSid}`.toLow
 export async function callBroker(ctx: CarrierContext, load: Load, url: string | null): Promise<boolean> {
   const broker = ctx.brokers.find((b) => b.id === load.brokerId);
   const to = broker?.phone ? toE164(broker.phone) : null;
-  if (!to || !url || !canCallOut()) return false;
+  if (!to || (!url && !sandboxed(ctx.carrier)) || !canCall(ctx.carrier)) return false;
   if (!(await claimMark(ctx.carrier.id, load.id, "broker_call"))) return false;
-  const sid = await startCall(to, url, { machineDetection: true });
+  const sid = await callTo(ctx.carrier, to, url, { kind: "broker_call", ref: load.id, opening: brokerCallOpening(ctx, load), machineDetection: true });
   await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "out", providerId: sid ? `${sid}:dial` : null, counterparty: to, body: `Calling ${broker!.company} about ${load.referenceNumber}`, data: { kind: "broker_call", loadId: load.id } });
   await addActivity(ctx.carrier.id, event({ type: "call_started", loadId: load.id, message: `AI is calling ${broker!.company}`, detail: `${load.referenceNumber} · asking $${(load.bookRequest?.ask ?? load.targetRate).toLocaleString()}`, severity: "info" }));
   return true;

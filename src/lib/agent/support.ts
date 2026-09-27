@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
-import { sendSms, twilioConfigured } from "../channels/twilio";
+import { canText, textTo, type Sender } from "../channels/out";
 import { admin, logChannel } from "./db";
 
 /**
@@ -34,11 +34,11 @@ const phones = () =>
     .filter(Boolean);
 
 /** Texts the support team about something urgent at a carrier. Quietly does nothing when no phones are set. */
-export async function alertSupport(carrierId: string | null, text: string) {
-  if (!twilioConfigured()) return;
+export async function alertSupport(carrier: Sender | null, text: string) {
+  if (!canText(carrier)) return;
   for (const to of phones()) {
-    const sid = await sendSms(to, text);
+    const sid = await textTo(carrier, to, text);
     // A caller the line doesn't know has no carrier to log it under; the text itself is the record.
-    if (carrierId) await logChannel({ carrierId, channel: "sms", direction: "out", providerId: sid ?? null, counterparty: to, body: text, data: { kind: "support_alert" } }).catch(() => {});
+    if (carrier) await logChannel({ carrierId: carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, counterparty: to, body: text, data: { kind: "support_alert" } }).catch(() => {});
   }
 }

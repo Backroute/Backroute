@@ -2,7 +2,7 @@ import { z } from "zod";
 import { dbConfigured, loadContext } from "@/lib/agent/db";
 import { decideItem } from "@/lib/agent/decide";
 import { asUser } from "@/lib/agent/user";
-import { emailConfigured } from "@/lib/channels/email";
+import { canEmail } from "@/lib/channels/out";
 import type { Escalation, Load } from "@/lib/types";
 
 const Body = z.object({ escalationId: z.string().min(1), send: z.boolean(), body: z.string().trim().min(1).max(20000).optional() });
@@ -24,9 +24,9 @@ export async function POST(request: Request) {
   const escalation = row.data as Escalation;
   if (!escalation.draft || escalation.status === "resolved") return Response.json({ error: "nothing_to_send" }, { status: 409 });
 
-  if (parsed.data.send && !emailConfigured()) return Response.json({ error: "email_off" }, { status: 503 });
   const ctx = await loadContext(carrierId);
   if (!ctx) return Response.json({ error: "not_found" }, { status: 404 });
+  if (parsed.data.send && !canEmail(ctx.carrier)) return Response.json({ error: "email_off" }, { status: 503 });
   const updated = await decideItem(ctx, escalation, parsed.data.send, parsed.data.body);
   const load: Load | undefined = parsed.data.send ? ctx.loads.find((l) => l.id === escalation.loadId) : undefined;
   return Response.json({ escalation: updated, loads: load ? [load] : [] });

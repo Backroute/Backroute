@@ -3,7 +3,7 @@ import { dbConfigured, loadContext } from "@/lib/agent/db";
 import { requestBooking } from "@/lib/agent/booking";
 import { askFor, floorFor } from "@/lib/agent/pricing";
 import { caller } from "@/lib/agent/user";
-import { emailConfigured } from "@/lib/channels/email";
+import { canEmail } from "@/lib/channels/out";
 
 const Body = z.object({ loadId: z.string().min(1), ask: z.number().positive().max(100000).optional() });
 
@@ -17,11 +17,10 @@ export async function POST(request: Request) {
   if (!who || who.me.role === "driver") return Response.json({ error: "sign_in" }, { status: 401 });
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "bad_request" }, { status: 400 });
-  if (!emailConfigured()) return Response.json({ error: "email_off" }, { status: 503 });
-
   const ctx = await loadContext(who.me.carrierId);
   const load = ctx?.loads.find((l) => l.id === parsed.data.loadId);
   if (!ctx || !load) return Response.json({ error: "not_found" }, { status: 404 });
+  if (!canEmail(ctx.carrier)) return Response.json({ error: "email_off" }, { status: 503 });
   if (load.stage !== "offered") return Response.json({ error: "not_offered" }, { status: 409 });
   // The price the owner saw on the offer, unless the lowest rate was raised since: never under the floor.
   const floor = floorFor(load, ctx.settings) ?? 0;

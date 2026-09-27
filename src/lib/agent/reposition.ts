@@ -1,6 +1,6 @@
 import "server-only";
 import { REPOSITION } from "../channels/phrases";
-import { sendSms, twilioConfigured } from "../channels/twilio";
+import { canText, textTo } from "../channels/out";
 import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import { estimateMiles } from "../fleet";
@@ -63,14 +63,14 @@ export async function suggestRepositions(ctx: CarrierContext, now: number): Prom
     const driver = ctx.drivers.find((d) => d.id === truck.driverId);
     const goes = ctx.settings.autonomy === "full" && best.miles <= limit / 2;
     const why = `Truck ${truck.unitNumber} has been empty in ${truck.currentCity}, ${truck.currentState} for ${hours} hours with no load that fits. ${best.city}, ${best.state} is ${best.miles} miles away and ${best.loads} of your loads came out of it in the last 3 weeks.`;
-    if (goes && driver && twilioConfigured() && !driver.prefs?.smsOptOut) {
+    if (goes && driver && canText(ctx.carrier) && !driver.prefs?.smsOptOut) {
       const next: Truck = { ...truck, repositionTo: { city: best.city, state: best.state, at: new Date(now).toISOString() } };
       await save("trucks", ctx.carrier.id, next as unknown as Item);
       ctx.trucks = ctx.trucks.map((t) => (t.id === truck.id ? next : t));
       const to = toE164(driver.phone);
       if (to) {
         const text = REPOSITION[driver.prefs?.language ?? "en"]({ city: `${best.city}, ${best.state}`, miles: best.miles });
-        const sid = await sendSms(to, text);
+        const sid = await textTo(ctx.carrier, to, text);
         await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: new Date(now).toISOString(), channel: "sms", ai: true });
         await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: to, body: text, data: { kind: "reposition" } });
       }

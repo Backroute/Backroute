@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { CloudOff, Loader2 } from "lucide-react";
@@ -126,6 +127,7 @@ function ReadyOrSetUp({ area, children }: { area: Area; children: React.ReactNod
   const empty = useStore((s) => s.session.mode === "office" && s.trucks.length === 0);
   const solo = useStore((s) => s.settings.ownerOperator);
   const addToFleet = useStore((s) => s.actions.addToFleet);
+  const practice = useStore((s) => !!s.settings.sandbox && s.session.mode === "office");
   if (empty && area !== "signup")
     return (
       <div className="min-h-screen bg-ink-50 px-4 py-10">
@@ -143,6 +145,14 @@ function ReadyOrSetUp({ area, children }: { area: Area; children: React.ReactNod
     );
   return (
     <>
+      {practice && (
+        <div role="note" aria-label="Practice mode" className="w-full bg-ink-950 px-4 py-1.5 text-center text-xs text-white">
+          <span className="font-semibold">Practice mode</span> · the AI works as usual but sends nothing.{" "}
+          <Link href="/carrier/settings" className="underline">
+            See what it would have sent
+          </Link>
+        </div>
+      )}
       {children}
       <OfflineNotice />
     </>

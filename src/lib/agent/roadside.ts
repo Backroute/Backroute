@@ -2,9 +2,9 @@ import "server-only";
 import { z } from "zod";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { AI_MODEL, FALLBACK, aiConfigured, claude } from "../ai/server";
-import { emailConfigured } from "../channels/email";
 import { SHOP_CAN_HELP, SHOPS_NEAR } from "../channels/phrases";
-import { absoluteUrl, canCallOut, sendSms, startCall } from "../channels/twilio";
+import { absoluteUrl } from "../channels/twilio";
+import { callTo, canCall, canEmail, sandboxed, textTo } from "../channels/out";
 import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import { placeCoords, roadMiles } from "../trip-geo";
@@ -122,7 +122,7 @@ function whereIs(truck: Truck, said: string | undefined, now: number): { near: {
 async function textDriver(ctx: CarrierContext, driver: Driver, text: string, kind: string) {
   const to = toE164(driver.phone);
   if (!to || driver.prefs?.smsOptOut) return;
-  const sid = await sendSms(to, text);
+  const sid = await textTo(ctx.carrier, to, text);
   await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: new Date().toISOString(), channel: "sms" });
   await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: to, body: text, data: { kind } });
 }
@@ -139,9 +139,9 @@ async function callShop(ctx: CarrierContext, truck: Truck, roadside: Roadside, i
   const shop = roadside.shops[i];
   const to = shop ? toE164(shop.phone) : null;
   const url = absoluteUrl(`/api/channels/voice/shop?carrier=${encodeURIComponent(ctx.carrier.id)}&truck=${encodeURIComponent(truck.id)}&shop=${i}`);
-  if (!to || !url || !canCallOut()) return false;
+  if (!to || (!url && !sandboxed(ctx.carrier)) || !canCall(ctx.carrier)) return false;
   await saveRoadside(ctx, truck, { ...roadside, calling: i });
-  const sid = await startCall(to, url, { machineDetection: true });
+  const sid = await callTo(ctx.carrier, to, url, { kind: "shop_call", ref: `${truck.id}:${i}`, machineDetection: true });
   await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "out", providerId: sid ? `${sid}:dial` : null, counterparty: to, body: `Calling ${shop.name} about truck ${truck.unitNumber}'s breakdown`, data: { kind: "shop_call", truckId: truck.id } });
   return true;
 }
@@ -187,7 +187,7 @@ export async function handleBreakdown(ctx: CarrierContext, driver: Driver, detai
   }
 
   // The broker hears before the appointment is missed.
-  if (load && emailConfigured()) {
+  if (load && canEmail(ctx.carrier)) {
     const to = load.brokerContactEmail ?? ctx.brokers.find((b) => b.id === load.brokerId)?.email;
     if (to && (await claimMark(ctx.carrier.id, load.id, "breakdown_notice"))) {
       await sendOrQueue(ctx, {

@@ -712,6 +712,12 @@ export interface AgentSettings {
   hazmat?: boolean;
   /** Real accounts: who brokers reach from the carrier's truck posts: the AI's line (default) or the owner. */
   postContact?: "ai" | "owner";
+  /**
+   * Real accounts: sandbox mode. The AI reads and decides everything as usual, but no text, email or call leaves;
+   * each one is kept for the owner to see what it would have sent (a shadow week), or for the simulated brokers and
+   * drivers to answer (eval/sim).
+   */
+  sandbox?: boolean;
 }
 
 export interface LiveMetrics {

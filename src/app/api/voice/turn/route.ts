@@ -1,9 +1,7 @@
 import { z } from "zod";
 import { dbConfigured, loadContext } from "@/lib/agent/db";
-import { brokerCallReply } from "@/lib/agent/broker-call";
-import { shopCallReply } from "@/lib/agent/roadside";
 import { validVoiceToken } from "@/lib/channels/realtime";
-import { driverCallReply, ownerCallReply } from "@/lib/channels/voice";
+import { callTurn } from "@/lib/channels/turn";
 
 export const maxDuration = 30;
 
@@ -32,18 +30,5 @@ export async function POST(request: Request) {
 
   const ctx = await loadContext(b.carrier);
   if (!ctx) return Response.json({ reply: "Sorry, I can't find your account. Please call your carrier.", hangUp: true });
-  if (b.kind === "driver") {
-    const driver = ctx.drivers.find((d) => d.id === b.ref);
-    if (!driver) return Response.json({ reply: "Sorry, I can't find you on file. Please call your carrier.", hangUp: true });
-    return Response.json(await driverCallReply(b.carrier, driver, b.callSid, b.said, { realtime: true }));
-  }
-  if (b.kind === "owner") return Response.json(await ownerCallReply(b.carrier, b.callSid, b.said, { realtime: true }));
-  if (b.kind === "broker") {
-    const load = ctx.loads.find((l) => l.id === b.ref);
-    if (!load) return Response.json({ reply: "Sorry, I'll follow up by email. Thanks.", hangUp: true });
-    return Response.json(await brokerCallReply(ctx, load, b.callSid, b.said, { realtime: true }));
-  }
-  const truck = ctx.trucks.find((t) => t.id === b.ref);
-  if (!truck?.roadside) return Response.json({ reply: "Sorry, wrong number. Thanks.", hangUp: true });
-  return Response.json(await shopCallReply(ctx, truck, b.callSid, b.said));
+  return Response.json(await callTurn(ctx, b.kind, b.ref, b.callSid, b.said, { realtime: true }));
 }

@@ -185,6 +185,7 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
 - **The log:** every text, call and email in or out is listed in Settings, with what the AI did.
 - **Access rules in the database:** they decide who sees what, so it isn't only the app hiding things. See `supabase/migrations/`.
   - A driver's app can change only the trip on their own truck's loads: the stage along the trip, times, documents and stops. The rate, broker, invoice and rate con stay as the office and the AI set them, even when a phone saves an old copy (`20260929000000_driver_edits.sql`).
+  - Texts, emails and calls that didn't go straight out (held in practice mode, or waiting to be sent again after a provider outage) are readable by the carrier's office only, and only the server writes them (`20260930000000_outbound.sql`).
 
 ## What it doesn't do yet
 
@@ -218,7 +219,7 @@ them in chat. `.env.example` lists every variable.
 ### 1. Supabase: accounts and the database
 
 1. Create a project at supabase.com (region near your drivers, e.g. US East).
-2. In **SQL Editor**, run the files in `supabase/migrations/` in order: `20260924000000_core.sql`, `20260925000000_channels.sql`, `20260926000000_dispatch.sql`, `20260927000000_support.sql`, `20260928000000_boards.sql`, then `20260929000000_driver_edits.sql`. With the CLI instead: `supabase link`, then `supabase db push`.
+2. In **SQL Editor**, run the files in `supabase/migrations/` in order: `20260924000000_core.sql`, `20260925000000_channels.sql`, `20260926000000_dispatch.sql`, `20260927000000_support.sql`, `20260928000000_boards.sql`, `20260929000000_driver_edits.sql`, then `20260930000000_outbound.sql`. With the CLI instead: `supabase link`, then `supabase db push`.
 3. From **Project Settings → API**, set:
    - `NEXT_PUBLIC_SUPABASE_URL`: the Project URL.
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: the anon (or publishable) key.

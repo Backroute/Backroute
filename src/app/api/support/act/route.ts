@@ -3,8 +3,7 @@ import { addActivity, dbConfigured, loadContext, logChannel, save, saveDriverMes
 import { event, uid } from "@/lib/agent/dispatcher";
 import { deliver } from "@/lib/agent/outbox";
 import { supportCaller } from "@/lib/agent/support";
-import { emailConfigured } from "@/lib/channels/email";
-import { sendSms, twilioConfigured } from "@/lib/channels/twilio";
+import { canEmail, canText, textTo } from "@/lib/channels/out";
 import { toE164 } from "@/lib/cloud/phone";
 import type { Item } from "@/lib/cloud/rows";
 import type { Escalation } from "@/lib/types";
@@ -56,7 +55,7 @@ export async function POST(request: Request) {
     }
     case "send_draft": {
       if (!esc!.draft) return Response.json({ error: "nothing_to_send" }, { status: 409 });
-      if (!emailConfigured()) return Response.json({ error: "email_off" }, { status: 503 });
+      if (!canEmail(ctx.carrier)) return Response.json({ error: "email_off" }, { status: 503 });
       await deliver(ctx, { ...esc!.draft, body: a.body }, esc!.loadId || undefined, { approved: true });
       const done = await update({ status: "resolved", resolvedBy: "support", resolvedAt: at, draft: { ...esc!.draft, body: a.body, sentAt: at }, resolutionNote: `Sent by ${me.name}` });
       return Response.json({ escalation: done });
@@ -66,8 +65,8 @@ export async function POST(request: Request) {
       const to = driver ? toE164(driver.phone) : null;
       if (!driver || !to) return Response.json({ error: "not_found" }, { status: 404 });
       if (driver.prefs?.smsOptOut) return Response.json({ error: "opted_out" }, { status: 409 });
-      if (!twilioConfigured()) return Response.json({ error: "sms_off" }, { status: 503 });
-      const sid = await sendSms(to, a.body);
+      if (!canText(ctx.carrier)) return Response.json({ error: "sms_off" }, { status: 503 });
+      const sid = await textTo(ctx.carrier, to, a.body);
       await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: a.body, timestamp: at, channel: "sms", bySupport: me.name });
       await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: to, body: a.body, data: { bySupport: me.name } });
       return Response.json({ sent: true });
@@ -84,9 +83,9 @@ export async function POST(request: Request) {
     case "text_owner": {
       const to = ctx.carrier.owner_phone ? toE164(ctx.carrier.owner_phone) : null;
       if (!to) return Response.json({ error: "no_owner_phone" }, { status: 404 });
-      if (!twilioConfigured()) return Response.json({ error: "sms_off" }, { status: 503 });
+      if (!canText(ctx.carrier)) return Response.json({ error: "sms_off" }, { status: 503 });
       const body = `Backroute support: ${a.body}`;
-      const sid = await sendSms(to, body);
+      const sid = await textTo(ctx.carrier, to, body);
       await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, counterparty: to, body, data: { bySupport: me.name, kind: "support_to_owner" } });
       return Response.json({ sent: true });
     }

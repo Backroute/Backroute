@@ -4,7 +4,8 @@ import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import { estimateMiles, guessEquipment, makeBroker, makeLoad } from "../fleet";
 import { NEW_LOAD, SLOW_DOCK } from "../channels/phrases";
-import { absoluteUrl, sendSms, twilioConfigured } from "../channels/twilio";
+import { absoluteUrl } from "../channels/twilio";
+import { canText, textTo } from "../channels/out";
 import { formatAtStop, stopLocalToIso } from "../stop-time";
 import type { Broker, Load, Truck } from "../types";
 import type { OfferReading } from "./broker-mail";
@@ -378,7 +379,7 @@ export async function bookIt(ctx: CarrierContext, load: Load, rate?: number): Pr
 
 /** The driver's text about a new load, in their language. False when it couldn't go (no texting, no number, STOP). */
 export async function textNewLoad(ctx: CarrierContext, load: Load): Promise<boolean> {
-  if (!twilioConfigured()) return false;
+  if (!canText(ctx.carrier)) return false;
   const truck = ctx.trucks.find((t) => t.id === load.truckId);
   const driver = ctx.drivers.find((d) => d.id === truck?.driverId);
   const to = driver ? toE164(driver.phone) : null;
@@ -393,7 +394,7 @@ export async function textNewLoad(ctx: CarrierContext, load: Load): Promise<bool
     pickup: load.pickupWindow,
     delivery: load.deliveryWindow,
   }), ...slow].join(" ");
-  const sid = await sendSms(to, text);
+  const sid = await textTo(ctx.carrier, to, text);
   await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: new Date().toISOString(), channel: "sms" });
   await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: to, body: text, data: { kind: "new_load", loadId: load.id } });
   return true;

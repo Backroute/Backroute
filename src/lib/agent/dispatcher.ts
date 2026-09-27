@@ -73,7 +73,7 @@ async function raise(ctx: CarrierContext, p: { reason: string; loadId?: string; 
   };
   await save("escalations", ctx.carrier.id, escalation as unknown as Item);
   ctx.escalations.unshift(escalation);
-  if (to === "support" && p.critical) await alertSupport(ctx.carrier.id, `Backroute support, urgent: ${ctx.carrier.name}. ${p.reason}`.slice(0, 600)).catch((e) => console.error("[support] alert failed", e));
+  if (to === "support" && p.critical) await alertSupport(ctx.carrier, `Backroute support, urgent: ${ctx.carrier.name}. ${p.reason}`.slice(0, 600)).catch((e) => console.error("[support] alert failed", e));
   return escalation;
 }
 

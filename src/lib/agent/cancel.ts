@@ -2,7 +2,7 @@ import "server-only";
 import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import { LOAD_CANCELLED } from "../channels/phrases";
-import { sendSms, twilioConfigured } from "../channels/twilio";
+import { canText, textTo } from "../channels/out";
 import type { Load, Truck } from "../types";
 import { addActivity, logChannel, save, saveDriverMessage, type CarrierContext } from "./db";
 import { event, uid } from "./dispatcher";
@@ -59,9 +59,9 @@ export async function cancelLoad(ctx: CarrierContext, load: Load, reason: string
   // Tell the driver not to go.
   const driver = ctx.drivers.find((d) => d.id === truck?.driverId);
   const to = driver ? toE164(driver.phone) : null;
-  if (driver && to && !driver.prefs?.smsOptOut && twilioConfigured()) {
+  if (driver && to && !driver.prefs?.smsOptOut && canText(ctx.carrier)) {
     const text = LOAD_CANCELLED[driver.prefs?.language ?? "en"](load.referenceNumber, `${load.lane.origin}, ${load.lane.originState}`);
-    const sid = await sendSms(to, text);
+    const sid = await textTo(ctx.carrier, to, text);
     await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: at, channel: "sms", ai: true });
     await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: to, body: text, data: { kind: "cancelled", loadId: load.id } });
   }

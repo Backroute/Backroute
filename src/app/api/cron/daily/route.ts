@@ -1,5 +1,5 @@
 import { admin, dbConfigured, loadContext, logChannel } from "@/lib/agent/db";
-import { sendSms, twilioConfigured } from "@/lib/channels/twilio";
+import { canText, textTo } from "@/lib/channels/out";
 import { pack } from "@/lib/lang";
 import { formatCurrency } from "@/lib/utils";
 
@@ -12,7 +12,7 @@ export const maxDuration = 300;
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
-  if (!dbConfigured() || !twilioConfigured()) return Response.json({ sent: 0, reason: "not_set_up" });
+  if (!dbConfigured()) return Response.json({ sent: 0, reason: "not_set_up" });
 
   const { data: carriers, error } = await admin().from("carriers").select("id").not("owner_phone", "is", null);
   if (error) return Response.json({ error: error.message }, { status: 500 });
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   for (const { id } of carriers ?? []) {
     try {
       const ctx = await loadContext(id);
-      if (!ctx?.carrier.owner_phone || ctx.settings.dailyText === false) continue;
+      if (!ctx?.carrier.owner_phone || ctx.settings.dailyText === false || !canText(ctx.carrier)) continue;
       const today = new Date().toDateString();
       const delivered = ctx.loads.filter((l) => l.stage === "delivered" && new Date(l.updatedAt).toDateString() === today);
       const rolling = ctx.trucks.filter((t) => ctx.loads.some((l) => l.id === t.currentLoadId && (l.stage === "in_transit" || l.stage === "dispatched"))).length;
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
         asks: asks.length,
         firstAsk: asks[0],
       });
-      const sid = await sendSms(ctx.carrier.owner_phone.startsWith("+") ? ctx.carrier.owner_phone : `+${ctx.carrier.owner_phone}`, text);
+      const sid = await textTo(ctx.carrier, ctx.carrier.owner_phone.startsWith("+") ? ctx.carrier.owner_phone : `+${ctx.carrier.owner_phone}`, text);
       await logChannel({ carrierId: id, channel: "sms", direction: "out", providerId: sid ?? null, counterparty: ctx.carrier.owner_phone, body: text, data: { kind: "daily" } });
       sent++;
     } catch (e) {

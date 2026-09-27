@@ -1,6 +1,6 @@
 import "server-only";
 import { WEEKLY_CHECKIN, WEEKLY_PAY } from "../channels/phrases";
-import { sendSms, twilioConfigured } from "../channels/twilio";
+import { canText, textTo } from "../channels/out";
 import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import { hourAtStop } from "../stop-time";
@@ -37,7 +37,7 @@ const isoWeek = (now: number) => {
 async function text(ctx: CarrierContext, driver: Driver, body: string, kind: string) {
   const to = toE164(driver.phone);
   if (!to || driver.prefs?.smsOptOut) return false;
-  const sid = await sendSms(to, body);
+  const sid = await textTo(ctx.carrier, to, body);
   await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: body, timestamp: new Date().toISOString(), channel: "sms", ai: true });
   await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: to, body, data: { kind } });
   return true;
@@ -77,7 +77,7 @@ export async function trackHomeTime(ctx: CarrierContext, now: number): Promise<s
 
 /** Once a week, in the driver's language and waking hours: how's it going? And, if the owner turned it on, their pay. */
 export async function weeklyCare(ctx: CarrierContext, now: number): Promise<string[]> {
-  if (!twilioConfigured()) return [];
+  if (!canText(ctx.carrier)) return [];
   const done: string[] = [];
   const week = isoWeek(now);
   const [from, to] = textingHours();
