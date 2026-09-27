@@ -17,6 +17,8 @@ import { doubleBrokered, lookalikeOf, paymentScam } from "./fraud";
 import { checkBroker } from "./brokers";
 import { cancelLoad } from "./cancel";
 import { recordPayments } from "./money";
+import { PORTAL_SIGNING, signRateCon } from "./sign";
+import { askDriverToTrack, trackingNeed } from "./tracking";
 import { dollarAmounts, onlyKnownPrices } from "./pricing";
 
 const ACTIVE = new Set(["negotiating", "rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery"]);
@@ -115,7 +117,16 @@ async function handle(carrierId: string, email: InboundEmail) {
             const truck = ctx.trucks.find((t) => t.id === load!.truckId);
             const booked = load.stage !== "negotiating" && load.stage !== "offered";
             const who = booked && truck ? { unit: truck.unitNumber, driver: ctx.drivers.find((d) => d.id === truck.driverId)?.name.split(" ")[0] } : {};
-            await sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: mail.rateConThanks(ctx.carrier, ctx.settings, load, who, fromName), inReplyTo: sender.messageId, loadId: load.id, withinRules: true, why: `Thank ${fromName} for the rate con on ${load.referenceNumber}?` });
+            // The rate con asks for a tracking app: the driver is told what to accept.
+            const tracking = booked ? trackingNeed(`${[...reading.otherConcerns, ...reading.finesAndFees, reading.summary].join(" ")}\n${text}`) : null;
+            if (tracking) await askDriverToTrack(ctx, load, tracking);
+            // Booked on a matching rate con: signed and sent back, the way the broker needs it before the truck rolls.
+            const portal = PORTAL_SIGNING.test(text) && /https?:\/\//.test(text);
+            const signed = booked && !portal ? await signRateCon(ctx, load, Buffer.from(pdf.Content, "base64"), isPhoto(pdf) ? pdf.ContentType : "application/pdf") : null;
+            if (signed) load = ctx.loads.find((l) => l.id === load!.id) ?? load;
+            else if (booked && portal) await passToOwner(ctx, { reason: `${fromName} wants the rate con for ${load.referenceNumber} signed in their online portal. The AI doesn't log in to other companies' systems: sign it from the link in their email.`, loadId: load.id, label: "Signed", source: "email", to: "support" });
+            else if (booked && !ctx.settings.rateConSigner?.name && (await claimMark(carrierId, `carrier:${carrierId}`, "no_signer"))) await passToOwner(ctx, { reason: `The AI booked ${load.referenceNumber} on a matching rate con but can't sign it for you yet. In Settings → Your rules, add who signs rate cons, and the AI will sign and return them.`, loadId: load.id, label: "Added", source: "email", to: "owner" });
+            await sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: mail.rateConThanks(ctx.carrier, ctx.settings, load, who, fromName, !!signed), inReplyTo: sender.messageId, loadId: load.id, attachments: signed ? [signed] : undefined, withinRules: true, why: `Thank ${fromName} for the rate con on ${load.referenceNumber}?` });
             replied = true;
           }
         }
@@ -184,6 +195,10 @@ async function handle(carrierId: string, email: InboundEmail) {
     });
     return;
   }
+
+  // A tracking link for a load that's booked: straight to the driver, whatever else the email says.
+  const trackingLink = load && ["booked", "rate_confirmed", "dispatched", "at_pickup", "in_transit"].includes(load.stage) ? trackingNeed(`${email.Subject}\n${text}`) : null;
+  if (load && trackingLink?.link) await askDriverToTrack(ctx, load, trackingLink);
 
   const reading = await readBrokerEmail(email.Subject, text);
   if (impostor && reading?.kind !== "load_offers") return impostorEmail();

@@ -3,6 +3,7 @@ import { aiConfigured } from "../ai/server";
 import { carrierById, driverByPhone, driverThread, loadContext, logChannel, ownerByPhone, save, saveDriverMessage, threadWith } from "../agent/db";
 import { driverTurn, ownerTurn, passToOwner, uid } from "../agent/dispatcher";
 import { driverPhotos } from "../agent/photos";
+import { trackingReply } from "../agent/tracking";
 import type { Item } from "../cloud/rows";
 import type { Driver, DriverMessage } from "../types";
 import { forCarrier } from "../agent/scope";
@@ -84,10 +85,12 @@ export async function receiveText(t: IncomingText): Promise<{ now?: string; late
       // Photos (a POD, a BOL, a lumper receipt): stored, checked and put on the load. A caption that says more than
       // what the photo is still gets the AI's answer too.
       const photos = media.length ? await driverPhotos(ctx, driver, media, body).catch((e) => (console.error("[sms] photos failed", e), "Got your photo, but it didn't save. Please send it again or use the app.")) : "";
-      const talk = !media.length || body.length > 40 || body.includes("?");
+      // "Yes" to the tracking-app request: tracking's on, the broker hears, nothing more to answer.
+      const tracked = !media.length ? await trackingReply(ctx, driver, body).catch(() => null) : null;
+      const talk = !tracked && (!media.length || body.length > 40 || body.includes("?"));
       const result = talk && aiConfigured() ? await driverTurn(ctx, driver, "sms", body || "(sent a photo)", history) : { reply: "", effects: { done: [] as string[], failed: talk } };
       if (result.effects.failed) await passToOwner(ctx, { reason: `${driver.name} texted: "${body}"`, label: "I'll answer", source: "sms" });
-      const text = [photos, result.reply].filter(Boolean).join(" ") || PASSED_ON_TEXT[lang];
+      const text = [photos, tracked, result.reply].filter(Boolean).join(" ") || PASSED_ON_TEXT[lang];
       const sid = await textTo(ctx.carrier, from, text).catch((e) => {
         console.error("[sms] send failed", e);
         return undefined;

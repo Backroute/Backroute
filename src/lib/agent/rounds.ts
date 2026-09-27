@@ -15,6 +15,7 @@ import { chasePayments } from "./money";
 import { expireOffers, sendDetentionClaims, sendInvoices, warnCoiExpiring } from "./paperwork";
 import { refreshPlans } from "./plan";
 import { suggestRepositions } from "./reposition";
+import { trackingRounds } from "./tracking";
 
 /**
  * One carrier's share of the dispatcher's rounds: check-ins with drivers and following up when they go quiet,
@@ -66,6 +67,7 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   done.push(...(await suggestRepositions(ctx, now)));
   done.push(...(await complianceReminders(ctx, now)));
   done.push(...(await trackHomeTime(ctx, now)));
+  if (canText(ctx.carrier)) done.push(...(await trackingRounds(ctx, now)));
   done.push(...(await weeklyCare(ctx, now)));
   await refreshPlans(ctx, now);
   if (canEmail(ctx.carrier)) {

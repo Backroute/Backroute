@@ -718,6 +718,12 @@ export interface AgentSettings {
    * drivers to answer (eval/sim).
    */
   sandbox?: boolean;
+  /** Real accounts: who signs rate cons for the carrier, as the owner authorized it (the AI signs matching ones in their name). */
+  rateConSigner?: { name: string; title?: string };
+  /** Real accounts: pay per extra stop the AI asks for when a broker adds one (default $75). */
+  stopPay?: number;
+  /** Real accounts: layover pay per day the AI asks for when a truck is held overnight (default $250). */
+  layoverPay?: number;
 }
 
 export interface LiveMetrics {

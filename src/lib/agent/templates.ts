@@ -115,10 +115,10 @@ ${signature(carrier, settings)}`;
 }
 
 /** Their rate con matched and the load is booked: who's coming and when. */
-export function rateConThanks(carrier: CarrierRow, settings: AgentSettings, load: Load, who: { unit?: string; driver?: string }, toName?: string) {
+export function rateConThanks(carrier: CarrierRow, settings: AgentSettings, load: Load, who: { unit?: string; driver?: string }, toName?: string, signed = false) {
   return `${hello(toName)}
 
-Got the rate con for ${load.referenceNumber}, thanks. It matches.${who.unit ? ` Truck ${who.unit}${who.driver ? ` with ${who.driver}` : ""} is set for pickup ${when(load.pickupWindow)}.` : ""}
+Got the rate con for ${load.referenceNumber}, thanks. It matches${signed ? ", and the signed copy is attached" : ""}.${who.unit ? ` Truck ${who.unit}${who.driver ? ` with ${who.driver}` : ""} is set for pickup ${when(load.pickupWindow)}.` : ""}
 
 Thanks,
 ${signature(carrier, settings)}`;

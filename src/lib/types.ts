@@ -495,6 +495,11 @@ export interface Load {
   rateCon?: RateConReview;
   /** The real AI's reading of a rate con PDF the owner uploaded, checked against what was agreed on this load. */
   rateConReading?: RateConPdfReading;
+  /** Real accounts: when the rate con was signed and sent back, and by whom (lib/agent/sign). */
+  rateConSignedAt?: string;
+  rateConSignedBy?: string;
+  /** Real accounts: the broker's tracking app for this load: which, the link if they sent one, and the driver's yes. */
+  tracking?: { app: string | null; link: string | null; askedAt: string; acceptedAt?: string };
   /** Real accounts: pickup and delivery appointment times, for check-ins and detention. */
   pickupAt?: string;
   deliveryAt?: string;
@@ -798,6 +803,10 @@ export interface RateConPdfReading {
   /** The shipper and receiver names on the rate con: the AI remembers how long each keeps trucks. */
   shipper?: string | null;
   receiver?: string | null;
+  /** The facilities' phone numbers, and a stop still waiting on an appointment the carrier has to book. */
+  shipperPhone?: string | null;
+  receiverPhone?: string | null;
+  appointmentNeeded?: "pickup" | "delivery" | "both" | "none";
   finesAndFees: string[];
   mismatches: { item: string; agreed: string; onDoc: string; serious: boolean }[];
   otherConcerns: string[];
