@@ -60,6 +60,7 @@ export function phoneTree(heard: string, want: RegExp): PhoneTree {
 export const WANT = {
   broker: /carrier|capacity|dispatch|truck|load|sales|operations|ops\b|track|book|logistics|freight/i,
   shop: /service|repair|road ?side|tow|breakdown|dispatch|emergency|24|mobile|tire/i,
+  facility: /appointment|schedul|receiving|shipping|dock|warehouse|traffic|transportation|carrier|driver|trucking/i,
 };
 
 /** What the AI does next on a call: say something (maybe nothing), hang up, press keys, or wait quietly on hold. */

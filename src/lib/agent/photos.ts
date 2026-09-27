@@ -6,6 +6,7 @@ import type { Item } from "../cloud/rows";
 import type { Driver, Load, LoadDocument, Truck } from "../types";
 import { addActivity, admin, save, type CarrierContext } from "./db";
 import { event, passToOwner, uid } from "./dispatcher";
+import { DAMAGE, openClaim } from "./claims";
 
 /**
  * A driver texts a photo instead of opening the app: the BOL at pickup, the signed POD at delivery, a lumper receipt.
@@ -28,6 +29,9 @@ export async function driverPhotos(ctx: CarrierContext, driver: Driver, media: {
   const load =
     ctx.loads.find((l) => l.id === truck?.currentLoadId) ??
     ctx.loads.find((l) => l.truckId && l.truckId === truck?.id && ["dispatched", "at_pickup", "in_transit", "at_delivery"].includes(l.stage));
+  // Photos of damaged or short freight: kept for the claim file, not filed as the BOL or POD.
+  const justDelivered = ctx.loads.filter((l) => l.truckId && l.truckId === truck?.id && l.stage === "delivered" && Date.now() - Date.parse(l.updatedAt) < 24 * 3600_000).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
+  if (DAMAGE.test(text) && !/\b(bol|b\.o\.l|pod|lumper|receipt|signed)\b/i.test(text) && (load ?? justDelivered)) return damagePhotos(ctx, driver, (load ?? justDelivered)!, media, text);
   if (!load) {
     await passToOwner(ctx, { reason: `${driver.name} texted ${media.length} photo${media.length === 1 ? "" : "s"}${text ? ` ("${text}")` : ""}, but has no load on the go to put it on.`, label: "Got it", source: "sms", to: "owner" });
     return "Got the photo, thanks. I don't see a load on your truck right now, so I passed it to the office.";
@@ -35,6 +39,7 @@ export async function driverPhotos(ctx: CarrierContext, driver: Driver, media: {
   const kind = whichDocument(text, load);
   const said: string[] = [];
   let current = load;
+  let podDamage: string[] | null = null;
   for (const [i, m] of media.entries()) {
     const file = await twilioMedia(m.url).catch(() => null);
     if (!file) {
@@ -54,6 +59,7 @@ export async function driverPhotos(ctx: CarrierContext, driver: Driver, media: {
     if (error) throw error;
     const doc: LoadDocument = { id: uid("doc"), type: kind, name, generatedAt: new Date().toISOString(), status: "verified", flagged, fileId: row.id as string, uploadedBy: "driver", ...(amount ? { amount } : {}), ...(note ? { aiNote: note } : {}) } as LoadDocument;
     current = { ...current, documents: [...current.documents.filter((d) => !(d.type === kind && kind !== "lumper_receipt")), doc], updatedAt: new Date().toISOString() };
+    if (kind === "pod" && check?.exceptions.some((e) => DAMAGE.test(e))) podDamage = check.exceptions;
     if (flagged) {
       await passToOwner(ctx, { reason: `${driver.name} texted the ${NAMES[kind]} for ${load.referenceNumber}, and it needs a look: ${note ?? "the AI couldn't read it."}`, loadId: load.id, label: "Checked", source: "sms", to: "owner" });
       said.push(`Got the ${NAMES[kind]}, but ${check && !check.signed && kind !== "lumper_receipt" ? "I don't see a signature on it" : "something on it needs a look"}. If you can, get it signed and send another photo.`);
@@ -73,6 +79,25 @@ export async function driverPhotos(ctx: CarrierContext, driver: Driver, media: {
   }
   await save("loads", ctx.carrier.id, current as unknown as Item);
   ctx.loads = ctx.loads.map((l) => (l.id === current.id ? current : l));
+  // Damage or a shortage written on the POD: the claim file starts now, while the driver remembers.
+  if (podDamage) await openClaim(ctx, current, { source: "pod", details: `Noted on the POD: ${podDamage.join("; ")}` }).catch((e) => console.error("[photos] claim failed", e));
   await addActivity(ctx.carrier.id, event({ type: "document_captured", loadId: load.id, message: `${driver.name.split(" ")[0]} texted the ${NAMES[kind]}`, detail: `${load.referenceNumber}${current.stage === "delivered" && load.stage !== "delivered" ? " · delivered" : ""}`, severity: "success" }));
   return said.join(" ");
+}
+
+async function damagePhotos(ctx: CarrierContext, driver: Driver, load: Load, media: { url: string }[], text: string): Promise<string> {
+  let kept = 0;
+  for (const [i, m] of media.entries()) {
+    const file = await twilioMedia(m.url).catch(() => null);
+    if (!file) continue;
+    const name = `${load.referenceNumber}-damage-${Date.now().toString(36)}-${i + 1}.${file.contentType.split("/")[1] ?? "jpg"}`;
+    const { error } = await admin().from("carrier_files").insert({ carrier_id: ctx.carrier.id, kind: "damage_photo", load_id: load.id, name, content_type: file.contentType, size: file.bytes.length, data: file.bytes.toString("base64"), note: text.slice(0, 200) || null });
+    if (error) throw error;
+    kept++;
+  }
+  if (!kept) return "The photos didn't come through; send them again or use the app.";
+  const current = ctx.loads.find((l) => l.id === load.id) ?? load;
+  if (!current.claim) await openClaim(ctx, current, { source: "pod", details: `The driver reported: ${text.slice(0, 300)}` });
+  await addActivity(ctx.carrier.id, event({ type: "document_captured", loadId: load.id, message: `${driver.name.split(" ")[0]} texted ${kept} photo${kept === 1 ? "" : "s"} of damage`, detail: load.referenceNumber, severity: "warning" }));
+  return `Got ${kept === 1 ? "the photo" : `${kept} photos`} of the damage on ${load.referenceNumber}; they're in the claim file. Get the receiver to write it on the POD before you sign, if you can.`;
 }

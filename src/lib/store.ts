@@ -724,6 +724,10 @@ export interface AgentSettings {
   stopPay?: number;
   /** Real accounts: layover pay per day the AI asks for when a truck is held overnight (default $250). */
   layoverPay?: number;
+  /** Real accounts: the cargo insurer's claims email, where the AI sends a claim file once the owner OKs it. */
+  cargoInsurerEmail?: string;
+  /** Real accounts: the lowest broker credit score (0-100) the AI books with when a credit service is connected (default 70). */
+  minBrokerCredit?: number;
 }
 
 export interface LiveMetrics {

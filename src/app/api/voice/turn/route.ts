@@ -6,7 +6,7 @@ import { callTurn } from "@/lib/channels/turn";
 export const maxDuration = 30;
 
 const Body = z.object({
-  kind: z.enum(["driver", "broker", "shop", "owner"]),
+  kind: z.enum(["driver", "broker", "shop", "owner", "facility"]),
   carrier: z.string().min(1),
   ref: z.string().min(1),
   callSid: z.string().min(1),

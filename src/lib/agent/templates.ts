@@ -171,6 +171,18 @@ Thanks,
 ${signature(carrier, settings)}`;
 }
 
+/** The invoice packet to the factoring company. */
+export function factoringEmail(carrier: CarrierRow, settings: AgentSettings, load: Load, number: string, amount: number, broker: { company: string; mc?: string } | undefined, withRateCon: boolean) {
+  return `Hello,
+
+Please find our invoice packet for purchase: invoice ${number}, ${money(amount)}, for load ${load.referenceNumber} with ${broker?.company ?? "the broker"}${broker?.mc ? ` (MC ${broker.mc})` : ""}, ${load.lane.origin}, ${load.lane.originState} to ${load.lane.destination}, ${load.lane.destState}.
+
+Attached: the schedule of accounts, the invoice, ${withRateCon ? "the rate confirmation, " : ""}the signed proof of delivery and bill of lading${withRateCon ? "" : ". The rate confirmation will follow separately"}.
+
+Thanks,
+${signature(carrier, settings)}`;
+}
+
 export function invoiceEmail(carrier: CarrierRow, settings: AgentSettings, load: Load, number: string, amount: number, factoring: boolean, lines: { label: string; amount: number }[] = [], toName?: string) {
   const tonu = load.stage === "cancelled";
   return `${hello(toName)}

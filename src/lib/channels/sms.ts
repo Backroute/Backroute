@@ -4,6 +4,7 @@ import { carrierById, driverByPhone, driverThread, loadContext, logChannel, owne
 import { driverTurn, ownerTurn, passToOwner, uid } from "../agent/dispatcher";
 import { driverPhotos } from "../agent/photos";
 import { trackingReply } from "../agent/tracking";
+import { claimStatementReply } from "../agent/claims";
 import type { Item } from "../cloud/rows";
 import type { Driver, DriverMessage } from "../types";
 import { forCarrier } from "../agent/scope";
@@ -85,8 +86,9 @@ export async function receiveText(t: IncomingText): Promise<{ now?: string; late
       // Photos (a POD, a BOL, a lumper receipt): stored, checked and put on the load. A caption that says more than
       // what the photo is still gets the AI's answer too.
       const photos = media.length ? await driverPhotos(ctx, driver, media, body).catch((e) => (console.error("[sms] photos failed", e), "Got your photo, but it didn't save. Please send it again or use the app.")) : "";
-      // "Yes" to the tracking-app request: tracking's on, the broker hears, nothing more to answer.
-      const tracked = !media.length ? await trackingReply(ctx, driver, body).catch(() => null) : null;
+      // "Yes" to the tracking-app request (tracking's on, the broker hears), or the driver's account for a cargo
+      // claim: nothing more to answer.
+      const tracked = !media.length ? ((await trackingReply(ctx, driver, body).catch(() => null)) ?? (await claimStatementReply(ctx, driver, body).catch(() => null))) : null;
       const talk = !tracked && (!media.length || body.length > 40 || body.includes("?"));
       const result = talk && aiConfigured() ? await driverTurn(ctx, driver, "sms", body || "(sent a photo)", history) : { reply: "", effects: { done: [] as string[], failed: talk } };
       if (result.effects.failed) await passToOwner(ctx, { reason: `${driver.name} texted: "${body}"`, label: "I'll answer", source: "sms" });

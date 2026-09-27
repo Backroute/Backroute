@@ -91,6 +91,10 @@ const LABEL: Record<DraftPurpose, string> = {
   setup_packet: "Send the setup packet",
   invoice: "Send the invoice",
   detention: "Send the detention claim",
+  layover: "Send the layover claim",
+  change: "Send the price for the change",
+  claim: "Send the claim file",
+  factoring: "Send it to the factoring company",
   payment_reminder: "Send the payment reminder",
   tonu: "Send the TONU claim",
   eta_update: "Send the late notice",
@@ -107,6 +111,10 @@ const WHAT: Record<DraftPurpose, string> = {
   setup_packet: "Sent the setup packet to",
   invoice: "Sent the invoice to",
   detention: "Sent a detention claim to",
+  layover: "Sent a layover claim to",
+  change: "Priced a change for",
+  claim: "Sent the cargo claim file to",
+  factoring: "Sent the invoice packet to",
   payment_reminder: "Reminded about payment:",
   tonu: "Claimed truck-ordered-not-used from",
   eta_update: "Told the broker the truck is running late:",
@@ -125,7 +133,7 @@ export async function deliver(ctx: CarrierContext, draft: DraftMessage, loadId: 
     text: draft.body,
     fromName: ctx.carrier.name,
     inReplyTo: draft.inReplyTo,
-    replyTo: ctx.settings.remitEmail && (draft.purpose === "invoice" || draft.purpose === "detention") ? ctx.settings.remitEmail : undefined,
+    replyTo: ctx.settings.remitEmail && (draft.purpose === "invoice" || draft.purpose === "detention" || draft.purpose === "layover") ? ctx.settings.remitEmail : undefined,
     attachments: files.map((f) => ({ name: f.name, contentType: f.content_type, content: f.data })),
   });
   await logChannel({
@@ -172,6 +180,9 @@ async function afterSent(ctx: CarrierContext, loadId: string, draft: DraftMessag
   } else if (p === "invoice" && load.invoice) next = { ...load, invoice: { ...load.invoice, sentAt: at, sentTo: draft.to } };
   else if (p === "tonu") next = { ...load, tonuClaimedAt: at };
   else if (p === "detention") next = { ...load, detentionClaims: (load.detentionClaims ?? []).map((c) => (c.sentAt ? c : { ...c, sentAt: at })) };
+  else if (p === "layover") next = { ...load, layoverClaims: (load.layoverClaims ?? []).map((c) => (c.sentAt ? c : { ...c, sentAt: at })) };
+  else if (p === "factoring" && load.invoice) next = { ...load, factoredAt: at, invoice: { ...load.invoice, sentAt: at, sentTo: draft.to } };
+  else if (p === "claim" && load.claim) next = { ...load, claim: { ...load.claim, insurerSentAt: at } };
   else if (p === "payment_reminder" && load.invoice) next = { ...load, invoice: { ...load.invoice, remindedAt: [...(load.invoice.remindedAt ?? []), at] } };
   if (!next) return;
   next = { ...next, updatedAt: at };

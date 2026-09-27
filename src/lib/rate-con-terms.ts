@@ -5,7 +5,8 @@ import type { Broker, Load } from "./types";
 export function agreedTerms(load: Load, broker: Broker | undefined) {
   return {
     broker: broker?.company ?? "Unknown broker",
-    rate: load.bookedRate ?? load.targetRate,
+    // A change the broker agreed to pay for (an added stop, a reroute) is part of the rate now.
+    rate: (load.bookedRate ?? load.targetRate) + (load.change?.status === "agreed" ? load.change.extra : 0),
     origin: `${load.lane.origin}, ${load.lane.originState}`,
     destination: `${load.lane.destination}, ${load.lane.destState}`,
     pickup: load.pickupWindow,

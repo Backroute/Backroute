@@ -72,6 +72,22 @@ export function OwnerRulesCard() {
           <p className="text-xs text-ink-500">What the AI asks every broker to put on the rate con:</p>
           <DollarField label="Detention per hour, after 2 hours free" value={settings.detentionPerHour ?? 50} min={25} max={200} onSave={(n) => updateSettings({ detentionPerHour: n })} />
           <DollarField label="Truck ordered, not used (TONU)" value={settings.tonuFee ?? 150} min={50} max={1000} onSave={(n) => updateSettings({ tonuFee: n })} />
+          <DollarField label="Layover, per day held overnight" value={settings.layoverPay ?? 250} min={100} max={1000} onSave={(n) => updateSettings({ layoverPay: n })} />
+          <DollarField label="Each extra stop a broker adds" value={settings.stopPay ?? 75} min={25} max={500} onSave={(n) => updateSettings({ stopPay: n })} />
+        </div>
+        <div className="flex flex-col gap-2 border-t border-line pt-3">
+          <p className="text-sm font-medium text-ink-900">Rate cons</p>
+          <p className="text-xs text-ink-500">
+            Who&apos;s authorized to sign for the company. The AI signs a rate con in their name only when it matches what was agreed, and sends it back. Empty: it asks you to sign.
+          </p>
+          <TextField label="Signer's name" placeholder="Maria Lopez" value={settings.rateConSigner?.name ?? ""} onSave={(v) => updateSettings({ rateConSigner: v ? { name: v, title: settings.rateConSigner?.title } : undefined })} />
+          <TextField label="Title" placeholder="Owner" value={settings.rateConSigner?.title ?? ""} disabled={!settings.rateConSigner?.name} onSave={(v) => settings.rateConSigner?.name && updateSettings({ rateConSigner: { name: settings.rateConSigner.name, title: v || undefined } })} />
+        </div>
+        <div className="flex flex-col gap-2 border-t border-line pt-3">
+          <p className="text-sm font-medium text-ink-900">Brokers&apos; credit and cargo claims</p>
+          <NumberField label="Lowest broker credit score to book" hint="out of 100, when a credit service is connected" value={settings.minBrokerCredit ?? 70} min={0} max={100} onSave={(n) => updateSettings({ minBrokerCredit: n })} />
+          <TextField label="Cargo insurer's claims email" placeholder="claims@insurer.com" type="email" value={settings.cargoInsurerEmail ?? ""} onSave={(v) => updateSettings({ cargoInsurerEmail: v || undefined })} />
+          <p className="text-xs text-ink-500">The AI puts each claim file together; it goes to your insurer only after you OK it.</p>
         </div>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -108,6 +124,44 @@ function DollarField({ label, value, min, max, onSave }: { label: string; value:
           onBlur={() => n >= min && n <= max && n !== value && onSave(n)}
         />
       </span>
+    </label>
+  );
+}
+
+function NumberField({ label, hint, value, min, max, onSave }: { label: string; hint?: string; value: number; min: number; max: number; onSave: (n: number) => void }) {
+  const [text, setText] = useState(String(value));
+  const n = Number(text);
+  return (
+    <label className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink-900">
+      {label}
+      <input
+        className="w-20 rounded-xl border border-line bg-white px-3 py-1.5 text-sm outline-none focus:border-ink-400"
+        inputMode="numeric"
+        value={text}
+        onChange={(e) => setText(e.target.value.replace(/\D/g, ""))}
+        onBlur={() => text !== "" && n >= min && n <= max && n !== value && onSave(n)}
+      />
+      {hint && <span className="text-xs font-normal text-ink-500">{hint}</span>}
+    </label>
+  );
+}
+
+function TextField({ label, placeholder, value, type = "text", disabled, onSave }: { label: string; placeholder: string; value: string; type?: string; disabled?: boolean; onSave: (v: string) => void }) {
+  const [text, setText] = useState(value);
+  const valid = type !== "email" || !text.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text.trim());
+  return (
+    <label className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink-900">
+      {label}
+      <input
+        className="w-56 max-w-full rounded-xl border border-line bg-white px-3 py-1.5 text-sm outline-none focus:border-ink-400 disabled:opacity-50"
+        type={type}
+        placeholder={placeholder}
+        value={text}
+        disabled={disabled}
+        maxLength={80}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => valid && text.trim() !== value && onSave(text.trim())}
+      />
     </label>
   );
 }

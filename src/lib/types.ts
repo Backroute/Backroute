@@ -78,6 +78,8 @@ export interface Broker {
   detentionPaidPct: number;
   /** Loads the broker cancelled on carriers after booking, last 90 days. */
   cancellations90d: number;
+  /** Real accounts: the broker's credit, from a credit service and the carrier's own paid invoices (lib/agent/credit). */
+  credit?: { score: number | null; daysToPay: number | null; source: string; at: string };
 }
 
 export interface Lane {
@@ -530,6 +532,16 @@ export interface Load {
   offerEmail?: { subject: string; messageId?: string };
   invoice?: LoadInvoice;
   detentionClaims?: DetentionClaim[];
+  /** Real accounts: dock appointments the AI is booking or moving by phone with the shipper or receiver (lib/agent/appointments). */
+  appointments?: Partial<Record<"pickup" | "delivery", FacilityAppointment>>;
+  /** Layover claims: the truck held overnight at a stop (lib/agent/layover). */
+  layoverClaims?: LayoverClaim[];
+  /** A change the broker asked for after booking (an added stop, a new delivery), priced by the AI (lib/agent/changes). */
+  change?: LoadChange;
+  /** A cargo claim (damage, shortage) and the file the AI keeps for it (lib/agent/claims). */
+  claim?: CargoClaim;
+  /** When the invoice packet went to the factoring company, and what was in it. */
+  factoredAt?: string;
   /** Intermediate stops beyond the lane's origin/destination — absent or empty means a normal single-pickup,
    *  single-delivery load, which is most of them. */
   stops?: LoadStop[];
@@ -637,7 +649,7 @@ export interface DraftMessage {
  */
 export type OwnerRule = "tonu_default" | "detention_default" | "invoice_noted_pod" | "replies";
 
-export type DraftPurpose = "reply" | "book_request" | "counter" | "accept" | "setup_packet" | "invoice" | "detention" | "payment_reminder" | "tonu" | "eta_update" | "capacity" | "pass" | "ack";
+export type DraftPurpose = "reply" | "book_request" | "counter" | "accept" | "setup_packet" | "invoice" | "detention" | "layover" | "change" | "claim" | "factoring" | "payment_reminder" | "tonu" | "eta_update" | "capacity" | "pass" | "ack";
 
 export interface DriverMessage {
   id: string;
@@ -837,6 +849,59 @@ export interface LoadInvoice {
   paidAmount?: number;
   /** Payment reminders sent, oldest first. */
   remindedAt?: string[];
+}
+
+export interface FacilityAppointment {
+  /** Book a time the rate con says to call for, or move one the truck will miss. */
+  purpose: "book" | "move";
+  status: "needed" | "calling" | "set" | "failed";
+  /** For a move: when the truck will really get there (ISO). */
+  eta?: string;
+  tries: number;
+  lastCallAt?: string;
+  /** The time the facility gave (ISO) and their confirmation number. */
+  at?: string;
+  confirmation?: string;
+  /** Why it failed, when it did. */
+  note?: string;
+}
+
+export interface LayoverClaim {
+  stop: "pickup" | "delivery";
+  days: number;
+  amount: number;
+  draftedAt: string;
+  sentAt?: string;
+}
+
+export interface LoadChange {
+  kind: "add_stop" | "reroute";
+  /** The new stops, or the new delivery for a reroute. */
+  places: { city: string; state: string }[];
+  extraMiles: number;
+  /** What the change pays on top of the rate, and the new all-in total. */
+  extra: number;
+  newTotal: number;
+  askedAt: string;
+  status: "asked" | "agreed" | "declined";
+  agreedAt?: string;
+}
+
+export interface CargoClaim {
+  openedAt: string;
+  /** Who raised it: the broker or shipper in writing, or the AI from a POD with exceptions. */
+  source: "broker" | "pod";
+  kind: "damage" | "shortage" | "loss" | "other";
+  amount?: number;
+  details: string;
+  /** Claimant's email, for the acknowledgment and what they still need to send. */
+  claimant?: string;
+  ackSentAt?: string;
+  statementAskedAt?: string;
+  statement?: string;
+  packetFileId?: string;
+  packetAt?: string;
+  insurerSentAt?: string;
 }
 
 export interface DetentionClaim {

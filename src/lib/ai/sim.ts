@@ -15,7 +15,7 @@ export interface Line {
 }
 
 export interface Partner {
-  role: "broker" | "driver" | "owner" | "shop";
+  role: "broker" | "driver" | "owner" | "shop" | "facility";
   channel: "email" | "sms" | "call";
   /** Who they are and how they talk. */
   persona: string;
@@ -34,6 +34,7 @@ const WHO: Record<Partner["role"], string> = {
   driver: "a truck driver working for a small trucking company",
   owner: "the owner of a small trucking company",
   shop: "someone at a truck repair shop or towing company",
+  facility: "the scheduler at a warehouse's shipping or receiving office, who books dock appointments",
 };
 
 const HOW: Record<Partner["channel"], string> = {

@@ -57,7 +57,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("opening"), carrier: z.string(), kind: z.literal("broker"), ref: z.string() }),
   z.object({ action: z.literal("email"), carrier: z.string(), from: z.string(), fromName: z.string().optional(), subject: z.string(), text: z.string(), messageId: z.string().optional(), inReplyTo: z.string().optional() }),
   z.object({ action: z.literal("text"), carrier: z.string(), from: z.string(), body: z.string() }),
-  z.object({ action: z.literal("call"), carrier: z.string(), kind: z.enum(["driver", "broker", "shop", "owner"]), ref: z.string(), callSid: z.string(), said: z.string().min(1).max(2000) }),
+  z.object({ action: z.literal("call"), carrier: z.string(), kind: z.enum(["driver", "broker", "shop", "owner", "facility"]), ref: z.string(), callSid: z.string(), said: z.string().min(1).max(2000) }),
   z.object({ action: z.literal("rounds"), carrier: z.string(), at: z.string().optional() }),
   z.object({ action: z.literal("held"), carrier: z.string(), after: z.string().optional() }),
   z.object({ action: z.literal("state"), carrier: z.string() }),
@@ -66,7 +66,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("import"), carrier: z.string(), csv: z.string().max(5_000_000) }),
   z.object({
     action: z.literal("play"),
-    partner: z.object({ role: z.enum(["broker", "driver", "owner", "shop"]), channel: z.enum(["email", "sms", "call"]), persona: z.string().max(3000), secret: z.string().max(3000), language: z.string().optional() }),
+    partner: z.object({ role: z.enum(["broker", "driver", "owner", "shop", "facility"]), channel: z.enum(["email", "sms", "call"]), persona: z.string().max(3000), secret: z.string().max(3000), language: z.string().optional() }),
     transcript: z.array(Line).max(60),
   }),
   z.object({ action: z.literal("judge"), situation: z.string().max(3000), expectations: z.array(z.string().max(500)).max(20), transcript: z.array(Line).max(60), outcome: z.string().max(3000) }),

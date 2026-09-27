@@ -1,5 +1,8 @@
 import "server-only";
-import { canEmail, canText } from "../channels/out";
+import { canCall, canEmail, canText } from "../channels/out";
+import { appointmentRounds } from "./appointments";
+import { sendLayoverClaims } from "./layover";
+import { claimRounds } from "./claims";
 import { isBoard, runBoards } from "./boards";
 import { followUpByPhone } from "./broker-call";
 import { offerCapacity } from "./capacity";
@@ -36,9 +39,12 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
     done.push(...(await followUpByPhone(ctx, now, (loadId) => url(`/api/channels/voice/broker?carrier=${encodeURIComponent(id)}&load=${encodeURIComponent(loadId)}`))));
   }
   if (canEmail(ctx.carrier)) {
+    // Layover first: a stop held overnight is claimed as that, not as hours of detention, and it's on the invoice.
+    done.push(...(await sendLayoverClaims(ctx, now)));
     done.push(...(await sendInvoices(ctx)));
     done.push(...(await sendDetentionClaims(ctx, now)));
     done.push(...(await chasePayments(ctx, now)));
+    done.push(...(await claimRounds(ctx, now)));
   }
   // Connections, in order: the ELD first (where trucks are, drivers' hours), then load feeds and load boards,
   // which search from where the trucks now are.
@@ -68,6 +74,7 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   done.push(...(await complianceReminders(ctx, now)));
   done.push(...(await trackHomeTime(ctx, now)));
   if (canText(ctx.carrier)) done.push(...(await trackingRounds(ctx, now)));
+  if (canCall(ctx.carrier)) done.push(...(await appointmentRounds(ctx, now)));
   done.push(...(await weeklyCare(ctx, now)));
   await refreshPlans(ctx, now);
   if (canEmail(ctx.carrier)) {

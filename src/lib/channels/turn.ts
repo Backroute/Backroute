@@ -2,13 +2,14 @@ import "server-only";
 import { brokerCallReply } from "../agent/broker-call";
 import type { CarrierContext } from "../agent/db";
 import { shopCallReply } from "../agent/roadside";
+import { facilityCallReply, type Stop } from "../agent/appointments";
 import { press, updateCall } from "./twilio";
 import { streamXml } from "./realtime";
 import type { CallReply } from "./ivr";
 import { forCarrier } from "../agent/scope";
 import { driverCallReply, ownerCallReply } from "./voice";
 
-export type TurnKind = "driver" | "broker" | "shop" | "owner";
+export type TurnKind = "driver" | "broker" | "shop" | "owner" | "facility";
 
 /**
  * One turn of a phone call: what the other person just said, and what the AI says back (and whether it hangs up).
@@ -45,6 +46,13 @@ async function answer(ctx: CarrierContext, kind: TurnKind, ref: string, callSid:
     const load = ctx.loads.find((l) => l.id === ref);
     if (!load) return { reply: "Sorry, I'll follow up by email. Thanks.", hangUp: true };
     return brokerCallReply(ctx, load, callSid, said, data);
+  }
+  if (kind === "facility") {
+    // ref is "<load id>:<pickup|delivery>".
+    const [loadId, stop] = ref.split(":");
+    const load = ctx.loads.find((l) => l.id === loadId);
+    if (!load || (stop !== "pickup" && stop !== "delivery")) return { reply: "Sorry, wrong number. Thanks.", hangUp: true };
+    return facilityCallReply(ctx, load, stop as Stop, callSid, said);
   }
   const truck = ctx.trucks.find((t) => t.id === ref);
   if (!truck?.roadside) return { reply: "Sorry, wrong number. Thanks.", hangUp: true };

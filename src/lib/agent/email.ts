@@ -6,7 +6,7 @@ import { messageIdHeader, plainText, type InboundEmail } from "../channels/email
 import { agreedTerms } from "../rate-con-terms";
 import type { Item } from "../cloud/rows";
 import type { Load, RateConPdfReading } from "../types";
-import { addActivity, claimMark, loadContext, save, threadWith } from "./db";
+import { addActivity, claimMark, loadContext, save, storeFile, threadWith } from "./db";
 import { brokerEmailDraft, event, passToOwner } from "./dispatcher";
 import { readBrokerEmail } from "./broker-mail";
 import { answerRateReply, bookIt, offersFromEmail, type Sender } from "./booking";
@@ -20,6 +20,8 @@ import { recordPayments } from "./money";
 import { PORTAL_SIGNING, signRateCon } from "./sign";
 import { askDriverToTrack, trackingNeed } from "./tracking";
 import { dollarAmounts, onlyKnownPrices } from "./pricing";
+import { answerChange, changeReply } from "./changes";
+import { CLAIM_EMAIL, claimLoad, openClaim } from "./claims";
 
 const ACTIVE = new Set(["negotiating", "rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery"]);
 
@@ -89,6 +91,8 @@ async function handle(carrierId: string, email: InboundEmail) {
         reading = await readRateConPdf(Buffer.from(pdf.Content, "base64"), agreedTerms(load, ctx.brokers.find((b) => b.id === load!.brokerId)), isPhoto(pdf) ? pdf.ContentType : "application/pdf");
       }
       if (load) {
+        // Kept on the load: it's signed from, and the factoring company wants it with the invoice.
+        await storeFile(carrierId, { kind: "rate_con", name: pdf.Name, contentType: isPhoto(pdf) ? pdf.ContentType : "application/pdf", bytes: Buffer.from(pdf.Content, "base64"), loadId: load.id }).catch((e) => console.error("[email] couldn't keep the rate con", e));
         const saved: RateConPdfReading = { ...reading, fileName: pdf.Name, readAt: new Date().toISOString() };
         const updated: Load = { ...load, rateConReading: saved, updatedAt: saved.readAt };
         await save("loads", carrierId, updated as unknown as Item);
@@ -100,6 +104,11 @@ async function handle(carrierId: string, email: InboundEmail) {
         if (double) await passToOwner(ctx, { reason: `Possible double brokering on ${load.referenceNumber}. ${double} Call ${onLoad!.company} on the number from FMCSA, not the one on the rate con, before the truck goes.`, loadId: load.id, critical: true, label: "Checked", source: "email", to: "support", brokerId: onLoad!.id });
         else if (onLoad && reading.brokerMc) await checkBroker(ctx, onLoad, reading.brokerMc);
         const serious = reading.mismatches.filter((m) => m.serious).length + (double ? 1 : 0);
+        // A revised rate con for a change we priced (an added stop, a reroute): its total is their answer.
+        if (load.change?.status === "asked" && reading.totalRate && !double && (await changeReply(ctx, load, { agreed: reading.totalRate >= load.change.newTotal, brokerRate: reading.totalRate }, fromName))) {
+          load = ctx.loads.find((l) => l.id === load!.id) ?? load;
+          notes.push(`Revised rate con for the change on ${load.referenceNumber}: $${reading.totalRate.toLocaleString("en-US")}.`);
+        }
         // The broker's rate con for a load the AI asked for: it confirms the booking when it matches.
         if (load.stage === "negotiating" || load.stage === "offered") {
           if (double) notes.push(`Not booked: ${double}`);
@@ -219,6 +228,25 @@ async function handle(carrierId: string, email: InboundEmail) {
     const target = byRef(reading.loadNumber) ?? load;
     if (target) return cancelLoad(ctx, target, reading.cancelReason ?? "no reason given", from);
   }
+  // A cargo claim (damage, a shortage): acknowledged in writing, and the claim file started.
+  if (CLAIM_EMAIL.test(`${email.Subject}\n${text}`) && !suspect()) {
+    const target = claimLoad(byRef(reading?.loadNumber) ?? load);
+    if (target) {
+      const amounts = dollarAmounts(text);
+      await openClaim(ctx, target, { source: "broker", details: text.replace(/\s+/g, " ").trim().slice(0, 400), amount: amounts.length ? Math.max(...amounts) : null, claimant: from, claimantName: reading?.contactName ?? undefined, subject: email.Subject, inReplyTo: sender.messageId });
+      return;
+    }
+  }
+  // A booked load changed (another stop, a new delivery): priced and answered before anyone says yes.
+  if (reading?.kind === "change_request" && reading.changeKind) {
+    const target = byRef(reading.loadNumber) ?? load;
+    if (target && ["booked", "rate_confirmed", "dispatched", "at_pickup", "in_transit"].includes(target.stage) && !suspect()) {
+      await answerChange(ctx, target, reading.changeKind, reading.changePlaces, { ...sender, contactName: reading.contactName });
+      return;
+    }
+  }
+  // Their answer to what we asked for a change.
+  if (reading?.kind === "rate_reply" && load?.change?.status === "asked" && (await changeReply(ctx, load, { agreed: reading.agreedToOurRate, brokerRate: reading.brokerRate }, fromName))) return;
   if (reading?.kind === "load_offers" && reading.offers.length && !pdfs.length) {
     const { added } = await offersFromEmail(ctx, reading.offers, sender, { company: reading.brokerCompany, mc: reading.brokerMc, phone: reading.brokerPhone, contact: reading.contactName });
     if (!added.length) {

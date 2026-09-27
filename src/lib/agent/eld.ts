@@ -3,6 +3,8 @@ import type { Item } from "../cloud/rows";
 import { roadMiles, roughCoords } from "../trip-geo";
 import { formatAtStop } from "../stop-time";
 import type { Driver, HosStatus, Load, Truck } from "../types";
+import { canCall } from "../channels/out";
+import { needAppointment } from "./appointments";
 import { claimMark, save, type CarrierContext } from "./db";
 import { sendOrQueue } from "./outbox";
 import { routedEta } from "./routing";
@@ -194,6 +196,10 @@ export async function lateNotices(ctx: CarrierContext, now: number): Promise<str
     const [city, state] = stop === "pickup" ? [load.lane.origin, load.lane.originState] : [load.lane.destination, load.lane.destState];
     const eta = truck ? ((await routedEta(truck, driver, city, state, now)) ?? etaTo(truck, driver, city, state, now)) : null;
     if (!eta || eta <= Date.parse(due) + 30 * 60_000) continue;
+    // The appointment will be missed: call the facility to move it, the way a dispatcher does before the truck is late.
+    const phone = stop === "pickup" ? load.rateConReading?.shipperPhone : load.rateConReading?.receiverPhone;
+    if (phone && canCall(ctx.carrier) && load.appointments?.[stop]?.purpose !== "move" && (await claimMark(ctx.carrier.id, load.id, `appt_move_${stop}`)))
+      done.push(`${load.referenceNumber}: ${await needAppointment(ctx, load, stop, "move", eta, now)}`);
     const to = load.brokerContactEmail ?? ctx.brokers.find((b) => b.id === load.brokerId)?.email;
     if (!to || !(await claimMark(ctx.carrier.id, load.id, `late_notice_${stop}`))) continue;
     const etaText = formatAtStop(new Date(eta).toISOString(), state);

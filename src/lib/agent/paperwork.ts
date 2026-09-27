@@ -103,6 +103,8 @@ export function invoiceLines(load: Load): { label: string; amount: number }[] {
   if (load.stage === "cancelled") return load.tonuFee ? [{ label: "Truck ordered, not used (TONU)", amount: load.tonuFee }] : [];
   const lines = [{ label: "Line haul, all in", amount: load.bookedRate ?? 0 }];
   for (const c of load.detentionClaims ?? []) if (c.sentAt && c.amount > 0) lines.push({ label: `Detention at ${c.stop} (${Math.round(c.minutes / 6) / 10} hours, claimed ${c.sentAt.slice(0, 10)})`, amount: c.amount });
+  for (const c of load.layoverClaims ?? []) if (c.sentAt && c.amount > 0) lines.push({ label: `Layover at ${c.stop} (${c.days} day${c.days === 1 ? "" : "s"}, claimed ${c.sentAt.slice(0, 10)})`, amount: c.amount });
+  if (load.change?.status === "agreed" && load.change.extra > 0) lines.push({ label: load.change.kind === "reroute" ? `Reroute (${load.change.extraMiles} extra miles)` : `Extra stop${load.change.places.length === 1 ? "" : "s"} (${load.change.places.map((p) => `${p.city}, ${p.state}`).join("; ")})`, amount: load.change.extra });
   for (const d of load.documents) if (d.type === "lumper_receipt" && d.amount && d.fileId) lines.push({ label: "Lumper (receipt attached)", amount: d.amount });
   return lines;
 }
@@ -138,6 +140,28 @@ function invoicePdf(ctx: CarrierContext, load: Load, number: string, charges: { 
   return textPdf(lines);
 }
 
+/** The factoring company's cover sheet: who owes what, for which load, and what's attached. */
+function schedulePdf(ctx: CarrierContext, load: Load, number: string, amount: number): Buffer {
+  const broker = brokerOf(ctx, load);
+  const money = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+  return textPdf([
+    { text: "Schedule of accounts", size: 16, bold: true },
+    { text: `${ctx.carrier.name}${ctx.carrier.mc ? `, MC ${String(ctx.carrier.mc).replace(/^mc\s*/i, "")}` : ""}` },
+    { text: `Submitted ${new Date().toISOString().slice(0, 10)}` },
+    { text: "Debtor (broker)", bold: true, gap: 14 },
+    { text: broker?.legalName ?? broker?.company ?? "Broker" },
+    ...(broker?.mc ? [{ text: `MC ${broker.mc}` }] : []),
+    ...(billTo(ctx, load) ? [{ text: billTo(ctx, load)! }] : []),
+    { text: "Invoice", bold: true, gap: 14 },
+    { text: `Invoice ${number} · load ${load.referenceNumber}` },
+    { text: `${load.lane.origin}, ${load.lane.originState} to ${load.lane.destination}, ${load.lane.destState}` },
+    { text: `Delivered ${load.tripChecklist?.unloadedAt?.slice(0, 10) ?? load.updatedAt.slice(0, 10)}` },
+    { text: `Amount: ${money(amount)}`, bold: true },
+    { text: "Attached: invoice, rate confirmation, signed proof of delivery, bill of lading, and receipts billed.", size: 9, gap: 18 },
+    { text: "The carrier certifies the load was delivered and the invoice is due and unpaid.", size: 9 },
+  ]);
+}
+
 /** Delivered with a POD photo on file and not billed yet: make the invoice and send it with the POD. */
 export async function sendInvoices(ctx: CarrierContext): Promise<string[]> {
   const done: string[] = [];
@@ -161,17 +185,31 @@ export async function sendInvoices(ctx: CarrierContext): Promise<string[]> {
       const fileId = await storeFile(ctx.carrier.id, { kind: "invoice", name: `${number}.pdf`, contentType: "application/pdf", bytes: invoicePdf(ctx, load, number, lines), loadId: load.id });
       const bol = load.documents.find((d) => d.type === "bol" && d.fileId);
       const lumper = load.documents.find((d) => d.type === "lumper_receipt" && d.amount && d.fileId);
+      // Factoring: the whole submission packet the factor asks for, the way a dispatcher sends it: a schedule of
+      // accounts on top, the invoice, the (signed) rate con, the signed POD and BOL, and any receipts billed.
+      const factoring = !!ctx.settings.factoringEmail;
+      const rateCon = factoring ? (await latestFiles(ctx.carrier.id, ["rate_con_signed", "rate_con"], load.id)).sort((a, b) => (a.kind === "rate_con_signed" ? -1 : b.kind === "rate_con_signed" ? 1 : 0))[0] : undefined;
+      const schedule = factoring ? await storeFile(ctx.carrier.id, { kind: "factoring_schedule", name: `${number}-schedule.pdf`, contentType: "application/pdf", bytes: schedulePdf(ctx, load, number, amount), loadId: load.id }) : null;
+      if (factoring && !rateCon)
+        await passToOwner(ctx, { reason: `${load.referenceNumber}'s invoice packet went to your factoring company without the rate con (there's none on file). Send it to them, or upload it on the load, so they don't hold the advance.`, loadId: load.id, label: "Sent it", source: "email", to: "owner" });
       const withInvoice: Load = { ...load, invoice: { number, amount, lines, draftedAt: new Date().toISOString() }, updatedAt: new Date().toISOString() };
       await save("loads", ctx.carrier.id, withInvoice as unknown as Item);
       ctx.loads = ctx.loads.map((l) => (l.id === load.id ? withInvoice : l));
       const result = await sendOrQueue(ctx, {
-        purpose: "invoice",
+        purpose: factoring ? "factoring" : "invoice",
         to,
-        subject: mail.subjectFor(load, `Invoice ${number}`),
-        body: mail.invoiceEmail(ctx.carrier, ctx.settings, load, number, amount, !!ctx.settings.factoringEmail, lines),
+        subject: factoring ? `Invoice packet ${number}: ${brokerOf(ctx, load)?.company ?? "broker"}, load ${load.referenceNumber}` : mail.subjectFor(load, `Invoice ${number}`),
+        body: factoring ? mail.factoringEmail(ctx.carrier, ctx.settings, load, number, amount, brokerOf(ctx, load), !!rateCon) : mail.invoiceEmail(ctx.carrier, ctx.settings, load, number, amount, false, lines),
         loadId: load.id,
         amount,
-        attachments: [{ fileId, name: `${number}.pdf` }, ...(pod ? [{ fileId: pod.fileId!, name: pod.name }] : []), ...(bol ? [{ fileId: bol.fileId!, name: bol.name }] : []), ...(lumper ? [{ fileId: lumper.fileId!, name: lumper.name }] : [])],
+        attachments: [
+          ...(schedule ? [{ fileId: schedule, name: `${number}-schedule.pdf` }] : []),
+          { fileId, name: `${number}.pdf` },
+          ...(rateCon ? [{ fileId: rateCon.id, name: rateCon.name }] : []),
+          ...(pod ? [{ fileId: pod.fileId!, name: pod.name }] : []),
+          ...(bol ? [{ fileId: bol.fileId!, name: bol.name }] : []),
+          ...(lumper ? [{ fileId: lumper.fileId!, name: lumper.name }] : []),
+        ],
         // A POD with something written on it (a shortage, damage, no signature) waits for the owner.
         withinRules: !pod?.flagged,
         rule: "invoice_noted_pod",
@@ -214,6 +252,8 @@ export async function sendDetentionClaims(ctx: CarrierContext, now: number): Pro
     const freeHours = terms.freeHours ?? FREE_HOURS;
     for (const d of dwell(load)) {
       if (d.minutes < freeHours * 60 + 15) continue;
+      // Held overnight: that stop is claimed as layover instead (lib/agent/layover).
+      if (load.layoverClaims?.some((c) => c.stop === d.stop)) continue;
       if (!(await claimMark(ctx.carrier.id, load.id, `detention_${d.stop}`))) continue;
       try {
         const to = billTo(ctx, load);

@@ -9,10 +9,11 @@ import { canCall, canText, textTo } from "../channels/out";
 import { formatAtStop, stopLocalToIso } from "../stop-time";
 import type { Broker, Load, Truck } from "../types";
 import type { OfferReading } from "./broker-mail";
-import { addActivity, logChannel, save, saveDriverMessage, type CarrierContext } from "./db";
+import { addActivity, claimMark, logChannel, save, saveDriverMessage, type CarrierContext } from "./db";
 import { answerBrokerQuestion, event, passToOwner, uid } from "./dispatcher";
 import { sendOrQueue } from "./outbox";
 import { askSupportAboutBroker, checkBroker } from "./brokers";
+import { checkCredit } from "./credit";
 import { callBroker, truckAt } from "./broker-call";
 import { canMakePickup } from "./eld";
 import { askFor, floorFor } from "./pricing";
@@ -249,7 +250,21 @@ export function pickForTruck(ctx: Pick<CarrierContext, "trucks" | "drivers">, lo
  * to that truck are set aside, the way picking one load passes on the rest.
  */
 export async function requestBooking(ctx: CarrierContext, load: Load, ask: number, how: { byRules?: boolean; byOwner?: boolean; callFirst?: boolean }) {
-  const broker = ctx.brokers.find((b) => b.id === load.brokerId);
+  let broker = ctx.brokers.find((b) => b.id === load.brokerId);
+  // Their credit, before asking: too weak and the AI doesn't book on its own; slow to pay and it asks a bit more.
+  if (broker && !how.byOwner) {
+    const credit = await checkCredit(ctx, broker);
+    broker = credit.broker;
+    if (credit.blocked) {
+      if (await claimMark(ctx.carrier.id, load.id, "credit_hold"))
+        await passToOwner(ctx, { reason: `The AI didn't ask to book ${load.referenceNumber}: ${credit.why}. Brokers like that pay late or not at all. Book it yourself from the load if you still want it.`, loadId: load.id, label: "Got it", source: "email", to: "decider", brokerId: broker.id });
+      return "queued" as const;
+    }
+    if (credit.surchargePct && !load.surchargePct) {
+      ask = Math.round((ask * (1 + credit.surchargePct / 100)) / 25) * 25;
+      load = { ...load, surchargePct: credit.surchargePct };
+    }
+  }
   const to = load.brokerContactEmail ?? broker?.email;
   // A truck sitting empty and a board load with a phone number: call now, the way dispatchers cover a load before
   // someone else does. The email is the fallback when the call can't go.
