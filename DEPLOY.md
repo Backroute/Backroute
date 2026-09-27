@@ -82,17 +82,40 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - **Within my rules:** book requests, counters and acceptances at or over the lowest rate, invoices, detention claims with known terms, and setup packets go on their own. Replies the AI wrote itself wait.
   - **Full autopilot:** the AI's own replies go too, unless one names a price that isn't already in the conversation.
   - Whatever the setting, anything under the owner's lowest rate, a POD with a problem on it, or an unverified broker waits for the owner. The AI won't book on its own without a lowest rate per mile set.
-- **Your support team, not the carrier's dispatcher.** Anything the AI can't handle goes to Backroute's support team, at `/ops`, for every carrier at once. Examples: a breakdown, a driver who can't be reached, a broker who fails the check, a short payment, an email the AI couldn't answer.
+- **The AI finishes almost everything; your support team gets only a few kinds of thing.** Backroute's support team works at `/ops`, for every carrier at once, and gets only:
+  1. **Safety emergencies:** a crash, an injury, danger on the road, or a stranded truck no repair shop or tow company the AI called could help.
+  2. **Other companies' websites:** a rate con a broker will only take signed in their portal (after the AI asked for a PDF), or a broker's setup portal the carrier has no profile on.
+  3. **Our own systems failing:** the AI couldn't answer a text, call or email even on a second try, or the text or email service was down the whole time a message was worth sending.
+  4. **The owner asks for a person.**
+  5. **Backup:** something urgent the owner hasn't picked up within an hour (a driver who won't answer on a late load goes to the owner first, since they know the driver).
+
+  Everything else the AI does itself, and what's the carrier's own money goes to the owner. See "What the AI handles instead of support" below.
   - Each item comes with the carrier, load, driver, broker, how to reach them, and the texts, calls or emails it came from.
   - Support can take it, call, text the driver from the dispatch number, send or fix the AI's draft, mark a broker as checked, hand it to the owner, or close it with a note the owner sees.
   - Urgent ones (a crash, a missing driver on a late load) also text the support team's phones.
   - Each item shows its kind and a short playbook, for example emergency, possible fraud, breakdown, broker check or money. It turns red once it's late: 15 minutes for urgent items, 2 hours for the rest.
   - The **Numbers** tab shows hand-offs to support per truck per week, by kind, how fast they're closed, and how many ran late. That's the number to push down.
-  - The owner sees these items as "Backroute support is on it". Only the carrier's own decisions go to the owner, and on **Full autopilot** those go to support too, so the owner only hears about emergencies.
-- **Brokers are checked** before the AI books with them. The broker's MC number (from their email signature or rate con) is looked up with FMCSA: broker authority active, and the name on file matching the name and email domain they use. Someone posing as a real broker, or using a free email, is flagged, and support is asked to look. The AI won't book with a broker who doesn't pass.
+  - The owner sees these items as "Backroute support is on it".
+  - The owner gets the carrier's own decisions: a price just under their lowest, filing on a broker's bond, a claim to their insurer, a broker the AI won't book with. On **Full autopilot**, what the AI already handled is only in the activity log, not in Needs you.
+- **What the AI handles instead of support:**
+  - **A broker with no MC number:** it emails them for it, checks it with FMCSA when they answer, and asks to book their load if it passes. A broker who fails the check isn't booked; the owner can mark them trusted.
+  - **A dock appointment the facility won't set or can't be reached for:** the broker is asked to set it, reminded once after 2 hours, and the time they send goes on the load and to the driver.
+  - **Short payments:** the broker is asked what the difference is for and for the balance, with the invoice lines.
+  - **Late invoices:** a reminder at 3 days, another at 13, and a final notice at 30 that names the broker's bond. Filing on the bond is the owner's call.
+  - **Bank-detail requests:** the standing answer (payment details never change by email), nothing shared, and the owner is told.
+  - **Impostors:** no answer and nothing done; the real broker is warned at the address the carrier already had, and the owner is told.
+  - **Double brokering:** not booked. The broker the carrier dealt with is asked, at the known address, for a rate con from their own company.
+  - **Tracking still off at pickup:** the broker is asked to resend it to the driver's number, and the driver is told.
+  - **A broker call the AI couldn't finish:** it follows up by email with where things stood, or calls back.
+  - **No email or phone to book a load:** the AI lets it go; the truck stays free.
+  - **No broker email for an invoice or claim:** it uses the one on their rate con.
+  - **A breakdown with no repair shop found:** it searches for heavy-duty towing and calls those too, before support.
+  - **A change after booking priced too low by the broker:** it holds its number once, with the reason.
+  - **A hiccup in the AI service:** each answer is tried a second time before anyone is asked.
+- **Brokers are checked** before the AI books with them. The broker's MC number (from their email signature or rate con) is looked up with FMCSA: broker authority active, and the name on file matching the name and email domain they use. Someone posing as a real broker, or using a free email, is flagged. The AI won't book with a broker who doesn't pass; one with no MC yet is asked for it.
 - **Getting paid:**
-  - Payment emails (ACH notices, remittances) mark invoices paid. A short payment goes to support.
-  - An invoice past its terms gets a polite reminder 3 days late, another at 13 days, then support calls the broker's accounts payable. Skipped when the carrier factors.
+  - Payment emails (ACH notices, remittances) mark invoices paid. A short payment gets an email asking what the difference is for.
+  - An invoice past its terms gets a polite reminder 3 days late, another at 13 days, and a final notice at 30 naming the broker's bond. Skipped when the carrier factors.
 - **Cancellations:** when a broker cancels, the load comes off the truck and the driver is told not to go, in their language. If the truck was already dispatched, a TONU claim is sent, using the rate con's amount, or $150 checked first. The truck's other offers come back, and within the rules the AI asks for the best one.
 - **The AI calls brokers:**
   - When a book request gets no email answer in 30 minutes, the AI phones the broker. It does the same right away for a broker who only gave a phone number (most load board posts).
@@ -155,7 +178,7 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - An email from a domain one letter off a broker the carrier knows is treated as an impostor, even when it quotes the real broker's MC.
   - An email asking to change bank or payment details, or to "verify" an account: the AI doesn't reply, and support confirms by phone.
 - **Check calls:** when the rate con asks for tracking, or the owner turns it on for every load, the broker gets a location and ETA email from the ELD every 4 hours.
-- **Carrier setup networks:** the carrier's MyCarrierPackets, Highway or RMIS profile links go out with every setup packet. A broker's portal invite goes to support to accept once.
+- **Carrier setup networks:** the carrier's MyCarrierPackets, Highway or RMIS profile links go out with every setup packet. A broker's portal invite for a network the carrier has a profile on gets the link; any other goes to support to fill out once.
 - **Truck routing** (HERE, truck mode): real road miles for loads posted without them, and ETAs by road for late notices and check calls. Without it, miles are estimated from city coordinates.
 - **The whole fleet at once:** when two loads both want the same nearest truck, it takes the better one and the other goes to the next free truck that can reach it.
 - **Moving an idle truck to the freight:** a truck that's sat empty 12 hours with nothing that fits is pointed at the nearest place the carrier's loads actually come from (at least 3 in 3 weeks). On full autopilot, within half the owner's empty-miles limit, the AI texts the driver to go. Otherwise it asks the owner. Board searches then run from there.
@@ -167,9 +190,9 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - A broker's yes gets a thank-you and "send the rate con" with the detention and TONU terms. A question alongside a price ("when can you get there?") is answered in the same email, from the carrier's data and never with a new price. A rate per mile ("we can do 2.90 a mile") is handled like any offer.
   - A rate con that matches gets "got it, truck 102 with Ana is set for pickup". One that doesn't gets a list of what's off and a request for a corrected one (and the owner hears).
   - A cancellation before the truck rolled gets "got it, thanks". Loads that fit no truck get "not today, here's what we run", once a day per broker. A request for papers that aren't uploaded yet gets "coming shortly".
-  - An email the AI can't answer gets "thanks, we'll get back to you shortly", and support takes it.
+  - An email the AI can't answer, even on a second try, gets "thanks, we'll get back to you shortly", and support takes it.
   - These short notes carry no price or promise, so they go out on every autopilot setting.
-  - On the phone, brokers asking for the carrier packet get it by email. Questions the AI can't answer are noted and support follows up by email.
+  - On the phone, brokers asking for the carrier packet get it by email. Questions only the carrier can answer go to the owner.
   - A broker calling back the number the AI called them from reaches the AI, which picks up about that load.
   - The owner can call or text the dispatch line: the AI answers from the fleet data in the owner's language, and passes anything that needs a person to support.
   - A broker who saw a carrier's truck on a load board calls the dispatch line. The post says to call it and ask for the carrier; the owner can switch that back to their own number in Settings → Your rules. The front desk finds the carrier, takes the load down (lanes, time, equipment, weight, company, MC), checks it fits a truck, and works the price on the same call.
@@ -216,8 +239,8 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - The brokers and finished loads it adds give the AI lane prices and broker habits from day one.
   - Importing the same sheet twice doesn't double it, and nothing is invoiced or texted for old loads.
 - **The rest of a dispatcher's paperwork and phone work:**
-  - **Signing the rate con:** in Settings → Your rules → Rate cons, the owner names who's authorized to sign. When a broker's rate con matches what was agreed on a load the AI booked, the AI adds a signature page (the load, the rate, the terms, the signer's name and the time) and sends the signed copy back with its thanks. Both the broker's copy and the signed one are kept on the load. A rate con that doesn't match is sent back for a fix, never signed. A broker who wants it signed in their own portal (DocuSign and the like) goes to support: the AI doesn't log in to other companies' systems. With no signer named, the owner is asked once to add one.
-  - **The broker's tracking app:** when the rate con or the broker's email asks for Macropoint, Trucker Tools, FourKites, project44 or the like, the driver is texted what to accept, with the link when there is one. "Yes" back turns it on and tells the broker. Not on 2 hours before pickup, the driver gets a reminder; still not on at pickup, support is told.
+  - **Signing the rate con:** in Settings → Your rules → Rate cons, the owner names who's authorized to sign. When a broker's rate con matches what was agreed on a load the AI booked, the AI adds a signature page (the load, the rate, the terms, the signer's name and the time) and sends the signed copy back with its thanks. Both the broker's copy and the signed one are kept on the load. A rate con that doesn't match is sent back for a fix, never signed. A broker who wants it signed in their own portal (DocuSign and the like) is first asked for a PDF by email; if they insist, support signs it there, since the AI doesn't log in to other companies' systems. With no signer named, the owner is asked once to add one.
+  - **The broker's tracking app:** when the rate con or the broker's email asks for Macropoint, Trucker Tools, FourKites, project44 or the like, the driver is texted what to accept, with the link when there is one. "Yes" back turns it on and tells the broker. Not on 2 hours before pickup, the driver gets a reminder; still not on at pickup, the broker is asked to resend it to the driver's number.
   - **Dock appointments by phone:** a rate con that says to call for an appointment gets a call to the shipper or receiver (their number from the rate con) to book one, in their working hours, up to three tries. A truck that will miss its appointment gets a call to move it, before the late notice goes to the broker. The time they give goes on the load, the driver is texted it and the broker hears. It goes through their phone menu (receiving, shipping, scheduling), answers the usual questions from the load (load number, weight, what it is), and a facility that says the broker has to set it gets the broker asked by email and support told.
   - **Layover:** a truck held overnight at a stop it reached on time is claimed a day's layover per day, while it's still waiting, at the rate con's layover terms or the owner's rate (default $250). That stop gets no hourly detention on top, and the layover goes on the invoice. Without the broker's terms it waits for the owner's OK, like detention.
   - **Broker credit:** before asking to book, the AI checks the broker's credit: a credit service by MC number (step 14) and, once a broker has paid a couple of invoices, how long they really took. Under the owner's lowest score (default 70 of 100), or 60+ days to pay, it doesn't book on its own and says why. Slower than 40 days, it asks 4% more.
@@ -245,7 +268,7 @@ The AI now does the day-to-day work of a dispatcher by email, text and phone. Wh
 - **Natural calls need the voice server running** (step 13). Without it, calls take turns through Twilio's speech recognition, with a short pause after each person speaks.
   - Even with it, the AI answers in about a second or two, since each answer goes through the same checks as email.
   - Punjabi calls always take turns.
-  - Some brokers won't deal with an AI and hang up. Those come back to email or to support.
+  - Some brokers won't deal with an AI and hang up. Those come back to email.
 - **Rate data and routing need their own accounts** (steps 11 and 12). The DAT and Greenscreens request formats must be checked against their documents when access is granted, the same as DAT's load board.
 - **Emergencies need a person.** For a crash, the AI tells the driver to call 911 and alerts support and the owner. A person reaches the driver, deals with the police report and the insurance claim, and approves any repair.
 - **Where it guesses, it asks first**, until the owner turns on the matching rule:
@@ -255,7 +278,7 @@ The AI now does the day-to-day work of a dispatcher by email, text and phone. Wh
   - layover pay without the broker's terms
   - sending a claim file to the insurer
   - A new broker that fails the check, or whose credit is under the owner's lowest, always waits.
-- **Broker portals need a person:** signing a rate con in DocuSign or a broker's own site, accepting a setup invite, or booking a dock time in an online scheduling portal. The AI hands these to support with the link.
+- **Broker portals need a person:** signing a rate con in DocuSign or a broker's own site (when they won't email a PDF), or filling out a setup portal the carrier has no profile on. The AI hands these to support with the link. Online dock-scheduling portals go back to the broker by email.
 - **Credit scores need a credit service** (step 14). Until one is set, the AI only has the carrier's own payment history, which starts empty.
 - **Miles and ETAs without a routing account** (step 12) come from about 130 freight cities and each state's middle. For a town not on the list, miles are rough, and the AI doesn't send late notices from them.
 - **Negotiation is by rules, not instinct.** The AI haggles in steps with reasons, and adjusts to each broker's history. But it doesn't read a broker's mood, bluff about other loads, or trade favors across loads the way a long-time dispatcher might. Every number comes from the rules, on purpose, so it can't be talked below the owner's lowest.
@@ -520,14 +543,14 @@ The code was run against local stand-ins that behave like the real services:
   - Support can take an item, text the driver, close it with a note the owner sees, or mark a broker checked.
   - An owner can't open the console, and sees support items as handled.
 - **Broker checks:**
-  - Someone posing as a broker (inactive MC, free email) isn't booked with, and support is asked.
+  - Someone posing as a broker (inactive MC, free email) isn't booked with, and the owner is told why.
   - A real broker passes FMCSA and is booked with automatically.
 - **Cancellations:**
   - A booked load comes off the truck.
   - A dispatched one also gets a TONU claim, and the driver is told not to go.
 - **Getting paid:**
-  - A payment email marks the invoice paid, and a short payment goes to support.
-  - A late invoice gets a reminder, a second one, then goes to support, each once.
+  - A payment email marks the invoice paid, and a short payment gets an email asking for the rest.
+  - A late invoice gets a reminder, a second one, then a final notice naming the broker's bond, each once; the owner decides what's next.
 - **Calls to brokers:**
   - An unanswered book request gets a call, which opens with the AI disclosure and the price.
   - A lower offer is countered, and the AI can't be talked into a number the rules didn't accept.
@@ -540,7 +563,7 @@ The code was run against local stand-ins that behave like the real services:
   - Samsara (two pages of vehicles) and Motive both connect, and a wrong key is refused.
   - Trucks and drivers are matched, and unknown ones are listed.
   - Location and hours are saved, and the broker gets one late notice when the truck can't make it.
-- **Full autopilot:** a decision the AI won't make goes to support, not the owner.
+- **Full autopilot:** a money decision the AI won't make is the owner's, not support's.
 - **Load boards** (against stand-ins built from Truckstop's public reference and the DAT shape in the code):
   - Without Backroute's logins, a carrier can save their side, nothing is searched, and it says it's waiting.
   - A wrong Truckstop Integration ID is caught when it's added.
@@ -570,11 +593,11 @@ The code was run against local stand-ins that behave like the real services:
 - **Money and fraud:**
   - The market rate raises the ask on an underpriced post.
   - The invoice bills line haul, claimed detention and the lumper from the receipt, and a claimed TONU gets its own invoice.
-  - A rate con from another MC stops the booking, and support checks it.
+  - A rate con from another MC stops the booking; the broker is asked for their own rate con and the owner is told.
   - A lookalike domain quoting a real MC is flagged.
-  - A bank-details email gets no reply and goes to support.
+  - A bank-details email gets the standing answer (nothing changes by email), and the owner is told.
   - Tracking-required loads get a check call every 4 hours.
-  - A setup request gets the profile links, and portal invites go to support.
+  - A setup request gets the profile links; a portal invite for a network the carrier is already on needs nobody.
 - **Fleet:**
   - Loads without miles get truck-route miles.
   - Two loads for one nearest truck are split across two trucks.
@@ -607,12 +630,21 @@ The code was run against local stand-ins that behave like the real services:
   - The next load from that broker on that lane is priced from what they paid.
   - Nothing is invoiced or texted for old loads.
 - **The simulated week** (`eval/sim.mjs`, scripted): every scenario runs with no hard rule broken, and the money captured stays at 90% or more of what brokers would really pay.
+- **What the AI finishes instead of support** (24 checks):
+  - A broker with no MC is emailed for it; their answer is checked with FMCSA and their load is asked for.
+  - A bank-details request gets the standing answer and the owner is told. An impostor gets nothing, and the real broker is warned.
+  - A short pay gets a question with the invoice lines. A month late gets a final notice naming the bond, and the owner decides.
+  - With no facility number, the broker is asked to set the appointment. Their emailed time goes on the load and to the driver, and they get a short thanks.
+  - Tracking still off at pickup: the broker is asked to resend it to the driver's number.
+  - A portal rate con: a PDF is asked for first, and support signs it only if the broker insists.
+  - An urgent item the owner leaves for an hour goes to support, and their phones get it.
+  - In all of that, the only new support items are the portal and the owner-silent emergency.
 - **The rest of a dispatcher's job** (49 checks):
   - **Rate con:** a matching one is signed (the broker's pages plus a signature page) and sent back, and both copies are kept on the load.
   - **Tracking:** the driver is texted the Macropoint link. Their "yes" turns it on, and the broker is told.
   - **Dock appointments, by phone:**
     - A delivery appointment is booked through the receiver's phone menu (it presses "receiving"). Their question is answered, and the time and confirmation number go on the load, to the driver and to the broker.
-    - A pickup move the facility won't make by phone goes to the broker and to support.
+    - A pickup move the facility won't make by phone goes back to the broker, and the owner is told.
     - Voicemail is tried again later.
   - **Layover:** a truck held overnight is claimed at the rate con's layover rate, with no hourly detention on top. A late truck claims nothing.
   - **Broker credit:** a broker under the lowest credit score isn't asked to book, and the owner is told why. A slow payer is asked 4% more.

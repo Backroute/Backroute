@@ -150,7 +150,7 @@ async function handle(carrierId: string, email: InboundEmail) {
               // Their portal: first ask for it as a PDF by email (most brokers will); if they insist, support signs it there.
               if (await claimMark(carrierId, load.id, "portal_pdf_ask"))
                 await sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: `Hi${fromName ? ` ${fromName.split(" ")[0]}` : ""},\n\nCould you email the rate con for ${load.referenceNumber} as a PDF? We sign and send it straight back.\n\nThanks,\n${ctx.carrier.name}`, inReplyTo: sender.messageId, loadId: load.id, withinRules: true, why: `Ask ${fromName} for the rate con as a PDF?` });
-              else await passToOwner(ctx, { reason: `${fromName} needs the rate con for ${load.referenceNumber} signed in their online portal (they didn't send a PDF when asked). Sign it from the link in their email.`, loadId: load.id, label: "Signed", source: "email", to: "support" });
+              else if (await claimMark(carrierId, load.id, "portal_support")) await passToOwner(ctx, { reason: `${fromName} needs the rate con for ${load.referenceNumber} signed in their online portal (they didn't send a PDF when asked). Sign it from the link in their email.`, loadId: load.id, label: "Signed", source: "email", to: "support" });
             }
             else if (booked && !ctx.settings.rateConSigner?.name && (await claimMark(carrierId, `carrier:${carrierId}`, "no_signer"))) await passToOwner(ctx, { reason: `The AI booked ${load.referenceNumber} on a matching rate con but can't sign it for you yet. In Settings → Your rules, add who signs rate cons, and the AI will sign and return them.`, loadId: load.id, label: "Added", source: "email", to: "owner" });
             await sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: mail.rateConThanks(ctx.carrier, ctx.settings, load, who, fromName, !!signed), inReplyTo: sender.messageId, loadId: load.id, attachments: signed ? [signed] : undefined, withinRules: true, why: `Thank ${fromName} for the rate con on ${load.referenceNumber}?` });
@@ -225,6 +225,16 @@ async function handle(carrierId: string, email: InboundEmail) {
       source: "email",
       to: "owner",
     });
+    return;
+  }
+
+  // A booked load whose rate con isn't signed yet, and the broker wants it signed in their portal: asked for a PDF by
+  // email first; asked again, support signs it there (another company's website).
+  if (load && !impostor && !load.rateConSignedAt && ["booked", "rate_confirmed", "dispatched"].includes(load.stage) && PORTAL_SIGNING.test(text) && /https?:\/\//.test(text)) {
+    if (await claimMark(carrierId, load.id, "portal_pdf_ask"))
+      await sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: `Hi${fromName ? ` ${fromName.split(" ")[0]}` : ""},\n\nCould you email the rate con for ${load.referenceNumber} as a PDF? We sign and send it straight back.\n\nThanks,\n${ctx.carrier.name}`, inReplyTo: sender.messageId, loadId: load.id, withinRules: true, why: `Ask ${fromName} for the rate con as a PDF?` });
+    else if (await claimMark(carrierId, load.id, "portal_support"))
+      await passToOwner(ctx, { reason: `${fromName} needs the rate con for ${load.referenceNumber} signed in their online portal (they didn't send a PDF when asked). Sign it from the link in their email.`, loadId: load.id, label: "Signed", source: "email", to: "support" });
     return;
   }
 

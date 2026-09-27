@@ -59,7 +59,7 @@ The real version switches on from environment variables:
 - **Natural phone calls:** with the voice server (`voice-server/`, run outside Vercel), the AI talks and listens at the same time, and stops when interrupted.
 - **Support team tools:** a playbook for each kind of hand-off, timers that turn red when an item is late, and the number to push down: hand-offs per truck per week.
 - **ELD and load feeds:** Samsara or Motive for truck locations and drivers' hours, and any JSON or CSV list of loads.
-- **Backroute support:** anything the AI can't handle goes to your support team's console at `/ops`, not to a dispatcher. On full autopilot the owner only hears about emergencies.
+- **Backroute support, for very little:** the AI finishes the job itself (it asks brokers for missing MCs, chases short pays and late invoices, hands dock appointments back to brokers, answers bank-detail scams, warns brokers about impostors). Your support team at `/ops` gets only safety emergencies, other companies' websites, our own outages, owners who ask for a person, and urgent things an owner leaves for an hour. Money decisions are the owner's.
 - **Evening text:** an end-of-day text to the owner.
 - **Before real carriers:**
   - **Practice mode:** the AI does everything but sends nothing, and shows what it would have sent.
