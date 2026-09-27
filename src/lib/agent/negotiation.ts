@@ -14,7 +14,10 @@ import { floorFor } from "./pricing";
  * - Close enough to our number (within $50 or 3%): it takes it.
  * - After three counters: at or over the owner's lowest it takes it; within 5% under, the owner decides; further
  *   under, it passes politely and leaves the door open.
- * - Every counter comes with a reason a broker understands (the market, the empty miles, being ready on time).
+ * - Every counter comes with a reason a broker understands (the market, the empty miles, a hard place to reload,
+ *   being ready on time), a different one each round when there's more than one, the way people don't repeat
+ *   themselves.
+ * - When the two numbers are close (within about 12%) after a round, it offers to meet in the middle.
  */
 
 export const MAX_COUNTERS = 3;
@@ -27,7 +30,7 @@ export type BookRequest = NonNullable<Load["bookRequest"]>;
 
 export type Move =
   | { action: "accept"; amount: number }
-  | { action: "counter"; amount: number; round: number; final: boolean; held: boolean; reason: string }
+  | { action: "counter"; amount: number; round: number; final: boolean; held: boolean; split?: boolean; reason: string }
   | { action: "owner"; why: string }
   | { action: "pass"; amount: number; why: string };
 
@@ -45,20 +48,31 @@ export function targetFor(load: Pick<Load, "lane" | "market">, settings: Pick<Ag
 /** Counters made so far (older loads only have the countered flag). */
 export const roundsOf = (req: Load["bookRequest"]) => req?.rounds ?? (req?.countered ? 1 : 0);
 
-/** A reason for our number that a broker hears every day. Numbers in it come from the load, never from the AI. */
-export function reasonFor(load: Pick<Load, "lane" | "market" | "deadheadMiles" | "pickupAt">, amount: number, now = Date.now()): string {
-  if (load.market?.rpm && amount <= round25(load.market.rpm * load.lane.miles * 1.1)) return `Lanes like this are paying about $${load.market.rpm.toFixed(2)} a mile right now.`;
-  if (load.deadheadMiles >= 75) return `We're running ${Math.round(load.deadheadMiles)} miles empty to get to it.`;
+type ReasonLoad = Pick<Load, "lane" | "market" | "deadheadMiles" | "pickupAt" | "reloadMarket">;
+
+/** Every reason for our number that holds for this load, most persuasive first. Numbers come from the load. */
+export function reasonsFor(load: ReasonLoad, amount: number, now = Date.now()): string[] {
+  const out: string[] = [];
+  if (load.market?.rpm && amount <= round25(load.market.rpm * load.lane.miles * 1.1)) out.push(`Lanes like this are paying about $${load.market.rpm.toFixed(2)} a mile right now.`);
+  if (load.deadheadMiles >= 75) out.push(`We're running ${Math.round(load.deadheadMiles)} miles empty to get to it.`);
+  if (load.reloadMarket === "weak") out.push(`${load.lane.destination} is a tough place to reload, so we'll likely leave there empty.`);
   const pickup = load.pickupAt ? Date.parse(load.pickupAt) : NaN;
-  if (pickup && pickup - now < 36 * 3600_000 && pickup > now) return "The truck is ready and will be there on time.";
-  return `That works out to $${(amount / Math.max(1, load.lane.miles)).toFixed(2)} a mile, which is what we need on this lane.`;
+  if (pickup && pickup - now < 36 * 3600_000 && pickup > now) out.push("The truck is ready and will be there on time.");
+  out.push(`That works out to $${(amount / Math.max(1, load.lane.miles)).toFixed(2)} a mile, which is what we need on this lane.`);
+  return out;
+}
+
+/** The reason for this round: a different one each time, while there are others to give. */
+export function reasonFor(load: ReasonLoad, amount: number, round = 1, now = Date.now()): string {
+  const all = reasonsFor(load, amount, now);
+  return all[(Math.max(1, round) - 1) % all.length];
 }
 
 /**
  * The broker named a price (on the phone or by email). What the AI answers, from where the haggling stands.
  * `before` is the book request as it was before this offer.
  */
-export function respond(offer: number, load: Pick<Load, "lane" | "market" | "deadheadMiles" | "pickupAt" | "targetRate" | "bookRequest">, settings: Pick<AgentSettings, "minRpm">, now = Date.now()): Move {
+export function respond(offer: number, load: ReasonLoad & Pick<Load, "targetRate" | "bookRequest">, settings: Pick<AgentSettings, "minRpm">, now = Date.now()): Move {
   const req = load.bookRequest;
   const floor = floorFor(load, settings);
   if (!floor) return { action: "owner", why: `No lowest rate per mile is set, so the AI won't agree to ${money(offer)} on its own.` };
@@ -77,7 +91,7 @@ export function respond(offer: number, load: Pick<Load, "lane" | "market" | "dea
 
   // They didn't move since last time: hold our number.
   if (rounds > 0 && theirsBefore !== undefined && offer <= theirsBefore) {
-    return { action: "counter", amount: ours, round: rounds + 1, final: rounds + 1 >= MAX_COUNTERS, held: true, reason: reasonFor(load, ours, now) };
+    return { action: "counter", amount: ours, round: rounds + 1, final: rounds + 1 >= MAX_COUNTERS, held: true, reason: reasonFor(load, ours, rounds + 1, now) };
   }
 
   const target = Math.max(targetFor(load, settings) ?? floor, floor);
@@ -87,7 +101,11 @@ export function respond(offer: number, load: Pick<Load, "lane" | "market" | "dea
   // Our next step would meet them: take their number (when it's one the owner allows).
   if (offer >= floor && next - offer <= Math.max(50, next * 0.03)) return { action: "accept", amount: offer };
   const final = rounds + 1 >= MAX_COUNTERS || next <= floor;
-  return { action: "counter", amount: next, round: rounds + 1, final, held: next === ours && rounds > 0, reason: reasonFor(load, next, now) };
+  // Close, after a round of back-and-forth: meet in the middle, when that gives up less than the next step would.
+  const middle = round25((ours + offer) / 2);
+  if (rounds > 0 && offer >= target && ours - offer <= ours * 0.12 && middle < ours && (middle > next || next >= ours))
+    return { action: "counter", amount: middle, round: rounds + 1, final, held: false, split: true, reason: reasonFor(load, middle, rounds + 1, now) };
+  return { action: "counter", amount: next, round: rounds + 1, final, held: next === ours && rounds > 0, reason: reasonFor(load, next, rounds + 1, now) };
 }
 
 /** The broker's number, on record. */
@@ -114,4 +132,10 @@ export function ourNumbers(req: Load["bookRequest"], fallbackAsk: number): numbe
 /** What a broker should put on the rate con besides the price: detention and TONU terms, in one line. */
 export function termsLine(settings: Pick<AgentSettings, "detentionPerHour" | "tonuFee">): string {
   return `Please show detention at ${money(settings.detentionPerHour ?? 50)}/hour after 2 hours free, and TONU at ${money(settings.tonuFee ?? 150)}, on the rate con.`;
+}
+
+/** Our number when the broker asks what we need (or won't name one first): the standing ask and a reason. */
+export function ourNumber(load: ReasonLoad & Pick<Load, "targetRate" | "bookRequest">, now = Date.now()): { amount: number; reason: string } {
+  const amount = load.bookRequest?.ask ?? load.targetRate;
+  return { amount, reason: reasonFor(load, amount, roundsOf(load.bookRequest) + 1, now) };
 }

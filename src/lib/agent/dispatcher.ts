@@ -9,6 +9,7 @@ import { driverSnapshot, ownerSnapshot } from "../ai/snapshot";
 import { LANG_INFO } from "../lang/pack";
 import { PRIMARY_CARRIER_ID } from "../mock-data";
 import { memoryNote } from "./memory";
+import { truckAt } from "./broker-call";
 import { NEARBY, findNearby, handleBreakdown } from "./roadside";
 import { recordFeedback } from "./care";
 import { LOAD_STAGE_LABEL, LOAD_STAGE_ORDER, type ActivityEvent, type Driver, type Escalation, type Load, type LoadStage, type MessageChannel } from "../types";
@@ -263,7 +264,7 @@ function textOf(message: Anthropic.Beta.BetaMessage) {
 // ─── Broker email ────────────────────────────────────────────────────────────
 
 const BROKER_NOTES = `
-Now you're handling the carrier's email with a freight broker. Write the reply the carrier would send: short, professional, first person plural ("we"), signed with the carrier's name. Never agree to a lower rate, extra fees or changed terms, and never commit a truck the data doesn't show as free; for those, say you'll confirm and use flag_for_owner. Don't invent load details. If the email needs no reply (an automated notice, a thank-you), write exactly NO_REPLY.`;
+Now you're handling the carrier's email with a freight broker. Write the reply the way a busy, experienced dispatcher does: answer what they asked in the first line, two or three short lines in all, first name greeting, "we" for the carrier, signed with the carrier's name. No filler ("I hope this finds you well", "please don't hesitate"). If they ask where the truck is, when it can get there, or for the MC, answer from the context. Never agree to a lower rate, extra fees or changed terms, and never commit a truck the data doesn't show as free; for those, say you'll confirm and use flag_for_owner. Don't invent load details. If the email needs no reply (an automated notice, a thank-you), write exactly NO_REPLY.`;
 
 export interface BrokerEmail {
   from: string;
@@ -294,7 +295,8 @@ export async function brokerEmailDraft(ctx: CarrierContext, email: BrokerEmail):
   const context = {
     carrier: ctx.carrier.name,
     fleet: ownerSnapshot(snapshotSource(ctx), { ask: "Ask me first", rules: "Within my rules", full: "Full autopilot" }),
-    thisLoad: email.load ? { ref: email.load.referenceNumber, lane: `${email.load.lane.origin}, ${email.load.lane.originState} → ${email.load.lane.destination}, ${email.load.lane.destState}`, rate: email.load.bookedRate ?? email.load.targetRate, pickup: email.load.pickupWindow, delivery: email.load.deliveryWindow, stage: LOAD_STAGE_LABEL[email.load.stage], history: memoryNote(ctx.loads, ctx.brokers, email.load) || undefined } : null,
+    mc: ctx.carrier.mc,
+    thisLoad: email.load ? { truck: truckAt(ctx, email.load) ?? undefined, ref: email.load.referenceNumber, lane: `${email.load.lane.origin}, ${email.load.lane.originState} → ${email.load.lane.destination}, ${email.load.lane.destState}`, rate: email.load.bookedRate ?? email.load.targetRate, pickup: email.load.pickupWindow, delivery: email.load.deliveryWindow, stage: LOAD_STAGE_LABEL[email.load.stage], history: memoryNote(ctx.loads, ctx.brokers, email.load) || undefined } : null,
     earlierEmails: email.thread.map((t) => ({ direction: t.direction === "in" ? "from broker" : "from us", body: (t.body ?? "").slice(0, 1500) })),
     attachments: email.attachmentNotes,
   };

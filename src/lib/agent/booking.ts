@@ -12,7 +12,7 @@ import { addActivity, logChannel, save, saveDriverMessage, type CarrierContext }
 import { event, passToOwner, uid } from "./dispatcher";
 import { sendOrQueue } from "./outbox";
 import { askSupportAboutBroker, checkBroker } from "./brokers";
-import { callBroker } from "./broker-call";
+import { callBroker, truckAt } from "./broker-call";
 import { canMakePickup } from "./eld";
 import { askFor, floorFor } from "./pricing";
 import { ourNumbers, respond, withTheirOffer } from "./negotiation";
@@ -264,7 +264,7 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
     to,
     toName: broker?.contact || undefined,
     subject: subject.includes(load.referenceNumber) ? subject : `${subject} (${load.referenceNumber})`,
-    body: mail.bookRequest(ctx.carrier, ctx.settings, load, ask, broker?.contact || undefined),
+    body: mail.bookRequest(ctx.carrier, ctx.settings, load, ask, broker?.contact || undefined, truckAt(ctx, load) ?? undefined),
     inReplyTo: load.offerEmail?.messageId,
     loadId: load.id,
     amount: ask,
@@ -321,7 +321,7 @@ export async function answerRateReply(ctx: CarrierContext, load: Load, reply: { 
   const body =
     move.action === "accept"
       ? mail.accept(ctx.carrier, ctx.settings, withOffer, move.amount, name)
-      : mail.counter(ctx.carrier, ctx.settings, withOffer, move.amount, name, { final: move.final, held: move.held, reason: move.reason });
+      : mail.counter(ctx.carrier, ctx.settings, withOffer, move.amount, name, { final: move.final, held: move.held, split: move.split, reason: move.reason });
   await sendOrQueue(ctx, {
     ...base,
     purpose: move.action,

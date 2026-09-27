@@ -12,7 +12,8 @@ import type { Load } from "../types";
 import { addActivity, claimMark, logChannel, releaseMark, save, threadWith, type CarrierContext } from "./db";
 import { event, passToOwner } from "./dispatcher";
 import { floorFor } from "./pricing";
-import { ourNumbers, respond, withOurMove, withTheirOffer } from "./negotiation";
+import { ourNumber, ourNumbers, respond, withOurMove, withTheirOffer } from "./negotiation";
+import { estimateMiles } from "../fleet";
 import { askSupportAboutBroker, checkBroker } from "./brokers";
 import { assessBroker } from "../broker-policy";
 import { confirmPhoneBooking } from "./paperwork";
@@ -57,10 +58,40 @@ export async function callBroker(ctx: CarrierContext, load: Load, url: string | 
   return true;
 }
 
-/** What the AI says when the broker picks up. Written out, not generated, so the price is exactly the ask. */
+/**
+ * What the AI says when the broker picks up. Like a dispatcher: who's calling (and that it's an AI), which load, and
+ * whether it's still available. The price comes after, once the broker names theirs or asks for ours.
+ */
 export function brokerCallOpening(ctx: CarrierContext, load: Load): string {
-  const ask = load.bookRequest?.ask ?? load.targetRate;
-  return `Hi, this is the AI dispatcher for ${ctx.carrier.name}${ctx.carrier.mc ? `, MC ${ctx.carrier.mc.replace(/\D/g, "").split("").join(" ")}` : ""}. This call is transcribed. I'm calling on your load ${load.referenceNumber}, ${load.lane.origin}, ${load.lane.originState} to ${load.lane.destination}, ${load.lane.destState}, picking up ${load.pickupWindow}. We've got a ${load.equipmentType.toLowerCase()} ready for it, and we'd run it for ${money(ask)} all in. Can we lock it in?`;
+  return `Hi, this is the AI dispatcher for ${ctx.carrier.name}${ctx.carrier.mc ? `, MC ${ctx.carrier.mc.replace(/\D/g, "").split("").join(" ")}` : ""}. This call is transcribed. I'm calling on your ${load.lane.origin} to ${load.lane.destination} load, ${load.referenceNumber}, picking up ${load.pickupWindow}. Is it still available?`;
+}
+
+/** Where the load's truck is, the way a dispatcher tells a broker: empty somewhere now, or unloading somewhere soon. */
+export function truckAt(ctx: Pick<CarrierContext, "trucks" | "loads">, load: Load): string | null {
+  const truck = ctx.trucks.find((t) => t.id === load.truckId);
+  if (!truck) return null;
+  const on = ctx.loads.find((l) => l.id === truck.currentLoadId && l.id !== load.id);
+  if (on) return `unloading in ${on.lane.destination}, ${on.lane.destState}${on.deliveryWindow ? ` (${on.deliveryWindow})` : ""}`;
+  const where = truck.position?.description ?? `${truck.currentCity}, ${truck.currentState}`;
+  return truck.status === "available" ? `empty in ${where}` : `in ${where}`;
+}
+
+/** What a broker asks a dispatcher about the truck, the driver and the company, answered from the carrier's data. */
+function factsNote(ctx: CarrierContext, load: Load): string {
+  const facts: string[] = [];
+  const truck = ctx.trucks.find((t) => t.id === load.truckId);
+  const at = truckAt(ctx, load);
+  if (truck && at) {
+    facts.push(`Truck ${truck.unitNumber}, a ${truck.equipmentType.toLowerCase()}, is ${at}.`);
+    const miles = estimateMiles({ city: truck.currentCity, state: truck.currentState }, { city: load.lane.origin, state: load.lane.originState });
+    if (miles !== null && !truck.currentLoadId) facts.push(miles < 25 ? "It's right by the pickup." : `It's about ${miles} miles from the pickup, roughly ${Math.max(1, Math.round(miles / 50))} hour${Math.round(miles / 50) > 1 ? "s" : ""} away.`);
+    const driver = ctx.drivers.find((d) => d.id === truck.driverId);
+    if (driver) facts.push(`Driver: ${driver.name.split(" ")[0]}${typeof driver.hoursRemaining === "number" ? `, ${Math.floor(driver.hoursRemaining)} hours left to drive today` : ""}.`);
+    if (truck.position) facts.push("We track the truck by ELD and send check calls with its location.");
+  }
+  if (ctx.carrier.mc) facts.push(`Our MC is ${ctx.carrier.mc}.`);
+  facts.push("Our W-9, insurance certificate and authority go out with the carrier packet by email.");
+  return ` Facts you can give the broker: ${facts.join(" ")}`;
 }
 
 export const VOICEMAIL = (ctx: CarrierContext, load: Load) => {
@@ -78,25 +109,20 @@ export async function retryAfterVoicemail(ctx: CarrierContext, load: Load) {
   if (!hasEmail && (await claimMark(ctx.carrier.id, load.id, "broker_call_retry"))) await releaseMark(ctx.carrier.id, load.id, "broker_call");
 }
 
-const BROKER_CALL = `You're a truck dispatcher on the phone with a freight broker, booking one load for a small carrier. You already said who you are, that you're an AI, that the call is transcribed, and our price. Talk like an experienced dispatcher: friendly, quick, confident, a little casual ("yeah", "gotcha", "I hear you"). Your words are spoken by a voice: one or two short sentences a turn, no lists or symbols, say numbers the way people say them ("twenty-one fifty").
+const BROKER_CALL = `You're a truck dispatcher on the phone with a freight broker, booking one load for a small carrier. You already said who you are, that you're an AI and that the call is transcribed, and asked if the load is still available. Talk like an experienced dispatcher: friendly, quick, confident, a little casual ("yeah", "gotcha", "I hear you", "appreciate it"). Use the broker's first name once you know it. Your words are spoken by a voice: one or two short sentences a turn, no lists or symbols, say numbers the way people say them ("twenty-one fifty", "two eighty a mile").
 
-How you work the price:
-- Every time the broker names a price, call broker_offer with it first, then say what it tells you in your own words, with the reason it gives. Never name, agree to or hint at a number yourself; the tools decide every number.
-- Don't give up the rate you were told in one go, and don't sound desperate. If they push, acknowledge them ("I hear you") and restate the number with the reason.
-- If the broker asks what your best is, call broker_offer with their last number (or our ask if they haven't named one) and say what it tells you.
-- When the broker agrees to a price the tools gave you, call booked.
+How the call goes, like any dispatcher's:
+1. Covered or cancelled: call not_available, thank them, say bye, and call hang_up.
+2. Available: get what you don't know yet about the freight (commodity, weight, are appointments set) and call load_details with what they say. If it says we can't haul it, say so politely.
+3. Ask what it pays ("What are you paying on it?"). When they name a number, a total or a rate per mile, call broker_offer. If they ask what you need, or won't give a number first, call our_price.
+4. Work the price only through the tools, and say each answer in your own words with the reason it gives. Don't give up ground in one go and don't sound desperate. If they push without moving, acknowledge them and restate the number. On your last number, tell them if they can do it, you'll book it right now.
+5. When they agree to a price the tools gave you, call booked and do what it says (MC number, email for the confirmation). Ask them to send the rate con with detention and TONU on it.
+6. Wrap up with a quick thanks and bye, then call hang_up.
 
-Before you book, like any dispatcher, get the details you don't have: what's the commodity, the weight, and are the pickup and delivery appointments set. Call load_details with what they say. If it says we can't haul it, say so politely.
-
-After booking:
-- If you don't have their MC number yet (the tools will say), ask for it and call broker_mc.
-- If the tools ask for an email address, get it, read it back, and call broker_email.
-- Ask them to send the rate con, and mention detention and TONU should be on it.
-
-Other things:
-- If the load is covered or cancelled, call not_available.
-- Stick to this load. Anything you can't answer, say someone from the office will follow up by email.
-- When you're done, say a short goodbye and call hang_up.`;
+Rules:
+- Never name, agree to or hint at a number the tools didn't give you.
+- Answer questions about the truck, the driver and the company only from the facts you're given. If you don't have it, say you'll confirm by email. Never make anything up.
+- Stick to this load.`;
 
 export interface CallTurnResult {
   reply: string;
@@ -121,9 +147,16 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
   const tools: BetaRunnableTool<any>[] = [
     betaZodTool({
       name: "broker_offer",
-      description: "The broker named a price (all-in total, dollars), or asked for our best. Returns what the carrier's rules say to answer, and a reason to give.",
-      inputSchema: z.object({ amount: z.number().positive() }),
-      run: async ({ amount }) => {
+      description: "The broker named a price: an all-in total in dollars, or a rate per mile. Returns what the carrier's rules say to answer, and a reason to give.",
+      inputSchema: z.object({
+        amount: z.number().positive().optional().describe("All-in total in dollars"),
+        perMile: z.number().positive().optional().describe("Rate per loaded mile in dollars, when that's how they said it"),
+      }),
+      run: async ({ amount: said, perMile }) => {
+        // "Two eighty a mile" is a rate per mile, however it was passed.
+        const rate = perMile ?? (said !== undefined && said < 20 ? said : undefined);
+        const amount = rate !== undefined ? Math.round(rate * current.lane.miles) : said;
+        if (!amount) return "Ask them what the number is.";
         const ours = current.bookRequest?.ask ?? current.targetRate;
         const move = respond(amount, current, ctx.settings);
         const request = withOurMove(withTheirOffer(current.bookRequest, ours, amount, "phone"), move, "phone");
@@ -134,8 +167,14 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
         }
         if (move.action === "counter") {
           accepted.add(move.amount);
-          const say = move.held ? `hold at ${move.amount} dollars all in; they haven't moved` : move.final ? `say the best you can do is ${move.amount} dollars all in` : `say you can come down to ${move.amount} dollars all in`;
-          return `Counter: ${say}. Reason to give: ${move.reason} If they agree to ${move.amount}, book it.`;
+          const say = move.split
+            ? `say you're close and offer to meet in the middle at ${move.amount} dollars all in`
+            : move.held
+              ? `hold at ${move.amount} dollars all in; they haven't moved`
+              : move.final
+                ? `say the best you can do is ${move.amount} dollars all in, and if they can do ${move.amount} you'll book it right now`
+                : `say you can come down to ${move.amount} dollars all in`;
+          return `Counter: ${say}.${rate !== undefined ? ` (Their ${rate.toFixed(2)} a mile is ${amount} dollars.)` : ""} Reason to give: ${move.reason} If they agree to ${move.amount}, book it.`;
         }
         if (move.action === "pass") {
           await addActivity(ctx.carrier.id, event({ type: "call_completed", loadId: current.id, message: `Passed on ${current.referenceNumber} at $${amount.toLocaleString()}`, detail: `Our lowest was $${move.amount.toLocaleString()}`, severity: "info" }));
@@ -143,6 +182,16 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
         }
         await passToOwner(ctx, { reason: `${ctx.brokers.find((b) => b.id === current.brokerId)?.company ?? "The broker"} offered $${amount.toLocaleString()} by phone on ${current.referenceNumber}. ${move.why}`, loadId: current.id, label: "Decided", source: "voice", to: "decider" });
         return `Don't agree. Say you have to run it by the office and will email back shortly.`;
+      },
+    }),
+    betaZodTool({
+      name: "our_price",
+      description: "The broker asked what we need on the load, or won't name a number first. Returns our number and a reason for it.",
+      inputSchema: z.object({}),
+      run: async () => {
+        const ours = ourNumber(current);
+        accepted.add(ours.amount);
+        return `Say we'd need ${ours.amount} dollars all in (${(ours.amount / Math.max(1, current.lane.miles)).toFixed(2)} a mile). Reason to give: ${ours.reason} If they agree to ${ours.amount}, book it.`;
       },
     }),
     betaZodTool({
@@ -255,7 +304,7 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
       output_config: { effort: "low" },
       system: [
         { type: "text", text: BROKER_CALL, cache_control: { type: "ephemeral" } },
-        { type: "text", text: `Carrier: ${ctx.carrier.name}. Load ${current.referenceNumber}: ${current.lane.origin}, ${current.lane.originState} to ${current.lane.destination}, ${current.lane.destState}, ${current.lane.miles} miles, pickup ${current.pickupWindow}, delivery ${current.deliveryWindow}, ${current.equipmentType}. Our ask: ${current.bookRequest?.ask ?? current.targetRate} dollars all in.${freightNote(current)}${memoryNote(ctx.loads, ctx.brokers, current) ? ` ${memoryNote(ctx.loads, ctx.brokers, current)} Use history only to sound informed; prices still come from the tools.` : ""}` },
+        { type: "text", text: `Carrier: ${ctx.carrier.name}. Load ${current.referenceNumber}: ${current.lane.origin}, ${current.lane.originState} to ${current.lane.destination}, ${current.lane.destState}, ${current.lane.miles} miles, pickup ${current.pickupWindow}, delivery ${current.deliveryWindow}, ${current.equipmentType}. Loaded miles: ${current.lane.miles}. Prices come only from the tools.${freightNote(current)}${factsNote(ctx, current)}${memoryNote(ctx.loads, ctx.brokers, current) ? ` ${memoryNote(ctx.loads, ctx.brokers, current)} Use history only to sound informed; prices still come from the tools.` : ""}` },
       ],
       messages,
       tools,

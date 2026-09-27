@@ -18,31 +18,37 @@ function signature(carrier: CarrierRow, settings: Pick<AgentSettings, "remitEmai
 
 export const subjectFor = (l: Load, what?: string) => `${what ? `${what}: ` : ""}Load ${l.referenceNumber} · ${l.lane.origin}, ${l.lane.originState} → ${l.lane.destination}, ${l.lane.destState}`;
 
-export function bookRequest(carrier: CarrierRow, settings: AgentSettings, load: Load, ask: number, toName?: string) {
+/** Asking to book a load. `truckAt` is where the truck is, as a dispatcher would say it ("empty in Dallas, TX"). */
+export function bookRequest(carrier: CarrierRow, settings: AgentSettings, load: Load, ask: number, toName?: string, truckAt?: string) {
+  const equipment = load.equipmentType.toLowerCase();
   return `${hello(toName)}
 
-We can cover ${load.referenceNumber}, ${lane(load)}, picking up ${load.pickupWindow}. Our ${load.equipmentType.toLowerCase()} is ready for it.
+Can we get ${load.referenceNumber}, ${lane(load)}, picking up ${load.pickupWindow}? ${truckAt ? `Our ${equipment} is ${truckAt} and ready for it.` : `We have a ${equipment} ready for it.`}
 
 Our rate is ${money(ask)} all in. ${termsLine(settings)}
 
-If that works, send the rate con here and we'll dispatch.
+Send the rate con here and we'll dispatch.
 
 Thanks,
 ${signature(carrier, settings)}`;
 }
 
-/** Our counter, worded for where the haggling is: coming down, holding, or our last number. */
-export function counter(carrier: CarrierRow, settings: AgentSettings, load: Load, amount: number, toName?: string, how: { final?: boolean; held?: boolean; reason?: string } = { final: true }) {
-  const line = how.held
-    ? `We're staying at ${money(amount)} all in on ${load.referenceNumber} (${lane(load)}).`
-    : how.final
-      ? `The best we can do on ${load.referenceNumber} (${lane(load)}) is ${money(amount)} all in.`
-      : `Thanks for coming back to us. We can come down to ${money(amount)} all in on ${load.referenceNumber} (${lane(load)}).`;
+/** Our counter, worded for where the haggling is: coming down, meeting in the middle, holding, or our last number. */
+export function counter(carrier: CarrierRow, settings: AgentSettings, load: Load, amount: number, toName?: string, how: { final?: boolean; held?: boolean; split?: boolean; reason?: string } = { final: true }) {
+  const where = `on ${load.referenceNumber} (${lane(load)})`;
+  const line = how.split
+    ? `We're close. Let's meet in the middle at ${money(amount)} all in ${where}.`
+    : how.held
+      ? `I hear you, but we're staying at ${money(amount)} all in ${where}.`
+      : how.final
+        ? `The best we can do ${where} is ${money(amount)} all in.`
+        : `Thanks for coming back to us. We can come down to ${money(amount)} all in ${where}.`;
+  const close = how.final || how.split ? `If you can do ${money(amount)}, send the rate con and we'll book it right now.` : "If that works, send the rate con and we'll dispatch right away.";
   return `${hello(toName)}
 
 ${line}${how.reason ? ` ${how.reason}` : ""}
 
-If that works, send the rate con and we'll dispatch right away.
+${close}
 
 Thanks,
 ${signature(carrier, settings)}`;

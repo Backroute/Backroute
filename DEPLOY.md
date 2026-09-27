@@ -60,9 +60,9 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
 - **Broker email.** Each carrier gets its own address, shown in Settings → General → Phone, text and email. Brokers email it, or the owner forwards to it. The AI handles each email the way a dispatcher would:
   - **Loads offered** (one load or a list): each one that fits a truck goes on the dashboard as an offer, priced by the owner's rules. A truck fits when it has the right equipment, is free (or delivers at least 2 hours before the pickup) and is within 300 miles.
   - **Booking:** the owner taps **Ask to book it**, or on **Within my rules** the AI asks for the best offer per truck by itself. The ask is 5% over the posted rate, never under the owner's lowest rate per mile.
-  - **Haggling, like a dispatcher** (`src/lib/agent/negotiation.ts`): the AI opens at its ask and comes down in steps, up to three counters, each with a reason a broker hears every day (what the lane pays now, the empty miles to get there, a truck ready on time). If the broker doesn't move, neither does it. An offer within $50 or 3% of its number, and over the owner's lowest, it takes. It aims no lower than 90% of what the lane pays today when a rate service is connected, and never under the owner's lowest. After three counters: at or over the lowest it takes it, just under (within 5%) the owner decides, further under it passes politely and leaves the door open. If the broker comes back with more while the truck is still free, it takes it.
+  - **Haggling, like a dispatcher** (`src/lib/agent/negotiation.ts`): the AI opens at its ask and comes down in steps, up to three counters, each with a reason a broker hears every day (what the lane pays now, the empty miles to get there, a hard place to reload, a truck ready on time), a different one each round. If the broker doesn't move, neither does it. When the numbers get close, it offers to meet in the middle, and on its last number it says it'll book right now if they can do it. An offer within $50 or 3% of its number, and over the owner's lowest, it takes. It aims no lower than 90% of what the lane pays today when a rate service is connected, and never under the owner's lowest. After three counters: at or over the lowest it takes it, just under (within 5%) the owner decides, further under it passes politely and leaves the door open. If the broker comes back with more while the truck is still free, it takes it.
   - **Terms, not just the price:** every book request and acceptance asks for detention (default $50/hour after 2 hours free) and TONU (default $150) on the rate con. The owner sets both in Settings → Your rules.
-  - These emails come from templates, so every number in them is exactly what the rules picked. The back-and-forth is shown on the load.
+  - These emails come from templates, so every number in them is exactly what the rules picked, and they read like a dispatcher's: "Can we get it? Our van is empty in Dallas." The back-and-forth is shown on the load. Replies the AI writes itself (a broker's question) are two or three short lines that answer the question first.
   - **Rate cons:** the AI reads the PDF and checks it against the load. If it confirms a load the AI asked for and matches, the load goes on its truck and the driver gets a text. If anything doesn't match, the owner is told.
   - **Setup requests:** the AI replies with the carrier's W-9, insurance certificate and authority from Settings → General → Your papers. If one is missing or expired, the owner is told.
   - **Anything else:** the AI writes a reply.
@@ -99,6 +99,8 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - A broker it has no MC number for is asked for it on the call, and it's checked with FMCSA before the AI agrees to book.
   - After booking by phone with a broker it has no email for, it asks where to send the confirmation, then emails a written confirmation with the carrier packet so the rate con comes back to the carrier's address.
   - It says it's an AI and that the call is transcribed, and asks the price the rules set.
+  - The call goes the way a dispatcher's does: who's calling (and that it's an AI), which load, is it still available; then the freight (commodity, weight, appointments); then "what are you paying on it?". If the broker asks what we need, it gives our number with a reason. It understands a rate per mile ("two eighty a mile").
+  - It answers the broker's usual questions from the carrier's data: where the truck is, how far from the pickup, the driver's hours, the MC number.
   - It talks like a dispatcher (short, friendly, confident) and haggles with the same rules as email, saying the reason for each number. It can't be talked into a number the rules didn't give it.
   - Before booking it asks what the freight is, the weight and the appointments. Freight over what the truck can legally carry isn't booked, and hazmat waits for the owner unless they've said they haul it.
   - It leaves a short voicemail if nobody answers, and a phone-only broker gets one more call.
@@ -186,6 +188,7 @@ The AI now does the day-to-day work of a dispatcher by email, text and phone. Wh
   - a POD with a shortage written on it
   - A new broker that fails the check always waits.
 - **Miles and ETAs without a routing account** (step 12) come from about 130 freight cities and each state's middle. For a town not on the list, miles are rough, and the AI doesn't send late notices from them.
+- **Brokers who call in about a posted truck** reach the owner's number on the board post, not the AI: the dispatch line only answers the carrier's own drivers and owner.
 - **Negotiation is by rules, not instinct.** The AI haggles in steps with reasons, but it doesn't read a broker's mood, bluff about other loads, or trade favors across loads the way a long-time dispatcher might. Every number comes from the rules, on purpose, so it can't be talked below the owner's lowest.
 - **Two screens editing the same load at once:** the last save wins, and that includes the AI's own changes.
 - **Driver edits to loads:** a driver can edit any detail of a load on their own truck, not just its stage.
@@ -405,7 +408,7 @@ The code was run against local stand-ins that behave like the real services:
 - **Haggling on Within my rules:**
   - A low offer: the AI comes down part of the way, with a reason. The broker doesn't move: it holds. Its third counter is its last number, never under the floor.
   - Just under the floor after three counters, the owner decides. The broker meets the floor: it takes it, asking for detention and TONU terms.
-  - By phone: several rounds with the market as the reason, the freight asked about and checked before booking, and every number on record. Freight too heavy for the truck isn't booked, whatever the price.
+  - By phone: it asks if the load is available before any price, gets the freight details, knows where the truck is, gives our number when asked, takes a rate per mile, changes its reason each round, meets in the middle when close, and keeps every number on record. Freight too heavy for the truck isn't booked, whatever the price.
   - Far under after three counters: it passes politely and the truck is free; when the broker comes back with more, it takes it.
   - A driver asking where to park gets the nearest truck parking by text.
   - When the broker agrees, the matching rate con books the load onto the truck and texts the driver.
