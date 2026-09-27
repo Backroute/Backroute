@@ -10,6 +10,7 @@ import { LANG_INFO } from "../lang/pack";
 import { PRIMARY_CARRIER_ID } from "../mock-data";
 import { memoryNote } from "./memory";
 import { brokerFacts, truckAt } from "./broker-call";
+import { decideItem } from "./decide";
 import { dollarAmounts } from "./pricing";
 import { NEARBY, findNearby, handleBreakdown } from "./roadside";
 import { recordFeedback } from "./care";
@@ -81,7 +82,12 @@ async function raise(ctx: CarrierContext, p: { reason: string; loadId?: string; 
 /** What a driver can report by text or on a call, in their words, mapped to the load's stage. */
 const REPORTS = { at_pickup: "at_pickup", loaded: "in_transit", at_delivery: "at_delivery" } as const satisfies Record<string, LoadStage>;
 
-function driverTools(ctx: CarrierContext, driver: Driver, channel: "sms" | "voice", effects: Effects) {
+/** Where a person is talking to the AI: a text, a phone call, or the chat in the app. */
+export type Talk = "sms" | "voice" | "chat";
+const sourceOf = (t: Talk): MessageChannel => (t === "chat" ? "app" : t);
+const BY: Record<Talk, string> = { sms: "by text", voice: "by phone", chat: "in the app" };
+
+function driverTools(ctx: CarrierContext, driver: Driver, channel: Talk, effects: Effects) {
   const first = driver.name.split(" ")[0];
   const truck = ctx.trucks.find((t) => t.id === driver.truckId || t.secondDriverId === driver.id);
   const theirLoads = () => ctx.loads.filter((l) => l.truckId && l.truckId === truck?.id);
@@ -114,7 +120,7 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: "sms" | "voic
         ctx.loads = ctx.loads.map((l) => (l.id === load.id ? updated : l));
         await addActivity(
           ctx.carrier.id,
-          event({ type: "check_call", loadId: load.id, message: `${first}: ${LOAD_STAGE_LABEL[target].toLowerCase()}`, detail: `${load.lane.origin} → ${load.lane.destination} · by ${channel === "sms" ? "text" : "phone"}`, severity: "info" }),
+          event({ type: "check_call", loadId: load.id, message: `${first}: ${LOAD_STAGE_LABEL[target].toLowerCase()}`, detail: `${load.lane.origin} → ${load.lane.destination} · ${BY[channel]}`, severity: "info" }),
         );
         effects.done.push(`Marked ${load.referenceNumber} ${LOAD_STAGE_LABEL[target]}`);
         return `Done: ${load.referenceNumber} is now ${LOAD_STAGE_LABEL[target]}.`;
@@ -133,7 +139,7 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: "sms" | "voic
       run: async ({ kind, details, where, urgent }) => {
         // A breakdown with nobody hurt: the AI finds help near the truck, calls a shop, and tells the broker.
         if (kind === "breakdown" && !urgent) {
-          const said = await handleBreakdown(ctx, driver, details, where, channel);
+          const said = await handleBreakdown(ctx, driver, details, where, sourceOf(channel));
           effects.done.push("Working the breakdown: shops, broker, owner");
           return said;
         }
@@ -143,7 +149,7 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: "sms" | "voic
           loadId: load?.id,
           critical: urgent || kind === "accident",
           label: "I've handled it",
-          source: channel,
+          source: sourceOf(channel),
         });
         await addActivity(ctx.carrier.id, event({ type: "incident", loadId: load?.id, message: `${first} reported a problem: ${kind}`, detail: details, severity: urgent ? "danger" : "warning" }));
         effects.done.push(`Told the owner: ${kind}`);
@@ -183,7 +189,7 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: "sms" | "voic
       description: "Pass a message to the owner that needs a person: a question you can't answer from the data, a request for a call back, pay or time off.",
       inputSchema: z.object({ message: z.string() }),
       run: async ({ message }) => {
-        await raise(ctx, { reason: `${driver.name} says: ${message}`, loadId: current()?.id, label: "Got it", source: channel, to: "owner" });
+        await raise(ctx, { reason: `${driver.name} says: ${message}`, loadId: current()?.id, label: "Got it", source: sourceOf(channel), to: "owner" });
         effects.done.push("Passed a message to the owner");
         return "Passed to the owner.";
       },
@@ -204,13 +210,23 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: "sms" | "voic
   return tools;
 }
 
-const CHANNEL_NOTES = {
+const CHANNEL_NOTES: Record<Talk, string> = {
   sms: `You're texting with the driver by SMS. Keep each reply short, under 300 characters when you can, plain text only.`,
+  chat: `The driver is typing in the Messages tab of the Backroute app. Keep replies short and plain, like a text.`,
   voice: `You're on a phone call with the driver. Your words are read out by a voice, so answer in one or two short spoken sentences: no lists, no symbols, say numbers the way people say them. When they're done, say a short goodbye and use hang_up.`,
 };
 
 const ACTING = `
 You can act with your tools. When the driver tells you they've arrived, are loaded, or reached delivery, update the load. When they report a problem, report it. When they need parking, fuel, a scale, a wash or a shop, find it nearby. When they need a person, tell the owner. Only say you did something after the tool says it's done.`;
+
+/**
+ * For measuring the AI (api/eval): the tools it picks are recorded, with what it passed them, and nothing is done.
+ * Each answers "Done." so the conversation carries on as if it had worked.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function dryRun(tools: BetaRunnableTool<any>[], picked: { tool: string; input: unknown }[]): BetaRunnableTool<any>[] {
+  return tools.map((t) => ({ ...t, run: async (input: unknown) => (picked.push({ tool: t.name, input }), "Done.") }));
+}
 
 export interface Turn {
   from: "them" | "ai";
@@ -218,7 +234,7 @@ export interface Turn {
 }
 
 /** One reply to a driver, by text or on a call, with whatever the AI did along the way. */
-export async function driverTurn(ctx: CarrierContext, driver: Driver, channel: "sms" | "voice", said: string, history: Turn[]): Promise<{ reply: string; effects: Effects }> {
+export async function driverTurn(ctx: CarrierContext, driver: Driver, channel: Talk, said: string, history: Turn[], dry?: { tool: string; input: unknown }[]): Promise<{ reply: string; effects: Effects }> {
   const effects: Effects = { done: [] };
   const lang = LANG_INFO[driver.prefs?.language ?? "en"];
   const messages: Anthropic.Beta.BetaMessageParam[] = history.map((t) => ({ role: t.from === "them" ? "user" : "assistant", content: t.text }));
@@ -242,7 +258,7 @@ export async function driverTurn(ctx: CarrierContext, driver: Driver, channel: "
         { type: "text", text: `${CHANNEL_NOTES[channel]}${ACTING}` },
       ],
       messages,
-      tools: driverTools(ctx, driver, channel, effects),
+      tools: dry ? dryRun(driverTools(ctx, driver, channel, effects), dry) : driverTools(ctx, driver, channel, effects),
       max_iterations: 5,
     });
     if (final.stop_reason === "refusal") return { reply: "", effects: { ...effects, failed: true } };
@@ -254,8 +270,9 @@ export async function driverTurn(ctx: CarrierContext, driver: Driver, channel: "
   }
 }
 
-const OWNER_CHANNEL = {
+const OWNER_CHANNEL: Record<Talk, string> = {
   sms: `The owner is texting the dispatch line. Keep each reply short, under 300 characters when you can, plain text only.`,
+  chat: `The owner is typing in the Backroute app. Keep it short and plain: one to four sentences, a short list only when naming a few items.`,
   voice: `The owner is on the phone with you. Your words are read out by a voice: one or two short spoken sentences, no lists or symbols, numbers the way people say them. When they're done, say a short goodbye and use hang_up.`,
 };
 
@@ -263,7 +280,7 @@ const OWNER_CHANNEL = {
  * The owner texts or calls the dispatch line: answers from the fleet data (what's moving, what needs them, money),
  * and anything that needs a person goes to Backroute support.
  */
-export async function ownerTurn(ctx: CarrierContext, channel: "sms" | "voice", said: string, history: Turn[]): Promise<{ reply: string; effects: Effects }> {
+export async function ownerTurn(ctx: CarrierContext, channel: Talk, said: string, history: Turn[]): Promise<{ reply: string; effects: Effects }> {
   const effects: Effects = { done: [] };
   const lang = LANG_INFO[ctx.settings.ownerLanguage ?? "en"];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -273,12 +290,28 @@ export async function ownerTurn(ctx: CarrierContext, channel: "sms" | "voice", s
       description: "Pass something to Backroute's support team that needs a person: a problem, a request the AI can't do from here, a call back.",
       inputSchema: z.object({ message: z.string(), urgent: z.boolean().optional() }),
       run: async ({ message, urgent }) => {
-        await raise(ctx, { reason: `The owner (${channel === "sms" ? "by text" : "on the phone"}): ${message}`, label: "Done", source: channel, to: "support", critical: !!urgent });
+        await raise(ctx, { reason: `The owner (${channel === "voice" ? "on the phone" : BY[channel]}): ${message}`, label: "Done", source: sourceOf(channel), to: "support", critical: !!urgent });
         effects.done.push("Passed a request to support");
         return "Support has it and will get back to the owner.";
       },
     }),
   ];
+  // Only from the signed-in app: a text or a call can't prove it's the owner well enough to send email for them.
+  if (channel === "chat")
+    tools.push(
+      betaZodTool({
+        name: "decide",
+        description: "The owner's answer to one item waiting on them (listed with its id): send=true to go ahead (send the email the AI wrote, or mark it done), false to not send / dismiss it. Only when they've clearly said which item and what to do.",
+        inputSchema: z.object({ id: z.string(), send: z.boolean() }),
+        run: async ({ id, send }) => {
+          const item = ctx.escalations.find((e) => e.id === id && e.status === "open");
+          if (!item) return "That item isn't waiting any more (or the id is wrong). Say what's still waiting.";
+          await decideItem(ctx, item, send);
+          effects.done.push(`${send ? "Went ahead with" : "Declined"}: ${item.reason.slice(0, 80)}`);
+          return item.draft ? (send ? "Sent." : "Not sent; it's closed.") : "Marked done.";
+        },
+      }),
+    );
   if (channel === "voice")
     tools.push(
       betaZodTool({
@@ -297,7 +330,8 @@ export async function ownerTurn(ctx: CarrierContext, channel: "sms" | "voice", s
     role: "user",
     content: [
       { type: "text", text: `Fleet data right now (${new Date().toUTCString()}):\n${JSON.stringify(ownerSnapshot(snapshotSource(ctx), { ask: "Ask me first", rules: "Within my rules", full: "Full autopilot" }))}` },
-      { type: "text", text: `${channel === "voice" ? "The owner said" : "The owner texted"} (answer in ${lang.english} unless they use another language): ${said}` },
+      { type: "text", text: `Waiting on the owner (id: what):\n${ctx.escalations.filter((e) => e.status === "open").slice(0, 15).map((e) => `${e.id}: ${e.reason}${e.draft ? ` [a ${e.draft.purpose ?? "reply"} email${e.draft.amount ? ` at $${e.draft.amount.toLocaleString()}` : ""} is ready to send]` : ""}`).join("\n") || "nothing"}` },
+      { type: "text", text: `${channel === "voice" ? "The owner said" : channel === "chat" ? "The owner wrote in the app" : "The owner texted"} (answer in ${lang.english} unless they use another language): ${said}` },
     ],
   });
   try {
@@ -308,7 +342,7 @@ export async function ownerTurn(ctx: CarrierContext, channel: "sms" | "voice", s
       output_config: { effort: channel === "voice" ? "low" : "medium" },
       system: [
         { type: "text", text: OWNER_SYSTEM, cache_control: { type: "ephemeral" } },
-        { type: "text", text: `${OWNER_CHANNEL[channel]} Decisions waiting in Needs you are made in the app; say what's waiting and where. Anything else that needs a person, pass to support with tell_support.` },
+        { type: "text", text: `${OWNER_CHANNEL[channel]} ${channel === "chat" ? "When the owner clearly says yes or no to an item that's waiting, call decide with its id; if it's unclear which one, ask." : "Decisions waiting on the owner are made in the app (Home, Needs you); say what's waiting and where."} Anything else that needs a person, pass to support with tell_support.` },
       ],
       messages,
       tools,

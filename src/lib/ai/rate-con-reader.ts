@@ -54,10 +54,12 @@ export class ReadError extends Error {
 }
 
 /**
- * Reads a rate con PDF. With agreed terms it also lists what doesn't match them; without (a new load being added
+ * Reads a rate con (a PDF, or a photo of one). With agreed terms it also lists what doesn't match them; without (a new load being added
  * from its rate con) it only reads the terms.
  */
-export async function readRateConPdf(pdf: Buffer, agreed: AgreedTerms | null): Promise<RateConReading> {
+export async function readRateConPdf(pdf: Buffer, agreed: AgreedTerms | null, contentType = "application/pdf"): Promise<RateConReading> {
+  // A photo of the rate con (a broker's phone snap, a fax scan) is read the same way as the PDF.
+  const image = ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(contentType) ? (contentType as "image/jpeg" | "image/png" | "image/gif" | "image/webp") : null;
   const response = await claude().beta.messages.parse({
     model: AI_MODEL,
     max_tokens: 16000,
@@ -68,7 +70,9 @@ export async function readRateConPdf(pdf: Buffer, agreed: AgreedTerms | null): P
       {
         role: "user",
         content: [
-          { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdf.toString("base64") } },
+          image
+            ? { type: "image" as const, source: { type: "base64" as const, media_type: image, data: pdf.toString("base64") } }
+            : { type: "document" as const, source: { type: "base64" as const, media_type: "application/pdf" as const, data: pdf.toString("base64") } },
           {
             type: "text",
             text: agreed

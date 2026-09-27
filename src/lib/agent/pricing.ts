@@ -39,9 +39,33 @@ export function askFor(load: Pick<Load, "lane" | "listedRate">, settings: Pick<A
   return ask;
 }
 
-/** Dollar amounts written in a message, e.g. "$2,450", "$ 75" or "$2450.00". */
+/**
+ * Dollar amounts written in a message, however they're written: "$2,450", "$ 75", "$2450.00", "$2.4k", "2,450 dollars",
+ * "2450 bucks", "USD 2450". Cents are dropped. Used to keep any price the AI didn't get from the rules out of its words.
+ */
 export function dollarAmounts(text: string): number[] {
-  return [...text.matchAll(/\$\s?(\d{1,3}(?:,\d{3})+|\d{1,6})(?:\.\d{2})?/g)].map((m) => Number(m[1].replace(/,/g, "")));
+  const out: number[] = [];
+  const num = (whole: string, frac: string | undefined, k: string | undefined) => {
+    const n = Number(`${whole.replace(/,/g, "")}${frac ? `.${frac}` : ""}`);
+    return Math.floor(k ? n * 1000 : n);
+  };
+  for (const m of text.matchAll(/\$\s?(\d{1,3}(?:,\d{3})+|\d{1,6})(?:\.(\d{1,2}))?(\s?[kK]\b)?/g)) out.push(num(m[1], m[3] ? m[2] : undefined, m[3]));
+  for (const m of text.matchAll(/(?<![$\d.,])(\d{1,3}(?:,\d{3})+|\d{1,6})(?:\.(\d{1,2}))?(\s?[kK])?\s?(?:dollars|bucks|usd)\b/gi)) out.push(num(m[1], m[3] ? m[2] : undefined, m[3]));
+  for (const m of text.matchAll(/\busd\s?(\d{1,3}(?:,\d{3})+|\d{1,6})/gi)) out.push(num(m[1], undefined, undefined));
+  return out;
+}
+
+/** An email address said out loud ("kim at t q l dot com", "kim underscore b at tql dot com"), written out. */
+export function spokenEmail(said: string): string {
+  return said
+    .trim()
+    .toLowerCase()
+    .replace(/\s+(?:at)\s+/g, "@")
+    .replace(/\s+(?:dot|period)\s+/g, ".")
+    .replace(/\s+underscore\s+/g, "_")
+    .replace(/\s+(?:dash|hyphen)\s+/g, "-")
+    .replace(/\s/g, "")
+    .replace(/[.,]$/, "");
 }
 
 /**

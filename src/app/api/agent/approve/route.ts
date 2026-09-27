@@ -1,10 +1,8 @@
 import { z } from "zod";
-import { dbConfigured, loadContext, save } from "@/lib/agent/db";
-import { deliver } from "@/lib/agent/outbox";
-import { noticeApprovals } from "@/lib/agent/learning";
+import { dbConfigured, loadContext } from "@/lib/agent/db";
+import { decideItem } from "@/lib/agent/decide";
 import { asUser } from "@/lib/agent/user";
 import { emailConfigured } from "@/lib/channels/email";
-import type { Item } from "@/lib/cloud/rows";
 import type { Escalation, Load } from "@/lib/types";
 
 const Body = z.object({ escalationId: z.string().min(1), send: z.boolean(), body: z.string().trim().min(1).max(20000).optional() });
@@ -26,27 +24,10 @@ export async function POST(request: Request) {
   const escalation = row.data as Escalation;
   if (!escalation.draft || escalation.status === "resolved") return Response.json({ error: "nothing_to_send" }, { status: 409 });
 
-  const body = parsed.data.body ?? escalation.draft.body;
-  const edited = body.trim() !== escalation.draft.body.trim();
-  const now = new Date().toISOString();
-  let load: Load | undefined;
-  let ctx: Awaited<ReturnType<typeof loadContext>> = null;
-  if (parsed.data.send) {
-    if (!emailConfigured()) return Response.json({ error: "email_off" }, { status: 503 });
-    ctx = await loadContext(carrierId);
-    if (!ctx) return Response.json({ error: "not_found" }, { status: 404 });
-    await deliver(ctx, { ...escalation.draft, body }, escalation.loadId || undefined, { approved: true });
-    load = ctx.loads.find((l) => l.id === escalation.loadId);
-  }
-  const updated: Escalation = {
-    ...escalation,
-    status: "resolved",
-    resolvedBy: "carrier",
-    resolvedAt: now,
-    draft: { ...escalation.draft, body, edited, ...(parsed.data.send ? { sentAt: now } : {}) },
-    ...(parsed.data.send ? {} : { resolutionNote: "Not sent" }),
-  };
-  await save("escalations", carrierId, updated as unknown as Item);
-  if (ctx) await noticeApprovals(ctx, updated);
+  if (parsed.data.send && !emailConfigured()) return Response.json({ error: "email_off" }, { status: 503 });
+  const ctx = await loadContext(carrierId);
+  if (!ctx) return Response.json({ error: "not_found" }, { status: 404 });
+  const updated = await decideItem(ctx, escalation, parsed.data.send, parsed.data.body);
+  const load: Load | undefined = parsed.data.send ? ctx.loads.find((l) => l.id === escalation.loadId) : undefined;
   return Response.json({ escalation: updated, loads: load ? [load] : [] });
 }

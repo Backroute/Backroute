@@ -10,8 +10,8 @@ import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import type { Load } from "../types";
 import { addActivity, claimMark, logChannel, releaseMark, save, threadWith, type CarrierContext } from "./db";
-import { event, passToOwner } from "./dispatcher";
-import { floorFor } from "./pricing";
+import { dryRun, event, passToOwner } from "./dispatcher";
+import { floorFor, spokenEmail } from "./pricing";
 import { ourNumber, ourNumbers, respond, withOurMove, withTheirOffer } from "./negotiation";
 import { estimateMiles } from "../fleet";
 import { askSupportAboutBroker, checkBroker } from "./brokers";
@@ -19,6 +19,7 @@ import { assessBroker } from "../broker-policy";
 import { confirmPhoneBooking, sendSetupPacket } from "./paperwork";
 import { memoryNote } from "./memory";
 import { when } from "./templates";
+import { TRUCKING } from "../ai/prompts";
 
 /**
  * The AI phones a broker about a load, the way a dispatcher follows up an email nobody answered, or books with a
@@ -140,7 +141,9 @@ Rules:
 - Answer questions about the truck, the driver and the company only from the facts you're given. If you don't have it, say you'll confirm by email. Never make anything up.
 - If they ask for our carrier packet or setup papers, call send_packet.
 - If they ask something about this load you can't answer from the facts (their rules, a detail you don't have), say the office will confirm by email, then call follow_up with the question so someone does.
-- Stick to this load.`;
+- Stick to this load.
+
+${TRUCKING}`;
 
 export interface CallTurnResult {
   reply: string;
@@ -149,7 +152,7 @@ export interface CallTurnResult {
 }
 
 /** One turn of the call: what the broker said, and what the AI says back (with whatever it did). */
-export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: string, history: { from: "them" | "ai"; text: string }[]): Promise<CallTurnResult> {
+export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: string, history: { from: "them" | "ai"; text: string }[], dry?: { tool: string; input: unknown }[]): Promise<CallTurnResult> {
   let hangUp = false;
   let current = load;
   const persist = async (patch: Partial<Load>) => {
@@ -277,7 +280,7 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
       description: "The email address the broker gave for the confirmation and rate con, after booking. Spell-check it back to them first.",
       inputSchema: z.object({ email: z.string(), name: z.string().optional() }),
       run: async ({ email, name }) => {
-        const address = email.trim().toLowerCase().replace(/\s+at\s+/, "@").replace(/\s+dot\s+/g, ".").replace(/\s/g, "");
+        const address = spokenEmail(email);
         if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(address)) return "That doesn't sound like a full email address. Ask them to spell it.";
         if (current.bookRequest?.status !== "accepted") return "Nothing booked yet: agree on the price first.";
         const broker = ctx.brokers.find((b) => b.id === current.brokerId);
@@ -306,7 +309,7 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
       inputSchema: z.object({ email: z.string().optional().describe("Where to send it, if they gave an address") }),
       run: async ({ email }) => {
         const broker = ctx.brokers.find((b) => b.id === current.brokerId);
-        const address = (email ?? "").trim().toLowerCase().replace(/\s+at\s+/, "@").replace(/\s+dot\s+/g, ".").replace(/\s/g, "") || current.brokerContactEmail || broker?.email;
+        const address = spokenEmail(email ?? "") || current.brokerContactEmail || broker?.email;
         if (!address || !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(address)) return "Ask for the email address to send the packet to, spell it back, and call send_packet with it.";
         await sendSetupPacket(ctx, { from: address, fromName: broker?.company ?? address, subject: `Carrier packet: ${ctx.carrier.name}`, contactName: null });
         return `Packet on its way to ${address} (or the office will send it shortly if a paper is missing). Tell them.`;
@@ -346,7 +349,7 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
         { type: "text", text: `Carrier: ${ctx.carrier.name}. Load ${current.referenceNumber}: ${current.lane.origin}, ${current.lane.originState} to ${current.lane.destination}, ${current.lane.destState}, ${current.lane.miles} miles, pickup ${current.pickupWindow}, delivery ${current.deliveryWindow}, ${current.equipmentType}. Loaded miles: ${current.lane.miles}. Prices come only from the tools.${freightNote(current)}${factsNote(ctx, current)}${memoryNote(ctx.loads, ctx.brokers, current) ? ` ${memoryNote(ctx.loads, ctx.brokers, current)} Use history only to sound informed; prices still come from the tools.` : ""}` },
       ],
       messages,
-      tools,
+      tools: dry ? dryRun(tools, dry) : tools,
       max_iterations: 4,
     });
     if (final.stop_reason === "refusal") return { reply: "", hangUp: true, failed: true };

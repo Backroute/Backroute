@@ -112,6 +112,26 @@ export function say(text: string, lang: Lang) {
 }
 
 /** Speaks, then listens for the driver's answer and posts it to `action`. */
+/** Words speech recognition should expect on a dispatch call (Twilio's hints), so "reefer" isn't heard as "real fur". */
+export const SPEECH_HINTS = [
+  "reefer", "dry van", "flatbed", "step deck", "power only", "rate con", "rate confirmation", "BOL", "bill of lading", "POD", "lumper", "detention", "TONU",
+  "deadhead", "bobtail", "drop and hook", "live unload", "check call", "all in", "per mile", "MC number", "DOT", "weigh station", "scale", "blowout",
+  "breakdown", "loaded", "empty", "at the shipper", "at the receiver", "hours of service", "34 reset", "out of hours", "10-4", "copy that",
+];
+
 export function sayAndListen(text: string, lang: Lang, action: string) {
-  return `<Gather input="speech" language="${VOICE[lang].speech}" speechTimeout="auto" actionOnEmptyResult="true" action="${xml(action)}" method="POST">${say(text, lang)}</Gather>`;
+  // English calls use the phone-call speech model and the trucking vocabulary; other languages use the default model.
+  const tuned = lang === "en" ? ` speechModel="phone_call" enhanced="true" hints="${xml(SPEECH_HINTS.join(", "))}"` : "";
+  return `<Gather input="speech" language="${VOICE[lang].speech}" speechTimeout="auto" actionOnEmptyResult="true"${tuned} action="${xml(action)}" method="POST">${say(text, lang)}</Gather>`;
+}
+
+/** A photo or file a driver texted (MMS), from Twilio's media store. Only Twilio's own addresses are fetched. */
+export async function twilioMedia(url: string): Promise<{ bytes: Buffer; contentType: string } | null> {
+  if (!url.startsWith(`${base()}/`) && !url.startsWith(`${API}/`)) return null;
+  const sid = process.env.TWILIO_ACCOUNT_SID!;
+  const res = await fetch(url, { headers: { authorization: `Basic ${Buffer.from(`${sid}:${process.env.TWILIO_AUTH_TOKEN}`).toString("base64")}` }, signal: AbortSignal.timeout(20000) });
+  if (!res.ok) return null;
+  const bytes = Buffer.from(await res.arrayBuffer());
+  if (bytes.length > 10 * 1024 * 1024) return null;
+  return { bytes, contentType: (res.headers.get("content-type") ?? "").split(";")[0].trim() };
 }

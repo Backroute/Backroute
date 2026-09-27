@@ -27,6 +27,7 @@ const DG_URL = process.env.DEEPGRAM_URL ?? "wss://api.deepgram.com/v1/listen";
 const EL_BASE = (process.env.ELEVENLABS_BASE ?? "https://api.elevenlabs.io").replace(/\/$/, "");
 const VOICE = process.env.ELEVENLABS_VOICE_ID ?? "";
 const SILENCE_MS = 12000;
+const KEYTERMS = ["reefer", "dry van", "flatbed", "rate con", "BOL", "POD", "lumper", "detention", "TONU", "deadhead", "bobtail", "drop and hook", "MC number", "weigh station", "blowout", "34 reset"];
 
 /** The same signature the app puts on the stream's parameters. */
 export function sign(kind, carrier, ref, callSid) {
@@ -71,6 +72,8 @@ class Call {
 
   listen() {
     const q = new URLSearchParams({ encoding: "mulaw", sample_rate: "8000", channels: "1", model: "nova-3", language: this.params.lang ?? "en", interim_results: "true", endpointing: "400", utterance_end_ms: "1000", vad_events: "true", smart_format: "true" });
+    // Trucking words Deepgram should listen for (keyterm prompting), so "reefer" and "lumper" come through right.
+    if ((this.params.lang ?? "en") === "en") for (const term of KEYTERMS) q.append("keyterm", term);
     this.dg = new WebSocket(`${DG_URL}?${q}`, { headers: { Authorization: `Token ${process.env.DEEPGRAM_API_KEY}` } });
     this.dg.on("message", (raw) => this.heardFromDeepgram(JSON.parse(raw.toString())));
     this.dg.on("error", (e) => log("deepgram error", e.message));

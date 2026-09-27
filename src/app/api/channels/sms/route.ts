@@ -5,6 +5,7 @@ import { driverTurn, ownerTurn, passToOwner, uid } from "@/lib/agent/dispatcher"
 import { readTwilioWebhook, sendSms, twiml, twilioConfigured, xml } from "@/lib/channels/twilio";
 import { PASSED_ON_TEXT, SMS_HELP, UNKNOWN_NUMBER } from "@/lib/channels/phrases";
 import type { Item } from "@/lib/cloud/rows";
+import { driverPhotos } from "@/lib/agent/photos";
 import type { Driver, DriverMessage } from "@/lib/types";
 
 export const maxDuration = 60;
@@ -63,7 +64,8 @@ export async function POST(request: Request) {
     return twiml(`<Message>${xml(SMS_HELP(carrier?.name ?? "your carrier"))}</Message>`);
   }
 
-  const incoming: DriverMessage = { id: uid("dm"), driverId: driver.id, from: "driver", content: body, timestamp: new Date().toISOString(), channel: "sms" };
+  const media = Array.from({ length: Math.min(Number(params.NumMedia ?? 0) || 0, 5) }, (_, i) => ({ url: params[`MediaUrl${i}`] ?? "" })).filter((m) => m.url);
+  const incoming: DriverMessage = { id: uid("dm"), driverId: driver.id, from: "driver", content: body || (media.length ? `(sent ${media.length} photo${media.length === 1 ? "" : "s"})` : ""), timestamp: new Date().toISOString(), channel: "sms" };
   await saveDriverMessage(carrierId, incoming);
 
   after(async () => {
@@ -72,10 +74,14 @@ export async function POST(request: Request) {
     const history = (await driverThread(carrierId, driver.id, 13))
       .filter((m) => m.id !== incoming.id)
       .map((m) => ({ from: m.from === "driver" ? ("them" as const) : ("ai" as const), text: m.content }));
-    const result = aiConfigured() ? await driverTurn(ctx, driver, "sms", body, history) : { reply: "", effects: { done: [], failed: true } };
     const lang = driver.prefs?.language ?? "en";
+    // Photos (a POD, a BOL, a lumper receipt): stored, checked and put on the load. A caption that says more than
+    // what the photo is still gets the AI's answer too.
+    const photos = media.length ? await driverPhotos(ctx, driver, media, body).catch((e) => (console.error("[sms] photos failed", e), "Got your photo, but it didn't save. Please send it again or use the app.")) : "";
+    const talk = !media.length || body.length > 40 || body.includes("?");
+    const result = talk && aiConfigured() ? await driverTurn(ctx, driver, "sms", body || "(sent a photo)", history) : { reply: "", effects: { done: [] as string[], failed: talk } };
     if (result.effects.failed) await passToOwner(ctx, { reason: `${driver.name} texted: "${body}"`, label: "I'll answer", source: "sms" });
-    const text = result.reply || PASSED_ON_TEXT[lang];
+    const text = [photos, result.reply].filter(Boolean).join(" ") || PASSED_ON_TEXT[lang];
     const sid = await sendSms(from, text).catch((e) => {
       console.error("[sms] send failed", e);
       return undefined;

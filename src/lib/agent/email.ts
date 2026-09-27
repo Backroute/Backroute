@@ -52,14 +52,16 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
   const suspect = () => !!lookalikeOf(from, ctx.brokers.filter((b) => b.email?.toLowerCase() !== from)) || ctx.brokers.some((b) => b.email?.toLowerCase() === from && b.fraudRisk === "high");
   // Set when the email has had its answer from a template (a rate con thanks or fix), so the AI doesn't write another.
   let replied = false;
-  const pdfs = (email.Attachments ?? []).filter((a) => (a.ContentType === "application/pdf" || /\.pdf$/i.test(a.Name)) && a.ContentLength <= 10 * 1024 * 1024);
+  // PDFs, and photos big enough to be a document (not a logo in someone's signature).
+  const isPhoto = (a: { ContentType: string; ContentLength: number }) => /^image\/(jpeg|png|webp|gif)$/.test(a.ContentType) && a.ContentLength >= 60 * 1024;
+  const pdfs = (email.Attachments ?? []).filter((a) => (a.ContentType === "application/pdf" || /\.pdf$/i.test(a.Name) || isPhoto(a)) && a.ContentLength <= 10 * 1024 * 1024);
   for (const pdf of pdfs) {
     if (!aiConfigured()) {
       notes.push(`${pdf.Name}: not read (the AI isn't switched on)`);
       continue;
     }
     try {
-      const firstPass = await readRateConPdf(Buffer.from(pdf.Content, "base64"), load ? agreedTerms(load, ctx.brokers.find((b) => b.id === load!.brokerId)) : null);
+      const firstPass = await readRateConPdf(Buffer.from(pdf.Content, "base64"), load ? agreedTerms(load, ctx.brokers.find((b) => b.id === load!.brokerId)) : null, isPhoto(pdf) ? pdf.ContentType : "application/pdf");
       if (!firstPass.isRateCon) {
         notes.push(`${pdf.Name}: not a rate con`);
         continue;
@@ -68,7 +70,7 @@ export async function handleInboundEmail(carrierId: string, email: InboundEmail)
       let reading = firstPass;
       if (!load && byRef(firstPass.loadNumber)) {
         load = byRef(firstPass.loadNumber)!;
-        reading = await readRateConPdf(Buffer.from(pdf.Content, "base64"), agreedTerms(load, ctx.brokers.find((b) => b.id === load!.brokerId)));
+        reading = await readRateConPdf(Buffer.from(pdf.Content, "base64"), agreedTerms(load, ctx.brokers.find((b) => b.id === load!.brokerId)), isPhoto(pdf) ? pdf.ContentType : "application/pdf");
       }
       if (load) {
         const saved: RateConPdfReading = { ...reading, fileName: pdf.Name, readAt: new Date().toISOString() };
