@@ -95,6 +95,30 @@ export async function driverByPhone(phone: string): Promise<{ carrierId: string;
   return row ? { carrierId: row.carrier_id as string, driver: row.data as Driver } : null;
 }
 
+/** The carrier whose owner is on this phone number (the owner calling or texting the dispatch line). */
+export async function ownerByPhone(phone: string): Promise<CarrierRow | null> {
+  const last10 = phone.replace(/\D/g, "").slice(-10);
+  if (last10.length < 10) return null;
+  const { data, error } = await admin().from("carriers").select("id, name, mc, owner_operator, owner_phone, inbound_key, settings").like("owner_phone", `%${last10}`).limit(1);
+  if (error) throw error;
+  return (data?.[0] as CarrierRow | undefined) ?? null;
+}
+
+/** A broker calling back the number the AI called them from: which carrier and load that call was about. */
+export async function brokerCallBack(phone: string): Promise<{ carrierId: string; loadId: string } | null> {
+  const { data, error } = await admin()
+    .from("channel_messages")
+    .select("carrier_id, data")
+    .eq("channel", "voice")
+    .eq("direction", "out")
+    .eq("counterparty", phone)
+    .order("created_at", { ascending: false })
+    .limit(10);
+  if (error) throw error;
+  const row = (data ?? []).find((r) => (r.data as { kind?: string; loadId?: string })?.kind === "broker_call" && (r.data as { loadId?: string }).loadId);
+  return row ? { carrierId: row.carrier_id as string, loadId: (row.data as { loadId: string }).loadId } : null;
+}
+
 export async function save(table: Table, carrierId: string, item: Item, kind?: RecordKind) {
   const { error } = await admin().from(table).upsert(rowFor(table, kind, carrierId, item), { onConflict: conflictKey(kind) });
   if (error) throw error;

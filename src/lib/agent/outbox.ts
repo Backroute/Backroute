@@ -42,7 +42,8 @@ export interface Outgoing {
 export function goesNow(settings: Pick<CarrierContext["settings"], "autonomy" | "ownerRules">, o: Pick<Outgoing, "purpose" | "withinRules" | "rule">): boolean {
   const on = (r?: OwnerRule) => !!r && !!settings.ownerRules?.[r];
   if (!o.withinRules && !on(o.rule)) return false;
-  if (settings.autonomy === "full") return true;
+  // A short note with no price or promise in it ("got it, thanks", "send the rate con") goes the way a dispatcher's would.
+  if (settings.autonomy === "full" || o.purpose === "ack") return true;
   // A reply the AI wrote itself goes on "Within my rules" only when the owner said replies can.
   return settings.autonomy === "rules" && (o.purpose !== "reply" || on("replies"));
 }
@@ -81,6 +82,7 @@ const LABEL: Record<DraftPurpose, string> = {
   eta_update: "Send the late notice",
   capacity: "Tell them the truck is free",
   pass: "Pass on it politely",
+  ack: "Send this note",
 };
 
 const WHAT: Record<DraftPurpose, string> = {
@@ -96,6 +98,7 @@ const WHAT: Record<DraftPurpose, string> = {
   eta_update: "Told the broker the truck is running late:",
   capacity: "Told a broker about a free truck:",
   pass: "Passed on a load from",
+  ack: "Replied to",
 };
 
 /** Sends a draft (now, or when the owner approves it) and records what it means for the load. */

@@ -163,6 +163,16 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
 - **Deadlines:** each truck's annual DOT inspection, the quarterly IFTA return, UCR and Form 2290. The owner is reminded ahead of each, once.
 - **Natural phone calls** (with the voice server running): the AI hears while it talks and stops when interrupted. Driver calls are covered in English, Spanish, French, Hindi, Russian and Ukrainian, and so are calls to brokers and repair shops. Punjabi calls keep taking turns.
 - **Ask the AI** (dashboard) and driver **Messages** in the app are answered by the AI from the carrier's own data.
+- **Every email and call gets an answer**, the way a dispatcher's desk works:
+  - A broker's yes gets a thank-you and "send the rate con" with the detention and TONU terms. A question alongside a price ("when can you get there?") is answered in the same email, from the carrier's data and never with a new price. A rate per mile ("we can do 2.90 a mile") is handled like any offer.
+  - A rate con that matches gets "got it, truck 102 with Ana is set for pickup". One that doesn't gets a list of what's off and a request for a corrected one (and the owner hears).
+  - A cancellation before the truck rolled gets "got it, thanks". Loads that fit no truck get "not today, here's what we run", once a day per broker. A request for papers that aren't uploaded yet gets "coming shortly".
+  - An email the AI can't answer gets "thanks, we'll get back to you shortly", and support takes it.
+  - These short notes carry no price or promise, so they go out on every autopilot setting.
+  - On the phone, brokers asking for the carrier packet get it by email. Questions the AI can't answer are noted and support follows up by email.
+  - A broker calling back the number the AI called them from reaches the AI, which picks up about that load.
+  - The owner can call or text the dispatch line: the AI answers from the fleet data in the owner's language, and passes anything that needs a person to support.
+  - Anyone else who calls hears who it is and is asked who's calling; the message goes to the support team's phones.
 - **Drivers can ask for what's near them:** truck parking, a truck stop, diesel, a CAT scale, a truck wash, a repair or tire shop, by text or on a call (needs the Places key from the breakdown step).
 - **Evening text:** at 6 PM Central the owner gets a text: what was delivered, what it made, how many trucks are rolling, and what needs them.
 - **The log:** every text, call and email in or out is listed in Settings, with what the AI did.
@@ -188,7 +198,8 @@ The AI now does the day-to-day work of a dispatcher by email, text and phone. Wh
   - a POD with a shortage written on it
   - A new broker that fails the check always waits.
 - **Miles and ETAs without a routing account** (step 12) come from about 130 freight cities and each state's middle. For a town not on the list, miles are rough, and the AI doesn't send late notices from them.
-- **Brokers who call in about a posted truck** reach the owner's number on the board post, not the AI: the dispatch line only answers the carrier's own drivers and owner.
+- **Brokers who call in about a posted truck** reach the owner's number on the board post. The dispatch line answers drivers, the owner, and brokers calling back the AI; anyone else can leave a message.
+- **Owner calls are turn by turn** (a short pause after each person speaks), even with the voice server running.
 - **Negotiation is by rules, not instinct.** The AI haggles in steps with reasons, but it doesn't read a broker's mood, bluff about other loads, or trade favors across loads the way a long-time dispatcher might. Every number comes from the rules, on purpose, so it can't be talked below the owner's lowest.
 - **Two screens editing the same load at once:** the last save wins, and that includes the AI's own changes.
 - **Driver edits to loads:** a driver can edit any detail of a load on their own truck, not just its stage.

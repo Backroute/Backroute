@@ -4,6 +4,7 @@ import { formatAtStop } from "../stop-time";
 import type { Item } from "../cloud/rows";
 import type { Load, Truck } from "../types";
 import { save, type CarrierContext } from "./db";
+import { when } from "./templates";
 
 /**
  * The plan a dispatcher keeps in their head for each truck, written down: what it's on, what's lined up next (or
@@ -11,7 +12,7 @@ import { save, type CarrierContext } from "./db";
  */
 
 const ROLLING = new Set<Load["stage"]>(["dispatched", "at_pickup", "in_transit", "at_delivery"]);
-const at = (iso: string | undefined, state: string, fallback: string) => (iso ? formatAtStop(iso, state) : fallback);
+const at = (iso: string | undefined, state: string, fallback: string) => (iso ? formatAtStop(iso, state) : when(fallback));
 
 export function planFor(ctx: Pick<CarrierContext, "loads" | "drivers">, truck: Truck, now: number): string[] {
   const lines: string[] = [];

@@ -81,6 +81,10 @@ export async function cancelLoad(ctx: CarrierContext, load: Load, reason: string
       why: `${load.referenceNumber} was cancelled after the truck was dispatched. Claim $${tonu} TONU${tonuOnRateCon(load) ? "" : " (the rate con didn't say, so this is the usual amount)"}?`,
     });
 
+  // Not rolling yet: nothing to claim, just a "got it" the way a dispatcher answers.
+  else if (from.includes("@"))
+    await sendOrQueue(ctx, { purpose: "ack", to: from, subject: mail.subjectFor(load, "Cancelled"), body: mail.cancelledAck(ctx.carrier, ctx.settings, load), loadId: load.id, withinRules: true, why: `Tell the broker you got the cancellation of ${load.referenceNumber}?` });
+
   if (freed && !freed.currentLoadId) await rebook(ctx, freed);
 }
 

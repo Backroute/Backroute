@@ -34,10 +34,11 @@ const phones = () =>
     .filter(Boolean);
 
 /** Texts the support team about something urgent at a carrier. Quietly does nothing when no phones are set. */
-export async function alertSupport(carrierId: string, text: string) {
+export async function alertSupport(carrierId: string | null, text: string) {
   if (!twilioConfigured()) return;
   for (const to of phones()) {
     const sid = await sendSms(to, text);
-    await logChannel({ carrierId, channel: "sms", direction: "out", providerId: sid ?? null, counterparty: to, body: text, data: { kind: "support_alert" } }).catch(() => {});
+    // A caller the line doesn't know has no carrier to log it under; the text itself is the record.
+    if (carrierId) await logChannel({ carrierId, channel: "sms", direction: "out", providerId: sid ?? null, counterparty: to, body: text, data: { kind: "support_alert" } }).catch(() => {});
   }
 }

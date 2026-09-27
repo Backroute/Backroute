@@ -1,11 +1,14 @@
 import "server-only";
 import { aiConfigured } from "../ai/server";
-import { carrierById, driverByPhone, loadContext, logChannel, threadWith, addActivity } from "../agent/db";
-import { driverTurn, event, passToOwner } from "../agent/dispatcher";
+import { brokerCallBack, carrierById, driverByPhone, loadContext, logChannel, ownerByPhone, threadWith, addActivity } from "../agent/db";
+import { brokerCallBackOpening, brokerCallKey } from "../agent/broker-call";
+import { toE164 } from "../cloud/phone";
+import { alertSupport } from "../agent/support";
+import { driverTurn, event, ownerTurn, passToOwner } from "../agent/dispatcher";
 import { checkinText } from "../agent/checkins";
-import type { CheckinKind, Driver } from "../types";
+import type { CheckinKind, Driver, Lang } from "../types";
 import { streamTwiml, realtimeFor } from "./realtime";
-import { CHECKIN_CALL, DIDNT_HEAR, GOODBYE, GREETING, PASSED_ON_CALL, UNKNOWN_NUMBER } from "./phrases";
+import { CHECKIN_CALL, DIDNT_HEAR, GOODBYE, GREETING, MESSAGE_TAKEN, OWNER_GREETING, PASSED_ON_CALL, WHO_IS_CALLING } from "./phrases";
 import { publicUrl, say, sayAndListen, twiml } from "./twilio";
 
 /**
@@ -17,7 +20,7 @@ const callKey = (callSid: string) => `call:${callSid}`.toLowerCase();
 
 export async function answerCall(request: Request, params: Record<string, string>) {
   const found = await driverByPhone(params.From ?? "");
-  if (!found) return twiml(`${say(UNKNOWN_NUMBER, "en")}<Hangup/>`);
+  if (!found) return otherCaller(request, params);
   const { carrierId, driver } = found;
   const carrier = await carrierById(carrierId);
   const lang = driver.prefs?.language ?? "en";
@@ -85,4 +88,62 @@ export async function driverCallReply(carrierId: string, driver: Driver, callSid
   if (result.effects.done.length)
     await addActivity(carrierId, event({ type: "call_completed", message: `AI on the phone with ${driver.name.split(" ")[0]}`, detail: result.effects.done.join(" · "), severity: "info" }));
   return { reply: result.reply, hangUp: !!result.effects.hangUp };
+}
+
+// ─── Everyone else who calls the dispatch line ───────────────────────────────
+
+/**
+ * Not a driver: the owner (the AI answers from the fleet data), a broker calling back the number the AI called them
+ * from (the call picks up about that load), or anyone else (the AI takes a message for support). Nobody gets a
+ * recording and a hang-up.
+ */
+async function otherCaller(request: Request, params: Record<string, string>) {
+  const from = params.From ?? "";
+  const owner = await ownerByPhone(from);
+  if (owner) {
+    const lang = (owner.settings.ownerLanguage ?? "en") as Lang;
+    const greeting = OWNER_GREETING[lang](owner.name);
+    await logChannel({ carrierId: owner.id, channel: "voice", direction: "out", providerId: `${params.CallSid}:greeting`, counterparty: callKey(params.CallSid), body: greeting, data: { kind: "owner_call" } });
+    return twiml(sayAndListen(greeting, lang, publicUrl(request, "/api/channels/voice/owner/turn")));
+  }
+  const back = await brokerCallBack(toE164(from) ?? from);
+  const ctx = back ? await loadContext(back.carrierId) : null;
+  const load = ctx?.loads.find((l) => l.id === back?.loadId);
+  if (ctx && load) {
+    const opening = brokerCallBackOpening(ctx, load);
+    await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "out", providerId: `${params.CallSid}:greeting`, counterparty: brokerCallKey(params.CallSid), body: opening, data: { kind: "broker_call", loadId: load.id, callback: true } });
+    await addActivity(ctx.carrier.id, event({ type: "call_started", loadId: load.id, message: `${ctx.brokers.find((b) => b.id === load.brokerId)?.company ?? "A broker"} called back`, detail: `${load.referenceNumber} · AI dispatcher answered`, severity: "info" }));
+    if (realtimeFor("en")) return streamTwiml({ kind: "broker", carrier: ctx.carrier.id, ref: load.id, callSid: params.CallSid, lang: "en", opening });
+    return twiml(sayAndListen(opening, "en", publicUrl(request, `/api/channels/voice/broker/turn?carrier=${encodeURIComponent(ctx.carrier.id)}&load=${encodeURIComponent(load.id)}`)));
+  }
+  return twiml(sayAndListen(WHO_IS_CALLING, "en", publicUrl(request, "/api/channels/voice/message")));
+}
+
+/** The owner's call, one turn at a time. */
+export async function ownerNextTurn(request: Request, params: Record<string, string>, missed: number) {
+  const owner = await ownerByPhone(params.From ?? "");
+  if (!owner) return twiml("<Hangup/>");
+  const lang = (owner.settings.ownerLanguage ?? "en") as Lang;
+  const turnUrl = publicUrl(request, "/api/channels/voice/owner/turn");
+  const said = (params.SpeechResult ?? "").trim();
+  if (!said) return missed >= 1 ? twiml(`${say(GOODBYE[lang], lang)}<Hangup/>`) : twiml(sayAndListen(DIDNT_HEAR[lang], lang, `${turnUrl}?missed=1`));
+  const key = callKey(params.CallSid);
+  const earlier = await threadWith(owner.id, "voice", key, 16);
+  await logChannel({ carrierId: owner.id, channel: "voice", direction: "in", counterparty: key, body: said, data: { kind: "owner_call" } });
+  const ctx = await loadContext(owner.id);
+  const history = earlier.map((m) => ({ from: m.direction === "in" ? ("them" as const) : ("ai" as const), text: m.body ?? "" }));
+  const result = ctx && aiConfigured() ? await ownerTurn(ctx, "voice", said, history) : { reply: "", effects: { done: [], failed: true } as { done: string[]; failed?: boolean; hangUp?: boolean } };
+  if (result.effects.failed) {
+    if (ctx) await passToOwner(ctx, { reason: `The owner called and said: "${said}". The AI couldn't answer.`, label: "Called back", source: "voice", to: "support" });
+    return twiml(`${say(PASSED_ON_CALL[lang], lang)}<Hangup/>`);
+  }
+  await logChannel({ carrierId: owner.id, channel: "voice", direction: "out", counterparty: key, body: result.reply, data: { kind: "owner_call" } });
+  return result.effects.hangUp ? twiml(`${say(result.reply, lang)}<Hangup/>`) : twiml(sayAndListen(result.reply, lang, turnUrl));
+}
+
+/** Someone the line doesn't know left a message: it goes to Backroute support's phones. */
+export async function takeMessage(params: Record<string, string>) {
+  const said = (params.SpeechResult ?? "").trim();
+  if (said) await alertSupport(null, `Call to the dispatch line from ${params.From ?? "unknown"}: "${said.slice(0, 400)}"`).catch((e) => console.error("[voice] message alert failed", e));
+  return twiml(`${say(MESSAGE_TAKEN, "en")}<Hangup/>`);
 }

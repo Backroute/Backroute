@@ -48,6 +48,8 @@ export async function sendSetupPacket(ctx: CarrierContext, sender: { from: strin
       source: "email",
       to: "owner",
     });
+    // Meanwhile the broker hears it's coming, the way a dispatcher would say it.
+    await sendOrQueue(ctx, { purpose: "ack", to: sender.from, toName: sender.contactName ?? sender.fromName, subject: /^re:/i.test(sender.subject) ? sender.subject : `Re: ${sender.subject}`, body: mail.holding(ctx.carrier, ctx.settings, "our carrier packet", sender.contactName ?? sender.fromName), inReplyTo: sender.messageId, withinRules: true, why: `Tell ${sender.fromName} the packet is coming?` });
     return;
   }
   const order = ["w9", "coi", "authority", "noa"];

@@ -628,7 +628,7 @@ export interface DraftMessage {
  */
 export type OwnerRule = "tonu_default" | "detention_default" | "invoice_noted_pod" | "replies";
 
-export type DraftPurpose = "reply" | "book_request" | "counter" | "accept" | "setup_packet" | "invoice" | "detention" | "payment_reminder" | "tonu" | "eta_update" | "capacity" | "pass";
+export type DraftPurpose = "reply" | "book_request" | "counter" | "accept" | "setup_packet" | "invoice" | "detention" | "payment_reminder" | "tonu" | "eta_update" | "capacity" | "pass" | "ack";
 
 export interface DriverMessage {
   id: string;

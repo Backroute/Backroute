@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import { aiConfigured } from "@/lib/ai/server";
-import { dbConfigured, driverByPhone, driverThread, loadContext, logChannel, save, saveDriverMessage, carrierById } from "@/lib/agent/db";
-import { driverTurn, passToOwner, uid } from "@/lib/agent/dispatcher";
+import { dbConfigured, driverByPhone, driverThread, loadContext, logChannel, ownerByPhone, save, saveDriverMessage, carrierById, threadWith } from "@/lib/agent/db";
+import { driverTurn, ownerTurn, passToOwner, uid } from "@/lib/agent/dispatcher";
 import { readTwilioWebhook, sendSms, twiml, twilioConfigured, xml } from "@/lib/channels/twilio";
 import { PASSED_ON_TEXT, SMS_HELP, UNKNOWN_NUMBER } from "@/lib/channels/phrases";
 import type { Item } from "@/lib/cloud/rows";
@@ -25,7 +25,27 @@ export async function POST(request: Request) {
   const from = params.From ?? "";
   const body = (params.Body ?? "").trim();
   const found = await driverByPhone(from);
-  if (!found) return twiml(`<Message>${xml(UNKNOWN_NUMBER)}</Message>`);
+  if (!found) {
+    // The owner texting the line gets the AI dispatcher, answering from the fleet data.
+    const owner = await ownerByPhone(from);
+    if (!owner) return twiml(`<Message>${xml(UNKNOWN_NUMBER)}</Message>`);
+    const fresh = await logChannel({ carrierId: owner.id, channel: "sms", direction: "in", providerId: params.MessageSid, counterparty: from, body, data: { kind: "owner_text" } });
+    if (!fresh) return twiml();
+    after(async () => {
+      const ctx = await loadContext(owner.id);
+      if (!ctx) return;
+      const history = (await threadWith(owner.id, "sms", from, 12)).filter((m, i, all) => !(i === all.length - 1 && m.direction === "in" && m.body === body)).map((m) => ({ from: m.direction === "in" ? ("them" as const) : ("ai" as const), text: m.body ?? "" }));
+      const result = aiConfigured() ? await ownerTurn(ctx, "sms", body, history) : { reply: "", effects: { done: [], failed: true } };
+      if (result.effects.failed) await passToOwner(ctx, { reason: `The owner texted: "${body}". The AI couldn't answer.`, label: "Answered", source: "sms", to: "support" });
+      const text = result.reply || PASSED_ON_TEXT[ctx.settings.ownerLanguage ?? "en"];
+      const sid = await sendSms(from, text).catch((e) => {
+        console.error("[sms] send failed", e);
+        return null;
+      });
+      await logChannel({ carrierId: owner.id, channel: "sms", direction: "out", providerId: sid ?? null, counterparty: from, body: text, data: { kind: "owner_text" } });
+    });
+    return twiml();
+  }
   const { carrierId, driver } = found;
 
   const fresh = await logChannel({ carrierId, channel: "sms", direction: "in", providerId: params.MessageSid, driverId: driver.id, counterparty: from, body });

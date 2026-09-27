@@ -16,8 +16,9 @@ import { ourNumber, ourNumbers, respond, withOurMove, withTheirOffer } from "./n
 import { estimateMiles } from "../fleet";
 import { askSupportAboutBroker, checkBroker } from "./brokers";
 import { assessBroker } from "../broker-policy";
-import { confirmPhoneBooking } from "./paperwork";
+import { confirmPhoneBooking, sendSetupPacket } from "./paperwork";
 import { memoryNote } from "./memory";
+import { when } from "./templates";
 
 /**
  * The AI phones a broker about a load, the way a dispatcher follows up an email nobody answered, or books with a
@@ -63,7 +64,12 @@ export async function callBroker(ctx: CarrierContext, load: Load, url: string | 
  * whether it's still available. The price comes after, once the broker names theirs or asks for ours.
  */
 export function brokerCallOpening(ctx: CarrierContext, load: Load): string {
-  return `Hi, this is the AI dispatcher for ${ctx.carrier.name}${ctx.carrier.mc ? `, MC ${ctx.carrier.mc.replace(/\D/g, "").split("").join(" ")}` : ""}. This call is transcribed. I'm calling on your ${load.lane.origin} to ${load.lane.destination} load, ${load.referenceNumber}, picking up ${load.pickupWindow}. Is it still available?`;
+  return `Hi, this is the AI dispatcher for ${ctx.carrier.name}${ctx.carrier.mc ? `, MC ${ctx.carrier.mc.replace(/\D/g, "").split("").join(" ")}` : ""}. This call is transcribed. I'm calling on your ${load.lane.origin} to ${load.lane.destination} load, ${load.referenceNumber}, picking up ${when(load.pickupWindow)}. Is it still available?`;
+}
+
+/** A broker calling back the number the AI called them from: pick up where that call left off. */
+export function brokerCallBackOpening(ctx: CarrierContext, load: Load): string {
+  return `${ctx.carrier.name} dispatch, this is the AI dispatcher. This call is transcribed. Thanks for calling back about your ${load.lane.origin} to ${load.lane.destination} load, ${load.referenceNumber}. Is it still available?`;
 }
 
 /** Where the load's truck is, the way a dispatcher tells a broker: empty somewhere now, or unloading somewhere soon. */
@@ -71,27 +77,37 @@ export function truckAt(ctx: Pick<CarrierContext, "trucks" | "loads">, load: Loa
   const truck = ctx.trucks.find((t) => t.id === load.truckId);
   if (!truck) return null;
   const on = ctx.loads.find((l) => l.id === truck.currentLoadId && l.id !== load.id);
-  if (on) return `unloading in ${on.lane.destination}, ${on.lane.destState}${on.deliveryWindow ? ` (${on.deliveryWindow})` : ""}`;
+  if (on) return `unloading in ${on.lane.destination}, ${on.lane.destState}${on.deliveryWindow ? ` (${when(on.deliveryWindow)})` : ""}`;
   const where = truck.position?.description ?? `${truck.currentCity}, ${truck.currentState}`;
   return truck.status === "available" ? `empty in ${where}` : `in ${where}`;
 }
 
 /** What a broker asks a dispatcher about the truck, the driver and the company, answered from the carrier's data. */
-function factsNote(ctx: CarrierContext, load: Load): string {
+export function brokerFacts(ctx: CarrierContext, load: Load): string[] {
   const facts: string[] = [];
   const truck = ctx.trucks.find((t) => t.id === load.truckId);
   const at = truckAt(ctx, load);
   if (truck && at) {
     facts.push(`Truck ${truck.unitNumber}, a ${truck.equipmentType.toLowerCase()}, is ${at}.`);
     const miles = estimateMiles({ city: truck.currentCity, state: truck.currentState }, { city: load.lane.origin, state: load.lane.originState });
-    if (miles !== null && !truck.currentLoadId) facts.push(miles < 25 ? "It's right by the pickup." : `It's about ${miles} miles from the pickup, roughly ${Math.max(1, Math.round(miles / 50))} hour${Math.round(miles / 50) > 1 ? "s" : ""} away.`);
+    if (miles !== null && !truck.currentLoadId) {
+      facts.push(miles < 25 ? "It's right by the pickup." : `It's about ${miles} miles from the pickup, roughly ${Math.max(1, Math.round(miles / 50))} hour${Math.round(miles / 50) > 1 ? "s" : ""} away.`);
+      if (truck.status === "available" && miles < 60) facts.push("It's empty nearby now, so it can load early if the shipper allows.");
+    }
     const driver = ctx.drivers.find((d) => d.id === truck.driverId);
     if (driver) facts.push(`Driver: ${driver.name.split(" ")[0]}${typeof driver.hoursRemaining === "number" ? `, ${Math.floor(driver.hoursRemaining)} hours left to drive today` : ""}.`);
+    if (truck.secondDriverId) facts.push("It's a team truck.");
     if (truck.position) facts.push("We track the truck by ELD and send check calls with its location.");
   }
+  facts.push(`Pickup ${when(load.pickupWindow)}, delivery ${when(load.deliveryWindow)}.`);
   if (ctx.carrier.mc) facts.push(`Our MC is ${ctx.carrier.mc}.`);
   facts.push("Our W-9, insurance certificate and authority go out with the carrier packet by email.");
-  return ` Facts you can give the broker: ${facts.join(" ")}`;
+  if (ctx.settings.factoringEmail) facts.push("We factor our invoices; the notice of assignment comes with the packet.");
+  return facts;
+}
+
+function factsNote(ctx: CarrierContext, load: Load): string {
+  return ` Facts you can give the broker: ${brokerFacts(ctx, load).join(" ")}`;
 }
 
 export const VOICEMAIL = (ctx: CarrierContext, load: Load) => {
@@ -122,6 +138,8 @@ How the call goes, like any dispatcher's:
 Rules:
 - Never name, agree to or hint at a number the tools didn't give you.
 - Answer questions about the truck, the driver and the company only from the facts you're given. If you don't have it, say you'll confirm by email. Never make anything up.
+- If they ask for our carrier packet or setup papers, call send_packet.
+- If they ask something about this load you can't answer from the facts (their rules, a detail you don't have), say the office will confirm by email, then call follow_up with the question so someone does.
 - Stick to this load.`;
 
 export interface CallTurnResult {
@@ -271,6 +289,27 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
         await persist({ brokerContactEmail: address });
         await confirmPhoneBooking(ctx, current, address, current.bookRequest.ask, name);
         return `Sent the confirmation and our packet to ${address}. Tell them it's on its way and to reply with the rate confirmation.`;
+      },
+    }),
+    betaZodTool({
+      name: "follow_up",
+      description: "Something the broker asked that you couldn't answer from the facts. The office follows up by email.",
+      inputSchema: z.object({ question: z.string() }),
+      run: async ({ question }) => {
+        await passToOwner(ctx, { reason: `${ctx.brokers.find((b) => b.id === current.brokerId)?.company ?? "The broker"} asked on the phone about ${current.referenceNumber}: "${question}". Answer them by email.`, loadId: current.id, label: "Answered", source: "voice", to: "support" });
+        return "Noted for the office. Tell them someone will email the answer shortly.";
+      },
+    }),
+    betaZodTool({
+      name: "send_packet",
+      description: "The broker asked for our carrier packet or setup papers (W-9, insurance certificate, authority). Sends them by email.",
+      inputSchema: z.object({ email: z.string().optional().describe("Where to send it, if they gave an address") }),
+      run: async ({ email }) => {
+        const broker = ctx.brokers.find((b) => b.id === current.brokerId);
+        const address = (email ?? "").trim().toLowerCase().replace(/\s+at\s+/, "@").replace(/\s+dot\s+/g, ".").replace(/\s/g, "") || current.brokerContactEmail || broker?.email;
+        if (!address || !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(address)) return "Ask for the email address to send the packet to, spell it back, and call send_packet with it.";
+        await sendSetupPacket(ctx, { from: address, fromName: broker?.company ?? address, subject: `Carrier packet: ${ctx.carrier.name}`, contactName: null });
+        return `Packet on its way to ${address} (or the office will send it shortly if a paper is missing). Tell them.`;
       },
     }),
     betaZodTool({

@@ -9,7 +9,7 @@ import { formatAtStop, stopLocalToIso } from "../stop-time";
 import type { Broker, Load, Truck } from "../types";
 import type { OfferReading } from "./broker-mail";
 import { addActivity, logChannel, save, saveDriverMessage, type CarrierContext } from "./db";
-import { event, passToOwner, uid } from "./dispatcher";
+import { answerBrokerQuestion, event, passToOwner, uid } from "./dispatcher";
 import { sendOrQueue } from "./outbox";
 import { askSupportAboutBroker, checkBroker } from "./brokers";
 import { callBroker, truckAt } from "./broker-call";
@@ -278,7 +278,7 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
  * The broker answered our price. The haggling rules (lib/agent/negotiation) pick the answer; the email is a template
  * with exactly that number and a reason for it.
  */
-export async function answerRateReply(ctx: CarrierContext, load: Load, reply: { brokerRate: number | null; agreed: boolean; contactName: string | null }, sender: Sender) {
+export async function answerRateReply(ctx: CarrierContext, load: Load, reply: { brokerRate: number | null; agreed: boolean; contactName: string | null; question?: string | null }, sender: Sender) {
   const broker = ctx.brokers.find((b) => b.id === load.brokerId);
   const at = new Date().toISOString();
   if (load.stage === "declined") {
@@ -289,12 +289,19 @@ export async function answerRateReply(ctx: CarrierContext, load: Load, reply: { 
     load = { ...load, stage: "negotiating", bookRequest: { ...load.bookRequest, status: "sent" } };
   }
   const ours = load.bookRequest?.ask ?? load.targetRate;
+  const subject = /^re:/i.test(sender.subject) ? sender.subject : `Re: ${sender.subject}`;
+  const name = reply.contactName ?? undefined;
+  // Anything else they asked (where's the truck, when can it get there) is answered in the same email.
+  const answer = reply.question ? await answerBrokerQuestion(ctx, load, reply.question) : null;
   if (reply.agreed && (!reply.brokerRate || ourNumbers(load.bookRequest, ours).includes(reply.brokerRate) || reply.brokerRate >= ours)) {
     const amount = reply.brokerRate ?? ours;
     const updated: Load = { ...load, updatedAt: at, targetRate: amount, bookRequest: { ...load.bookRequest!, ask: amount, status: "accepted", brokerOffer: amount } };
     await save("loads", ctx.carrier.id, updated as unknown as Item);
     ctx.loads = ctx.loads.map((l) => (l.id === load.id ? updated : l));
     await addActivity(ctx.carrier.id, event({ type: "negotiation_email", loadId: load.id, message: `${broker?.company ?? "Broker"} agreed to $${amount.toLocaleString()}`, detail: `${load.referenceNumber} · waiting on their rate con`, severity: "success" }));
+    // A dispatcher answers a yes: thanks, the terms, and send the rate con.
+    const body = mail.agreed(ctx.carrier, ctx.settings, updated, amount, name);
+    await sendOrQueue(ctx, { purpose: "ack", to: sender.from, toName: name, subject, body: answer ? body.replace("\n\nSend the rate con here", `\n\n${answer}\n\nSend the rate con here`) : body, inReplyTo: sender.messageId, loadId: load.id, withinRules: true, why: `${broker?.company ?? "The broker"} agreed to $${amount.toLocaleString()} on ${load.referenceNumber}. Thank them and ask for the rate con?` });
     return;
   }
   if (!reply.brokerRate) return false; // Nothing to decide on: the AI's own reply handles it.
@@ -304,13 +311,11 @@ export async function answerRateReply(ctx: CarrierContext, load: Load, reply: { 
   const withOffer: Load = { ...load, updatedAt: at, bookRequest: withTheirOffer(load.bookRequest, ours, offer, "email") };
   await save("loads", ctx.carrier.id, withOffer as unknown as Item);
   ctx.loads = ctx.loads.map((l) => (l.id === load.id ? withOffer : l));
-  const subject = /^re:/i.test(sender.subject) ? sender.subject : `Re: ${sender.subject}`;
-  const name = reply.contactName ?? undefined;
   const company = broker?.company ?? "The broker";
   const base = { to: sender.from, toName: name, subject, inReplyTo: sender.messageId, loadId: load.id };
   if (move.action === "owner") {
     // Just under the owner's lowest: they decide. The acceptance is ready to send if they want it.
-    await sendOrQueue(ctx, { ...base, purpose: "accept", body: mail.accept(ctx.carrier, ctx.settings, withOffer, offer, name), amount: offer, withinRules: false, why: `${company} offered $${offer.toLocaleString()} on ${load.referenceNumber}. ${move.why} Send this to take it, or don't send to pass.` });
+    await sendOrQueue(ctx, { ...base, purpose: "accept", body: mail.accept(ctx.carrier, ctx.settings, withOffer, offer, name, answer ?? undefined), amount: offer, withinRules: false, why: `${company} offered $${offer.toLocaleString()} on ${load.referenceNumber}. ${move.why} Send this to take it, or don't send to pass.` });
     return true;
   }
   if (move.action === "pass") {
@@ -320,8 +325,8 @@ export async function answerRateReply(ctx: CarrierContext, load: Load, reply: { 
   }
   const body =
     move.action === "accept"
-      ? mail.accept(ctx.carrier, ctx.settings, withOffer, move.amount, name)
-      : mail.counter(ctx.carrier, ctx.settings, withOffer, move.amount, name, { final: move.final, held: move.held, split: move.split, reason: move.reason });
+      ? mail.accept(ctx.carrier, ctx.settings, withOffer, move.amount, name, answer ?? undefined)
+      : mail.counter(ctx.carrier, ctx.settings, withOffer, move.amount, name, { final: move.final, held: move.held, split: move.split, reason: move.reason, answer: answer ?? undefined });
   await sendOrQueue(ctx, {
     ...base,
     purpose: move.action,

@@ -225,3 +225,19 @@ export const SLOW_DOCK: Record<Lang, (p: { name: string; hours: string }) => str
   uk: (p) => `Увага: у ${p.name} зазвичай тримають близько ${p.hours} год. Відмічай прибуття і від'їзд у застосунку, щоб простій оплатили.`,
   fr: (p) => `Attention : ${p.name} prend souvent environ ${p.hours} heures. Indique arrivée et départ dans l'appli pour facturer l'attente.`,
 };
+
+/** The owner calls the dispatch line. */
+export const OWNER_GREETING: Record<Lang, (carrier: string) => string> = {
+  en: (c) => `Hi, it's your AI dispatcher for ${c}. What do you need?`,
+  es: (c) => `Hola, habla tu despachador de inteligencia artificial de ${c}. ¿Qué necesitas?`,
+  pa: (c) => `ਸਤ ਸ੍ਰੀ ਅਕਾਲ, ਮੈਂ ${c} ਦਾ ਤੁਹਾਡਾ AI ਡਿਸਪੈਚਰ ਬੋਲ ਰਿਹਾ ਹਾਂ। ਦੱਸੋ ਕੀ ਚਾਹੀਦਾ ਹੈ?`,
+  hi: (c) => `नमस्ते, मैं ${c} का आपका AI डिस्पैचर बोल रहा हूँ। बताइए, क्या चाहिए?`,
+  ru: (c) => `Здравствуйте, это ваш AI-диспетчер компании ${c}. Чем помочь?`,
+  uk: (c) => `Вітаю, це ваш AI-диспетчер компанії ${c}. Чим допомогти?`,
+  fr: (c) => `Bonjour, ici votre répartiteur IA de ${c}. Qu'est-ce qu'il vous faut ?`,
+};
+
+/** Someone the line doesn't know: take a message for Backroute support. English and Spanish, like UNKNOWN_NUMBER. */
+export const WHO_IS_CALLING =
+  "This is Backroute's AI dispatch line. This call is transcribed. Who's calling, and what can I help you with? / Esta es la línea de despacho de Backroute. ¿Quién llama y en qué le puedo ayudar?";
+export const MESSAGE_TAKEN = "Thanks, I've passed that on. Someone will call you back shortly. / Gracias, ya pasé el mensaje. Le llamarán pronto.";

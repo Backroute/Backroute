@@ -9,7 +9,8 @@ import { driverSnapshot, ownerSnapshot } from "../ai/snapshot";
 import { LANG_INFO } from "../lang/pack";
 import { PRIMARY_CARRIER_ID } from "../mock-data";
 import { memoryNote } from "./memory";
-import { truckAt } from "./broker-call";
+import { brokerFacts, truckAt } from "./broker-call";
+import { dollarAmounts } from "./pricing";
 import { NEARBY, findNearby, handleBreakdown } from "./roadside";
 import { recordFeedback } from "./care";
 import { LOAD_STAGE_LABEL, LOAD_STAGE_ORDER, type ActivityEvent, type Driver, type Escalation, type Load, type LoadStage, type MessageChannel } from "../types";
@@ -253,6 +254,75 @@ export async function driverTurn(ctx: CarrierContext, driver: Driver, channel: "
   }
 }
 
+const OWNER_CHANNEL = {
+  sms: `The owner is texting the dispatch line. Keep each reply short, under 300 characters when you can, plain text only.`,
+  voice: `The owner is on the phone with you. Your words are read out by a voice: one or two short spoken sentences, no lists or symbols, numbers the way people say them. When they're done, say a short goodbye and use hang_up.`,
+};
+
+/**
+ * The owner texts or calls the dispatch line: answers from the fleet data (what's moving, what needs them, money),
+ * and anything that needs a person goes to Backroute support.
+ */
+export async function ownerTurn(ctx: CarrierContext, channel: "sms" | "voice", said: string, history: Turn[]): Promise<{ reply: string; effects: Effects }> {
+  const effects: Effects = { done: [] };
+  const lang = LANG_INFO[ctx.settings.ownerLanguage ?? "en"];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tools: BetaRunnableTool<any>[] = [
+    betaZodTool({
+      name: "tell_support",
+      description: "Pass something to Backroute's support team that needs a person: a problem, a request the AI can't do from here, a call back.",
+      inputSchema: z.object({ message: z.string(), urgent: z.boolean().optional() }),
+      run: async ({ message, urgent }) => {
+        await raise(ctx, { reason: `The owner (${channel === "sms" ? "by text" : "on the phone"}): ${message}`, label: "Done", source: channel, to: "support", critical: !!urgent });
+        effects.done.push("Passed a request to support");
+        return "Support has it and will get back to the owner.";
+      },
+    }),
+  ];
+  if (channel === "voice")
+    tools.push(
+      betaZodTool({
+        name: "hang_up",
+        description: "End the call after your goodbye.",
+        inputSchema: z.object({}),
+        run: async () => {
+          effects.hangUp = true;
+          return "The call will end after your reply.";
+        },
+      }),
+    );
+  const messages: Anthropic.Beta.BetaMessageParam[] = history.map((t) => ({ role: t.from === "them" ? "user" : "assistant", content: t.text }));
+  while (messages.length && messages[0].role !== "user") messages.shift();
+  messages.push({
+    role: "user",
+    content: [
+      { type: "text", text: `Fleet data right now (${new Date().toUTCString()}):\n${JSON.stringify(ownerSnapshot(snapshotSource(ctx), { ask: "Ask me first", rules: "Within my rules", full: "Full autopilot" }))}` },
+      { type: "text", text: `${channel === "voice" ? "The owner said" : "The owner texted"} (answer in ${lang.english} unless they use another language): ${said}` },
+    ],
+  });
+  try {
+    const final = await claude().beta.messages.toolRunner({
+      model: AI_MODEL,
+      max_tokens: 4000,
+      ...FALLBACK,
+      output_config: { effort: channel === "voice" ? "low" : "medium" },
+      system: [
+        { type: "text", text: OWNER_SYSTEM, cache_control: { type: "ephemeral" } },
+        { type: "text", text: `${OWNER_CHANNEL[channel]} Decisions waiting in Needs you are made in the app; say what's waiting and where. Anything else that needs a person, pass to support with tell_support.` },
+      ],
+      messages,
+      tools,
+      max_iterations: 4,
+    });
+    if (final.stop_reason === "refusal") return { reply: "", effects: { ...effects, failed: true } };
+    const reply = textOf(final);
+    return { reply, effects: reply ? effects : { ...effects, failed: true } };
+  } catch (error) {
+    console.error("[dispatcher] owner turn failed", error instanceof Anthropic.APIError ? error.status : error);
+    return { reply: "", effects: { ...effects, failed: true } };
+  }
+}
+
 function textOf(message: Anthropic.Beta.BetaMessage) {
   return message.content
     .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
@@ -265,6 +335,30 @@ function textOf(message: Anthropic.Beta.BetaMessage) {
 
 const BROKER_NOTES = `
 Now you're handling the carrier's email with a freight broker. Write the reply the way a busy, experienced dispatcher does: answer what they asked in the first line, two or three short lines in all, first name greeting, "we" for the carrier, signed with the carrier's name. No filler ("I hope this finds you well", "please don't hesitate"). If they ask where the truck is, when it can get there, or for the MC, answer from the context. Never agree to a lower rate, extra fees or changed terms, and never commit a truck the data doesn't show as free; for those, say you'll confirm and use flag_for_owner. Don't invent load details. If the email needs no reply (an automated notice, a thank-you), write exactly NO_REPLY.`;
+
+const QUESTION = `You're a truck dispatcher. A freight broker asked a question in an email about a load. Write the answer the carrier would put in its reply: one or two short sentences, from the facts only, plain words. No greeting, no sign-off, no prices or dollar amounts, no promises the facts don't back. If the facts don't answer it, say you'll confirm shortly.`;
+
+/**
+ * The answer to a broker's question (where's the truck, when can it get there, the MC...) that goes in the same email
+ * as the price. Null when there's nothing safe to say: the AI isn't available, or its answer names a dollar amount.
+ */
+export async function answerBrokerQuestion(ctx: CarrierContext, load: Load, question: string): Promise<string | null> {
+  try {
+    const message = await claude().beta.messages.create({
+      model: AI_MODEL,
+      max_tokens: 1000,
+      ...FALLBACK,
+      output_config: { effort: "low" },
+      system: QUESTION,
+      messages: [{ role: "user", content: `Facts: Load ${load.referenceNumber}, ${load.lane.origin}, ${load.lane.originState} to ${load.lane.destination}, ${load.lane.destState}, ${load.equipmentType}. ${brokerFacts(ctx, load).join(" ")}\n\nThe broker asked: ${question}` }],
+    });
+    const answer = textOf(message);
+    return answer && !dollarAmounts(answer).length ? answer : null;
+  } catch (error) {
+    console.error("[dispatcher] broker question failed", error instanceof Anthropic.APIError ? error.status : error);
+    return null;
+  }
+}
 
 export interface BrokerEmail {
   from: string;
