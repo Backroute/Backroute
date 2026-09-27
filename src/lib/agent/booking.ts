@@ -61,6 +61,12 @@ export async function brokerFor(ctx: CarrierContext, email: string, name: string
   return broker;
 }
 
+/** Going for one of a truck's offers passes on the others (so the next free truck can have them). */
+async function setAsideOthers(ctx: CarrierContext, chosen: Load, at: string) {
+  ctx.loads = ctx.loads.map((l) => (l.id === chosen.id ? chosen : l.offerGroupId && l.offerGroupId === chosen.offerGroupId && l.stage === "offered" ? { ...l, stage: "declined" as const, updatedAt: at } : l));
+  for (const l of ctx.loads) if (l.offerGroupId === chosen.offerGroupId && l.id !== chosen.id && l.stage === "declined" && l.updatedAt === at) await save("loads", ctx.carrier.id, l as unknown as Item);
+}
+
 /** A truck with nothing on it right now: no load it's hauling or heading to. */
 function emptyNow(ctx: Pick<CarrierContext, "trucks" | "loads">, truckId: string | null): boolean {
   const truck = ctx.trucks.find((t) => t.id === truckId);
@@ -253,7 +259,7 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
       const at = new Date().toISOString();
       const asking: Load = { ...load, stage: "negotiating", targetRate: ask, updatedAt: at, bookRequest: { ask, askedAt: at, status: "sent" } };
       await save("loads", ctx.carrier.id, asking as unknown as Item);
-      ctx.loads = ctx.loads.map((l) => (l.id === load.id ? asking : l));
+      await setAsideOthers(ctx, asking, at);
       const url = absoluteUrl(`/api/channels/voice/broker?carrier=${encodeURIComponent(ctx.carrier.id)}&load=${encodeURIComponent(load.id)}`);
       if (await callBroker(ctx, asking, url)) return "sent" as const;
       load = asking;
@@ -276,8 +282,7 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
   const at = new Date().toISOString();
   const updated: Load = { ...load, stage: "negotiating", targetRate: ask, updatedAt: at, bookRequest: { ask, askedAt: at, status: "drafted" } };
   await save("loads", ctx.carrier.id, updated as unknown as Item);
-  ctx.loads = ctx.loads.map((l) => (l.id === load.id ? updated : l.offerGroupId && l.offerGroupId === load.offerGroupId && l.stage === "offered" ? { ...l, stage: "declined" as const, updatedAt: at } : l));
-  for (const l of ctx.loads) if (l.offerGroupId === load.offerGroupId && l.id !== load.id && l.stage === "declined" && l.updatedAt === at) await save("loads", ctx.carrier.id, l as unknown as Item);
+  await setAsideOthers(ctx, updated, at);
 
   const floor = floorFor(load, ctx.settings);
   const subject = load.offerEmail ? (/^re:/i.test(load.offerEmail.subject) ? load.offerEmail.subject : `Re: ${load.offerEmail.subject}`) : mail.subjectFor(load);
