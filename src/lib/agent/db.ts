@@ -85,23 +85,49 @@ export async function loadContext(carrierId: string): Promise<CarrierContext | n
   return { carrier, settings, drivers, trucks, loads, escalations, brokers };
 }
 
-/** The driver a text or call came from, by the last 10 digits of the number. First carrier wins if they drive for two. */
+/**
+ * Of several carriers a phone number belongs to, the one this text or call is about: the one with a load on the
+ * truck (for a driver), else the one we last texted, called or heard from on that number, else the first.
+ */
+async function likeliest(carrierIds: string[], last10: string, driverIds: Map<string, string> = new Map()): Promise<string> {
+  if (carrierIds.length === 1) return carrierIds[0];
+  if (driverIds.size) {
+    const { data } = await admin().from("trucks").select("carrier_id, driver_id, second_driver_id, data").in("carrier_id", carrierIds);
+    const rolling = (data ?? []).find((t) => {
+      const d = driverIds.get(t.carrier_id as string);
+      return d && (t.driver_id === d || t.second_driver_id === d) && (t.data as { currentLoadId?: string | null })?.currentLoadId;
+    });
+    if (rolling) return rolling.carrier_id as string;
+  }
+  const { data: recent } = await admin().from("channel_messages").select("carrier_id").in("carrier_id", carrierIds).like("counterparty", `%${last10}`).order("created_at", { ascending: false }).limit(1);
+  return (recent?.[0]?.carrier_id as string | undefined) ?? carrierIds[0];
+}
+
+/** The driver a text or call came from, by the last 10 digits of the number. Someone who drives for two carriers is taken as the likeliest one. */
 export async function driverByPhone(phone: string): Promise<{ carrierId: string; driver: Driver } | null> {
   const last10 = phone.replace(/\D/g, "").slice(-10);
   if (last10.length < 10) return null;
-  const { data, error } = await admin().from("drivers").select("carrier_id, data").eq("phone_last10", last10).limit(1);
+  const { data, error } = await admin().from("drivers").select("carrier_id, data").eq("phone_last10", last10).limit(10);
   if (error) throw error;
-  const row = data?.[0];
-  return row ? { carrierId: row.carrier_id as string, driver: row.data as Driver } : null;
+  if (!data?.length) return null;
+  const chosen = await likeliest(
+    data.map((r) => r.carrier_id as string),
+    last10,
+    new Map(data.map((r) => [r.carrier_id as string, (r.data as Driver).id])),
+  );
+  const row = data.find((r) => r.carrier_id === chosen) ?? data[0];
+  return { carrierId: row.carrier_id as string, driver: row.data as Driver };
 }
 
-/** The carrier whose owner is on this phone number (the owner calling or texting the dispatch line). */
+/** The carrier whose owner is on this phone number (the owner calling or texting the dispatch line). An owner of two is taken in the one last in touch. */
 export async function ownerByPhone(phone: string): Promise<CarrierRow | null> {
   const last10 = phone.replace(/\D/g, "").slice(-10);
   if (last10.length < 10) return null;
-  const { data, error } = await admin().from("carriers").select("id, name, mc, owner_operator, owner_phone, inbound_key, settings").like("owner_phone", `%${last10}`).limit(1);
+  const { data, error } = await admin().from("carriers").select("id, name, mc, owner_operator, owner_phone, inbound_key, settings").like("owner_phone", `%${last10}`).limit(10);
   if (error) throw error;
-  return (data?.[0] as CarrierRow | undefined) ?? null;
+  if (!data?.length) return null;
+  const chosen = await likeliest(data.map((r) => r.id as string), last10);
+  return ((data.find((r) => r.id === chosen) ?? data[0]) as CarrierRow) ?? null;
 }
 
 /** Carriers whose name matches what a caller said ("Titan", "Titan Freight"), for the shared dispatch line. */

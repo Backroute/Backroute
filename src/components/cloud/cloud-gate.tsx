@@ -7,7 +7,7 @@ import { CloudOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/shared/logo";
 import { cloudEnabled, supabase } from "@/lib/cloud/client";
-import { claimInvites, homeFor, myMemberships } from "@/lib/cloud/account";
+import { claimInvites, homeFor, myMemberships, pickMembership, useMemberships } from "@/lib/cloud/account";
 import { connect, NotSetUpError, signOut, useSyncStatus } from "@/lib/cloud/sync";
 import { demoAllowed, inDemo } from "@/lib/cloud/demo";
 import { NotAvailable } from "./not-available";
@@ -49,8 +49,12 @@ function LiveGate({ area, children }: { area: Area; children: React.ReactNode })
       if (!data.session) return router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       await claimInvites();
       const memberships = await myMemberships();
-      const m = memberships[0];
+      useMemberships.setState({ list: memberships });
+      const m = pickMembership(memberships);
       if (!m) return area === "signup" ? !cancelled && setState("ready") : router.replace("/signup");
+      // Adding another company (from the carrier switcher) is the one reason someone with a carrier signs up again.
+      const another = area === "signup" && new URLSearchParams(window.location.search).has("another");
+      if (another) return !cancelled && setState("ready");
       if (area === "signup" && useStore.getState().session.mode === "demo") return router.replace(homeFor(m));
       if (area === "carrier" && m.role === "driver") return router.replace("/driver");
       if (area === "driver" && m.role !== "driver" && !m.driverId) return router.replace("/carrier");

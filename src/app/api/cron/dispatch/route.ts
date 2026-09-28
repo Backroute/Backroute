@@ -3,6 +3,7 @@ import { runRounds } from "@/lib/agent/rounds";
 import { flagStuck } from "@/lib/agent/stuck";
 import { retryOutbound } from "@/lib/channels/out";
 import { publicUrl } from "@/lib/channels/twilio";
+import { alertOnHealth, beat } from "@/lib/health";
 
 export const maxDuration = 300;
 
@@ -18,6 +19,7 @@ export async function GET(request: Request) {
 
   const now = Date.now();
   const done: string[] = [];
+  await beat("cron_dispatch");
   try {
     const retried = await retryOutbound(now);
     if (retried.sent) done.push(`${retried.sent} held-up message${retried.sent === 1 ? "" : "s"} sent`);
@@ -38,5 +40,7 @@ export async function GET(request: Request) {
       console.error("[cron] dispatch rounds failed for", id, e);
     }
   }
+  // Anything down (or AI spending running away) goes to support's phones.
+  done.push(...(await alertOnHealth(now).catch((e) => (console.error("[cron] health check failed", e), []))));
   return Response.json({ done });
 }

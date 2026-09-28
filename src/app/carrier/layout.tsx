@@ -1,6 +1,7 @@
 "use client";
 
 import { CloudGate } from "@/components/cloud/cloud-gate";
+import { CarrierSwitcher } from "@/components/cloud/carrier-switcher";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutGrid, Settings, Truck, Users, Wallet } from "lucide-react";
@@ -117,6 +118,8 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
         />
       }
       footer={
+        <>
+        <CarrierSwitcher />
         <div className="flex items-center gap-2.5 rounded-xl border border-line px-3 py-2.5">
           <Avatar name={carrier.name} size="sm" />
           <div className="min-w-0 flex-1">
@@ -125,6 +128,7 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
           </div>
           <Badge tone="dark">{carrier.plan}</Badge>
         </div>
+        </>
       }
     >
       <CommandPalette groups={commandGroups} />

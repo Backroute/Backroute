@@ -7,7 +7,7 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import { cloudEnabled, supabase } from "@/lib/cloud/client";
-import { claimInvites, homeFor, myMemberships } from "@/lib/cloud/account";
+import { claimInvites, homeFor, myMemberships, pickMembership } from "@/lib/cloud/account";
 import { authHeader } from "@/lib/ai/client";
 import { formatPhone, toE164 } from "@/lib/cloud/phone";
 import { demoAllowed, leaveDemo } from "@/lib/cloud/demo";
@@ -100,7 +100,7 @@ function PhoneSignIn() {
     }
     try {
       await claimInvites();
-      const m = (await myMemberships())[0];
+      const m = pickMembership(await myMemberships());
       const next = params.get("next");
       if (!m) {
         // Backroute's support team has no carrier of their own: their home is the support console.

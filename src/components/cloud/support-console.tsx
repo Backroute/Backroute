@@ -58,7 +58,7 @@ async function act(body: Record<string, unknown>): Promise<string | null> {
  */
 export function SupportConsole() {
   const [q, setQ] = useState<Queue | null>(null);
-  const [tab, setTab] = useState<"queue" | "carriers" | "numbers">("queue");
+  const [tab, setTab] = useState<"queue" | "carriers" | "numbers" | "system">("queue");
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/support/queue", { headers: await authHeader() });
@@ -92,9 +92,9 @@ export function SupportConsole() {
           </div>
         </div>
         <div className="mx-auto flex max-w-5xl gap-1 px-4">
-          {(["queue", "carriers", "numbers"] as const).map((t) => (
+          {(["queue", "carriers", "numbers", "system"] as const).map((t) => (
             <button key={t} type="button" onClick={() => setTab(t)} className={cn("border-b-2 px-3 py-2 text-sm font-medium", tab === t ? "border-ink-950 text-ink-950" : "border-transparent text-ink-500")}>
-              {t === "queue" ? `Waiting on us${q ? ` (${q.items.length})` : ""}` : t === "carriers" ? "Carriers" : "Numbers"}
+              {t === "queue" ? `Waiting on us${q ? ` (${q.items.length})` : ""}` : t === "carriers" ? "Carriers" : t === "numbers" ? "Numbers" : "System"}
             </button>
           ))}
         </div>
@@ -119,6 +119,7 @@ export function SupportConsole() {
           </>
         )}
         {q && tab === "numbers" && <Numbers />}
+        {q && tab === "system" && <SystemHealth />}
         {q && tab === "carriers" && (
           <div className="overflow-hidden rounded-2xl border border-line bg-white">
             {q.carriers.map((c) => (
@@ -452,5 +453,61 @@ function QueueCard({ item, onDone }: { item: QueueItem; onDone: () => Promise<vo
       </div>
       {problem && <p className="mt-2 text-xs text-[var(--accent-danger)]">{problem}</p>}
     </article>
+  );
+}
+
+interface HealthCheck {
+  key: string;
+  label: string;
+  level: "ok" | "warn" | "down" | "off";
+  detail: string;
+}
+
+/** Every part of the system and how it's doing (lib/health). The same checks text support when something goes down. */
+function SystemHealth() {
+  const [checks, setChecks] = useState<HealthCheck[] | null>(null);
+  const [at, setAt] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/support/health", { headers: await authHeader() });
+      if (res.ok) {
+        const body = (await res.json()) as { checks: HealthCheck[]; at: string };
+        setChecks(body.checks);
+        setAt(body.at);
+      }
+    } catch {
+      // Offline: the next tick tries again.
+    }
+  }, []);
+  useEffect(() => {
+    // Checked when the tab opens, then every 30 seconds.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+    const id = setInterval(() => void load(), 30000);
+    return () => clearInterval(id);
+  }, [load]);
+  if (!checks) return <p className="text-sm text-ink-500">Checking…</p>;
+  const dot: Record<HealthCheck["level"], string> = { ok: "bg-emerald-500", warn: "bg-amber-500", down: "bg-red-600", off: "bg-ink-300" };
+  const word: Record<HealthCheck["level"], string> = { ok: "Working", warn: "Look at it", down: "Down", off: "Not set up" };
+  const down = checks.filter((c) => c.level === "down").length;
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-ink-600">
+        {down ? `${down} part${down === 1 ? "" : "s"} down. Support's phones were texted.` : "Everything that's set up is working."} Checked {at ? new Date(at).toLocaleTimeString() : ""}.
+      </p>
+      <div className="overflow-hidden rounded-2xl border border-line bg-white">
+        {checks.map((c) => (
+          <div key={c.key} className="flex items-start gap-3 border-b border-line px-4 py-3 last:border-0">
+            <span className={cn("mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full", dot[c.level])} aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-ink-900">
+                {c.label} <span className="font-normal text-ink-500">· {word[c.level]}</span>
+              </p>
+              <p className="text-xs text-ink-500">{c.detail}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

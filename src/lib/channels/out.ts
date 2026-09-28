@@ -97,6 +97,18 @@ export async function emailTo(c: Sender, p: EmailOut): Promise<string> {
   }
 }
 
+/** Backroute's own email to its team (a system alert): no carrier, nothing kept to retry. Returns false when it can't go. */
+export async function emailOurTeam(to: string, subject: string, text: string): Promise<boolean> {
+  if (!emailConfigured()) return false;
+  try {
+    await sendEmail({ to, subject, text, fromName: "Backroute alerts" });
+    return true;
+  } catch (e) {
+    console.error("[out] alert email failed", e);
+    return false;
+  }
+}
+
 /**
  * Rings someone. `call` says what the call is for, so a held call can be played by the simulator (and shown to the
  * owner): the kind of call and what it's about (a load, a truck).

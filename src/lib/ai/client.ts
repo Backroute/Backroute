@@ -20,7 +20,15 @@ export async function authHeader(): Promise<Record<string, string>> {
   if (!cloudEnabled) return {};
   try {
     const { data } = await supabase().auth.getSession();
-    return data.session ? { authorization: `Bearer ${data.session.access_token}` } : {};
+    if (!data.session) return {};
+    // The carrier this person is working in, for people in more than one (lib/cloud/account).
+    let carrier: string | null = null;
+    try {
+      carrier = localStorage.getItem("backroute-carrier");
+    } catch {
+      carrier = null;
+    }
+    return { authorization: `Bearer ${data.session.access_token}`, ...(carrier ? { "x-carrier-id": carrier } : {}) };
   } catch {
     return {};
   }

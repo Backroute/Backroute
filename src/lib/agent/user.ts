@@ -20,15 +20,19 @@ export interface Caller {
   driverId: string | null;
 }
 
-/** Who is calling, and as whom in their (first) carrier, checked against the database as that person. */
+/**
+ * Who is calling, and as whom, checked against the database as that person. Someone in more than one carrier is
+ * taken in the one their app says they're working in (x-carrier-id), if they belong to it; otherwise their first.
+ */
 export async function caller(request: Request): Promise<{ db: SupabaseClient; me: Caller } | null> {
   const db = asUser(request);
   if (!db) return null;
   const token = request.headers.get("authorization")!.replace(/^Bearer\s+/i, "");
   const { data: auth } = await db.auth.getUser(token);
   if (!auth.user) return null;
-  const { data } = await db.from("members").select("carrier_id, role, driver_id").eq("user_id", auth.user.id).order("created_at").limit(1);
-  const m = data?.[0];
+  const { data } = await db.from("members").select("carrier_id, role, driver_id").eq("user_id", auth.user.id).order("created_at");
+  const wanted = request.headers.get("x-carrier-id");
+  const m = (data ?? []).find((r) => r.carrier_id === wanted) ?? data?.[0];
   if (!m) return null;
   return { db, me: { userId: auth.user.id, carrierId: m.carrier_id as string, role: m.role as Caller["role"], driverId: (m.driver_id as string | null) ?? null } };
 }

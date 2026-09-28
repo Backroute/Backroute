@@ -114,6 +114,8 @@ interface Connection {
 
 let conn: Connection | null = null;
 
+const MERGED = new Set(["loads", "trucks", "drivers", "escalations"]);
+
 const itemKey = (s: Spec, id: string) => `${specKey(s)}/${id}`;
 
 /**
@@ -322,8 +324,9 @@ async function flush(c: Connection) {
       const now = new Date().toISOString();
       const rowOf = (i: Item) => {
         const row = rowFor(spec.table, spec.kind, c.carrierId, i, now);
-        // A load: only what this screen changed, merged into the current row by the database.
-        const changed = spec.table === "loads" ? changedFields(previous.get(i.id)?.json, i) : null;
+        // Only what this screen changed, merged into the current row by the database (loads, trucks, drivers and
+        // Needs you items; supabase/migrations/20261001000000_merge_edits.sql and 20261006000000_merge_more.sql).
+        const changed = MERGED.has(spec.table) ? changedFields(previous.get(i.id)?.json, i) : null;
         return changed ? { ...row, data: { ...row.data, _changed: changed } } : row;
       };
       for (let n = 0; n < changed.length; n += 200) {

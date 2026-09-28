@@ -3,6 +3,7 @@ import { z } from "zod";
 import { dbConfigured, storeFile } from "@/lib/agent/db";
 import { portalStep } from "@/lib/portal/step";
 import { claimNext, giveUpOn, portalReady, taskById, updateTask } from "@/lib/portal/tasks";
+import { beat } from "@/lib/health";
 
 export const maxDuration = 60;
 
@@ -56,6 +57,7 @@ export async function POST(request: Request) {
   const b = parsed.data;
 
   if (b.op === "next") {
+    await beat("portal_worker", { worker: b.worker });
     const task = await claimNext(b.worker);
     return Response.json({ task: task ? { id: task.id, kind: task.kind, url: task.url } : null });
   }

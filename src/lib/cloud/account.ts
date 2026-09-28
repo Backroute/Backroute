@@ -1,3 +1,4 @@
+import { create } from "zustand";
 import { supabase } from "./client";
 
 export type Role = "owner" | "dispatcher" | "driver";
@@ -34,6 +35,38 @@ export async function myMemberships(): Promise<Membership[]> {
     return { carrierId: m.carrier_id, role: m.role as Role, driverId: m.driver_id, carrierName: c?.name ?? "", ownerOperator: !!c?.owner_operator };
   });
 }
+
+// ─── Several carriers on one login ──────────────────────────────────────────
+// A dispatch service, or an owner with two companies, belongs to more than one carrier. The one they're working in
+// is remembered on this device, sent to the server with every request (lib/ai/client authHeader), and switched from
+// the sidebar.
+
+const CHOSEN = "backroute-carrier";
+
+export function chosenCarrier(): string | null {
+  try {
+    return localStorage.getItem(CHOSEN);
+  } catch {
+    return null;
+  }
+}
+
+export function chooseCarrier(carrierId: string) {
+  try {
+    localStorage.setItem(CHOSEN, carrierId);
+  } catch {
+    // Private mode: they'll get their first carrier.
+  }
+}
+
+/** The carrier to open: the one chosen on this device if they still belong to it, otherwise their first. */
+export function pickMembership(list: Membership[]): Membership | undefined {
+  const id = chosenCarrier();
+  return list.find((m) => m.carrierId === id) ?? list[0];
+}
+
+/** Everyone's carriers, for the switcher (filled in when the app loads). */
+export const useMemberships = create<{ list: Membership[] }>(() => ({ list: [] }));
 
 /** Where someone lands after signing in: drivers and owner-operators get the app, the office gets the dashboard. */
 export function homeFor(m: Membership): "/driver" | "/carrier" {

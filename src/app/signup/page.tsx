@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import type { RunType } from "@/lib/types";
 import type { FmcsaResult } from "@/lib/fmcsa";
 import { cloudEnabled } from "@/lib/cloud/client";
-import { createCarrierAccount } from "@/lib/cloud/account";
+import { chooseCarrier, createCarrierAccount } from "@/lib/cloud/account";
 import { connect as connectCarrier } from "@/lib/cloud/sync";
 import { inDemo } from "@/lib/cloud/demo";
 import { FleetForm } from "@/components/cloud/fleet-form";
@@ -118,6 +118,7 @@ function Signup() {
           ownerOperator: !!solo,
           driverId: solo ? (realDriverId ?? PRIMARY_DRIVER_ID) : null,
         });
+        chooseCarrier(m.carrierId);
         await connectCarrier(m, { fresh: true });
       } catch {
         setSaving(false);
