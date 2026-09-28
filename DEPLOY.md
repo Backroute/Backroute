@@ -247,6 +247,14 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - **Changes after booking:** a broker adding a stop or sending the truck somewhere else gets a price first: the extra miles at what the load pays a mile (never under the owner's lowest) plus stop pay (default $75 a stop). Their yes, or a revised rate con at the new total, puts it on the load, the driver hears, and it goes on the invoice. A lower number that covers most of it is taken; less goes to the owner.
   - **Factoring:** with a factoring email set, each delivered load's packet goes to the factor the way they want it: a schedule of accounts on top, then the invoice, the (signed) rate con, the signed POD and BOL, and any receipts billed. A load with no rate con on file still goes, and the owner is asked to send it.
   - **Cargo claims:** a broker's claim email (damage, a shortage, OS&D) is acknowledged in writing with what they still need to send (the written amount, the commercial invoice, the noted POD, photos). The driver is asked what happened while it's fresh, and their answer and any damage photos they text go in the claim file. A POD with damage or a shortage written on it starts the file before anyone asks. The file (the load, the times from the driver's app, what the BOL and POD say, the statement) goes to the cargo insurer's claims email once the owner OKs it. Paying a claim or filing it with insurance is always the owner's call.
+- **Closer to a veteran dispatcher:**
+  - **It remembers drivers.** What a driver mentions about their life or how they like to work (a kid's game, a bad back, no night driving) is kept on their profile and brought up naturally later. The owner's AI sees it too when they ask how someone's doing.
+  - **Dock knowledge shared across every carrier.** Each finished stop (the facility, the city, and how long the truck waited, from the driver's app) goes into a shared record, so a driver heading to a dock their carrier has never been to still hears "this one usually takes 4 hours." Nothing else is shared: no load, broker, rate or carrier name. Only the server reads it (`20261004000000_facility_network.sql`).
+  - **The carrier's report card.** Once a carrier has at least 5 delivered loads in six months and 90% or more on time, book requests and setup packets say so: loads run, on-time %, tracking on every load that asked, paperwork the same day, no claims. It's the kind of record that gets a carrier on a broker's preferred list. Nothing is said while the record is short or not good.
+  - **It asks for reloads.** The rate con thanks tells the broker when and where the truck will be empty and asks if they have anything out of there, unless the truck already has its next load.
+  - **Brokers who won't talk to an AI** ("we don't deal with robots") get a polite goodbye, an email right away with where things stood, and email only from then on.
+  - **Blurry paperwork** a broker's billing clerk couldn't read is asked for again on the spot, with a tip (flash, flat, all four corners), before the driver leaves the dock. It isn't filed or used to mark the load delivered.
+  - **The weekly review:** the support console's Numbers tab lists what came up most this week, to support or to owners, grouped and with an example each. Each repeat is the next thing to teach the AI.
 - **Drivers can ask for what's near them:** truck parking, a truck stop, diesel, a CAT scale, a truck wash, a repair or tire shop, by text or on a call (needs the Places key from the breakdown step).
 - **Evening text:** at 6 PM Central the owner gets a text: what was delivered, what it made, how many trucks are rolling, and what needs them.
 - **The log:** every text, call and email in or out is listed in Settings, with what the AI did.
@@ -630,6 +638,13 @@ The code was run against local stand-ins that behave like the real services:
   - The next load from that broker on that lane is priced from what they paid.
   - Nothing is invoiced or texted for old loads.
 - **The simulated week** (`eval/sim.mjs`, scripted): every scenario runs with no hard rule broken, and the money captured stays at 90% or more of what brokers would really pay.
+- **Closer to a veteran dispatcher** (checks in `gaps-e2e`):
+  - A driver's news is remembered and in front of the AI next time.
+  - Other carriers' waits at a dock warn this carrier's driver; this carrier's finished stops are shared, and no one who signs in can read the record.
+  - The rate con thanks asks for a reload. A book request carries the carrier's record.
+  - "We don't deal with AI": goodbye, an email with the offer, and no more calls to that broker.
+  - A blurry POD is asked for again with a tip, and isn't filed.
+  - Support sees the week's repeated hand-offs.
 - **What the AI finishes instead of support** (24 checks):
   - A broker with no MC is emailed for it; their answer is checked with FMCSA and their load is asked for.
   - A bank-details request gets the standing answer and the owner is told. An impostor gets nothing, and the real broker is warned.

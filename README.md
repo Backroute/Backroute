@@ -50,6 +50,7 @@ The real version switches on from environment variables:
   - checks each broker's credit before booking
   - sends the factoring company the full invoice packet
   - runs cargo claims: acknowledgment, the driver's statement and photos, and a claim file for the insurer
+- **Like a veteran dispatcher:** remembers drivers' lives, warns about slow docks using what every carrier on Backroute has learned, shows brokers the carrier's on-time record, asks for reloads, respects brokers who won't talk to an AI, and gets blurry paperwork retaken at the dock.
 - **Smarter booking:** asks what the carrier usually gets on a lane, remembers each broker, plans around drivers' home time, and emails brokers when a truck will be free. Each truck has a plan on the Fleet page.
 - **Breakdowns:** nearby shops found (Google Places), phoned one by one, the driver texted the one that can come, the broker told of the delay.
 - **Owner rules:** judgment calls the owner hands to the AI. After the owner sends 3 of the same kind unchanged, the AI offers to stop asking.
