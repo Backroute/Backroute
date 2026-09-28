@@ -69,6 +69,8 @@ export function ownerSnapshot(s: StoreSnapshotSource, autonomyLabel: AutonomyLab
       homeBase: d.homeBase,
       homeTime: d.homeTimeTarget,
       language: LANG_INFO[d.prefs?.language ?? "en"].english,
+      // What the driver told the AI about themselves, so the owner hears it too when they ask how someone's doing.
+      toldUs: (d.prefs?.notes ?? []).slice(-5).map((n) => n.text),
     })),
     openLoads: active.slice(0, 40).map((l) => ({
       ref: l.referenceNumber,
@@ -121,6 +123,7 @@ export function driverSnapshot(s: StoreSnapshotSource, driverId: string) {
       homeTime: driver.homeTimeTarget,
       homeDueAt: driver.homeDueAt ?? null,
     },
+    whatYouKnow: (driver.prefs?.notes ?? []).filter((n) => !n.until || n.until >= new Date().toISOString().slice(0, 10)).slice(-10).map((n) => `${n.at.slice(0, 10)}: ${n.text}`),
     truck: truck ? { unit: truck.unitNumber, at: place(truck.currentCity, truck.currentState), status: truck.status } : null,
     currentLoad: current ? loadForDriver(current, driver, s.brokers, owner) : null,
     nextLoad: next ? loadForDriver(next, driver, s.brokers, owner) : null,

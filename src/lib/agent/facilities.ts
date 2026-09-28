@@ -5,7 +5,7 @@ import type { Load } from "../types";
  * from the carrier's own loads (the names on the rate con, and the driver's in and out times at each stop).
  */
 
-const norm = (s: string) => s.toLowerCase().replace(/\b(inc|llc|co|corp|company|dc|warehouse)\b/g, "").replace(/[^a-z0-9]/g, "");
+export const norm = (s: string) => s.toLowerCase().replace(/\b(inc|llc|co|corp|company|dc|warehouse)\b/g, "").replace(/[^a-z0-9]/g, "");
 
 export interface FacilityStats {
   name: string;

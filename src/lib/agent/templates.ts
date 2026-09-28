@@ -21,13 +21,15 @@ function signature(carrier: CarrierRow, settings: Pick<AgentSettings, "remitEmai
 export const subjectFor = (l: Load, what?: string) => `${what ? `${what}: ` : ""}Load ${l.referenceNumber} · ${l.lane.origin}, ${l.lane.originState} → ${l.lane.destination}, ${l.lane.destState}`;
 
 /** Asking to book a load. `truckAt` is where the truck is, as a dispatcher would say it ("empty in Dallas, TX"). */
-export function bookRequest(carrier: CarrierRow, settings: AgentSettings, load: Load, ask: number, toName?: string, truckAt?: string) {
+export function bookRequest(carrier: CarrierRow, settings: AgentSettings, load: Load, ask: number, toName?: string, truckAt?: string, record?: string | null) {
   const equipment = load.equipmentType.toLowerCase();
   return `${hello(toName)}
 
 Can we get ${load.referenceNumber}, ${lane(load)}, picking up ${when(load.pickupWindow)}? ${truckAt ? `Our ${equipment} is ${truckAt} and ready for it.` : `We have a ${equipment} ready for it.`}
 
-Our rate is ${money(ask)} all in. ${termsLine(settings)}
+Our rate is ${money(ask)} all in. ${termsLine(settings)}${record ? `
+
+${record}` : ""}
 
 Send the rate con here and we'll dispatch.
 
@@ -125,10 +127,12 @@ ${signature(carrier, settings)}`;
 }
 
 /** Their rate con matched and the load is booked: who's coming and when. */
-export function rateConThanks(carrier: CarrierRow, settings: AgentSettings, load: Load, who: { unit?: string; driver?: string }, toName?: string, signed = false) {
+export function rateConThanks(carrier: CarrierRow, settings: AgentSettings, load: Load, who: { unit?: string; driver?: string }, toName?: string, signed = false, askReload = false) {
   return `${hello(toName)}
 
-Got the rate con for ${load.referenceNumber}, thanks. It matches${signed ? ", and the signed copy is attached" : ""}.${who.unit ? ` Truck ${who.unit}${who.driver ? ` with ${who.driver}` : ""} is set for pickup ${when(load.pickupWindow)}.` : ""}
+Got the rate con for ${load.referenceNumber}, thanks. It matches${signed ? ", and the signed copy is attached" : ""}.${who.unit ? ` Truck ${who.unit}${who.driver ? ` with ${who.driver}` : ""} is set for pickup ${when(load.pickupWindow)}.` : ""}${askReload ? `
+
+The truck will be empty in ${load.lane.destination}, ${load.lane.destState} after it delivers ${when(load.deliveryWindow)}. Anything going out of there you could use us on?` : ""}
 
 Thanks,
 ${signature(carrier, settings)}`;
@@ -170,10 +174,12 @@ Thanks,
 ${signature(carrier, settings)}`;
 }
 
-export function setupPacket(carrier: CarrierRow, settings: AgentSettings, papers: string[], toName?: string) {
+export function setupPacket(carrier: CarrierRow, settings: AgentSettings, papers: string[], toName?: string, record?: string | null) {
   return `${hello(toName)}
 
-Attached for your carrier setup: ${papers.join(", ")}.${settings.setupProfiles?.length ? `\n\nOur setup profiles:\n${settings.setupProfiles.map((p) => `${p.name}: ${p.url}`).join("\n")}` : ""}${settings.businessAddress ? `\n\nOur address: ${settings.businessAddress}` : ""}${settings.remitEmail ? `\nBilling and remittance: ${settings.remitEmail}` : ""}
+Attached for your carrier setup: ${papers.join(", ")}.${record ? `
+
+${record}` : ""}${settings.setupProfiles?.length ? `\n\nOur setup profiles:\n${settings.setupProfiles.map((p) => `${p.name}: ${p.url}`).join("\n")}` : ""}${settings.businessAddress ? `\n\nOur address: ${settings.businessAddress}` : ""}${settings.remitEmail ? `\nBilling and remittance: ${settings.remitEmail}` : ""}
 
 Let us know if you need anything else to get us set up.
 

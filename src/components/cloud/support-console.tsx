@@ -152,6 +152,7 @@ interface Metrics {
   costs?: CarrierCost[];
 }
 interface Window {
+  repeats?: { pattern: string; count: number; toSupport: number; example: string; kind: keyof typeof PLAYBOOK }[];
   handoffs: number;
   toOwner: number;
   perTruckPerWeek: number;
@@ -205,6 +206,20 @@ function Numbers() {
           </div>
         ))}
       </div>
+      {!!m.week.repeats?.length && (
+        <div className="rounded-2xl border border-line bg-white p-4">
+          <p className="text-sm font-semibold text-ink-950">What came up most this week</p>
+          <p className="text-xs text-ink-500">Hand-offs that keep repeating, to support or to owners. Each is the next thing to teach the AI.</p>
+          <ul className="mt-3 flex flex-col gap-2">
+            {m.week.repeats.map((r) => (
+              <li key={r.pattern} className="text-sm text-ink-800">
+                <span className="font-semibold">{r.count}×</span> {PLAYBOOK[r.kind]?.label ?? "Other"}
+                {r.toSupport ? ` (${r.toSupport} to support)` : ""}: <span className="text-ink-600">{r.example}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <Costs rows={m.costs ?? []} />
     </div>
   );

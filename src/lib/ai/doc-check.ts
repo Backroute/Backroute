@@ -10,6 +10,8 @@ const Check = z.object({
   loadNumberSeen: z.string().nullable(),
   note: z.string(),
   amount: z.number().nullable().describe("A lumper receipt: the total paid, in dollars. Otherwise null."),
+  readable: z.enum(["clear", "hard", "unreadable"]).describe("Can a broker's billing clerk read it: clear; hard (some parts blurry, cut off or in shadow); unreadable."),
+  retakeTip: z.string().nullable().describe("When it isn't clear: one short tip for a better photo (closer, flash, flat on a surface, all four corners). Otherwise null."),
 });
 export type DocCheck = z.infer<typeof Check>;
 
@@ -32,7 +34,7 @@ export async function checkStopDocument(kind: keyof typeof WHAT, bytes: Buffer, 
     ...FALLBACK,
     output_config: { effort: "medium", format: betaZodOutputFormat(Check) },
     system:
-      "You check trucking paperwork before it's billed. Say whether the file is the expected document, whether it's signed, and list any exceptions written on it (shortage, overage, damage, refused, 'subject to count'). Only report what you can see; if it's unreadable, say so in the note. Keep the note to one sentence. For a lumper receipt, give the total paid.",
+      "You check trucking paperwork before it's billed. Say whether the file is the expected document, whether it's signed, and list any exceptions written on it (shortage, overage, damage, refused, 'subject to count'). Only report what you can see; say how readable it is (a broker won't pay on a photo their clerk can't read), and if it isn't clear, one tip for a better photo. Keep the note to one sentence. For a lumper receipt, give the total paid.",
     messages: [{ role: "user", content: [file, { type: "text", text: `Expected: the ${WHAT[kind]} for load ${loadRef}.` }] }],
   });
   if (response.stop_reason === "refusal") return null;

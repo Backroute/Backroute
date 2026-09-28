@@ -21,6 +21,8 @@ import { ourNumbers, respond, withTheirOffer } from "./negotiation";
 import { brokerMemory, laneMemory } from "./memory";
 import { route } from "./routing";
 import { slowDocks } from "./facilities";
+import { slowDocksAnywhere } from "./network";
+import { carrierRecord, recordLine } from "./record";
 import { lookalikeOf } from "./fraud";
 import { marketRate } from "./rates";
 import { homeTimeStatus } from "../home";
@@ -315,7 +317,7 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
     to,
     toName: broker?.contact || undefined,
     subject: subject.includes(load.referenceNumber) ? subject : `${subject} (${load.referenceNumber})`,
-    body: mail.bookRequest(ctx.carrier, ctx.settings, load, ask, broker?.contact || undefined, truckAt(ctx, load) ?? undefined),
+    body: mail.bookRequest(ctx.carrier, ctx.settings, load, ask, broker?.contact || undefined, truckAt(ctx, load) ?? undefined, recordLine(carrierRecord(ctx.loads))),
     inReplyTo: load.offerEmail?.messageId,
     loadId: load.id,
     amount: ask,
@@ -435,7 +437,8 @@ export async function textNewLoad(ctx: CarrierContext, load: Load): Promise<bool
   if (!driver || !to || driver.prefs?.smsOptOut) return false;
   const lang = driver.prefs?.language ?? "en";
   // A dock that usually keeps trucks 3 hours or more: the driver hears it with the load.
-  const slow = slowDocks(ctx.loads, load).map((f) => SLOW_DOCK[lang]({ name: f.name, hours: (Math.round(f.avgMinutes / 30) / 2).toString() }));
+  // The shared record from every carrier on Backroute fills in docks this carrier hasn't been to.
+  const slow = (await slowDocksAnywhere(ctx, load).catch(() => slowDocks(ctx.loads, load))).map((f) => SLOW_DOCK[lang]({ name: f.name, hours: (Math.round(f.avgMinutes / 30) / 2).toString() }));
   const text = [NEW_LOAD[lang]({
     ref: load.referenceNumber,
     from: `${load.lane.origin}, ${load.lane.originState}`,

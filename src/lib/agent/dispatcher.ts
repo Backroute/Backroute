@@ -179,6 +179,23 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: Talk, effects
       },
     }),
     betaZodTool({
+      name: "remember",
+      description: "Something the driver told you about themselves worth remembering next time: family, health, an event coming up, what they like or won't do. Not load facts (those are on the load).",
+      inputSchema: z.object({
+        note: z.string().max(200).describe("In a short sentence, in English, e.g. 'Daughter's soccer final Saturday Oct 4' or 'Bad back: prefers drop-and-hook'."),
+        until: z.string().optional().describe("For something with a date, the last day it matters, YYYY-MM-DD."),
+      }),
+      run: async ({ note, until }) => {
+        const fresh = ctx.drivers.find((d) => d.id === driver.id) ?? driver;
+        const notes = [...(fresh.prefs?.notes ?? []).filter((n) => n.text.toLowerCase() !== note.toLowerCase()), { at: now(), text: note, ...(until ? { until } : {}) }].slice(-20);
+        const next: Driver = { ...fresh, prefs: { ...fresh.prefs, notes } };
+        await save("drivers", ctx.carrier.id, next as unknown as Item);
+        ctx.drivers = ctx.drivers.map((d) => (d.id === next.id ? next : d));
+        effects.done.push("Remembered something about the driver");
+        return "Remembered.";
+      },
+    }),
+    betaZodTool({
       name: "find_nearby",
       description: "Find the closest truck parking, truck stop, diesel, CAT scale, truck wash, repair shop or tire shop near the driver.",
       inputSchema: z.object({

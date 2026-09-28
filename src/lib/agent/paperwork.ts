@@ -7,6 +7,7 @@ import { claimMark, latestFiles, releaseMark, save, storeFile, type CarrierConte
 import { passToOwner } from "./dispatcher";
 import { sendOrQueue } from "./outbox";
 import * as mail from "./templates";
+import { carrierRecord, recordLine } from "./record";
 
 /**
  * The paperwork a dispatcher does after the driving: the broker's setup packet, the invoice with the signed POD once
@@ -64,7 +65,7 @@ export async function sendSetupPacket(ctx: CarrierContext, sender: { from: strin
     to: sender.from,
     toName: sender.contactName ?? undefined,
     subject: /^re:/i.test(sender.subject) ? sender.subject : `Re: ${sender.subject}`,
-    body: mail.setupPacket(ctx.carrier, ctx.settings, attach.map((p) => label[p.kind]), sender.contactName ?? undefined),
+    body: mail.setupPacket(ctx.carrier, ctx.settings, attach.map((p) => label[p.kind]), sender.contactName ?? undefined, recordLine(carrierRecord(ctx.loads))),
     inReplyTo: sender.messageId,
     attachments: attach.map((p) => ({ fileId: p.id, name: p.name })),
     withinRules: true,

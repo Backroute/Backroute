@@ -26,6 +26,7 @@ export async function GET(request: Request) {
     const closed = toSupport.filter((e) => e.resolvedAt).map((e) => (Date.parse(e.resolvedAt!) - Date.parse(e.createdAt)) / 60000).sort((a, b) => a - b);
     const late = toSupport.filter((e) => ((e.resolvedAt ? Date.parse(e.resolvedAt) : Date.now()) - Date.parse(e.createdAt)) / 60000 > SLA_MINUTES(e)).length;
     return {
+      repeats: repeats(list),
       handoffs: toSupport.length,
       toOwner: list.length - toSupport.length,
       perTruckPerWeek: Math.round((toSupport.length / truckCount / (days / 7)) * 100) / 100,
@@ -35,6 +36,32 @@ export async function GET(request: Request) {
     };
   };
   return Response.json({ trucks: truckCount, week: window(7), month: window(30), costs: await costs(trucks ?? []) });
+}
+
+/**
+ * The weekly review: hand-offs (to support or owners) grouped by what they're about, most common first, with one
+ * example each. Anything that keeps coming up is the next thing to teach the AI.
+ */
+function repeats(list: Escalation[]) {
+  const shape = (reason: string) =>
+    reason
+      .replace(/\S+@\S+/g, "(email)")
+      .replace(/\$[\d,.]+/g, "$")
+      .replace(/\b[A-Z]{2,6}-\d{2,7}\b/g, "(load)")
+      .replace(/\d+/g, "#")
+      .split(/[.:;]/)[0]
+      .split(/\s+/)
+      .slice(0, 8)
+      .join(" ");
+  const groups = new Map<string, { pattern: string; count: number; toSupport: number; example: string; kind: HandoffKind }>();
+  for (const e of list) {
+    const key = shape(e.reason);
+    const g = groups.get(key) ?? { pattern: key, count: 0, toSupport: 0, example: e.reason.slice(0, 240), kind: handoffKind(e) };
+    g.count++;
+    if (e.status === "with_support" || e.resolvedBy === "support") g.toSupport++;
+    groups.set(key, g);
+  }
+  return [...groups.values()].filter((g) => g.count >= 2).sort((a, b) => b.count - a.count).slice(0, 8);
 }
 
 // What things cost, for the estimate: set these to Backroute's real rates. Defaults are rough list prices in dollars.

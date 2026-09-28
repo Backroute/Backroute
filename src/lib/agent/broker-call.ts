@@ -55,7 +55,8 @@ export const brokerCallKey = (callSid: string) => `broker-call:${callSid}`.toLow
 export async function callBroker(ctx: CarrierContext, load: Load, url: string | null): Promise<boolean> {
   const broker = ctx.brokers.find((b) => b.id === load.brokerId);
   const to = broker?.phone ? toE164(broker.phone) : null;
-  if (!to || (!url && !sandboxed(ctx.carrier)) || !canCall(ctx.carrier)) return false;
+  // A broker who told the AI they won't deal with it on the phone gets email only.
+  if (!to || broker?.noAiCalls || (!url && !sandboxed(ctx.carrier)) || !canCall(ctx.carrier)) return false;
   if (!(await claimMark(ctx.carrier.id, load.id, "broker_call"))) return false;
   const sid = await callTo(ctx.carrier, to, url, { kind: "broker_call", ref: load.id, opening: brokerCallOpening(ctx, load), machineDetection: true });
   await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "out", providerId: sid ? `${sid}:dial` : null, counterparty: to, body: `Calling ${broker!.company} about ${load.referenceNumber}`, data: { kind: "broker_call", loadId: load.id } });
@@ -124,6 +125,9 @@ export const VOICEMAIL = (ctx: CarrierContext, load: Load) => {
 };
 
 /** Voicemail on a phone-only broker: one more call, on the next follow-up round. */
+/** A broker who doesn't want to talk to an AI, however they put it. */
+export const NO_AI = /\b(don'?t|do not|won'?t|not going to|no) (talk|deal|speak|work)(ing)? (to|with) (a |an )?(robots?|bots?|ai|a\.i\.|machines?|computers?|recordings?)\b|\bno (robots|bots|ai calls)\b|\b(put|get) (me )?(a )?(real )?(person|human) on\b|\bare you a (robot|bot|machine)\?? (no|then) (thanks|thank you)\b/i;
+
 /** A broker call the AI couldn't finish: an email picking it up where it stopped, or one more call. */
 async function followUpDroppedCall(ctx: CarrierContext, load: Load, said: string) {
   if (!(await claimMark(ctx.carrier.id, load.id, "broker_call_dropped"))) return;
@@ -427,6 +431,20 @@ async function brokerCallAnswer(ctx: CarrierContext, load: Load, callSid: string
     return tree;
   }
   await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "in", counterparty: key, body: said, data: { kind: "broker_call", loadId: load.id, ...data } });
+  // "I don't talk to robots": fine. The AI says it'll email, does, and never calls them again.
+  if (NO_AI.test(said)) {
+    const broker = ctx.brokers.find((b) => b.id === load.brokerId);
+    if (broker && !broker.noAiCalls) {
+      const next = { ...broker, noAiCalls: { at: new Date().toISOString(), said: said.slice(0, 200) } };
+      await save("records", ctx.carrier.id, next as unknown as Item, "broker");
+      ctx.brokers = ctx.brokers.map((b) => (b.id === next.id ? next : b));
+      await addActivity(ctx.carrier.id, event({ type: "call_completed", loadId: load.id, message: `${broker.company} doesn't take AI calls`, detail: "Email only from now on", severity: "info" }));
+    }
+    await followUpDroppedCall(ctx, load, said);
+    const bye = "No problem at all, I'll send it over by email right now. Thanks.";
+    await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "out", counterparty: key, body: bye, data: { kind: "broker_call", loadId: load.id } });
+    return { reply: bye, hangUp: true };
+  }
   const history = earlier.slice(-16).map((m) => ({ from: m.direction === "in" ? ("them" as const) : ("ai" as const), text: m.body ?? "" }));
   const result = aiConfigured() ? await brokerCallTurn(ctx, load, said, history) : { reply: "", hangUp: true, failed: true };
   if (result.failed) {

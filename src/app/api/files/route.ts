@@ -49,6 +49,11 @@ export async function POST(request: Request) {
       note = check.exceptions.length ? `${check.note} Noted on it: ${check.exceptions.join("; ")}.` : check.note;
       if (kind.data === "lumper_receipt" && check.amount && check.amount > 0 && check.amount < 5000) amount = Math.round(check.amount * 100) / 100;
       if (!check.isExpectedDocument || (kind.data !== "lumper_receipt" && !check.signed) || check.exceptions.length) status = "check";
+      // Too blurry for a broker's billing clerk: the app shows the tip so the driver retakes it at the dock.
+      if (check.readable === "unreadable") {
+        status = "check";
+        note = `Hard to read: please retake it. ${check.retakeTip ?? "Lay it flat, turn on the flash, and get all four corners in."}`;
+      }
     }
   }
   const { data: row, error } = await admin()

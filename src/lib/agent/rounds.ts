@@ -3,6 +3,7 @@ import { canCall, canEmail, canText } from "../channels/out";
 import { appointmentRounds } from "./appointments";
 import { sendLayoverClaims } from "./layover";
 import { claimRounds } from "./claims";
+import { shareFacilityVisits } from "./network";
 import { isBoard, runBoards } from "./boards";
 import { followUpByPhone } from "./broker-call";
 import { offerCapacity } from "./capacity";
@@ -83,6 +84,8 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   }
   const expired = await expireOffers(ctx, now);
   if (expired) done.push(`${expired} old offer${expired === 1 ? "" : "s"} taken off the board`);
+  // What this carrier's trucks learned at docks goes into the shared record every carrier's AI reads.
+  await shareFacilityVisits(ctx, now);
   await warnCoiExpiring(ctx, now);
   return done;
 }

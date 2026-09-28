@@ -78,6 +78,8 @@ export interface Broker {
   detentionPaidPct: number;
   /** Loads the broker cancelled on carriers after booking, last 90 days. */
   cancellations90d: number;
+  /** Real accounts: the broker said they won't deal with an AI on the phone: the AI works with them by email only. */
+  noAiCalls?: { at: string; said: string };
   /** Real accounts: the broker's credit, from a credit service and the carrier's own paid invoices (lib/agent/credit). */
   credit?: { score: number | null; daysToPay: number | null; source: string; at: string };
 }
@@ -172,6 +174,11 @@ export interface DriverPrefs {
   reach?: "app" | "phone";
   /** The driver texted STOP to the dispatch number: no texts until they text START. */
   smsOptOut?: boolean;
+  /**
+   * Real accounts: what the driver has told the AI about themselves (family, health, what they like to run), newest
+   * last, the way a good dispatcher remembers. Used in later conversations and when picking their loads.
+   */
+  notes?: { at: string; text: string; until?: string }[];
 }
 
 export interface Truck {

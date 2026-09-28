@@ -47,6 +47,12 @@ export async function driverPhotos(ctx: CarrierContext, driver: Driver, media: {
       continue;
     }
     const check = aiConfigured() ? await checkStopDocument(kind, file.bytes, file.contentType, load.referenceNumber).catch(() => null) : null;
+    // Too blurry for the broker's billing clerk: asked for again now, while the driver is still at the dock.
+    if (check && check.readable === "unreadable") {
+      said.push(`That photo of the ${NAMES[kind]} is too hard to read for the broker to pay on it. ${check.retakeTip ?? "Lay it flat, turn on the flash, and get all four corners in."} Send another one before you leave, please.`);
+      await addActivity(ctx.carrier.id, event({ type: "document_captured", loadId: load.id, message: `Asked ${driver.name.split(" ")[0]} to retake the ${NAMES[kind]}`, detail: check.note, severity: "warning" }));
+      continue;
+    }
     const flagged = !!check && (!check.isExpectedDocument || (kind !== "lumper_receipt" && !check.signed) || check.exceptions.length > 0);
     const note = check ? (check.exceptions.length ? `${check.note} Noted on it: ${check.exceptions.join("; ")}.` : check.note) : null;
     const amount = kind === "lumper_receipt" && check?.amount && check.amount > 0 && check.amount < 5000 ? Math.round(check.amount * 100) / 100 : undefined;
