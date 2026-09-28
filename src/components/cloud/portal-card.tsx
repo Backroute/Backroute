@@ -64,7 +64,7 @@ export function PortalCard() {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-medium text-ink-900">Let the AI do these itself</p>
-              <p className="text-xs text-ink-500">It checks the rate before it signs, and asks you before it submits a carrier setup (unless your rules say not to). Off: Backroute support does them.</p>
+              <p className="text-xs text-ink-500">It checks the rate before it signs, and asks you before it submits a carrier setup, unless you told it not to. Off: Backroute support does them.</p>
             </div>
             <Switch checked={on} onChange={(v) => updateSettings({ portalAi: v })} label="Let the AI do these itself" />
           </div>
