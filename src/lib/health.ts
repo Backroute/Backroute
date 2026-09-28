@@ -10,7 +10,7 @@ import { portalReady } from "./portal/tasks";
  * Is Backroute working? Each part of the system is checked: the database, the AI, texts, email, the dispatcher's
  * rounds, the voice server, the website worker, messages stuck waiting for a provider, and AI spending. Support sees
  * the report in the console (System tab), uptime monitors can watch /api/health, and every round of the dispatcher
- * alerts support by text (and email, with SUPPORT_EMAIL) when something goes down: once per problem per hour, and
+ * alerts whoever is on call (ALERT_PHONES, or the support phones; and SUPPORT_EMAIL) when something goes down: once per problem per hour, and
  * once more when it's fixed.
  */
 
@@ -59,7 +59,8 @@ export async function healthReport(now = Date.now()): Promise<Check[]> {
   // The AI: set up, and not failing. Messages the AI couldn't answer even on a second try go to support as "system".
   const hourAgo = new Date(now - 60 * MIN).toISOString();
   const { data: failures } = await db.from("escalations").select("data").eq("status", "with_support").gte("updated_at", hourAgo).limit(200);
-  const aiFails = (failures ?? []).filter((r) => /couldn't answer|AI couldn't|system/i.test(String((r.data as { reason?: string }).reason ?? ""))).length;
+  // The same wording the support console files under "our own systems failing" (lib/support-playbooks).
+  const aiFails = (failures ?? []).filter((r) => /The AI couldn't answer|couldn't write a reply/i.test(String((r.data as { reason?: string }).reason ?? ""))).length;
   checks.push({
     key: "ai",
     label: "AI",
@@ -166,7 +167,8 @@ export async function alertOnHealth(now = Date.now()): Promise<string[]> {
   const done: string[] = [];
   const state = await heartbeat("alerts");
   const open = { ...((state?.data ?? {}) as Record<string, number>) };
-  const phones = (process.env.SUPPORT_PHONES ?? "").split(",").map((p) => p.trim()).filter(Boolean);
+  // Whoever is on call for the system (ALERT_PHONES), or else the support team's phones.
+  const phones = (process.env.ALERT_PHONES ?? process.env.SUPPORT_PHONES ?? "").split(",").map((p) => p.trim()).filter(Boolean);
   const email = process.env.SUPPORT_EMAIL;
   const send = async (text: string) => {
     for (const to of phones) await textTo(null, to, text).catch((e) => console.error("[health] alert text failed", e));

@@ -67,6 +67,7 @@ The real version switches on from environment variables:
   - **Practice mode:** the AI does everything but sends nothing, and shows what it would have sent.
   - **Simulated brokers and drivers:** `eval/sim.mjs` runs whole conversations and scores the money and the manners.
   - **History import:** a CSV of past loads, so pricing starts from what each lane and broker paid.
+- **Ready for a paid pilot:** per-truck billing through Stripe with a free trial, phone alerts for Needs you, a System tab and alerts when anything's down, one login for several companies, and a pilot playbook (`PILOT.md`) with a script to set up and step carriers from practice mode to full autopilot. `npm run measure` gives the AI's report card once the real key is set. Legal drafts for your lawyer are in `docs/legal/`.
 - **Holds up:** messages retried through provider outages, stale screens can't undo newer changes to a load, stuck work goes to a person, and the support console shows what each carrier costs to run.
 
 Each load board switches on when Backroute's partner login for it is set. Emergencies still need a person on the support team.

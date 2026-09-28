@@ -271,6 +271,8 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - A screen's save of a load carries only what it changed, merged into the current row (`20261001000000_merge_edits.sql`).
   - What each carrier costs to run is server-only: no one who signs in can read or change it (`20261002000000_usage.sql`).
   - The signed rate con, the factoring schedule, claim files and damage photos are kept with the load's other files (`20261003000000_paperwork_kinds.sql`).
+  - Trucks, drivers and Needs you items merge the same way loads do, and an old copy can't reopen a closed Needs you item. (This also fixed loads: the app's upsert used to replace the whole load; now it merges.) (`20261006000000_merge_more.sql`)
+  - Billing, push devices and the system's heartbeats are server-only; no one can mark their own account paid (`20261007000000_pilot_readiness.sql`). Rate-limit counters too (`20261008000000_rate_limits.sql`).
   - Website logins and the answers the owner gives for them are encrypted by the server before they're stored, and no one who signs in can read the table, not even the owner. The website job queue is server-only too, and only the server can hand a job to the worker (`20261005000000_portal_worker.sql`).
 
 ## What it doesn't do yet
@@ -298,9 +300,8 @@ The AI now does the day-to-day work of a dispatcher by email, text and phone. Wh
 - **Credit scores need a credit service** (step 14). Until one is set, the AI only has the carrier's own payment history, which starts empty.
 - **Miles and ETAs without a routing account** (step 12) come from about 130 freight cities and each state's middle. For a town not on the list, miles are rough, and the AI doesn't send late notices from them.
 - **Negotiation is by rules, not instinct.** The AI haggles in steps with reasons, and adjusts to each broker's history. But it doesn't read a broker's mood, bluff about other loads, or trade favors across loads the way a long-time dispatcher might. Every number comes from the rules, on purpose, so it can't be talked below the owner's lowest.
-- **Two screens editing the same thing at once:** loads merge field by field (above). For a truck, a driver or a Needs you item, the last save still wins.
 - **The simulator's scores with the real AI haven't been measured yet.** It needs the app running with `ANTHROPIC_API_KEY` and `EVAL_SECRET`. The scripted runs check the money rules and the plumbing; only the AI-played runs say how human it sounds.
-- **One carrier per person:** a person, or a driver's phone, in two carriers gets the first one.
+- **The legal paperwork is drafted, not done.** `docs/legal/` has drafts of the carrier agreement (with the authority to act and sign for the carrier), terms, privacy policy, driver text consent and the call notice, plus the questions for your lawyer. The driver-consent checkbox isn't in the app yet; it's added once the wording is approved.
 
 ## Setting it up
 
@@ -483,6 +484,38 @@ Without it, the AI goes by what the carrier's own invoices show once a broker ha
 4. For each carrier: Settings → Broker websites → **Let the AI do these itself**, and add any logins they already have.
 
 A job nobody picks up in 30 minutes goes to support, so a worker that's down is noticed. Before switching it on for real carriers, run it against each real site as in `portal-worker/README.md`.
+
+### 16. Billing (Stripe)
+
+Carriers pay per truck per month, through Stripe, with a free trial.
+
+1. In Stripe, make a product with a **monthly recurring price per unit** (one unit = one truck). Turn on the **customer portal** (Settings → Billing → Customer portal) so owners can change their card and cancel.
+2. Add a webhook endpoint `https://YOUR-SITE/api/billing/webhook` for `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid` and `invoice.payment_failed`.
+3. In Vercel set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (the endpoint's signing secret), `STRIPE_PRICE_PER_TRUCK` (the price id), and optionally `BILLING_TRIAL_DAYS` (default 14), `BILLING_GRACE_DAYS` (default 7) and `BILLING_PRICE_LABEL` (the dollars per truck, shown in Settings).
+4. When you're ready to require payment, set `BILLING_REQUIRED=1`. From then on a carrier whose trial ended with no subscription, whose card has failed past the grace days, or who cancelled gets no new loads booked by the AI (booked loads still run, and the owner is told once a day). Without it, billing is shown but nothing is held.
+
+The owner starts and manages it in Settings → Billing & Team. The daily job keeps each subscription's truck count in step with the fleet (Stripe prorates).
+
+### 17. Phone alerts (push notifications)
+
+1. Make a key pair once: `npx web-push generate-vapid-keys`.
+2. In Vercel set `NEXT_PUBLIC_VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` (`mailto:` your support address). Redeploy (the public key is built into the app).
+3. Owners turn them on in Settings → Notifications → Phone alerts. On an iPhone they first add Backroute to the home screen (Share → Add to Home Screen) and open it from there.
+
+Everything that lands on an owner's Needs you buzzes their phone; emergencies support has buzz too, marked urgent.
+
+### 18. Knowing when something's down
+
+- **Uptime monitor:** point one (Better Stack, UptimeRobot, Pingdom...) at `https://YOUR-SITE/api/health`. It answers 200 when the app and database do, 503 when not, and nothing else.
+- **The System tab** in `/ops` shows each part: database, AI, texts, email, the dispatcher's rounds, messages waiting on a provider, the voice server, the website worker, and AI spending (a carrier using three times its usual in a day).
+- **Alerts:** every round of the dispatcher checks the same things and texts `ALERT_PHONES` (or `SUPPORT_PHONES` if that's not set), and emails `SUPPORT_EMAIL`, when something goes down: once an hour per problem, and once when it's fixed. If the texting provider itself is down, the email still goes.
+
+### Security, in short
+
+- Every API route checks who's calling: the signed-in person (and their role and carrier, checked against the database as them), support staff, or a secret or signature for webhooks, the cron jobs, the voice server and the website worker. The public ones are the FMCSA lookup at sign-up (limited to 30 an address per 10 minutes) and `/api/health`.
+- A signed-in account can ask the AI up to `AI_PER_USER_HOURLY` times an hour (default 300), so a stolen login can't run up the bill.
+- Every page is sent with headers that stop framing, MIME sniffing and plain HTTP (`next.config.ts`).
+- `npm audit --omit=dev` shows no known vulnerabilities at the time of writing; check it before each release.
 
 ## Before real drivers: rules to get right
 
@@ -669,6 +702,14 @@ The code was run against local stand-ins that behave like the real services:
   - "We don't deal with AI": goodbye, an email with the offer, and no more calls to that broker.
   - A blurry POD is asked for again with a tip, and isn't filed.
   - Support sees the week's repeated hand-offs.
+- **Ready for a paid pilot** (47 checks in `pilot-e2e`):
+  - Security headers on every page; the push service worker and the home-screen manifest.
+  - `/api/health` for uptime monitors; the full report only for support. A system problem texts whoever's on call and emails `SUPPORT_EMAIL`, once an hour, and again when it's fixed.
+  - The public FMCSA lookup refuses the 31st call from one address in 10 minutes.
+  - Someone in two carriers works in the one their app says (never one they don't belong to); a driver in two carriers is heard by the one with a load on their truck.
+  - Billing: checkout for trucks × price with the trial left; unsigned webhooks change nothing; signed ones start the trial; invoices listed; the owner's Stripe page; the truck count follows the fleet daily; a failed card warns the owner (and buzzes their phone), holds new bookings after the grace days, and paying clears it; a cancelled one holds too.
+  - Phone alerts: turned on with a test, sent encrypted and signed; a driver can't subscribe; a phone that's gone is forgotten.
+  - The pilot script: a carrier in practice mode with its fleet and invites, moved between stages, its status, and paused.
 - **Broker websites** (45 checks in `portal-e2e`, the real worker and Chromium against stand-in sites):
   - A DocuSign-style link is signed in the signer's name after the consent box; the signed copy is downloaded to the load, with screenshots before signing and at the end.
   - A portal rate con showing a different rate isn't signed; the broker gets both numbers and the owner is told.
