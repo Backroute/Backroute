@@ -38,7 +38,12 @@ export async function authorize(request: Request): Promise<Access> {
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (token && url && anon) {
     const { data, error } = await createClient(url, anon, { auth: { persistSession: false } }).auth.getUser(token);
-    if (!error && data.user) return { ok: true, who: "account" };
+    if (!error && data.user) {
+      // A signed-in account asks the AI through the app as much as it needs, but not like a script would.
+      const { overLimit } = await import("../rate-limit");
+      if (await overLimit(`ai:${data.user.id}`, 3600, Number(process.env.AI_PER_USER_HOURLY ?? 300))) return { ok: false, status: 429, error: "account_limit" };
+      return { ok: true, who: "account" };
+    }
   }
   if (process.env.AI_IN_DEMO !== "on") return { ok: false, status: 403, error: "demo_scripted" };
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";

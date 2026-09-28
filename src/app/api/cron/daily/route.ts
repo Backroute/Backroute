@@ -44,5 +44,7 @@ export async function GET(request: Request) {
   }
   // Each subscription bills the trucks the carrier has now.
   const billing = await syncTruckCounts().catch((e) => (console.error("[cron] billing sync failed", e), [] as string[]));
+  // Old rate-limit counters are no use after a day.
+  await admin().from("rate_limits").delete().lt("window_start", new Date(Date.now() - 86400_000).toISOString());
   return Response.json({ sent, billing });
 }

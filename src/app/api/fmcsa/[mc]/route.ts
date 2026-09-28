@@ -5,8 +5,11 @@
 
 import type { FmcsaResult } from "@/lib/fmcsa";
 import { lookupMc } from "@/lib/fmcsa-lookup";
+import { clientIp, overLimit, tooMany } from "@/lib/rate-limit";
 
-export async function GET(_request: Request, { params }: { params: Promise<{ mc: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ mc: string }> }) {
+  // Open to anyone signing up, so limited per address: FMCSA's key is Backroute's.
+  if (await overLimit(`fmcsa:${clientIp(request)}`, 600, 30)) return tooMany();
   const { mc } = await params;
   const docket = mc.replace(/^MC-?/i, "");
   const r = await lookupMc(docket);

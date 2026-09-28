@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "measure": "node eval/measure.mjs",
+    "pilot:carrier": "node scripts/pilot-carrier.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
