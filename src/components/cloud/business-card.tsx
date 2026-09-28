@@ -115,6 +115,7 @@ const PAPERS: { kind: FileKind; label: string; hint: string; expires?: boolean }
   { kind: "coi", label: "Insurance certificate (COI)", hint: "The AI reminds you before it expires.", expires: true },
   { kind: "authority", label: "Operating authority (MC letter)", hint: "From FMCSA." },
   { kind: "noa", label: "Notice of assignment", hint: "Only if you factor." },
+  { kind: "voided_check", label: "Voided check", hint: "Broker setup websites ask for it to pay you. Only there, never by email." },
 ];
 
 interface OnFile {

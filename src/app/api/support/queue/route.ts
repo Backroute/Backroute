@@ -2,6 +2,7 @@ import { admin, dbConfigured } from "@/lib/agent/db";
 import { supportCaller } from "@/lib/agent/support";
 import type { AgentSettings } from "@/lib/store";
 import type { Broker, Driver, Escalation, Load, Truck } from "@/lib/types";
+import type { PortalTaskData } from "@/lib/portal/types";
 
 /**
  * Everything waiting on Backroute's support team, across all carriers, with what's needed to act on it: the carrier,
@@ -45,7 +46,26 @@ export async function GET(request: Request) {
       else q = q.eq("channel", "none");
       const { data: thread } = await q.order("created_at", { ascending: false }).limit(12);
       const c = byCarrier.get(carrierId);
+      // A job on another company's website the AI couldn't finish: the link, what it did, and its last screenshot.
+      let portal: { url: string; kind: string; note: string | null; steps: string[]; screenshot: string | null } | null = null;
+      if (e.portalTaskId) {
+        const { data: t } = await db.from("portal_tasks").select("url, kind, data").eq("id", e.portalTaskId).eq("carrier_id", carrierId).maybeSingle();
+        if (t) {
+          const d = t.data as PortalTaskData;
+          const shotId = d.screenshots?.[d.screenshots.length - 1];
+          const { data: shot } = shotId ? await db.from("carrier_files").select("data").eq("id", shotId).eq("carrier_id", carrierId).maybeSingle() : { data: null };
+          portal = {
+            url: t.url as string,
+            kind: t.kind as string,
+            note: d.note ?? null,
+            // Values typed from the vault were never kept; what's here is the placeholder.
+            steps: (d.steps ?? []).slice(-25).map((s) => `${s.action}${s.target ? ` ${s.target}` : ""}${s.value ? ` = ${s.value}` : ""}${s.ok === false ? ` (failed: ${s.error ?? "error"})` : ""}`),
+            screenshot: shot ? `data:image/jpeg;base64,${shot.data as string}` : null,
+          };
+        }
+      }
       return {
+        portal,
         carrier: { id: carrierId, name: c?.name ?? "", mc: c?.mc ?? null, ownerPhone: c?.owner_phone ?? null, autonomy: (c?.settings as Partial<AgentSettings> | null)?.autonomy ?? "ask" },
         escalation: e,
         load: load ? { id: load.id, ref: load.referenceNumber, lane: `${load.lane.origin}, ${load.lane.originState} → ${load.lane.destination}, ${load.lane.destState}`, stage: load.stage, pickup: load.pickupWindow, delivery: load.deliveryWindow, rate: load.bookedRate ?? load.targetRate } : null,

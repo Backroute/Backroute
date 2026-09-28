@@ -1,6 +1,6 @@
 import { authHeader } from "../ai/client";
 
-export type FileKind = "w9" | "coi" | "authority" | "noa" | "bol" | "pod" | "lumper_receipt" | "other";
+export type FileKind = "w9" | "coi" | "authority" | "noa" | "voided_check" | "bol" | "pod" | "lumper_receipt" | "other";
 
 export type Uploaded = { ok: true; id: string; status: "verified" | "check"; note: string | null; amount?: number | null } | { ok: false; reason: string };
 

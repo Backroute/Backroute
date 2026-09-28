@@ -58,7 +58,7 @@ function event(p: Omit<ActivityEvent, "id" | "timestamp" | "carrierId">): Activi
  */
 export type HandTo = "owner" | "support" | "decider";
 
-async function raise(ctx: CarrierContext, p: { reason: string; loadId?: string; critical?: boolean; label?: string; source: MessageChannel; to: HandTo; brokerId?: string }) {
+async function raise(ctx: CarrierContext, p: { reason: string; loadId?: string; critical?: boolean; label?: string; source: MessageChannel; to: HandTo; brokerId?: string; portalTaskId?: string }) {
   const to = p.to === "support" ? "support" : "owner";
   const escalation: Escalation = {
     id: uid("esc"),
@@ -72,6 +72,7 @@ async function raise(ctx: CarrierContext, p: { reason: string; loadId?: string; 
     recommendedLabel: p.label ?? "Got it",
     source: p.source,
     ...(p.brokerId ? { brokerId: p.brokerId } : {}),
+    ...(p.portalTaskId ? { portalTaskId: p.portalTaskId } : {}),
   };
   await save("escalations", ctx.carrier.id, escalation as unknown as Item);
   ctx.escalations.unshift(escalation);

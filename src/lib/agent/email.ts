@@ -24,6 +24,8 @@ import { answerChange, changeReply } from "./changes";
 import { CLAIM_EMAIL, claimLoad, openClaim } from "./claims";
 import { setAppointment } from "./appointments";
 import { stopLocalToIso } from "../stop-time";
+import { dockLink, portalOn, queuePortalTask, signingLink } from "../portal/tasks";
+import { takeEmailedCode } from "../portal/step";
 
 const ACTIVE = new Set(["negotiating", "rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery"]);
 
@@ -50,6 +52,8 @@ async function handle(carrierId: string, email: InboundEmail) {
   const text = plainText(email);
   const sender: Sender = { from, fromName, subject: email.Subject, messageId: messageIdHeader(email) };
   const haystack = `${email.Subject}\n${text}`.toLowerCase();
+  // A sign-in code a website sent for a job the AI is doing there: it's typed in, and that's all this email is.
+  if (await takeEmailedCode(carrierId, from, email.Subject, text).catch(() => false)) return;
 
   const broker = ctx.brokers.find((b) => b.email?.toLowerCase() === from);
   const byRef = (ref?: string | null) => (ref ? ctx.loads.find((l) => l.referenceNumber.toLowerCase() === ref.toLowerCase()) : undefined);
@@ -147,8 +151,12 @@ async function handle(carrierId: string, email: InboundEmail) {
             const signed = booked && !portal ? await signRateCon(ctx, load, Buffer.from(pdf.Content, "base64"), isPhoto(pdf) ? pdf.ContentType : "application/pdf") : null;
             if (signed) load = ctx.loads.find((l) => l.id === load!.id) ?? load;
             else if (booked && portal) {
-              // Their portal: first ask for it as a PDF by email (most brokers will); if they insist, support signs it there.
-              if (await claimMark(carrierId, load.id, "portal_pdf_ask"))
+              // Their portal: the AI signs it there itself (the browser worker), the PDF they sent having matched. Without
+              // the worker: asked for it as a PDF by email first; if they insist, support signs it there.
+              const link = signingLink(text);
+              if (link && portalOn(ctx) && ctx.settings.rateConSigner?.name && (await queuePortalTask(ctx, { kind: "sign_rate_con", url: link, loadId: load.id, data: { from, fromName, subject: email.Subject, brokerId: load.brokerId, verified: true } })))
+                notes.push(`Signing the rate con for ${load.referenceNumber} on their website.`);
+              else if (await claimMark(carrierId, load.id, "portal_pdf_ask"))
                 await sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: `Hi${fromName ? ` ${fromName.split(" ")[0]}` : ""},\n\nCould you email the rate con for ${load.referenceNumber} as a PDF? We sign and send it straight back.\n\nThanks,\n${ctx.carrier.name}`, inReplyTo: sender.messageId, loadId: load.id, withinRules: true, why: `Ask ${fromName} for the rate con as a PDF?` });
               else if (await claimMark(carrierId, load.id, "portal_support")) await passToOwner(ctx, { reason: `${fromName} needs the rate con for ${load.referenceNumber} signed in their online portal (they didn't send a PDF when asked). Sign it from the link in their email.`, loadId: load.id, label: "Signed", source: "email", to: "support" });
             }
@@ -231,6 +239,9 @@ async function handle(carrierId: string, email: InboundEmail) {
   // A booked load whose rate con isn't signed yet, and the broker wants it signed in their portal: asked for a PDF by
   // email first; asked again, support signs it there (another company's website).
   if (load && !impostor && !load.rateConSignedAt && ["booked", "rate_confirmed", "dispatched"].includes(load.stage) && PORTAL_SIGNING.test(text) && /https?:\/\//.test(text)) {
+    // With the browser worker, the AI signs it there, checking the rate on the page against what was agreed first.
+    const link = signingLink(text);
+    if (link && portalOn(ctx) && ctx.settings.rateConSigner?.name && !suspect() && (await queuePortalTask(ctx, { kind: "sign_rate_con", url: link, loadId: load.id, data: { from, fromName, subject: email.Subject, brokerId: load.brokerId } }))) return;
     if (await claimMark(carrierId, load.id, "portal_pdf_ask"))
       await sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: `Hi${fromName ? ` ${fromName.split(" ")[0]}` : ""},\n\nCould you email the rate con for ${load.referenceNumber} as a PDF? We sign and send it straight back.\n\nThanks,\n${ctx.carrier.name}`, inReplyTo: sender.messageId, loadId: load.id, withinRules: true, why: `Ask ${fromName} for the rate con as a PDF?` });
     else if (await claimMark(carrierId, load.id, "portal_support"))
@@ -241,6 +252,17 @@ async function handle(carrierId: string, email: InboundEmail) {
   // A tracking link for a load that's booked: straight to the driver, whatever else the email says.
   const trackingLink = load && ["booked", "rate_confirmed", "dispatched", "at_pickup", "in_transit"].includes(load.stage) ? trackingNeed(`${email.Subject}\n${text}`) : null;
   if (load && trackingLink?.link) await askDriverToTrack(ctx, load, trackingLink);
+
+  // A link to the facility's scheduling website for a stop still waiting on its appointment: the AI books it there.
+  const dock = load && !impostor && portalOn(ctx) ? dockLink(`${email.Subject}\n${text}`) : null;
+  if (load && dock) {
+    const need = (["pickup", "delivery"] as const).find((st) => {
+      const a = load!.appointments?.[st];
+      const asked = load!.rateConReading?.appointmentNeeded;
+      return a ? a.status !== "set" : asked === st || asked === "both";
+    });
+    if (need) await queuePortalTask(ctx, { kind: "dock_appointment", url: dock, loadId: load.id, data: { from, fromName, subject: email.Subject, brokerId: load.brokerId, stop: need } });
+  }
 
   const reading = await readBrokerEmail(email.Subject, text);
   if (impostor && reading?.kind !== "load_offers") return impostorEmail();

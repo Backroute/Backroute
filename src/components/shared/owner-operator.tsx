@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowUpRight, Briefcase, Check, LifeBuoy, X } from "lucide-react";
 import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { DraftApproval } from "@/components/shared/draft-approval";
+import { PortalApproval } from "@/components/shared/portal-approval";
 import { RuleSuggestion } from "@/components/cloud/owner-rules";
 import { Switch } from "@/components/ui/switch";
 import { useStore } from "@/lib/store";
@@ -51,6 +52,8 @@ export function OwnerNeedsYou({ driver, truck }: { driver: Driver; truck: Truck 
             </p>
             {e.suggestRule ? (
               <RuleSuggestion escalation={e} />
+            ) : e.portalTaskId && e.status === "open" ? (
+              <PortalApproval escalation={e} />
             ) : e.draft ? (
               <DraftApproval escalation={e} />
             ) : e.status === "with_support" ? (

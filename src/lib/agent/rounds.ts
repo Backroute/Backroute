@@ -20,6 +20,7 @@ import { expireOffers, sendDetentionClaims, sendInvoices, warnCoiExpiring } from
 import { refreshPlans } from "./plan";
 import { suggestRepositions } from "./reposition";
 import { trackingRounds } from "./tracking";
+import { portalReady, portalRounds } from "../portal/tasks";
 
 /**
  * One carrier's share of the dispatcher's rounds: check-ins with drivers and following up when they go quiet,
@@ -86,6 +87,8 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   if (expired) done.push(`${expired} old offer${expired === 1 ? "" : "s"} taken off the board`);
   // What this carrier's trucks learned at docks goes into the shared record every carrier's AI reads.
   await shareFacilityVisits(ctx, now);
+  // Jobs on broker websites the worker never picked up, and ones waiting on the owner too long.
+  if (portalReady()) done.push(...(await portalRounds(ctx, now)));
   await warnCoiExpiring(ctx, now);
   return done;
 }

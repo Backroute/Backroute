@@ -626,6 +626,8 @@ export interface Escalation {
   supportAssignee?: string;
   /** About a broker (e.g. one the AI couldn't verify), not a load. */
   brokerId?: string;
+  /** About a job on another company's website (lib/portal): the owner approves the submit or answers its question. */
+  portalTaskId?: string;
 }
 
 /** How a message reached Backroute or left it: the app itself, or a real text, call or email. */
@@ -656,7 +658,7 @@ export interface DraftMessage {
  * Judgment calls the owner can hand to the AI once they trust it with them. Off until the owner turns one on (in
  * Settings, or by saying yes when the AI notices they keep approving the same thing unchanged).
  */
-export type OwnerRule = "tonu_default" | "detention_default" | "invoice_noted_pod" | "replies";
+export type OwnerRule = "tonu_default" | "detention_default" | "invoice_noted_pod" | "replies" | "portal_setup";
 
 export type DraftPurpose = "reply" | "book_request" | "counter" | "accept" | "setup_packet" | "invoice" | "detention" | "layover" | "change" | "claim" | "factoring" | "payment_reminder" | "tonu" | "eta_update" | "capacity" | "pass" | "ack";
 

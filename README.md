@@ -48,6 +48,7 @@ The real version switches on from environment variables:
   - prices added stops and reroutes before saying yes
   - claims layover when a truck is held overnight
   - checks each broker's credit before booking
+  - signs in DocuSign and brokers' portals, fills carrier setups and books dock appointments on scheduling sites, with a browser worker (`portal-worker/`), once the owner switches it on
   - sends the factoring company the full invoice packet
   - runs cargo claims: acknowledgment, the driver's statement and photos, and a claim file for the insurer
 - **Like a veteran dispatcher:** remembers drivers' lives, warns about slow docks using what every carrier on Backroute has learned, shows brokers the carrier's on-time record, asks for reloads, respects brokers who won't talk to an AI, and gets blurry paperwork retaken at the dock.
@@ -60,7 +61,7 @@ The real version switches on from environment variables:
 - **Natural phone calls:** with the voice server (`voice-server/`, run outside Vercel), the AI talks and listens at the same time, and stops when interrupted.
 - **Support team tools:** a playbook for each kind of hand-off, timers that turn red when an item is late, and the number to push down: hand-offs per truck per week.
 - **ELD and load feeds:** Samsara or Motive for truck locations and drivers' hours, and any JSON or CSV list of loads.
-- **Backroute support, for very little:** the AI finishes the job itself (it asks brokers for missing MCs, chases short pays and late invoices, hands dock appointments back to brokers, answers bank-detail scams, warns brokers about impostors). Your support team at `/ops` gets only safety emergencies, other companies' websites, our own outages, owners who ask for a person, and urgent things an owner leaves for an hour. Money decisions are the owner's.
+- **Backroute support, for very little:** the AI finishes the job itself (it asks brokers for missing MCs, chases short pays and late invoices, hands dock appointments back to brokers, answers bank-detail scams, warns brokers about impostors). Your support team at `/ops` gets only safety emergencies, other companies' websites the AI couldn't finish, our own outages, owners who ask for a person, and urgent things an owner leaves for an hour. Money decisions are the owner's.
 - **Evening text:** an end-of-day text to the owner.
 - **Before real carriers:**
   - **Practice mode:** the AI does everything but sends nothing, and shows what it would have sent.

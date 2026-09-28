@@ -194,14 +194,14 @@ export async function facilityCallTurn(ctx: CarrierContext, load: Load, stop: St
 }
 
 /** The facility gave a time: on the load, to the driver, to the broker. */
-export async function setAppointment(ctx: CarrierContext, load: Load, stop: Stop, iso: string, confirmation: string | null, by: "facility" | "broker" = "facility") {
+export async function setAppointment(ctx: CarrierContext, load: Load, stop: Stop, iso: string, confirmation: string | null, by: "facility" | "broker" | "portal" = "facility") {
   const state = stateOf(load, stop);
   const when = formatAtStop(iso, state);
   const current = ctx.loads.find((l) => l.id === load.id) ?? load;
   const appt = current.appointments?.[stop] ?? { purpose: "book" as const, tries: 1, status: "calling" as const };
   const note = `${stop === "pickup" ? "Pickup" : "Delivery"} appointment ${when}${confirmation ? `, confirmation ${confirmation}` : ""}`;
   const saved = await saveAppt(ctx, current, stop, { ...appt, status: "set", at: iso, ...(confirmation ? { confirmation } : {}) }, stop === "pickup" ? { pickupAt: iso, pickupWindow: when, appointmentNote: note } : { deliveryAt: iso, deliveryWindow: when, appointmentNote: note });
-  await addActivity(ctx.carrier.id, event({ type: "check_call", loadId: load.id, message: `${stop === "pickup" ? "Pickup" : "Delivery"} appointment ${appt.purpose === "move" ? "moved" : "set"} for ${saved.referenceNumber}`, detail: `${when}${confirmation ? ` · confirmation ${confirmation}` : ""} · ${by === "broker" ? "set by the broker" : `by phone with ${nameOf(saved, stop)}`}`, severity: "success" }));
+  await addActivity(ctx.carrier.id, event({ type: "check_call", loadId: load.id, message: `${stop === "pickup" ? "Pickup" : "Delivery"} appointment ${appt.purpose === "move" ? "moved" : "set"} for ${saved.referenceNumber}`, detail: `${when}${confirmation ? ` · confirmation ${confirmation}` : ""} · ${by === "broker" ? "set by the broker" : by === "portal" ? "booked on the scheduling website" : `by phone with ${nameOf(saved, stop)}`}`, severity: "success" }));
   const driver = driverOf(ctx, saved);
   const to = driver ? toE164(driver.phone) : null;
   if (driver && to && !driver.prefs?.smsOptOut && canText(ctx.carrier)) {
@@ -213,7 +213,7 @@ export async function setAppointment(ctx: CarrierContext, load: Load, stop: Stop
   const broker = ctx.brokers.find((b) => b.id === saved.brokerId);
   const email = billTo(ctx, saved);
   // The broker set it themselves: they don't need telling.
-  if (email && by === "facility")
+  if (email && by !== "broker")
     await sendOrQueue(ctx, {
       purpose: "ack",
       to: email,

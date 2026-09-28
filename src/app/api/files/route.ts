@@ -4,7 +4,7 @@ import { checkStopDocument } from "@/lib/ai/doc-check";
 import { admin, dbConfigured } from "@/lib/agent/db";
 import { caller } from "@/lib/agent/user";
 
-const Kind = z.enum(["w9", "coi", "authority", "noa", "bol", "pod", "lumper_receipt", "other"]);
+const Kind = z.enum(["w9", "coi", "authority", "noa", "voided_check", "bol", "pod", "lumper_receipt", "other"]);
 const STOP_DOCS = new Set(["bol", "pod", "lumper_receipt"]);
 const MAX = 10 * 1024 * 1024;
 const TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp", "image/gif", "image/heic"]);
@@ -13,7 +13,7 @@ export const maxDuration = 60;
 
 /**
  * Upload a file: a driver's BOL or POD photo for a load on their truck, or the carrier's own paperwork (W-9,
- * insurance certificate, authority, notice of assignment), which only the office can add. The AI checks stop
+ * insurance certificate, authority, notice of assignment, voided check), which only the office can add. The AI checks stop
  * documents the way a dispatcher would before billing.
  */
 export async function POST(request: Request) {
@@ -73,7 +73,7 @@ export async function GET(request: Request) {
     .from("carrier_files")
     .select("id, kind, name, size, expires_on, created_at")
     .eq("carrier_id", who.me.carrierId)
-    .in("kind", ["w9", "coi", "authority", "noa"])
+    .in("kind", ["w9", "coi", "authority", "noa", "voided_check"])
     .order("created_at", { ascending: false });
   return Response.json({ files: data ?? [] });
 }

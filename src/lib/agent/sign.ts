@@ -9,7 +9,7 @@ import { save, storeFile, type CarrierContext } from "./db";
  * signature page with the load, the agreed rate and the terms, signed with the name of the person the owner
  * authorized in Settings (Your rules → Rate cons) and when. Only for a rate con that matched what was agreed, on a load
  * the AI booked. Without an authorized signer it doesn't sign. Brokers who want it signed in their own portal
- * (DocuSign and the like) get a person: the AI doesn't log in to other companies' systems.
+ * (DocuSign and the like) have it signed there by the browser worker (lib/portal), in the same signer's name.
  */
 
 export const PORTAL_SIGNING = /\b(docusign|hellosign|adobe ?sign|pandadoc|e-?sign(ature)?|sign (it )?(here|online|electronically)|click (here )?to (sign|accept)|accept (the )?(load|rate con(firmation)?) (online|in|at|through))\b/i;

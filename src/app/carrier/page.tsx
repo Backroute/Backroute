@@ -20,6 +20,7 @@ import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { DailyTextPreview } from "@/components/shared/daily-text";
 import { DriverCallsBoard } from "@/components/shared/driver-calls-board";
 import { DraftApproval, SourceTag } from "@/components/shared/draft-approval";
+import { PortalApproval } from "@/components/shared/portal-approval";
 import { RuleSuggestion } from "@/components/cloud/owner-rules";
 import { useDriverRetention } from "@/components/shared/driver-retention";
 import { RUN_TYPE_LABEL } from "@/lib/run-types";
@@ -225,6 +226,8 @@ export default function CarrierOverviewPage() {
                     <p className="text-sm leading-relaxed text-ink-800">{e.reason}</p>
                     {e.suggestRule && signedIn ? (
                       <RuleSuggestion escalation={e} />
+                    ) : e.portalTaskId && signedIn && e.status === "open" ? (
+                      <PortalApproval escalation={e} />
                     ) : e.draft && !(signedIn && e.status === "with_support") ? (
                       <DraftApproval escalation={e} />
                     ) : signedIn && e.status === "with_support" ? (

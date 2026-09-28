@@ -84,7 +84,7 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - Whatever the setting, anything under the owner's lowest rate, a POD with a problem on it, or an unverified broker waits for the owner. The AI won't book on its own without a lowest rate per mile set.
 - **The AI finishes almost everything; your support team gets only a few kinds of thing.** Backroute's support team works at `/ops`, for every carrier at once, and gets only:
   1. **Safety emergencies:** a crash, an injury, danger on the road, or a stranded truck no repair shop or tow company the AI called could help.
-  2. **Other companies' websites:** a rate con a broker will only take signed in their portal (after the AI asked for a PDF), or a broker's setup portal the carrier has no profile on.
+  2. **Other companies' websites the AI couldn't finish:** signing in DocuSign or a broker's portal, a carrier setup (MyCarrierPackets, RMIS, Highway), or a dock scheduling site. With the browser worker (step 15) switched on for the carrier, the AI does these itself; support gets the ones that beat it, with the link, its steps and its last screenshot. Without it, support does them all (a signing is asked for as a PDF first).
   3. **Our own systems failing:** the AI couldn't answer a text, call or email even on a second try, or the text or email service was down the whole time a message was worth sending.
   4. **The owner asks for a person.**
   5. **Backup:** something urgent the owner hasn't picked up within an hour (a driver who won't answer on a late load goes to the owner first, since they know the driver).
@@ -178,7 +178,7 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - An email from a domain one letter off a broker the carrier knows is treated as an impostor, even when it quotes the real broker's MC.
   - An email asking to change bank or payment details, or to "verify" an account: the AI doesn't reply, and support confirms by phone.
 - **Check calls:** when the rate con asks for tracking, or the owner turns it on for every load, the broker gets a location and ETA email from the ELD every 4 hours.
-- **Carrier setup networks:** the carrier's MyCarrierPackets, Highway or RMIS profile links go out with every setup packet. A broker's portal invite for a network the carrier has a profile on gets the link; any other goes to support to fill out once.
+- **Carrier setup networks:** the carrier's MyCarrierPackets, Highway or RMIS profile links go out with every setup packet. With the browser worker on, a broker's portal invite is filled in on the site by the AI (below); without it, an invite for a network the carrier has a profile on gets the link, and any other goes to support to fill out once.
 - **Truck routing** (HERE, truck mode): real road miles for loads posted without them, and ETAs by road for late notices and check calls. Without it, miles are estimated from city coordinates.
 - **The whole fleet at once:** when two loads both want the same nearest truck, it takes the better one and the other goes to the next free truck that can reach it.
 - **Moving an idle truck to the freight:** a truck that's sat empty 12 hours with nothing that fits is pointed at the nearest place the carrier's loads actually come from (at least 3 in 3 weeks). On full autopilot, within half the owner's empty-miles limit, the AI texts the driver to go. Otherwise it asks the owner. Board searches then run from there.
@@ -239,7 +239,14 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - The brokers and finished loads it adds give the AI lane prices and broker habits from day one.
   - Importing the same sheet twice doesn't double it, and nothing is invoiced or texted for old loads.
 - **The rest of a dispatcher's paperwork and phone work:**
-  - **Signing the rate con:** in Settings → Your rules → Rate cons, the owner names who's authorized to sign. When a broker's rate con matches what was agreed on a load the AI booked, the AI adds a signature page (the load, the rate, the terms, the signer's name and the time) and sends the signed copy back with its thanks. Both the broker's copy and the signed one are kept on the load. A rate con that doesn't match is sent back for a fix, never signed. A broker who wants it signed in their own portal (DocuSign and the like) is first asked for a PDF by email; if they insist, support signs it there, since the AI doesn't log in to other companies' systems. With no signer named, the owner is asked once to add one.
+  - **Signing the rate con:** in Settings → Your rules → Rate cons, the owner names who's authorized to sign. When a broker's rate con matches what was agreed on a load the AI booked, the AI adds a signature page (the load, the rate, the terms, the signer's name and the time) and sends the signed copy back with its thanks. Both the broker's copy and the signed one are kept on the load. A rate con that doesn't match is sent back for a fix, never signed. A broker who wants it signed in their own portal (DocuSign and the like) has it signed there by the browser worker when it's on (below); otherwise they're asked for a PDF first, and support signs it there if they insist. With no signer named, the owner is asked once to add one.
+  - **Broker websites** (with the browser worker, step 15, and the owner's switch in Settings → Broker websites):
+    - **Signing:** a DocuSign, Adobe Sign or broker-portal link for a booked load is signed there in the authorized signer's name. Before the signature the AI reads the rate on the page; if it isn't what was agreed it doesn't sign, asks the broker to fix it and tells the owner. The signed copy is downloaded to the load.
+    - **Carrier setup:** a MyCarrierPackets, RMIS or Highway invite is filled in from the carrier's details and papers (W-9, COI, authority, voided check). It signs in with the carrier's login, or opens the account itself with the carrier's AI email address and a strong password it keeps in the vault. The final submit waits for the owner unless they turn on "Submit carrier setups on broker websites" in Your rules (or run full autopilot).
+    - **Dock appointments:** a scheduling-site link (Opendock, C3 and the like) for a stop still waiting on its time is booked there: the load number, the earliest slot in the load's window, and the confirmation number go on the load, to the driver and to the broker. A slot outside the window waits for the owner.
+    - **What it doesn't know it asks once:** a login, a tax ID, a code texted to the owner. The answer is kept encrypted for next time. Codes the site emails come to the carrier's AI address and are typed in without anyone.
+    - **Passwords are never shown:** the owner adds logins in Settings and can't read them back; the AI writes a placeholder and the real value goes to the worker only for that field, only on that website. Nothing typed from the vault is kept in the job's log. Every signature and submit has a screenshot from just before it.
+    - **When the site beats it** (it broke, three tries, or the worker is down), a signing asks the broker for a PDF; anything else goes to support with the link, what the AI did and its last screenshot. The owner can send a failed job back to the AI, or stop one.
   - **The broker's tracking app:** when the rate con or the broker's email asks for Macropoint, Trucker Tools, FourKites, project44 or the like, the driver is texted what to accept, with the link when there is one. "Yes" back turns it on and tells the broker. Not on 2 hours before pickup, the driver gets a reminder; still not on at pickup, the broker is asked to resend it to the driver's number.
   - **Dock appointments by phone:** a rate con that says to call for an appointment gets a call to the shipper or receiver (their number from the rate con) to book one, in their working hours, up to three tries. A truck that will miss its appointment gets a call to move it, before the late notice goes to the broker. The time they give goes on the load, the driver is texted it and the broker hears. It goes through their phone menu (receiving, shipping, scheduling), answers the usual questions from the load (load number, weight, what it is), and a facility that says the broker has to set it gets the broker asked by email and support told.
   - **Layover:** a truck held overnight at a stop it reached on time is claimed a day's layover per day, while it's still waiting, at the rate con's layover terms or the owner's rate (default $250). That stop gets no hourly detention on top, and the layover goes on the invoice. Without the broker's terms it waits for the owner's OK, like detention.
@@ -264,6 +271,7 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - A screen's save of a load carries only what it changed, merged into the current row (`20261001000000_merge_edits.sql`).
   - What each carrier costs to run is server-only: no one who signs in can read or change it (`20261002000000_usage.sql`).
   - The signed rate con, the factoring schedule, claim files and damage photos are kept with the load's other files (`20261003000000_paperwork_kinds.sql`).
+  - Website logins and the answers the owner gives for them are encrypted by the server before they're stored, and no one who signs in can read the table, not even the owner. The website job queue is server-only too, and only the server can hand a job to the worker (`20261005000000_portal_worker.sql`).
 
 ## What it doesn't do yet
 
@@ -286,7 +294,7 @@ The AI now does the day-to-day work of a dispatcher by email, text and phone. Wh
   - layover pay without the broker's terms
   - sending a claim file to the insurer
   - A new broker that fails the check, or whose credit is under the owner's lowest, always waits.
-- **Broker portals need a person:** signing a rate con in DocuSign or a broker's own site (when they won't email a PDF), or filling out a setup portal the carrier has no profile on. The AI hands these to support with the link. Online dock-scheduling portals go back to the broker by email.
+- **Broker websites are built but not yet tried on the real sites.** The browser worker (step 15) signs in DocuSign and brokers' portals, fills carrier setups and books dock appointments, and it's tested end to end against stand-in sites. Each real site (DocuSign, Adobe Sign, MyCarrierPackets, RMIS, Highway, Opendock, C3) needs a supervised run first: `portal-worker/README.md` has the plan. Until a carrier's owner switches it on, support does these. Sites that want a selfie or a phone call to prove who you are always need the owner.
 - **Credit scores need a credit service** (step 14). Until one is set, the AI only has the carrier's own payment history, which starts empty.
 - **Miles and ETAs without a routing account** (step 12) come from about 130 freight cities and each state's middle. For a town not on the list, miles are rough, and the AI doesn't send late notices from them.
 - **Negotiation is by rules, not instinct.** The AI haggles in steps with reasons, and adjusts to each broker's history. But it doesn't read a broker's mood, bluff about other loads, or trade favors across loads the way a long-time dispatcher might. Every number comes from the rules, on purpose, so it can't be talked below the owner's lowest.
@@ -459,6 +467,22 @@ Any credit service that answers by MC number: the factoring company's broker che
 - `CREDIT_API_NAME`: the name shown on broker checks
 
 Without it, the AI goes by what the carrier's own invoices show once a broker has paid a couple.
+
+### 15. The browser worker (broker websites)
+
+`portal-worker/` is a small Node service with Chromium that does the clicking on other companies' websites. It holds no carrier data and makes no decisions: the app decides each step. Like the voice server, it runs anywhere that keeps a process up, not Vercel. `portal-worker/Dockerfile` has the matching Chromium.
+
+1. In Vercel, set:
+   - `PORTAL_WORKER_SECRET`: a long random string
+   - `PORTAL_VAULT_KEY`: 32 random bytes, base64 (`openssl rand -base64 32`). It encrypts the carrier's website passwords. Keep a copy somewhere safe: without it the saved logins can't be opened. To change it, put the old one in `PORTAL_VAULT_KEY_OLD` and the new one in `PORTAL_VAULT_KEY`.
+2. Run the migration `20261005000000_portal_worker.sql` (it's with the others).
+3. Deploy the `portal-worker` folder (the Dockerfile, or `npm install` and `npm start` where Chromium is installed) with:
+   - `APP_URL`: this app's address
+   - `PORTAL_WORKER_SECRET`: the same secret
+   - `WORKER_CONCURRENCY` (default 2), and `PORT` for its health check, if the host needs one
+4. For each carrier: Settings → Broker websites → **Let the AI do these itself**, and add any logins they already have.
+
+A job nobody picks up in 20 minutes goes to support, so a worker that's down is noticed. Before switching it on for real carriers, run it against each real site as in `portal-worker/README.md`.
 
 ## Before real drivers: rules to get right
 
@@ -645,6 +669,13 @@ The code was run against local stand-ins that behave like the real services:
   - "We don't deal with AI": goodbye, an email with the offer, and no more calls to that broker.
   - A blurry POD is asked for again with a tip, and isn't filed.
   - Support sees the week's repeated hand-offs.
+- **Broker websites** (45 checks in `portal-e2e`, the real worker and Chromium against stand-in sites):
+  - A DocuSign-style link is signed in the signer's name after the consent box; the signed copy is downloaded to the load, with screenshots before signing and at the end.
+  - A portal rate con showing a different rate isn't signed; the broker gets both numbers and the owner is told.
+  - A setup invite: the AI opens the account with the carrier's AI address and a strong password (encrypted in the vault), types the code the site emailed, fills the company form and the W-9, asks the owner the EIN once, and waits for the owner's OK before submitting.
+  - A scheduling-site link books a slot in the load's window; the confirmation goes on the load, to the driver and to the broker.
+  - No password, code or EIN is in the owner's screens, the job logs, the worker's log or support's view. A job only answers to the worker holding it; the worker's door needs the secret.
+  - With the worker down, a signing asks the broker for a PDF and a setup goes to support with the link and where it stopped. The owner can retry or stop a job. With the owner's switch off, support still does them.
 - **What the AI finishes instead of support** (24 checks):
   - A broker with no MC is emailed for it; their answer is checked with FMCSA and their load is asked for.
   - A bank-details request gets the standing answer and the owner is told. An impostor gets nothing, and the real broker is warned.
@@ -671,6 +702,7 @@ The code was run against local stand-ins that behave like the real services:
 - **Access rules:**
   - A stale copy saving one field of a load changes only that field.
   - What carriers cost to run is server-only.
+  - The website password vault and job queue can't be read or written by anyone who signs in, not even the owner, and only the server can take a job like the worker.
 
 **None of it has been run against the live services yet.** These are all untested:
 
@@ -679,6 +711,7 @@ The code was run against local stand-ins that behave like the real services:
 - Supabase Realtime
 - Live Claude answers, and how well the AI reads real broker emails and real POD photos
 - Truckstop, DAT, Google Places and the ELDs themselves
+- The browser worker on the real signing, setup and scheduling sites
 
 Before inviting drivers:
 

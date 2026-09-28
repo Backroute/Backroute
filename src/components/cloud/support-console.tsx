@@ -21,6 +21,8 @@ interface QueueItem {
   driver: { id: string; name: string; phone: string; language: string; smsOptOut: boolean } | null;
   broker: { id: string; company: string; email: string; phone: string; mc: string | null; verified: boolean; note: string | null } | null;
   thread: { channel: string; direction: string; counterparty: string | null; body: string | null; created_at: string; data: { subject?: string; bySupport?: string } }[];
+  /** A broker website the AI couldn't finish: the link, its steps (never the values it typed) and what it last saw. */
+  portal?: { url: string; kind: string; note: string | null; steps: string[]; screenshot: string | null } | null;
 }
 interface CarrierRow {
   id: string;
@@ -349,6 +351,32 @@ function QueueCard({ item, onDone }: { item: QueueItem; onDone: () => Promise<vo
           </p>
         )}
       </div>
+
+      {item.portal && (
+        <div className="mt-3 rounded-xl border border-line p-3 text-xs text-ink-600">
+          <p>
+            <span className="font-medium text-ink-900">Website:</span>{" "}
+            <a href={item.portal.url} target="_blank" rel="noreferrer noopener" className="break-all underline underline-offset-2">
+              {item.portal.url}
+            </a>
+          </p>
+          {item.portal.note && <p className="mt-1">Where the AI stopped: {item.portal.note}</p>}
+          {item.portal.steps.length > 0 && (
+            <details className="mt-1">
+              <summary className="cursor-pointer font-medium text-ink-800">What the AI did ({item.portal.steps.length} steps)</summary>
+              <ol className="mt-1 list-decimal pl-5">
+                {item.portal.steps.map((s, n) => (
+                  <li key={n}>{s}</li>
+                ))}
+              </ol>
+            </details>
+          )}
+          {item.portal.screenshot && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={item.portal.screenshot} alt="What the AI last saw on the website" className="mt-2 max-h-72 w-full rounded-lg border border-line object-contain object-top" />
+          )}
+        </div>
+      )}
 
       {item.thread.length > 0 && (
         <div className="mt-3 max-h-56 overflow-y-auto rounded-xl bg-ink-50 p-3">

@@ -1,0 +1,9 @@
+{
+  "name": "backroute-portal-worker",
+  "private": true,
+  "type": "module",
+  "description": "Browser worker that signs rate cons and fills carrier setup and dock scheduling websites for the AI dispatcher.",
+  "scripts": { "start": "node worker.mjs" },
+  "engines": { "node": ">=20" },
+  "dependencies": { "playwright-core": "1.56.1" }
+}

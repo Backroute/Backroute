@@ -728,6 +728,8 @@ export interface AgentSettings {
   cargoInsurerEmail?: string;
   /** Real accounts: the lowest broker credit score (0-100) the AI books with when a credit service is connected (default 70). */
   minBrokerCredit?: number;
+  /** Real accounts: the AI signs, fills and books on broker websites itself (lib/portal). Off: support does them. */
+  portalAi?: boolean;
 }
 
 export interface LiveMetrics {

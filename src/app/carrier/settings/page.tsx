@@ -22,6 +22,7 @@ import { AppAccessCard } from "@/components/cloud/app-access";
 import { ChannelsCard } from "@/components/cloud/channels-card";
 import { BusinessCard, DocumentsCard } from "@/components/cloud/business-card";
 import { OwnerRulesCard } from "@/components/cloud/owner-rules";
+import { PortalCard } from "@/components/cloud/portal-card";
 import { ExportsCard } from "@/components/cloud/exports-card";
 import { ConnectionsCard } from "@/components/cloud/connections-card";
 import { HistoryCard } from "@/components/cloud/history-card";
@@ -110,6 +111,7 @@ export default function SettingsPage() {
                 <>
                   <BusinessCard />
                   <OwnerRulesCard />
+                  <PortalCard />
                   <DocumentsCard />
                   <ConnectionsCard />
                   <HistoryCard />

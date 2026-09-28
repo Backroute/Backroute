@@ -8,6 +8,7 @@ import { passToOwner } from "./dispatcher";
 import { sendOrQueue } from "./outbox";
 import * as mail from "./templates";
 import { carrierRecord, recordLine } from "./record";
+import { portalOn, queuePortalTask } from "../portal/tasks";
 
 /**
  * The paperwork a dispatcher does after the driving: the broker's setup packet, the invoice with the signed POD once
@@ -29,12 +30,15 @@ export const billTo = (ctx: CarrierContext, l: Load) => l.brokerContactEmail || 
 const SETUP_NETWORKS = /https?:\/\/[^\s>"]*(mycarrierpackets|rmis|registrymonitoring|highway\.com|carrierassure|carrier411|carrierok|trucker ?tools|assure)[^\s>"]*/i;
 
 export async function sendSetupPacket(ctx: CarrierContext, sender: { from: string; fromName: string; subject: string; messageId?: string; contactName?: string | null }, text = "") {
-  // An invite to the broker's onboarding portal. When the carrier already has a profile on that network (Settings),
-  // the packet email points them to it and that's it. Otherwise someone has to sign in and fill it out: support.
+  // An invite to the broker's onboarding portal. With the browser worker, the AI fills it in there itself (signing in
+  // with the carrier's login, or opening the account), and the owner sees it before it's submitted unless they said
+  // not to. Without it: when the carrier already has a profile on that network (Settings), the packet email points
+  // them to it; otherwise someone has to sign in and fill it out: support.
   const invite = text.match(SETUP_NETWORKS)?.[0];
   const network = invite?.match(SETUP_NETWORKS)?.[1]?.toLowerCase().replace(/\s+/g, "");
   const onFile = network && ctx.settings.setupProfiles?.some((p) => `${p.name} ${p.url}`.toLowerCase().replace(/\s+/g, "").includes(network.replace(/\.com$/, "")));
-  if (invite && !onFile)
+  const byAi = invite && portalOn(ctx) ? await queuePortalTask(ctx, { kind: "carrier_setup", url: invite, data: { from: sender.from, fromName: sender.fromName, subject: sender.subject } }).catch(() => null) : null;
+  if (invite && !onFile && !byAi)
     await passToOwner(ctx, {
       reason: `${sender.fromName} wants ${ctx.carrier.name} set up through their onboarding portal: ${invite}. Complete it with the details and papers in Settings; the AI sent the papers by email too.`,
       label: "Set up",
