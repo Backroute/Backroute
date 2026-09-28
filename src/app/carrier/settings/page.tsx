@@ -23,6 +23,8 @@ import { ChannelsCard } from "@/components/cloud/channels-card";
 import { BusinessCard, DocumentsCard } from "@/components/cloud/business-card";
 import { OwnerRulesCard } from "@/components/cloud/owner-rules";
 import { PortalCard } from "@/components/cloud/portal-card";
+import { BillingCard } from "@/components/cloud/billing-card";
+import { PhoneAlerts } from "@/components/cloud/phone-alerts";
 import { ExportsCard } from "@/components/cloud/exports-card";
 import { ConnectionsCard } from "@/components/cloud/connections-card";
 import { HistoryCard } from "@/components/cloud/history-card";
@@ -174,6 +176,7 @@ export default function SettingsPage() {
                     <p className="text-xs text-ink-500">
                       Only three kinds of alerts reach you: something that needs you, money moving, and safety. Everything else the AI does stays in its log.
                     </p>
+                    {signedIn && <PhoneAlerts />}
                     <ToggleRow label="Text me when something needs me" desc="Approvals, loads to pick, drivers' requests" checked={settings.notifySms} onChange={(v) => updateSettings({ notifySms: v })} />
                     <ToggleRow label="Email me a copy of every alert" desc="Needs you, money and safety" checked={settings.notifyEmail} onChange={(v) => updateSettings({ notifyEmail: v })} />
                     <ToggleRow label="End-of-day text at 6 PM" desc="Loads delivered, profit, and anything that needs you tomorrow" checked={settings.dailyText} onChange={(v) => updateSettings({ dailyText: v })} />
@@ -308,6 +311,9 @@ export default function SettingsPage() {
 
           {tab === "billing" && (
             <>
+              {signedIn ? (
+                <BillingCard />
+              ) : (
               <Card>
                 <CardHeader>
                   <CardTitle>Billing</CardTitle>
@@ -404,6 +410,7 @@ export default function SettingsPage() {
                   </div>
                 </CardContent>
               </Card>
+              )}
 
               {signedIn ? (
                 <AppAccessCard />

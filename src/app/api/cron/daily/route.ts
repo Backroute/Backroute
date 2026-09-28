@@ -2,6 +2,7 @@ import { admin, dbConfigured, loadContext, logChannel } from "@/lib/agent/db";
 import { canText, textTo } from "@/lib/channels/out";
 import { pack } from "@/lib/lang";
 import { formatCurrency } from "@/lib/utils";
+import { syncTruckCounts } from "@/lib/billing";
 
 export const maxDuration = 300;
 
@@ -41,5 +42,7 @@ export async function GET(request: Request) {
       console.error("[cron] daily text failed for", id, e);
     }
   }
-  return Response.json({ sent });
+  // Each subscription bills the trucks the carrier has now.
+  const billing = await syncTruckCounts().catch((e) => (console.error("[cron] billing sync failed", e), [] as string[]));
+  return Response.json({ sent, billing });
 }

@@ -1,4 +1,5 @@
 import "server-only";
+import { holdForBilling } from "../billing";
 import { assessBroker } from "../broker-policy";
 import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
@@ -252,6 +253,8 @@ export function pickForTruck(ctx: Pick<CarrierContext, "trucks" | "drivers">, lo
  * to that truck are set aside, the way picking one load passes on the rest.
  */
 export async function requestBooking(ctx: CarrierContext, load: Load, ask: number, how: { byRules?: boolean; byOwner?: boolean; callFirst?: boolean }) {
+  // An account whose trial ended unpaid (with billing required) books nothing new; what's booked keeps running.
+  if (await holdForBilling(ctx, load.id)) return "queued" as const;
   let broker = ctx.brokers.find((b) => b.id === load.brokerId);
   // Their credit, before asking: too weak and the AI doesn't book on its own; slow to pay and it asks a bit more.
   if (broker && !how.byOwner) {

@@ -1,4 +1,5 @@
 import "server-only";
+import { pushToOffice } from "../push";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
@@ -76,6 +77,9 @@ async function raise(ctx: CarrierContext, p: { reason: string; loadId?: string; 
   };
   await save("escalations", ctx.carrier.id, escalation as unknown as Item);
   ctx.escalations.unshift(escalation);
+  // The owner's phone buzzes for what needs them (and for an emergency support has, so they know).
+  if (to === "owner" || p.critical)
+    await pushToOffice(ctx.carrier.id, { title: p.critical ? "Urgent" : to === "owner" ? "Needs you" : "Support is on it", body: p.reason, url: p.loadId ? `/carrier/loads/${p.loadId}` : "/carrier", tag: escalation.id, urgent: !!p.critical }).catch((e) => console.error("[push] failed", e));
   if (to === "support" && p.critical) await alertSupport(ctx.carrier, `Backroute support, urgent: ${ctx.carrier.name}. ${p.reason}`.slice(0, 600)).catch((e) => console.error("[support] alert failed", e));
   return escalation;
 }
