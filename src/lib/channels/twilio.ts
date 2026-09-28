@@ -51,15 +51,17 @@ export async function readTwilioWebhook(request: Request, path: string) {
 const API = "https://api.twilio.com/2010-04-01";
 const base = () => process.env.TWILIO_API_BASE?.replace(/\/$/, "") ?? API;
 
-async function twilio(path: string, body: Record<string, string>) {
+async function twilio(path: string, body: Record<string, string | string[]>) {
   const sid = process.env.TWILIO_ACCOUNT_SID!;
+  const form = new URLSearchParams();
+  for (const [k, v] of Object.entries(body)) for (const one of Array.isArray(v) ? v : [v]) form.append(k, one);
   const res = await fetch(`${base()}/Accounts/${sid}${path}`, {
     method: "POST",
     headers: {
       authorization: `Basic ${Buffer.from(`${sid}:${process.env.TWILIO_AUTH_TOKEN}`).toString("base64")}`,
       "content-type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams(body),
+    body: form,
   });
   const data = (await res.json().catch(() => ({}))) as { sid?: string; message?: string; code?: number };
   if (!res.ok) throw new Error(`Twilio ${res.status}: ${data.message ?? "error"} (${data.code ?? "?"})`);
@@ -71,6 +73,28 @@ export async function sendSms(to: string, body: string): Promise<string | undefi
   const service = process.env.TWILIO_MESSAGING_SERVICE_SID;
   const from: Record<string, string> = service ? { MessagingServiceSid: service } : { From: process.env.TWILIO_FROM_NUMBER! };
   const data = await twilio("/Messages.json", { To: to, Body: body.slice(0, 1500), ...from });
+  return data.sid;
+}
+
+/**
+ * WhatsApp through the same Twilio account: on when TWILIO_WHATSAPP_FROM (the WhatsApp sender's number) is set. A
+ * free-form message can go only within 24 hours of the driver's last message; outside that, WhatsApp takes only an
+ * approved template (TWILIO_WHATSAPP_TEMPLATE_SID, one variable: the message), else the text goes by SMS.
+ */
+export const whatsappConfigured = () => twilioConfigured() && Boolean(process.env.TWILIO_WHATSAPP_FROM);
+export const whatsappTemplate = () => process.env.TWILIO_WHATSAPP_TEMPLATE_SID || null;
+
+const wa = (n: string) => `whatsapp:${n.replace(/^whatsapp:/, "")}`;
+
+export async function sendWhatsApp(to: string, body: string, media: string[] = []): Promise<string | undefined> {
+  const data = await twilio("/Messages.json", { To: wa(to), From: wa(process.env.TWILIO_WHATSAPP_FROM!), Body: body.slice(0, 1500), ...(media.length ? { MediaUrl: media.slice(0, 1) } : {}) });
+  return data.sid;
+}
+
+/** Outside WhatsApp's 24 hours: the approved template, with the message as its one variable (no line breaks allowed). */
+export async function sendWhatsAppTemplate(to: string, body: string): Promise<string | undefined> {
+  const text = body.replace(/\s*\n+\s*/g, " · ").replace(/\s{2,}/g, " ").slice(0, 1000);
+  const data = await twilio("/Messages.json", { To: wa(to), From: wa(process.env.TWILIO_WHATSAPP_FROM!), ContentSid: whatsappTemplate()!, ContentVariables: JSON.stringify({ "1": text }) });
   return data.sid;
 }
 

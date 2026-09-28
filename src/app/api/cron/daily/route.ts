@@ -44,7 +44,8 @@ export async function GET(request: Request) {
   }
   // Each subscription bills the trucks the carrier has now.
   const billing = await syncTruckCounts().catch((e) => (console.error("[cron] billing sync failed", e), [] as string[]));
-  // Old rate-limit counters are no use after a day.
+  // Old rate-limit counters are no use after a day, and spoken answers only need to last until WhatsApp fetched them.
   await admin().from("rate_limits").delete().lt("window_start", new Date(Date.now() - 86400_000).toISOString());
+  await admin().from("carrier_files").delete().eq("kind", "voice_reply").lt("created_at", new Date(Date.now() - 2 * 86400_000).toISOString());
   return Response.json({ sent, billing });
 }

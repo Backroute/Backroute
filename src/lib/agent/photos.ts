@@ -7,6 +7,9 @@ import type { Driver, Load, LoadDocument, Truck } from "../types";
 import { addActivity, admin, save, type CarrierContext } from "./db";
 import { event, passToOwner, uid } from "./dispatcher";
 import { DAMAGE, openClaim } from "./claims";
+import { recordReefer } from "./reefer";
+
+const REEFER = /\b(reefer|temp|temperature|thermo\w*|degrees)\b|°/i;
 
 /**
  * A driver texts a photo instead of opening the app: the BOL at pickup, the signed POD at delivery, a lumper receipt.
@@ -32,6 +35,8 @@ export async function driverPhotos(ctx: CarrierContext, driver: Driver, media: {
   // Photos of damaged or short freight: kept for the claim file, not filed as the BOL or POD.
   const justDelivered = ctx.loads.filter((l) => l.truckId && l.truckId === truck?.id && l.stage === "delivered" && Date.now() - Date.parse(l.updatedAt) < 24 * 3600_000).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
   if (DAMAGE.test(text) && !/\b(bol|b\.o\.l|pod|lumper|receipt|signed)\b/i.test(text) && (load ?? justDelivered)) return damagePhotos(ctx, driver, (load ?? justDelivered)!, media, text);
+  // A photo of the reefer's display, with the reading in the caption: kept for the temperature record.
+  if (load && REEFER.test(text) && !/\b(bol|pod|lumper|receipt|signed)\b/i.test(text)) return reeferPhoto(ctx, driver, load, media, text);
   if (!load) {
     await passToOwner(ctx, { reason: `${driver.name} texted ${media.length} photo${media.length === 1 ? "" : "s"}${text ? ` ("${text}")` : ""}, but has no load on the go to put it on.`, label: "Got it", source: "sms", to: "owner" });
     return "Got the photo, thanks. I don't see a load on your truck right now, so I passed it to the office.";
@@ -106,4 +111,22 @@ async function damagePhotos(ctx: CarrierContext, driver: Driver, load: Load, med
   if (!current.claim) await openClaim(ctx, current, { source: "pod", details: `The driver reported: ${text.slice(0, 300)}` });
   await addActivity(ctx.carrier.id, event({ type: "document_captured", loadId: load.id, message: `${driver.name.split(" ")[0]} texted ${kept} photo${kept === 1 ? "" : "s"} of damage`, detail: load.referenceNumber, severity: "warning" }));
   return `Got ${kept === 1 ? "the photo" : `${kept} photos`} of the damage on ${load.referenceNumber}; they're in the claim file. Get the receiver to write it on the POD before you sign, if you can.`;
+}
+
+async function reeferPhoto(ctx: CarrierContext, driver: Driver, load: Load, media: { url: string }[], text: string): Promise<string> {
+  let kept = 0;
+  for (const [i, m] of media.entries()) {
+    const file = await twilioMedia(m.url).catch(() => null);
+    if (!file) continue;
+    const name = `${load.referenceNumber}-reefer-${Date.now().toString(36)}-${i + 1}.${file.contentType.split("/")[1] ?? "jpg"}`;
+    await admin().from("carrier_files").insert({ carrier_id: ctx.carrier.id, kind: "reefer_photo", load_id: load.id, name, content_type: file.contentType, size: file.bytes.length, data: file.bytes.toString("base64"), note: text.slice(0, 200) || null });
+    kept++;
+  }
+  const reading = text.match(/(-?\d{1,3}(?:\.\d)?)\s*(?:°|deg(?:rees)?)?\s*([FC])?\b/i);
+  if (reading) {
+    const n = Number(reading[1]);
+    const f = reading[2]?.toUpperCase() === "C" ? Math.round((n * 9) / 5 + 32) : n;
+    return recordReefer(ctx, driver, load, f, /\bpulp\b/i.test(text), "photo").then((said) => said.replace(/^Recorded/, "Got the photo and recorded"));
+  }
+  return kept ? `Got the reefer photo for ${load.referenceNumber}. What does it read? Text me the number.` : "The photo didn't come through; send it again or use the app.";
 }

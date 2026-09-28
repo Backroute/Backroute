@@ -241,3 +241,14 @@ export const OWNER_GREETING: Record<Lang, (carrier: string) => string> = {
 export const WHO_IS_CALLING =
   "This is Backroute's AI dispatch line. This call is transcribed. Who's calling, and which carrier is it for? / Esta es la línea de despacho de Backroute. ¿Quién llama y para qué transportista?";
 export const MESSAGE_TAKEN = "Thanks, I've passed that on. Someone will call you back shortly. / Gracias, ya pasé el mensaje. Le llamarán pronto.";
+
+/** A voice message that couldn't be made out (or can't be listened to here): the driver is asked to type or call. */
+export const VOICE_UNHEARD: Record<Lang, string> = {
+  en: "Sorry, I couldn't make out your voice message. Can you type it, or call this number?",
+  es: "Perdón, no entendí tu mensaje de voz. ¿Puedes escribirlo o llamar a este número?",
+  pa: "ਮਾਫ਼ ਕਰਨਾ, ਤੁਹਾਡਾ ਵੌਇਸ ਮੈਸੇਜ ਸਮਝ ਨਹੀਂ ਆਇਆ। ਕੀ ਤੁਸੀਂ ਲਿਖ ਕੇ ਭੇਜ ਸਕਦੇ ਹੋ, ਜਾਂ ਇਸ ਨੰਬਰ 'ਤੇ ਫ਼ੋਨ ਕਰ ਸਕਦੇ ਹੋ?",
+  hi: "माफ़ कीजिए, आपका वॉइस मैसेज समझ नहीं आया। क्या आप लिखकर भेज सकते हैं, या इस नंबर पर फ़ोन कर सकते हैं?",
+  ru: "Извини, не разобрал голосовое сообщение. Можешь написать текстом или позвонить на этот номер?",
+  uk: "Вибач, не розібрав голосове повідомлення. Можеш написати текстом або зателефонувати на цей номер?",
+  fr: "Désolé, je n'ai pas compris ton message vocal. Tu peux l'écrire, ou appeler ce numéro ?",
+};

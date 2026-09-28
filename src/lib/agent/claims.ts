@@ -3,6 +3,7 @@ import { canText, textTo } from "../channels/out";
 import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import { textPdf, type PdfLine } from "../pdf";
+import { reeferLine, reeferRecord } from "./reefer";
 import { formatAtStop } from "../stop-time";
 import type { CargoClaim, Driver, Load } from "../types";
 import { addActivity, admin, logChannel, save, saveDriverMessage, storeFile, type CarrierContext } from "./db";
@@ -146,6 +147,13 @@ function claimPdf(ctx: CarrierContext, load: Load): Buffer {
     { text: `Arrived delivery: ${at(t?.arrivedDeliveryAt, load.lane.destState)} · unloaded: ${at(t?.unloadedAt, load.lane.destState)}` },
     { text: "What the paperwork says", bold: true, gap: 12 },
     ...(docs.length ? docs.flatMap((d) => wrap(`${d.type.toUpperCase()}: ${d.aiNote}`).slice(0, 3).map((l) => ({ text: l, size: 10 }))) : [{ text: "No notes read off the BOL or POD.", size: 10 }]),
+    ...(load.reeferLog?.length || reeferLine(load)
+      ? [
+          { text: "Temperature record", bold: true, gap: 12 },
+          ...(reeferLine(load) ? [{ text: `Required: ${reeferLine(load)!.replace(/^Reefer: /, "").split(".")[0]}`, size: 10 }] : []),
+          ...(reeferRecord(load).length ? reeferRecord(load).slice(-20).map((l) => ({ text: l, size: 10 })) : [{ text: "No readings recorded.", size: 10 }]),
+        ]
+      : []),
     { text: "Driver's statement", bold: true, gap: 12 },
     ...(c.statement ? wrap(`"${c.statement}"`).slice(0, 12).map((l) => ({ text: l, size: 10 })) : [{ text: "Asked for; not received yet.", size: 10 }]),
     { text: "Attached: this summary, the rate confirmation, the BOL, the POD and the driver's photos on file.", size: 9, gap: 16 },

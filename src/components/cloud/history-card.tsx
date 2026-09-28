@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Upload } from "lucide-react";
+import { Mail, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { authHeader } from "@/lib/ai/client";
@@ -90,7 +90,81 @@ export function HistoryCard() {
           </div>
         )}
         {done && <p className="text-sm text-ink-700">{done.error ? "The import didn't go through. Try again." : `Imported ${done.loads} loads and ${done.brokers} brokers. The AI uses them for pricing now.`}</p>}
+        <RateConHistory />
       </CardContent>
     </Card>
+  );
+}
+
+interface DocsResult {
+  read: number;
+  loads: number;
+  brokers: number;
+  skipped: { file: string; why: string }[];
+  error?: string;
+}
+
+/**
+ * No spreadsheet? Old rate cons work too: upload a batch of PDFs or photos, or forward them from your email to the
+ * history address (open for a week). The AI reads each one: the broker, the lane, the rate and the terms.
+ */
+function RateConHistory() {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<DocsResult | null>(null);
+  const [inbox, setInbox] = useState<{ address: string | null; until: string } | null>(null);
+
+  async function upload(list: FileList | null) {
+    if (!list?.length) return;
+    setBusy(true);
+    setResult(null);
+    const form = new FormData();
+    for (const f of Array.from(list).slice(0, 40)) form.append("files", f);
+    try {
+      const res = await fetch("/api/import/ratecons", { method: "POST", headers: await authHeader(), body: form });
+      setResult((await res.json()) as DocsResult);
+    } catch {
+      setResult({ read: 0, loads: 0, brokers: 0, skipped: [], error: "offline" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openInbox() {
+    const res = await fetch("/api/import/ratecons?inbox=open", { method: "POST", headers: await authHeader() }).catch(() => null);
+    if (res?.ok) setInbox((await res.json()) as { address: string | null; until: string });
+  }
+
+  return (
+    <div className="mt-2 border-t border-line pt-4">
+      <p className="text-sm font-medium text-ink-900">Or use your old rate cons</p>
+      <p className="mt-0.5 text-xs text-ink-500">Up to 40 PDFs or photos at a time. The AI reads the broker, lane, rate and terms off each one; nothing else is sent anywhere.</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <label className="flex w-fit cursor-pointer items-center gap-2 rounded-xl border border-line px-3 py-2 text-sm font-medium text-ink-900 hover:bg-ink-50">
+          <Upload className="h-4 w-4" /> {busy ? "Reading them…" : "Upload rate cons"}
+          <input type="file" multiple accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" disabled={busy} onChange={(e) => void upload(e.target.files)} />
+        </label>
+        <Button size="sm" variant="outline" onClick={() => void openInbox()}>
+          <Mail className="h-3.5 w-3.5" /> Forward them from my email
+        </Button>
+      </div>
+      {inbox && (
+        <p className="mt-2 rounded-2xl bg-ink-50 px-4 py-3 text-sm text-ink-700">
+          {inbox.address ? (
+            <>
+              Forward emails with rate cons attached (or several at once as attachments) to <span className="font-medium text-ink-950">{inbox.address}</span>. It takes them until {new Date(inbox.until).toLocaleDateString()}.
+            </>
+          ) : (
+            "Email isn't set up for this account yet; upload the files instead."
+          )}
+        </p>
+      )}
+      {result && (
+        <p className="mt-2 text-sm text-ink-700">
+          {result.error
+            ? "Couldn't read them. Try again."
+            : `Read ${result.read}: ${result.loads} past load${result.loads === 1 ? "" : "s"} and ${result.brokers} new broker${result.brokers === 1 ? "" : "s"} added.${result.skipped.length ? ` Skipped ${result.skipped.length} (${result.skipped.slice(0, 3).map((s) => `${s.file}: ${s.why}`).join("; ")}${result.skipped.length > 3 ? "…" : ""}).` : ""}`}
+        </p>
+      )}
+    </div>
   );
 }

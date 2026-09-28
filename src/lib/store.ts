@@ -730,6 +730,10 @@ export interface AgentSettings {
   minBrokerCredit?: number;
   /** Real accounts: the AI signs, fills and books on broker websites itself (lib/portal). Off: support does them. */
   portalAi?: boolean;
+  /** Real accounts: each driver's morning text with the day's stops, dock tips and weather. On unless turned off. */
+  morningBriefs?: boolean;
+  /** Real accounts: the owner's one-minute review of the week, Monday mornings. On unless turned off. */
+  weeklyReview?: boolean;
 }
 
 export interface LiveMetrics {

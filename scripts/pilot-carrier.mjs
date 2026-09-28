@@ -2,10 +2,13 @@
 // machine, never a browser). See PILOT.md for the plan it follows.
 //
 //   node scripts/pilot-carrier.mjs create --name "Lone Star Hauling" --mc 123456 --dot 1234567 --owner-phone "+1 214 555 0100"
-//                                   [--fleet fleet.csv] [--owner-operator]
+//                                   [--fleet fleet.csv] [--owner-operator] [--drivers-agreed]
 //   node scripts/pilot-carrier.mjs stage <carrier-id> shadow|ask|rules|full
 //   node scripts/pilot-carrier.mjs status <carrier-id>
 //   node scripts/pilot-carrier.mjs pause <carrier-id>        (back to practice mode: nothing leaves)
+//
+// --drivers-agreed records that the owner has each driver's written OK to texts and calls (docs/legal); without it,
+// each driver's first text asks them to confirm.
 //
 // fleet.csv, one truck per line: unit,driver name,driver phone,equipment,home city,home state,run type
 //   101,Marcus Hill,+12145550148,Dry Van,Dallas,TX,regional
@@ -107,6 +110,9 @@ async function create() {
     await rest_("POST", "trucks", { id: truck.id, carrier_id: id, unit_number: truck.unitNumber, driver_id: driver.id, data: truck }, "return=minimal");
     // Drivers sign in to the driver app with their own phone.
     if (!(ownerOperator && driver.phone === owner)) await rest_("POST", "invites", { carrier_id: id, phone: driver.phone, role: "driver", driver_id: driver.id }, "return=minimal");
+    // The same words the owner checks in the app (lib/consent-words OWNER_ATTESTS), kept as the record.
+    if (args["drivers-agreed"] === "true")
+      await rest_("POST", "driver_consents", { carrier_id: id, driver_id: driver.id, phone: driver.phone, granted: true, via: "owner", version: "2026-10-01", wording: `This driver has agreed, in writing, to get texts and calls from ${name}'s dispatch line, run by Backroute, about their loads and work, including automated texts and calls from an AI dispatcher. I'll keep a copy of that agreement. (Recorded by Backroute's team at setup.)` }, "return=minimal");
   }
   const inbound = process.env.EMAIL_INBOUND_ADDRESS ? process.env.EMAIL_INBOUND_ADDRESS.replace("@", `+${c.inbound_key}@`) : `(set EMAIL_INBOUND_ADDRESS to see it; key ${c.inbound_key})`;
   console.log(`Pilot carrier created: ${name}
@@ -114,6 +120,7 @@ async function create() {
   stage:          shadow (practice: nothing leaves)
   owner signs in: ${owner}
   trucks:         ${fleet.length}${fleet.length ? ` (${fleet.map((f) => f.truck.unitNumber).join(", ")})` : " (the owner adds them at first sign-in)"}
+  drivers' OK:    ${args["drivers-agreed"] === "true" ? "recorded (the owner has it in writing)" : "not recorded: each driver's first text asks them to confirm"}
   broker email:   ${inbound}
 
 Next (PILOT.md, day 0):

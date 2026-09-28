@@ -58,6 +58,7 @@ Then compare it with what the carrier agreed, which comes with the PDF. List eac
 - different pickup or delivery dates, times or places
 - different equipment
 - a broker name or MC number that doesn't match the broker the carrier dealt with, which can mean double brokering
+- for a reefer load, a temperature requirement the carrier wasn't told about
 
 Set serious to true when it loses money, changes the job, or points to a different company. Don't flag differences in wording or formatting only (for example "Dallas, TX" against "Dallas"). Put anything else the owner should know, like unusual clauses, in otherConcerns.
 

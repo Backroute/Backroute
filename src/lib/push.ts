@@ -3,7 +3,8 @@ import webpush from "web-push";
 import { admin } from "./agent/db";
 
 /**
- * Push notifications to the office's phones and computers: the moment something lands on Needs you. Keys from
+ * Push notifications to the office's phones and computers (the moment something lands on Needs you), and to drivers'
+ * phones (every message from dispatch, a new load, a changed appointment) on top of the text. Keys from
  * NEXT_PUBLIC_VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY (npx web-push generate-vapid-keys). A device that's gone
  * (uninstalled, permission taken back) is forgotten the first time a push to it fails that way.
  */
@@ -29,15 +30,24 @@ export interface PushMessage {
 /** To everyone in the carrier's office (owner and dispatchers) who turned on phone alerts. Returns how many got it. */
 export async function pushToOffice(carrierId: string, m: PushMessage): Promise<number> {
   if (!pushConfigured()) return 0;
+  const { data: office } = await admin().from("members").select("user_id").eq("carrier_id", carrierId).in("role", ["owner", "dispatcher"]);
+  return pushTo(carrierId, new Set((office ?? []).map((r) => r.user_id as string)), m);
+}
+
+/** To a driver's own phone(s), when they turned on notifications in the driver app. */
+export async function pushToDriver(carrierId: string, driverId: string, m: PushMessage): Promise<number> {
+  if (!pushConfigured()) return 0;
+  const { data: them } = await admin().from("members").select("user_id").eq("carrier_id", carrierId).eq("driver_id", driverId);
+  return them?.length ? pushTo(carrierId, new Set(them.map((r) => r.user_id as string)), m) : 0;
+}
+
+async function pushTo(carrierId: string, allowed: Set<string>, m: PushMessage): Promise<number> {
+  if (!allowed.size) return 0;
   setup();
   const db = admin();
-  const [{ data: subs }, { data: office }] = await Promise.all([
-    db.from("push_subscriptions").select("endpoint, user_id, p256dh, auth").eq("carrier_id", carrierId),
-    db.from("members").select("user_id").eq("carrier_id", carrierId).in("role", ["owner", "dispatcher"]),
-  ]);
-  const allowed = new Set((office ?? []).map((r) => r.user_id as string));
+  const { data: subs } = await db.from("push_subscriptions").select("endpoint, user_id, p256dh, auth").eq("carrier_id", carrierId).in("user_id", [...allowed]);
   let sent = 0;
-  for (const s of (subs ?? []).filter((x) => allowed.has(x.user_id as string))) {
+  for (const s of subs ?? []) {
     try {
       await webpush.sendNotification({ endpoint: s.endpoint as string, keys: { p256dh: s.p256dh as string, auth: s.auth as string } }, JSON.stringify({ ...m, body: m.body.slice(0, 240) }), { TTL: 6 * 3600, urgency: m.urgent ? "high" : "normal" });
       sent++;

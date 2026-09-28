@@ -28,6 +28,11 @@ import { lookalikeOf } from "./fraud";
 import { marketRate } from "./rates";
 import { homeTimeStatus } from "../home";
 import * as mail from "./templates";
+import { tipsForLoad } from "./facility-notes";
+import { addWhy, whyBook, withWhy } from "./why";
+import { hardProblem, scheduleWarnings } from "./schedule";
+import { reeferLine } from "./reefer";
+import { translateForDriver } from "../ai/translate";
 
 /**
  * Booking by email, the way a small carrier's dispatcher does it: loads brokers send in are matched to a truck that
@@ -171,6 +176,10 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
       ...(sender.from ? { brokerContactEmail: sender.from } : {}),
       ...(sender.feed ? {} : { offerEmail: { subject: sender.subject, messageId: sender.messageId } }),
     };
+    // A holiday, a dock that's closed then, or too little time to drive it: noted on the offer; a hard one keeps the
+    // AI from asking for it on its own.
+    const warnings = await scheduleWarnings(load, fit.truck).catch(() => []);
+    if (warnings.length) load.scheduleWarnings = warnings;
     await save("loads", ctx.carrier.id, load as unknown as Item);
     ctx.loads.unshift(load);
     added.push(load);
@@ -193,7 +202,7 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
     for (const l of added) byTruck.set(l.truckId!, [...(byTruck.get(l.truckId!) ?? []), l]);
     for (const group of byTruck.values()) {
       const floor = (l: Load) => floorFor(l, ctx.settings);
-      const pick = pickForTruck(ctx, group.filter((l) => floor(l) !== null && l.targetRate >= floor(l)!));
+      const pick = pickForTruck(ctx, group.filter((l) => floor(l) !== null && l.targetRate >= floor(l)! && !hardProblem(l)));
       if (pick) {
         await requestBooking(ctx, pick, pick.targetRate, { byRules: true, callFirst: !!sender.feed && emptyNow(ctx, pick.truckId) });
         asked.push(pick);
@@ -214,7 +223,7 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
     }
     for (const group of leftover.values()) {
       const floor = (l: Load) => floorFor(l, ctx.settings);
-      const pick = pickForTruck(ctx, group.filter((l) => floor(l) !== null && l.targetRate >= floor(l)!));
+      const pick = pickForTruck(ctx, group.filter((l) => floor(l) !== null && l.targetRate >= floor(l)! && !hardProblem(l)));
       if (pick) {
         await requestBooking(ctx, pick, pick.targetRate, { byRules: true });
         asked.push(pick);
@@ -270,6 +279,8 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
       load = { ...load, surchargePct: credit.surchargePct };
     }
   }
+  // Why this load, at this price, for this truck: kept on the load, and shown with anything waiting for the owner.
+  load = withWhy(load, whyBook(ctx, load, ask));
   const to = load.brokerContactEmail ?? broker?.email;
   // A truck sitting empty and a board load with a phone number: call now, the way dispatchers cover a load before
   // someone else does. The email is the fallback when the call can't go.
@@ -326,7 +337,7 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
     amount: ask,
     withinRules: floor !== null && ask >= floor,
     ownerAsked: !!how.byOwner,
-    why: `Ask ${broker?.company ?? "the broker"} to book ${load.lane.origin} → ${load.lane.destination} at $${ask.toLocaleString()}?`,
+    why: `Ask ${broker?.company ?? "the broker"} to book ${load.lane.origin} → ${load.lane.destination} at $${ask.toLocaleString()}? ${(load.why?.lines ?? []).slice(0, 3).join(" ")}`.trim(),
   });
 }
 
@@ -364,7 +375,8 @@ export async function answerRateReply(ctx: CarrierContext, load: Load, reply: { 
   const offer = reply.brokerRate;
   const move = respond(offer, load, ctx.settings, Date.now(), load.brokerId ? brokerMemory(ctx.loads, load.brokerId) : null);
   if (move.action === "pass" && load.bookRequest?.passedAt) return false; // Already passed; nothing more to say.
-  const withOffer: Load = { ...load, updatedAt: at, bookRequest: withTheirOffer(load.bookRequest, ours, offer, "email") };
+  const said = `Broker offered $${offer.toLocaleString()}: ${move.action === "accept" ? `within your numbers, so the AI took it at $${move.amount.toLocaleString()}.` : move.action === "counter" ? `the AI countered at $${move.amount.toLocaleString()}${move.final ? " (its last number)" : ""}. ${move.reason}` : move.why}`;
+  const withOffer: Load = addWhy({ ...load, updatedAt: at, bookRequest: withTheirOffer(load.bookRequest, ours, offer, "email") }, said.trim());
   await save("loads", ctx.carrier.id, withOffer as unknown as Item);
   ctx.loads = ctx.loads.map((l) => (l.id === load.id ? withOffer : l));
   const company = broker?.company ?? "The broker";
@@ -406,8 +418,12 @@ export async function bookIt(ctx: CarrierContext, load: Load, rate?: number): Pr
   const at = new Date().toISOString();
   const agreed = rate ?? load.rateConReading?.totalRate ?? load.bookRequest?.brokerOffer ?? load.bookRequest?.ask ?? load.targetRate;
   const free = truck && !truck.currentLoadId;
+  // The rate con names the docks: their hours (from drivers' notes) and the holidays are checked again.
+  const warnings = await scheduleWarnings(load, truck).catch(() => load.scheduleWarnings ?? []);
+  const newlyHard = warnings.filter((w) => w.hard && !(load.scheduleWarnings ?? []).some((x) => x.text === w.text));
   const booked: Load = {
     ...load,
+    ...(warnings.length ? { scheduleWarnings: warnings } : {}),
     stage: free ? "dispatched" : "booked",
     bookedRate: agreed,
     targetRate: agreed,
@@ -427,6 +443,7 @@ export async function bookIt(ctx: CarrierContext, load: Load, rate?: number): Pr
     }
   }
   await addActivity(ctx.carrier.id, event({ type: "booked", loadId: load.id, message: `Booked: ${load.lane.origin} → ${load.lane.destination}`, detail: `${truck?.unitNumber ?? ""} · $${agreed.toLocaleString()}`, severity: "success" }));
+  if (newlyHard.length) await passToOwner(ctx, { reason: `Heads-up on ${load.referenceNumber}: ${newlyHard.map((w) => w.text).join(" ")}`, loadId: load.id, label: "Checked", source: "email", to: "owner" });
   await textNewLoad(ctx, booked).catch((e) => console.error("[booking] new-load text failed", e));
   return { load: booked, truck: truckAfter };
 }
@@ -442,15 +459,17 @@ export async function textNewLoad(ctx: CarrierContext, load: Load): Promise<bool
   // A dock that usually keeps trucks 3 hours or more: the driver hears it with the load.
   // The shared record from every carrier on Backroute fills in docks this carrier hasn't been to.
   const slow = (await slowDocksAnywhere(ctx, load).catch(() => slowDocks(ctx.loads, load))).map((f) => SLOW_DOCK[lang]({ name: f.name, hours: (Math.round(f.avgMinutes / 30) / 2).toString() }));
+  // What the driver should know before they go: the reefer setting, and what other drivers said about the docks.
+  const extra = [reeferLine(load), ...(await tipsForLoad(load).catch(() => [])), ...(load.scheduleWarnings ?? []).filter((w) => !w.hard).map((w) => w.text)].filter(Boolean).join(" ");
   const text = [NEW_LOAD[lang]({
     ref: load.referenceNumber,
     from: `${load.lane.origin}, ${load.lane.originState}`,
     to: `${load.lane.destination}, ${load.lane.destState}`,
     pickup: load.pickupWindow,
     delivery: load.deliveryWindow,
-  }), ...slow].join(" ");
+  }), ...slow, ...(extra ? [await translateForDriver(extra, lang)] : [])].join(" ");
   const sid = await textTo(ctx.carrier, to, text);
-  await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: new Date().toISOString(), channel: "sms" });
+  await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: new Date().toISOString(), channel: "sms" }, "/driver");
   await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: to, body: text, data: { kind: "new_load", loadId: load.id } });
   return true;
 }

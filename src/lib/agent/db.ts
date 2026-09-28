@@ -176,8 +176,15 @@ export async function driverThread(carrierId: string, driverId: string, limit = 
   return (data ?? []).map((r) => r.data as DriverMessage).reverse();
 }
 
-export async function saveDriverMessage(carrierId: string, message: DriverMessage) {
+/**
+ * A message in a driver's thread. One from dispatch also lights up their phone, when they turned on notifications
+ * in the driver app (on top of the text, which still goes): `link` is where tapping it opens.
+ */
+export async function saveDriverMessage(carrierId: string, message: DriverMessage, link = "/driver/messages") {
   await save("driver_messages", carrierId, message as unknown as Item);
+  if (message.from !== "ai") return;
+  const { pushToDriver } = await import("../push");
+  await pushToDriver(carrierId, message.driverId, { title: "Dispatch", body: message.content, url: link, tag: `dm-${message.driverId}` }).catch((e) => console.error("[push] driver push failed", e));
 }
 
 export interface ChannelLog {

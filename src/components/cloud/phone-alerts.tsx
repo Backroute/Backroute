@@ -17,11 +17,34 @@ function keyBytes(base64: string): Uint8Array<ArrayBuffer> {
 
 type State = "unsupported" | "off" | "on" | "blocked" | "busy";
 
+export interface AlertWords {
+  title: string;
+  unsupported: string;
+  off: string;
+  on: string;
+  blocked: string;
+  turnOn: string;
+  turnOff: string;
+  failed: string;
+}
+
+const OFFICE: AlertWords = {
+  title: "Phone alerts",
+  unsupported: "This browser can't show alerts. On an iPhone, add Backroute to your home screen first (Share → Add to Home Screen), then open it from there.",
+  off: "Get a notification on this device the moment something needs you.",
+  on: "On for this device. You'll get a notification when something needs you.",
+  blocked: "Notifications are blocked for Backroute in this browser's settings. Allow them there, then come back.",
+  turnOn: "Turn on",
+  turnOff: "Turn off",
+  failed: "Couldn't turn them on. Try again.",
+};
+
 /**
- * Push notifications on this phone or computer for what needs the owner. On an iPhone they work once Backroute is
- * added to the home screen (Share → Add to Home Screen).
+ * Push notifications on this phone or computer: for the owner, what needs them; for a driver (with their words and
+ * language), every message from dispatch. On an iPhone they work once Backroute is added to the home screen
+ * (Share → Add to Home Screen).
  */
-export function PhoneAlerts() {
+export function PhoneAlerts({ words = OFFICE, lang }: { words?: AlertWords; lang?: string } = {}) {
   const [state, setState] = useState<State>("busy");
   const [note, setNote] = useState<string | null>(null);
 
@@ -54,10 +77,10 @@ export function PhoneAlerts() {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(KEY) });
       if (!(await send({ op: "subscribe", subscription: sub.toJSON() }))) throw new Error("save");
-      await send({ op: "test" });
+      await send({ op: "test", ...(lang ? { lang } : {}) });
       setState("on");
     } catch {
-      setNote("Couldn't turn them on. Try again.");
+      setNote(words.failed);
       setState("off");
     }
   }
@@ -73,24 +96,18 @@ export function PhoneAlerts() {
     setState("off");
   }
 
-  const text: Record<State, string> = {
-    unsupported: "This browser can't show alerts. On an iPhone, add Backroute to your home screen first (Share → Add to Home Screen), then open it from there.",
-    off: "Get a notification on this device the moment something needs you.",
-    on: "On for this device. You'll get a notification when something needs you.",
-    blocked: "Notifications are blocked for Backroute in this browser's settings. Allow them there, then come back.",
-    busy: "…",
-  };
+  const text: Record<State, string> = { unsupported: words.unsupported, off: words.off, on: words.on, blocked: words.blocked, busy: "…" };
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 text-sm font-medium text-ink-900">
-          <BellRing className="h-3.5 w-3.5" /> Phone alerts
+          <BellRing className="h-3.5 w-3.5" /> {words.title}
         </p>
         <p className="text-xs text-ink-500">{note ?? text[state]}</p>
       </div>
       {(state === "off" || state === "on" || state === "busy") && (
         <Button size="sm" variant={state === "on" ? "outline" : "primary"} disabled={state === "busy"} onClick={() => void (state === "on" ? turnOff() : turnOn())}>
-          {state === "busy" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : state === "on" ? "Turn off" : "Turn on"}
+          {state === "busy" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : state === "on" ? words.turnOff : words.turnOn}
         </Button>
       )}
     </div>

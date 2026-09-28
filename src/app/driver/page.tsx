@@ -15,6 +15,7 @@ import { TripCompactCard, TripDetails, TripSheet } from "@/components/shared/tri
 import { Switch } from "@/components/ui/switch";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { IncidentCard } from "@/components/shared/incident-card";
+import { ConsentCard } from "@/components/cloud/driver-dispatch-card";
 import { useNow } from "@/lib/hooks";
 import { weekEarnings } from "@/lib/earnings";
 import { computeDriverPay } from "@/lib/settlements";
@@ -117,6 +118,7 @@ export default function DriverHomePage() {
 
   return (
     <div className="flex flex-col gap-5 px-5">
+      <ConsentCard />
       <div>
         <div className="flex items-center justify-between gap-3">
           <h1 className="font-display text-2xl text-ink-950">{t.hi(driver.name.split(" ")[0])}</h1>

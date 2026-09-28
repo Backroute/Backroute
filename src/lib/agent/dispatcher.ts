@@ -19,6 +19,8 @@ import { LOAD_STAGE_LABEL, LOAD_STAGE_ORDER, type ActivityEvent, type Driver, ty
 import type { Item } from "../cloud/rows";
 import { addActivity, save, type CarrierContext } from "./db";
 import { alertSupport } from "./support";
+import { addFacilityNote, cleanHours, facilitiesOf, tipsForLoad } from "./facility-notes";
+import { recordReefer } from "./reefer";
 
 /**
  * The AI dispatcher on the server: one brain behind texts, calls and email. It reads the carrier's data, answers,
@@ -201,6 +203,49 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: Talk, effects
       },
     }),
     betaZodTool({
+      name: "note_facility",
+      description:
+        "Something the driver says about a shipper or receiver on their load that the next driver going there should know: which gate or door, how check-in works, parking, rules (PPE, no overnight parking, lumper), how long they keep trucks, or its hours. Write it as a short tip about the place, in English, with no names or phone numbers.",
+      inputSchema: z.object({
+        stop: z.enum(["pickup", "delivery"]).optional().describe("Which stop it's about. Leave out if it's where they are now."),
+        facility: z.string().max(120).optional().describe("The place's name, if the driver said it and it isn't on the load."),
+        tip: z.string().min(3).max(200).describe("e.g. 'Check in at the guard shack on Elm St; trucks back in from the east gate.'"),
+        opens: z.string().optional().describe("Opening time they said, 24-hour HH:MM."),
+        closes: z.string().optional().describe("Closing time they said, 24-hour HH:MM (e.g. receiving closes at 14:00)."),
+        days: z.string().optional().describe("Days it's open, if they said, e.g. 'Mon-Fri'."),
+      }),
+      run: async ({ stop, facility, tip, opens, closes, days }) => {
+        const recent = theirLoads()
+          .filter((l) => l.stage === "delivered" && Date.now() - Date.parse(l.updatedAt) < 24 * 3600_000)
+          .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
+        const load = current() ?? recent;
+        if (!load) return "Not saved: there's no load to tie it to. Ask which place they mean.";
+        const which = stop ?? (["booked", "rate_confirmed", "dispatched", "at_pickup"].includes(load.stage) ? "pickup" : "delivery");
+        const known = facilitiesOf(load).find((f) => f.stop === which);
+        const where = known ?? (facility ? { stop: which, name: facility, city: which === "pickup" ? load.lane.origin : load.lane.destination, state: which === "pickup" ? load.lane.originState : load.lane.destState } : null);
+        if (!where) return "Not saved: the load doesn't name that place. Ask the driver what it's called.";
+        const saved = await addFacilityNote(ctx, driver, where, tip, cleanHours({ opens, closes, days }));
+        if (!saved) return "Not saved: the tip was empty.";
+        effects.done.push(`Noted a tip about ${where.name}`);
+        return `Saved for the next driver going to ${where.name}.`;
+      },
+    }),
+    betaZodTool({
+      name: "reefer_reading",
+      description: "The driver read the reefer's temperature (or the product's pulp temperature on the BOL). Record it; if it's outside what the load needs, the driver and owner are told what to do.",
+      inputSchema: z.object({
+        temp_f: z.number().min(-40).max(120).describe("Degrees Fahrenheit. Convert from Celsius if they said Celsius."),
+        pulp: z.boolean().optional().describe("It's the product's pulp temperature, not the unit's reading."),
+      }),
+      run: async ({ temp_f, pulp }) => {
+        const load = current();
+        if (!load) return "Not recorded: no load on the truck right now.";
+        const said = await recordReefer(ctx, driver, load, temp_f, !!pulp, "driver");
+        effects.done.push(`Recorded ${temp_f}°F on ${load.referenceNumber}`);
+        return said;
+      },
+    }),
+    betaZodTool({
       name: "find_nearby",
       description: "Find the closest truck parking, truck stop, diesel, CAT scale, truck wash, repair shop or tire shop near the driver.",
       inputSchema: z.object({
@@ -245,7 +290,7 @@ const CHANNEL_NOTES: Record<Talk, string> = {
 };
 
 const ACTING = `
-You can act with your tools. When the driver tells you they've arrived, are loaded, or reached delivery, update the load. When they report a problem, report it. When they need parking, fuel, a scale, a wash or a shop, find it nearby. When they need a person, tell the owner. Only say you did something after the tool says it's done.`;
+You can act with your tools. When the driver tells you they've arrived, are loaded, or reached delivery, update the load. When they report a problem, report it. When they need parking, fuel, a scale, a wash or a shop, find it nearby. When they tell you something about a dock the next driver should know (gate, check-in, parking, rules, hours), save it with note_facility. When they give you a reefer or pulp temperature, record it. When they need a person, tell the owner. Only say you did something after the tool says it's done.`;
 
 /**
  * For measuring the AI (api/eval): the tools it picks are recorded, with what it passed them, and nothing is done.
@@ -282,10 +327,16 @@ async function driverTurnOnce(ctx: CarrierContext, driver: Driver, channel: Talk
   const lang = LANG_INFO[driver.prefs?.language ?? "en"];
   const messages: Anthropic.Beta.BetaMessageParam[] = history.map((t) => ({ role: t.from === "them" ? "user" : "assistant", content: t.text }));
   while (messages.length && messages[0].role !== "user") messages.shift();
+  // What other drivers said about the docks on this driver's load, so "anything I should know about the receiver?"
+  // has an answer.
+  const truck = ctx.trucks.find((t) => t.id === driver.truckId || t.secondDriverId === driver.id);
+  const onTruck = ctx.loads.find((l) => l.id === truck?.currentLoadId) ?? ctx.loads.find((l) => l.truckId && l.truckId === truck?.id && ["booked", "rate_confirmed", "dispatched", "at_pickup", "in_transit", "at_delivery"].includes(l.stage));
+  const tips = onTruck ? await tipsForLoad(onTruck).catch(() => []) : [];
   messages.push({
     role: "user",
     content: [
       { type: "text", text: `Fleet data right now (${new Date().toUTCString()}), for ${driver.name}:\n${JSON.stringify(driverSnapshot(snapshotSource(ctx), driver.id))}` },
+      ...(tips.length ? [{ type: "text" as const, text: `Tips from drivers who've been to the docks on ${onTruck!.referenceNumber}:\n${tips.join("\n")}` }] : []),
       { type: "text", text: `${channel === "voice" ? "The driver said" : "The driver texted"} (their language is ${lang.english}; answer in it): ${said}` },
     ],
   });

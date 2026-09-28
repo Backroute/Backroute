@@ -174,6 +174,12 @@ export interface DriverPrefs {
   reach?: "app" | "phone";
   /** The driver texted STOP to the dispatch number: no texts until they text START. */
   smsOptOut?: boolean;
+  /** How the AI texts them: SMS, or WhatsApp (replies to a WhatsApp message go back on WhatsApp either way). */
+  textsBy?: "sms" | "whatsapp";
+  /** The morning text with the day's stops, times, dock tips and weather. On unless they turn it off. */
+  morningBrief?: boolean;
+  /** Answers to their WhatsApp voice messages come back as a voice message too (and as text). On unless turned off. */
+  voiceReplies?: boolean;
   /**
    * Real accounts: what the driver has told the AI about themselves (family, health, what they like to run), newest
    * last, the way a good dispatcher remembers. Used in later conversations and when picking their loads.
@@ -554,6 +560,27 @@ export interface Load {
   /** Intermediate stops beyond the lane's origin/destination — absent or empty means a normal single-pickup,
    *  single-delivery load, which is most of them. */
   stops?: LoadStop[];
+  /** Real accounts: why the AI went for this load, or answered the broker the way it did, in plain words (lib/agent/why). */
+  why?: { at: string; lines: string[] };
+  /** Real accounts: what's wrong with the load's times: a holiday, a dock's hours, not enough hours to drive it (lib/agent/schedule). */
+  scheduleWarnings?: ScheduleWarning[];
+  /** Real accounts: a reefer load's temperatures, as the driver read them off the unit (lib/agent/reefer). */
+  reeferLog?: { at: string; tempF: number; pulp?: boolean; by: "driver" | "photo" }[];
+}
+
+export interface ScheduleWarning {
+  /** A problem the load can't be run with as timed (the AI doesn't book it on its own), or one to know about. */
+  hard: boolean;
+  text: string;
+}
+
+/** What a reefer load needs, from the rate con: the set point or range, how the unit runs, pre-cooling. */
+export interface ReeferTerms {
+  setF: number | null;
+  minF: number | null;
+  maxF: number | null;
+  mode: "continuous" | "cycle" | null;
+  preCool: boolean;
 }
 
 export type ActivityType =
@@ -830,6 +857,8 @@ export interface RateConPdfReading {
   shipperPhone?: string | null;
   receiverPhone?: string | null;
   appointmentNeeded?: "pickup" | "delivery" | "both" | "none";
+  /** A refrigerated load's temperature terms, when the rate con has them. */
+  reefer?: ReeferTerms | null;
   finesAndFees: string[];
   mismatches: { item: string; agreed: string; onDoc: string; serious: boolean }[];
   otherConcerns: string[];

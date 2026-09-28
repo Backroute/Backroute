@@ -19,6 +19,7 @@ import { PaymentCard } from "@/components/shared/payment-card";
 import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 import { RateConCard } from "@/components/shared/rate-con-card";
 import { RateConReader } from "@/components/shared/rate-con-reader";
+import { WhyCard } from "@/components/cloud/why-card";
 import { LiveDot } from "@/components/shared/live-dot";
 import { StopsTimeline } from "@/components/shared/stops-timeline";
 import { TripStepper } from "@/components/shared/trip-stepper";
@@ -170,6 +171,7 @@ export default function LoadDetailPage() {
 
       <div className="grid gap-6 px-4 py-6 sm:px-8 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
+          {real && <WhyCard load={load} />}
           {real ? (
             <BookingCard load={load} broker={broker} />
           ) : (

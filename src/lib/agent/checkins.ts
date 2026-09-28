@@ -1,4 +1,7 @@
 import "server-only";
+import { tipsForLoad } from "./facility-notes";
+import { reeferLine } from "./reefer";
+import { translateForDriver } from "../ai/translate";
 import { LANG_INFO } from "../lang/pack";
 import { toE164 } from "../cloud/phone";
 import { CHECKIN, DRIVER_SILENT } from "../channels/phrases";
@@ -113,7 +116,10 @@ export async function runCheckins(ctx: CarrierContext, marks: Map<string, { at: 
     if (!(await claimMark(ctx.carrier.id, load.id, kind))) continue; // Another run got it first.
     try {
       const phone = toE164(driver.phone);
-      const text = checkinText(kind, load, driver);
+      // Before a stop: what other drivers said about that dock, and (before pickup) the reefer setting.
+      const before = kind === "before_pickup" ? "pickup" : kind === "before_delivery" ? "delivery" : null;
+      const extra = before ? [before === "pickup" ? reeferLine(load) : null, ...(await tipsForLoad(load, before).catch(() => []))].filter(Boolean).join(" ") : "";
+      const text = [checkinText(kind, load, driver), extra ? await translateForDriver(extra, driver.prefs?.language ?? "en") : ""].filter(Boolean).join(" ");
       const first = driver.name.split(" ")[0];
       const stopState = kind.startsWith("pickup") || kind === "before_pickup" ? load.lane.originState : load.lane.destState;
       const callOk = canCall(ctx.carrier) && !!phone && (driver.prefs?.noCallsBefore === undefined || hourAtStop(stopState, now) >= driver.prefs.noCallsBefore);

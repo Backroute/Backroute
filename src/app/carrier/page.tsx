@@ -18,6 +18,7 @@ import { TruckDriverChip } from "@/components/shared/truck-driver-chip";
 import { IncidentCard } from "@/components/shared/incident-card";
 import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { DailyTextPreview } from "@/components/shared/daily-text";
+import { WeeklyReviewCard } from "@/components/cloud/weekly-review-card";
 import { DriverCallsBoard } from "@/components/shared/driver-calls-board";
 import { DraftApproval, SourceTag } from "@/components/shared/draft-approval";
 import { PortalApproval } from "@/components/shared/portal-approval";
@@ -412,6 +413,8 @@ export default function CarrierOverviewPage() {
         </div>
 
         {dailyText && <DailyTextPreview />}
+
+        <WeeklyReviewCard />
 
         <div className="grid gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">

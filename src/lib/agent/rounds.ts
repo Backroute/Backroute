@@ -21,6 +21,9 @@ import { refreshPlans } from "./plan";
 import { suggestRepositions } from "./reposition";
 import { trackingRounds } from "./tracking";
 import { portalReady, portalRounds } from "../portal/tasks";
+import { morningBriefs } from "./brief";
+import { reeferRounds } from "./reefer";
+import { weeklyReview } from "./review";
 
 /**
  * One carrier's share of the dispatcher's rounds: check-ins with drivers and following up when they go quiet,
@@ -78,6 +81,10 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   if (canText(ctx.carrier)) done.push(...(await trackingRounds(ctx, now)));
   if (canCall(ctx.carrier)) done.push(...(await appointmentRounds(ctx, now)));
   done.push(...(await weeklyCare(ctx, now)));
+  // The driver's morning text, reefer readings, and the owner's Monday review.
+  done.push(...(await morningBriefs(ctx, now).catch((e) => (console.error("[rounds] morning texts failed", e), []))));
+  done.push(...(await reeferRounds(ctx, now).catch((e) => (console.error("[rounds] reefer checks failed", e), []))));
+  done.push(...(await weeklyReview(ctx, now).catch((e) => (console.error("[rounds] weekly review failed", e), []))));
   await refreshPlans(ctx, now);
   if (canEmail(ctx.carrier)) {
     done.push(...(await lateNotices(ctx, now)));

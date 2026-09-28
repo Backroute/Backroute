@@ -5,6 +5,8 @@ import { emailConfigured } from "./channels/email";
 import { emailOurTeam, textTo } from "./channels/out";
 import { twilioConfigured } from "./channels/twilio";
 import { portalReady } from "./portal/tasks";
+import { whatsappConfigured } from "./channels/twilio";
+import { spokenRepliesConfigured, transcriptionConfigured } from "./channels/voice-notes";
 
 /**
  * Is Backroute working? Each part of the system is checked: the database, the AI, texts, email, the dispatcher's
@@ -69,6 +71,8 @@ export async function healthReport(now = Date.now()): Promise<Check[]> {
   });
 
   checks.push({ key: "texts", label: "Texts and calls (Twilio)", level: twilioConfigured() ? "ok" : "down", detail: twilioConfigured() ? "Set up" : "Twilio isn't set up" });
+  checks.push({ key: "whatsapp", label: "WhatsApp", level: whatsappConfigured() ? "ok" : "off", detail: whatsappConfigured() ? `Set up${process.env.TWILIO_WHATSAPP_TEMPLATE_SID ? ", with a template for after 24 hours" : "; after 24 hours of quiet, texts go by SMS"}` : "Not set up: drivers text by SMS" });
+  checks.push({ key: "voice_notes", label: "Voice messages", level: transcriptionConfigured() ? "ok" : "off", detail: transcriptionConfigured() ? `Transcribed${spokenRepliesConfigured() ? "; answers spoken back on WhatsApp" : ""}` : "Not set up: drivers are asked to type" });
   checks.push({ key: "email", label: "Email (Postmark)", level: emailConfigured() ? "ok" : "down", detail: emailConfigured() ? "Set up" : "Postmark isn't set up" });
 
   // The dispatcher's rounds: without them no check-ins, invoices or follow-ups go out.

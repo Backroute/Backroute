@@ -19,6 +19,7 @@ import { DailyTextPreview } from "@/components/shared/daily-text";
 import { DispatchLineCard } from "@/components/shared/dispatch-line-card";
 import { OwnerLanguageCard } from "@/components/shared/owner-language-card";
 import { AppAccessCard } from "@/components/cloud/app-access";
+import { DriverConsentsCard } from "@/components/cloud/driver-consents";
 import { ChannelsCard } from "@/components/cloud/channels-card";
 import { BusinessCard, DocumentsCard } from "@/components/cloud/business-card";
 import { OwnerRulesCard } from "@/components/cloud/owner-rules";
@@ -181,6 +182,12 @@ export default function SettingsPage() {
                     <ToggleRow label="Email me a copy of every alert" desc="Needs you, money and safety" checked={settings.notifyEmail} onChange={(v) => updateSettings({ notifyEmail: v })} />
                     <ToggleRow label="End-of-day text at 6 PM" desc="Loads delivered, profit, and anything that needs you tomorrow" checked={settings.dailyText} onChange={(v) => updateSettings({ dailyText: v })} />
                     {settings.dailyText && <DailyTextPreview />}
+                    {signedIn && (
+                      <>
+                        <ToggleRow label="Your week, Monday morning" desc="What the trucks made, empty miles, best and worst broker, and one thing to change" checked={settings.weeklyReview !== false} onChange={(v) => updateSettings({ weeklyReview: v })} />
+                        <ToggleRow label="Drivers' morning text" desc="Each driver's stops, times, dock tips and weather before they roll (drivers can turn theirs off)" checked={settings.morningBriefs !== false} onChange={(v) => updateSettings({ morningBriefs: v })} />
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -413,7 +420,10 @@ export default function SettingsPage() {
               )}
 
               {signedIn ? (
-                <AppAccessCard />
+                <>
+                  <AppAccessCard />
+                  <DriverConsentsCard />
+                </>
               ) : (
               <Card>
                 <CardHeader>

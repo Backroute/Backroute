@@ -42,6 +42,16 @@ export const Reading = z.object({
   receiver: z.string().nullable().describe("The delivery facility's company name, as printed."),
   shipperPhone: z.string().nullable().describe("The pickup facility's phone number (shipping or scheduling), as printed; null if not on it."),
   receiverPhone: z.string().nullable().describe("The delivery facility's phone number (receiving or scheduling), as printed; null if not on it."),
+  reefer: z
+    .object({
+      setF: z.number().nullable().describe("The set point in °F (convert from °C), or null."),
+      minF: z.number().nullable().describe("The lowest allowed temperature in °F, when a range is given."),
+      maxF: z.number().nullable().describe("The highest allowed temperature in °F, when a range is given."),
+      mode: z.enum(["continuous", "cycle"]).nullable().describe("Continuous or start/stop (cycle-sentry), if stated."),
+      preCool: z.boolean().describe("The document asks for the trailer to be pre-cooled."),
+    })
+    .nullable()
+    .describe("For a refrigerated load: its temperature terms as printed. Null when the load isn't temperature-controlled or no temperature is given."),
   appointmentNeeded: z.enum(["pickup", "delivery", "both", "none"]).describe("A stop the carrier still has to call to book an appointment for (e.g. 'call for appt', 'appointment required' with no time given); none if every stop has a time or is first come, first served."),
   finesAndFees: z.array(z.string()),
   mismatches: z.array(z.object({ item: z.string(), agreed: z.string(), onDoc: z.string(), serious: z.boolean() })),

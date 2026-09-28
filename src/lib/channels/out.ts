@@ -2,7 +2,9 @@ import "server-only";
 import { admin } from "../agent/db";
 import type { AgentSettings } from "../store";
 import { emailConfigured, sendEmail, type Attachment } from "./email";
-import { canCallOut, sendSms, startCall, twilioConfigured } from "./twilio";
+import { canCallOut, startCall, twilioConfigured } from "./twilio";
+import { sendText } from "./texting";
+import { firstTextFor } from "../consent";
 
 /**
  * The one way a text, email or call leaves Backroute for a carrier. Everything the AI (or support) sends goes through
@@ -63,11 +65,17 @@ function retriable(e: unknown): boolean {
   return !status || status >= 500 || status === 429;
 }
 
-/** A text. `c` is null only for Backroute's own texts to its support team about a caller with no carrier. */
-export async function textTo(c: Sender | null, to: string, body: string): Promise<string> {
+/**
+ * A text, by SMS or WhatsApp, whichever way this person texts (lib/channels/texting). `c` is null only for
+ * Backroute's own texts to its support team. `media` (a public link) goes along on WhatsApp: a spoken answer.
+ */
+export async function textTo(c: Sender | null, to: string, body: string, opts: { media?: string[] } = {}): Promise<string> {
   if (c && sandboxed(c)) return keep(c, { channel: "sms", recipient: to, body, status: "held" });
   try {
-    return (await sendSms(to, body)) ?? "";
+    // A driver who hasn't said yes to texts anywhere yet hears first who's texting them and how to stop (once).
+    const first = c ? await firstTextFor(c.id, to).catch((e) => (console.error("[out] consent check failed", e), null)) : null;
+    if (first) await sendText(to, first).catch((e) => console.error("[out] first text failed", e));
+    return (await sendText(to, body, opts.media)).sid ?? "";
   } catch (e) {
     if (!c || !retriable(e)) throw e;
     console.error("[out] text failed, will retry", e);
@@ -152,7 +160,7 @@ export async function retryOutbound(now = Date.now(), limit = 50): Promise<{ sen
       const d = (row.data ?? {}) as { fromName?: string; inReplyTo?: string; replyTo?: string; files?: Attachment[] };
       const id =
         channel === "sms"
-          ? await sendSms(row.recipient as string, (row.body as string) ?? "")
+          ? (await sendText(row.recipient as string, (row.body as string) ?? "")).sid
           : await sendEmail({ to: row.recipient as string, subject: (row.subject as string) ?? "", text: (row.body as string) ?? "", fromName: d.fromName ?? "Dispatch", inReplyTo: d.inReplyTo, replyTo: d.replyTo, attachments: d.files });
       await admin().from("outbound").update({ status: "sent", next_at: null, attempts: (row.attempts as number) + 1, data: { ...(row.data as object), files: undefined, providerId: id ?? null } }).eq("id", row.id);
       sent++;

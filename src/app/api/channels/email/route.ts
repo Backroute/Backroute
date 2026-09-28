@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { carrierByInboundKey, dbConfigured, logChannel } from "@/lib/agent/db";
 import { handleInboundEmail } from "@/lib/agent/email";
+import { historyFromEmail } from "@/lib/agent/history-docs";
 import { plainText, type InboundEmail } from "@/lib/channels/email";
 
 export const maxDuration = 120;
@@ -21,9 +22,16 @@ export async function POST(request: Request) {
   const email = (await request.json().catch(() => null)) as InboundEmail | null;
   if (!email?.MessageID) return new Response("Bad request", { status: 400 });
 
-  const key = email.MailboxHash || email.To.match(/\+([a-z0-9]+)@/i)?.[1];
-  const carrier = key ? await carrierByInboundKey(key.toLowerCase()) : null;
+  const hash = (email.MailboxHash || email.To.match(/\+([a-z0-9-]+)@/i)?.[1] || "").toLowerCase();
+  // "<key>-history": old rate cons the owner forwards to build their history (lib/agent/history-docs).
+  const history = hash.endsWith("-history");
+  const key = history ? hash.slice(0, -"-history".length) : hash;
+  const carrier = key ? await carrierByInboundKey(key) : null;
   if (!carrier) return Response.json({ ok: true, ignored: "no_carrier" });
+  if (history) {
+    after(() => historyFromEmail(carrier.id, email).then(() => undefined).catch((e) => console.error("[email] history import failed", e)));
+    return Response.json({ ok: true, history: true });
+  }
 
   const from = (email.FromFull?.Email ?? email.From).toLowerCase();
   const fresh = await logChannel({

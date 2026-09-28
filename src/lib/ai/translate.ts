@@ -51,3 +51,24 @@ export async function translateEmail(body: string, lang: string): Promise<string
     return null;
   }
 }
+
+const FOR_DRIVER = (language: string) => `Translate these short notes for a truck driver into ${language}, the way a dispatcher who speaks ${language} would say them: short and plain. Keep every number, time, door or gate number, and place or company name exactly as written. Output only the translation.`;
+
+/** A driver's notes (dock tips, reefer settings) in their language, or the English when that can't be done safely. */
+export async function translateForDriver(text: string, lang: string): Promise<string> {
+  if (!text || !aiConfigured() || !lang || lang === "en") return text;
+  const language = NAMES.of(lang);
+  if (!language) return text;
+  try {
+    const message = await claude().beta.messages.create({ model: AI_MODEL, max_tokens: 1000, ...FALLBACK, output_config: { effort: "low" }, system: FOR_DRIVER(language), messages: [{ role: "user", content: text }] });
+    const out = message.content
+      .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("")
+      .trim();
+    return out && mustKeep(text).every((k) => out.includes(k)) ? out : text;
+  } catch (error) {
+    console.error("[translate] driver note failed", error instanceof Anthropic.APIError ? error.status : error);
+    return text;
+  }
+}
