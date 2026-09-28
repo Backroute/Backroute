@@ -262,6 +262,19 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - **Brokers who won't talk to an AI** ("we don't deal with robots") get a polite goodbye, an email right away with where things stood, and email only from then on.
   - **Blurry paperwork** a broker's billing clerk couldn't read is asked for again on the spot, with a tip (flash, flat, all four corners), before the driver leaves the dock. It isn't filed or used to mark the load delivered.
   - **The weekly review:** the support console's Numbers tab lists what came up most this week, to support or to owners, grouped and with an example each. Each repeat is the next thing to teach the AI.
+- **Reaching drivers the way they already talk:**
+  - **WhatsApp** (step 19): a driver who writes on WhatsApp is answered there, from the dispatch line's WhatsApp number, and hears from dispatch there after. WhatsApp only takes a free-form message within 24 hours of the driver's last one; after that the text goes as the approved template (one variable: the message) or, without one, by SMS. A driver can pick SMS or WhatsApp in the app (Profile → How dispatch reaches you).
+  - **Voice messages** (step 20): a WhatsApp voice note or an MMS recording is turned into text and handled like any text (a status, a reefer reading, a question). What they said is kept with the recording. On WhatsApp the answer also comes back spoken, so the driver never has to look down; the audio is fetched from a link that works for two hours and only opens spoken answers. One that can't be made out gets "type it, or call".
+  - **Notifications in the driver app:** a driver turns them on in Profile. Every message from dispatch shows on their lock screen (a new load opens Home). Texts still go too, so nothing depends on the phone keeping the permission. The office's alerts never go to a driver's phone.
+  - **Consent to texts and calls:** the owner checks that a driver agreed when adding them (the wording is in `docs/legal/driver-text-consent.md`), or the driver taps I agree in the app (shown in their app's language), or answers YES to the first text. A driver with nothing on record gets that first text before anything else: who's texting, that it's an AI, rates, HELP and STOP. STOP and START are recorded too. Every record keeps the words shown, when, how, and (in the app) the address it came from, and the table refuses changes and deletes (`20261009000000_natural_dispatch.sql`). The owner sees each driver's latest answer in Settings → Billing & Team.
+  - **Dock tips, passed on:** a driver mentions "check in at the guard shack, back in from the east gate, receiving closes at 2" and the AI saves it as a tip about that place (names and phone numbers taken out), with the hours. The next driver going there hears it with the new load, in the check-in before the stop, in the morning text, and whenever they ask the AI about the dock. Tips are pooled across carriers, like dock times.
+  - **The morning text:** in each driver's morning (5 to 9 local, never before their "no calls before" hour), on days with a stop, one text with the stops and times, appointment numbers, dock tips, slow docks, the reefer setting, National Weather Service warnings where the truck is and is going, and hours left. The AI writes it in the driver's language; a plain list if it can't. The owner can turn it off for everyone (Settings → Notifications), a driver for themselves.
+  - **Reefer loads:** the rate con's set point or range, mode and pre-cool are read off it and go to the driver with the load and before pickup. Once loaded the AI asks for the unit's reading and the pulp temperature, and again before delivery. A reading (texted, said in a voice message, or in a photo of the display with the number) is kept on the load; one out of range tells the driver what to check and reaches the owner (urgent at 5°F off). A warm pulp temperature at pickup: don't sign the BOL until it's written on it. The readings go in the cargo claim file.
+- **Owners seeing why:**
+  - **Why-lines:** every load the AI asks to book says why, on the load and on anything waiting for the owner's OK: what it pays a mile against their lowest and the market, empty miles to the pickup, what it does for the driver's home time, how the broker pays (their own invoices first), and what else the truck had. Each counter or acceptance adds a line with the broker's number and the AI's answer.
+  - **Holidays, dock hours and drive time:** each offer and booking is checked against the days most docks close (New Year's, Memorial Day, July 4th, Labor Day, Thanksgiving, Christmas, and the observed days), days many close early, the hours drivers reported for that dock, and whether one driver (or a team) can legally drive it between pickup and delivery. A hard problem is shown on the load and keeps the AI from asking for it on its own; a new one found at booking goes to the owner.
+  - **The weekly review:** Monday morning (owner's time), the week in a minute: loads, gross and net, per mile, empty miles, best and worst broker (a slow payer first), and one thing to change, like dropping a broker who pays in 40 days or a driver 3 weeks from home. On Home, by text, and on the owner's phone.
+  - **History from old rate cons:** in Settings → Bring your history, besides a spreadsheet: upload up to 40 old rate cons (PDFs or photos) at a time, or forward them from email to the history address (`inbound+KEY-history@...`), which opens for a week from the app. Each is read for the broker (name, email, MC, payment terms), lane, rate and docks, and becomes finished history for pricing, never invoiced or texted.
 - **Drivers can ask for what's near them:** truck parking, a truck stop, diesel, a CAT scale, a truck wash, a repair or tire shop, by text or on a call (needs the Places key from the breakdown step).
 - **Evening text:** at 6 PM Central the owner gets a text: what was delivered, what it made, how many trucks are rolling, and what needs them.
 - **The log:** every text, call and email in or out is listed in Settings, with what the AI did.
@@ -273,6 +286,7 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - The signed rate con, the factoring schedule, claim files and damage photos are kept with the load's other files (`20261003000000_paperwork_kinds.sql`).
   - Trucks, drivers and Needs you items merge the same way loads do, and an old copy can't reopen a closed Needs you item. (This also fixed loads: the app's upsert used to replace the whole load; now it merges.) (`20261006000000_merge_more.sql`)
   - Billing, push devices and the system's heartbeats are server-only; no one can mark their own account paid (`20261007000000_pilot_readiness.sql`). Rate-limit counters too (`20261008000000_rate_limits.sql`).
+  - Consent records can't be changed or deleted, even by the server; a carrier's office reads its own drivers', a driver their own. Dock tips: each office reads its own drivers', the server all. How each number texts us is server-only. The weekly review is the office's (`20261009000000_natural_dispatch.sql`).
   - Website logins and the answers the owner gives for them are encrypted by the server before they're stored, and no one who signs in can read the table, not even the owner. The website job queue is server-only too, and only the server can hand a job to the worker (`20261005000000_portal_worker.sql`).
 
 ## What it doesn't do yet
@@ -301,7 +315,10 @@ The AI now does the day-to-day work of a dispatcher by email, text and phone. Wh
 - **Miles and ETAs without a routing account** (step 12) come from about 130 freight cities and each state's middle. For a town not on the list, miles are rough, and the AI doesn't send late notices from them.
 - **Negotiation is by rules, not instinct.** The AI haggles in steps with reasons, and adjusts to each broker's history. But it doesn't read a broker's mood, bluff about other loads, or trade favors across loads the way a long-time dispatcher might. Every number comes from the rules, on purpose, so it can't be talked below the owner's lowest.
 - **The simulator's scores with the real AI haven't been measured yet.** It needs the app running with `ANTHROPIC_API_KEY` and `EVAL_SECRET`. The scripted runs check the money rules and the plumbing; only the AI-played runs say how human it sounds.
-- **The legal paperwork is drafted, not done.** `docs/legal/` has drafts of the carrier agreement (with the authority to act and sign for the carrier), terms, privacy policy, driver text consent and the call notice, plus the questions for your lawyer. The driver-consent checkbox isn't in the app yet; it's added once the wording is approved.
+- **The legal paperwork is drafted, not done.** `docs/legal/` has drafts of the carrier agreement (with the authority to act and sign for the carrier), terms, privacy policy, driver text consent and the call notice, plus the questions for your lawyer. The consent checkbox, the first text and the records are built with the draft wording; change it in `src/lib/consent-words.ts` (and bump `CONSENT_VERSION`) once your lawyer approves.
+- **WhatsApp needs Meta's approval** of the business and the template (step 19), and voice messages need Deepgram and ElevenLabs accounts (step 20). Punjabi voice messages are auto-detected and may not come through; those drivers are asked to type or call.
+- **Weather is US only** (the National Weather Service), and warnings are checked at the cities on today's loads and the truck's ELD position, not along the whole route.
+- **Holidays are the US ones**, and a dock's hours come only from what drivers told the AI. A dock no driver has reported is assumed open.
 
 ## Setting it up
 
@@ -507,8 +524,23 @@ Everything that lands on an owner's Needs you buzzes their phone; emergencies su
 ### 18. Knowing when something's down
 
 - **Uptime monitor:** point one (Better Stack, UptimeRobot, Pingdom...) at `https://YOUR-SITE/api/health`. It answers 200 when the app and database do, 503 when not, and nothing else.
-- **The System tab** in `/ops` shows each part: database, AI, texts, email, the dispatcher's rounds, messages waiting on a provider, the voice server, the website worker, and AI spending (a carrier using three times its usual in a day).
+- **The System tab** in `/ops` shows each part: database, AI, texts, WhatsApp, voice messages, email, the dispatcher's rounds, messages waiting on a provider, the voice server, the website worker, and AI spending (a carrier using three times its usual in a day).
 - **Alerts:** every round of the dispatcher checks the same things and texts `ALERT_PHONES` (or `SUPPORT_PHONES` if that's not set), and emails `SUPPORT_EMAIL`, when something goes down: once an hour per problem, and once when it's fixed. If the texting provider itself is down, the email still goes.
+
+### 19. WhatsApp (optional)
+
+1. In Twilio, register a WhatsApp sender for the dispatch line (Messaging → Senders → WhatsApp senders; Meta approves the business, which takes a few days) and set its webhook for incoming messages to `https://YOUR-SITE/api/channels/sms`, the same as texts.
+2. Make one message template (Content Template Builder), category Utility, body like `Dispatch update: {{1}}`, and get it approved. It's what reaches a driver who hasn't written in 24 hours.
+3. Set `TWILIO_WHATSAPP_FROM` (the sender's number, `+1...`), `TWILIO_WHATSAPP_TEMPLATE_SID` (the template's `HX...`) and `NEXT_PUBLIC_WHATSAPP_NUMBER` (the same number, for the "message dispatch on WhatsApp" link in the driver app). Redeploy.
+
+Without the template, a driver quiet for a day gets texts by SMS until they write on WhatsApp again.
+
+### 20. Voice messages (optional)
+
+1. A Deepgram account: set `DEEPGRAM_API_KEY` (the same one the voice server uses works). Voice notes are transcribed with `nova-3` in the driver's language; `DEEPGRAM_MODEL` changes the model.
+2. For spoken answers on WhatsApp: `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` (one multilingual voice covers the languages), and `PUBLIC_BASE_URL` so WhatsApp can fetch the audio. Spoken answers are deleted after two days by the daily job.
+
+Without Deepgram, a voice message gets a polite "type it, or call". The System tab shows both.
 
 ### Security, in short
 
@@ -519,7 +551,7 @@ Everything that lands on an owner's Needs you buzzes their phone; emergencies su
 
 ## Before real drivers: rules to get right
 
-- **Consent to texts.** Drivers must agree to get texts from the dispatch number. Get it in writing when you add them. STOP, START and HELP work, and STOP is recorded on the driver.
+- **Consent to texts.** Drivers must agree to get texts from the dispatch number. Get it in writing when you add them and check the box in Add a truck (or in Settings → Billing & Team). A driver with nothing on record gets the first text asking them to confirm, and can agree in the app. STOP, START, HELP and every yes are recorded, with the words shown. WhatsApp's own rules also ask for the driver's opt-in; the same records cover it.
 - **AI disclosure.** Every call opens by saying it's the carrier's AI dispatcher.
 - **Calls to brokers.** The AI says at the start that it's an AI and that the call is transcribed. Check the rules for automated calls with your lawyer; these are business calls about a specific load, not marketing.
 - **Transcripts.** What a driver says on a call is turned into text and saved in the log. No audio is recorded. Several states require everyone's consent to record, so have a lawyer confirm whether saving transcripts needs a spoken notice in your states.
@@ -708,8 +740,20 @@ The code was run against local stand-ins that behave like the real services:
   - The public FMCSA lookup refuses the 31st call from one address in 10 minutes.
   - Someone in two carriers works in the one their app says (never one they don't belong to); a driver in two carriers is heard by the one with a load on their truck.
   - Billing: checkout for trucks × price with the trial left; unsigned webhooks change nothing; signed ones start the trial; invoices listed; the owner's Stripe page; the truck count follows the fleet daily; a failed card warns the owner (and buzzes their phone), holds new bookings after the grace days, and paying clears it; a cancelled one holds too.
-  - Phone alerts: turned on with a test, sent encrypted and signed; a driver can't subscribe; a phone that's gone is forgotten.
+  - Phone alerts: turned on with a test, sent encrypted and signed; the office's alerts never reach a driver's phone; a phone that's gone is forgotten.
   - The pilot script: a carrier in practice mode with its fleet and invites, moved between stages, its status, and paused.
+- **Reaching drivers the way they talk, and owners seeing why** (68 checks in `natural-e2e`, plus 10 on the holiday calendar):
+  - Consent: the first text to a new driver says who's texting and how to stop, once; YES, STOP and START are recorded; the app's "I agree" keeps the words in the driver's language, with where it came from; the owner vouches for a driver by the phone typed in; a driver can't vouch for others; a driver on record gets no notice. Records can't be changed or deleted (and the RLS checks, now 96).
+  - WhatsApp: answered on WhatsApp from the WhatsApp number; after 24 hours the approved template with the message as its variable (no line breaks); a driver who picked SMS gets SMS.
+  - Voice messages: transcribed in the driver's language with trucking words, acted on like a text (a reefer reading out of range reaches the owner), kept with what they said; on WhatsApp the answer comes back spoken from a signed link that won't open with another signature or for another kind of file; one that can't be made out gets "type it, or call".
+  - Driver push: turned on in the driver app with a test in their language; a message from dispatch lights up their phone; the office's alerts don't.
+  - Dock tips: saved with the hours, without names or phone numbers; the next driver (in Spanish) gets them with the new load, and the AI has them when asked.
+  - Reefer: the setting with the load; readings asked for once loaded, once; a photo of the display recorded.
+  - Morning text: the stop, time, appointment number, the dock tip, the reefer setting and the NWS warning where the truck's going (not a marine statement); in Spanish for a Spanish speaker; once a day; not for a driver who turned it off.
+  - Weekly review: kept, on Home, not readable by drivers, texted to the owner once.
+  - A Thanksgiving delivery and 780 miles in 12 hours are flagged and not asked for. A load the AI asks for says why (per mile against the lowest and the market, empty miles, home time, the broker), and a counter adds what it did.
+  - History: uploaded rate cons become finished loads (with the docks) and brokers (MC, payment terms); a copy is skipped; a non-rate con is skipped with the reason; drivers can't add history; forwarded rate cons (even inside a forwarded email) go in while the history address is open, and nothing after.
+  - The System tab shows WhatsApp and voice messages.
 - **Broker websites** (45 checks in `portal-e2e`, the real worker and Chromium against stand-in sites):
   - A DocuSign-style link is signed in the signer's name after the consent box; the signed copy is downloaded to the load, with screenshots before signing and at the end.
   - A portal rate con showing a different rate isn't signed; the broker gets both numbers and the owner is told.

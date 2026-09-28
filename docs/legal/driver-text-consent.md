@@ -1,15 +1,22 @@
 # Driver consent to texts and calls (DRAFT for attorney review)
 
-**To add in the app once the wording is approved: shown to the owner when adding a driver** (they must check it):
+**Shown to the owner when adding a driver** (they must check it; built with this draft wording in `src/lib/consent-words.ts`):
 
 > ☐ This driver has agreed, in writing, to get texts and calls from [Carrier]'s dispatch line, run by Backroute, about
 > their loads and work, including automated texts and calls from an AI dispatcher. I'll keep a copy of that agreement.
 
-**The first text each driver gets:**
+**The first text each driver gets** (only a driver with no consent on record; translated into the driver's language):
 
 > [Carrier] dispatch: this is your dispatch line, run by Backroute (an AI dispatcher, with people for emergencies).
-> You'll get texts and calls about your loads. Msg frequency varies. Msg & data rates may apply. Reply HELP for help,
-> STOP to stop texts.
+> You'll get texts and calls about your loads. Msg frequency varies. Msg & data rates may apply. Reply YES to confirm,
+> HELP for help, STOP to stop texts.
+
+**What a driver agrees to in the driver app** (shown until they answer, in the app's language; the words shown are
+kept with the record):
+
+> I agree that [Carrier] and its dispatch provider, Backroute, may text and call me, including automated texts and
+> calls from an AI dispatcher, about my loads, schedule, pay and safety. Message frequency varies; message and data
+> rates may apply. I can reply STOP at any time to stop texts, and HELP for help.
 
 **Consent form for the carrier to have drivers sign** (paper or electronic):
 
@@ -19,6 +26,10 @@
 > Message frequency varies; message and data rates may apply.
 > Name ______ Signature ______ Date ______
 
-**How the app handles it today:** STOP, START and HELP work, and STOP is recorded on the driver; texts go only to drivers
-the carrier added. Not built yet: the consent checkbox above and a stored record of each driver's consent. [Per counsel:
-quiet hours, and what records of consent to keep.]
+**How the app handles it today:** texts go only to drivers the carrier added. Every consent event is kept in
+`driver_consents`: the owner's checkbox (who checked it and when), the driver's "I agree" or "Not now" in the app (with
+the words shown, the language, the time, the device's address), YES to the first text, and each STOP and START. The
+records can't be edited or deleted while the carrier is on Backroute; the owner sees each driver's latest answer in
+Settings. The same records cover WhatsApp, which also requires the driver's opt-in. Voice messages a driver sends are
+kept with their transcript; the AI's spoken answers are deleted after two days. [Per counsel: quiet hours, whether a
+driver with no consent should get only the first text until they say YES, and how long to keep the records.]

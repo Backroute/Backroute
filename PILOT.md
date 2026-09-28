@@ -49,7 +49,11 @@ node scripts/pilot-carrier.mjs create --name "Lone Star Hauling" --mc 123456 --d
   upload W-9 and COI (and a voided check if they want the AI doing setup websites), and name who signs rate cons.
 - They turn on phone alerts (Settings → Notifications) and add Backroute to their home screen on an iPhone.
 - They forward broker load emails to their Backroute address, or CC it on threads.
-- Drivers get the text with the app link; each signs in with their phone.
+- Drivers get the text with the app link; each signs in with their phone, taps I agree to texts from dispatch, and
+  turns on notifications (Profile). Drivers on WhatsApp just message the dispatch line there. If the owner has each
+  driver's written OK already, add `--drivers-agreed` when creating the carrier (or check the box in Add a truck).
+- Ask the owner to forward (or upload) a few months of old rate cons in Settings → Bring your history, so the AI prices
+  from their own lanes and brokers from the first day.
 - Start the subscription (Settings → Billing & Team): the trial covers the pilot.
 
 ### Every day (support, 15 minutes per carrier)
@@ -61,6 +65,7 @@ node scripts/pilot-carrier.mjs create --name "Lone Star Hauling" --mc 123456 --d
 
 ### Every week (with the owner, 20 minutes)
 
+- Start from their Monday review (Home → Your week): did they agree with the one thing it said to change?
 - What the AI did well, what it got wrong, and what the owner had to fix.
 - `/ops` → Numbers: what came up most. Each repeat is the next thing to teach the AI.
 - The owner's cost to run (Numbers) against what they pay.
