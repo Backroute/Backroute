@@ -9,7 +9,7 @@
 //   APP_URL                 the app, e.g. https://backroute.vercel.app
 //   PORTAL_WORKER_SECRET    shared with the app
 //   WORKER_ID               a name for this worker (default: host and process)
-//   WORKER_CONCURRENCY      jobs at once (default 2)
+//   WORKER_CONCURRENCY      jobs at once (default 3)
 //   POLL_SECONDS            how often to ask for work when idle (default 10)
 //   TASK_MAX_MINUTES        longest a job may take, waiting on the owner included (default 45)
 //   CHROMIUM_PATH           a Chromium to use instead of Playwright's
@@ -28,7 +28,7 @@ import { chromium } from "playwright-core";
 const APP = (process.env.APP_URL ?? "").replace(/\/$/, "");
 const SECRET = process.env.PORTAL_WORKER_SECRET ?? "";
 const WORKER = process.env.WORKER_ID || `${os.hostname()}-${process.pid}`;
-const CONCURRENCY = Math.max(1, Number(process.env.WORKER_CONCURRENCY ?? 2));
+const CONCURRENCY = Math.max(1, Number(process.env.WORKER_CONCURRENCY ?? 3));
 const POLL = Math.max(1, Number(process.env.POLL_SECONDS ?? 10)) * 1000;
 const MAX_MS = Math.max(1, Number(process.env.TASK_MAX_MINUTES ?? 45)) * 60_000;
 const CHROMIUM = process.env.CHROMIUM_PATH || undefined;

@@ -24,7 +24,7 @@ import { PORTAL_KIND_LABEL, type PortalKind, type PortalStatus, type PortalTask,
 
 export const OPEN_STATUSES: PortalStatus[] = ["queued", "running", "needs_approval", "needs_answer", "needs_code"];
 const MAX_ATTEMPTS = 3;
-const WORKER_QUIET_MINUTES = 20;
+const WORKER_QUIET_MINUTES = 30;
 
 /** The worker is set up: its secret, and the vault key for the logins it uses. */
 export const portalReady = () => Boolean(process.env.PORTAL_WORKER_SECRET) && vaultConfigured();

@@ -479,10 +479,10 @@ Without it, the AI goes by what the carrier's own invoices show once a broker ha
 3. Deploy the `portal-worker` folder (the Dockerfile, or `npm install` and `npm start` where Chromium is installed) with:
    - `APP_URL`: this app's address
    - `PORTAL_WORKER_SECRET`: the same secret
-   - `WORKER_CONCURRENCY` (default 2), and `PORT` for its health check, if the host needs one
+   - `WORKER_CONCURRENCY` (default 3), and `PORT` for its health check, if the host needs one
 4. For each carrier: Settings → Broker websites → **Let the AI do these itself**, and add any logins they already have.
 
-A job nobody picks up in 20 minutes goes to support, so a worker that's down is noticed. Before switching it on for real carriers, run it against each real site as in `portal-worker/README.md`.
+A job nobody picks up in 30 minutes goes to support, so a worker that's down is noticed. Before switching it on for real carriers, run it against each real site as in `portal-worker/README.md`.
 
 ## Before real drivers: rules to get right
 

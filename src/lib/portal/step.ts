@@ -60,7 +60,7 @@ export type WorkerAction =
 
 const MAX_STEPS = 60;
 /** How long the worker keeps a page open waiting on the owner before it lets go (the job starts over later). */
-const PARK_MINUTES = 30;
+const PARK_MINUTES = 10;
 const PAPERS = new Set(["w9", "coi", "authority", "noa", "voided_check", "rate_con", "rate_con_signed"]);
 const KEYS = new Set(["Enter", "Tab", "Escape", "ArrowDown", "ArrowUp", "Space"]);
 
@@ -276,11 +276,13 @@ async function resolve(ctx: CarrierContext, task: PortalTask, host: string, valu
 
 /** Is the binding click all right to make now? Returns why not (for the owner), or null. */
 function holdFinal(ctx: CarrierContext, task: PortalTask, load: Load | undefined, d: Decision): { mismatch?: string; ask?: string } | null {
+  // A rate that isn't what was agreed is never signed, the owner's OK to sign unread included.
+  if (task.kind === "sign_rate_con" && load && d.seenRate !== null && Math.abs(d.seenRate - agreedRate(load)) > 1)
+    return { mismatch: `rate: we agreed ${money(agreedRate(load))}, the rate con in their portal says ${money(d.seenRate)}` };
   if (task.data.approvedAt) return null;
   if (task.kind === "sign_rate_con") {
     if (!load) return { ask: "The AI can't find the load this rate con is for." };
     const agreed = agreedRate(load);
-    if (d.seenRate !== null && Math.abs(d.seenRate - agreed) > 1) return { mismatch: `rate: we agreed ${money(agreed)}, the rate con in their portal says ${money(d.seenRate)}` };
     if (d.seenRate === null && !task.data.verified) return { ask: `Sign the rate con for ${load.referenceNumber} as ${ctx.settings.rateConSigner?.name}? The AI couldn't read the rate on the page to check it against the ${money(agreed)} agreed.` };
     return null;
   }
@@ -400,6 +402,13 @@ export async function portalStep(task: PortalTask, page: PageSnapshot, last: Las
       if (task.kind === "dock_appointment" && !d.appointmentLocal && !task.data.appointment?.local) {
         await log(task, { url: page.url, action: "done", ok: false, error: "no appointment time" });
         return { do: "wait", seconds: 1 };
+      }
+      // Signed or submitted means the AI made that click here: a page that only says "completed" (someone else
+      // signed it, it was done before) isn't taken as our signature. Support looks.
+      if (task.kind !== "dock_appointment" && !(task.data.steps ?? []).some((s) => s.final && s.action !== "hold" && s.ok !== false)) {
+        await log(task, { url: page.url, action: "done", ok: false, error: "done without a signature or submit" });
+        await giveUpOn(await refreshed(task), "the website says it's complete, but the AI never signed or submitted it there", await screenshotFile(task, page, "done-unclear"));
+        return { do: "finish", outcome: "failed", note: "done without a final click" };
       }
       await log(task, { url: page.url, action: "done", note: d.note ?? undefined, ok: true });
       const shot = await screenshotFile(task, page, "done");

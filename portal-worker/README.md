@@ -22,7 +22,7 @@ Or build the `Dockerfile` (Playwright's image, with the matching Chromium). Sett
 | `APP_URL` | The app |
 | `PORTAL_WORKER_SECRET` | Shared with the app |
 | `WORKER_ID` | A name for this worker (default: host and process) |
-| `WORKER_CONCURRENCY` | Jobs at once (default 2) |
+| `WORKER_CONCURRENCY` | Jobs at once (default 3) |
 | `POLL_SECONDS` | How often to ask for work when idle (default 10) |
 | `TASK_MAX_MINUTES` | Longest a job may take, waiting on the owner included (default 45) |
 | `CHROMIUM_PATH` | A Chromium to use instead of Playwright's |
@@ -49,10 +49,10 @@ says.
 4. **What it doesn't know it asks the owner once**: a login, a tax ID, bank details, a code texted to them. Answers are
    encrypted (`portal_logins`) and reused. Codes a site emails go to the carrier's AI address and are typed in
    automatically.
-5. **When the site beats it** (stuck, three failed tries, 60 steps, or no worker picked it up in 20 minutes), a
+5. **When the site beats it** (stuck, three failed tries, 60 steps, or no worker picked it up in 30 minutes), a
    signing asks the broker for a PDF; anything else goes to support with the link, the steps and the last screenshot.
 
-While a job waits on the owner, the worker keeps the page open for 30 minutes, then lets go; the job starts over from
+While a job waits on the owner, the worker keeps the page open for 10 minutes, then lets go; the job starts over from
 the link when they answer.
 
 ## Before real carriers: trying each site
