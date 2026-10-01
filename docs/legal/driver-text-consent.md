@@ -34,7 +34,7 @@ Settings. The same records cover WhatsApp, which also requires the driver's opt-
 kept with their transcript; the AI's spoken answers are deleted after two days. The first text goes once per number,
 and never to the owner (who agreed to Backroute's terms at sign-up; an owner-operator is both). Texts that can wait (a
 suggestion to move a truck, the weekly check-in) wait for the driver's daytime (9 PM to 7 AM is quiet by default,
-`QUIET_HOURS`), or while their ELD shows them in the sleeper or off duty; texts a load needs now still go. Setting
+`QUIET_HOURS`), or while their ELD shows them in the sleeper; texts a load needs now still go. Setting
 `CONSENT_REQUIRED=1` holds every text to a driver with no yes on record (they get only the first text) until they answer
 YES, agree in the app, or the owner records that they agreed; the held texts then go out, and the owner is told once
 that a driver's texts are waiting. A driver can turn texts off in the app and get notifications instead. [Per counsel:
