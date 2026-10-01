@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { admin, dbConfigured } from "@/lib/agent/db";
 import { caller } from "@/lib/agent/user";
-import { consentsFor, DRIVER_AGREES, OWNER_ATTESTS, recordConsent } from "@/lib/consent";
+import { consentsFor, DRIVER_AGREES, OWNER_ATTESTS, recordConsent, releaseHeld } from "@/lib/consent";
 import { clientIp } from "@/lib/rate-limit";
 import { LANGS } from "@/lib/lang";
 import type { Driver, Lang } from "@/lib/types";
@@ -42,6 +42,7 @@ export async function POST(request: Request) {
     const { data: row } = await admin().from("drivers").select("phone").eq("carrier_id", who.me.carrierId).eq("id", who.me.driverId).maybeSingle();
     const lang: Lang = LANGS.some((l) => l.code === b.lang) ? (b.lang as Lang) : "en";
     await recordConsent({ carrierId: who.me.carrierId, driverId: who.me.driverId, phone: (row?.phone as string) ?? null, granted: b.granted, via: "app", wording: b.granted ? DRIVER_AGREES[lang](name) : `Declined: ${DRIVER_AGREES[lang](name)}`, byUser: who.me.userId, ...seen });
+    if (b.granted) await releaseHeld(who.me.carrierId, row?.phone as string | null).catch((e) => console.error("[consent] couldn't send held texts", e));
     return Response.json({ ok: true });
   }
 
@@ -59,6 +60,9 @@ export async function POST(request: Request) {
     if (found.length >= ids.size + last10s.length) break;
     await sleep(1500);
   }
-  for (const d of found) await recordConsent({ carrierId: who.me.carrierId, driverId: d.id, phone: d.phone, granted: true, via: "owner", wording: OWNER_ATTESTS(name), byUser: who.me.userId, ...seen });
+  for (const d of found) {
+    await recordConsent({ carrierId: who.me.carrierId, driverId: d.id, phone: d.phone, granted: true, via: "owner", wording: OWNER_ATTESTS(name), byUser: who.me.userId, ...seen });
+    await releaseHeld(who.me.carrierId, d.phone).catch((e) => console.error("[consent] couldn't send held texts", e));
+  }
   return Response.json({ ok: true, recorded: found.length });
 }

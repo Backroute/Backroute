@@ -11,6 +11,7 @@ import { LiveDot } from "@/components/shared/live-dot";
 import { ChannelBadge } from "@/components/shared/channel-badge";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { BrokerTrustBadge } from "@/components/shared/broker-trust-badge";
+import { authHeader } from "@/lib/ai/client";
 import { NegotiationComposer } from "@/components/shared/negotiation-composer";
 import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 import { TruckDriverChip } from "@/components/shared/truck-driver-chip";
@@ -28,6 +29,19 @@ export default function NegotiationsPage() {
   const drivers = useDriverMap();
   const sendNegotiationInstruction = useStore((s) => s.actions.sendNegotiationInstruction);
   const declineLoad = useStore((s) => s.actions.declineLoad);
+  // Real accounts: what the owner types goes to the broker for real (api/agent/instruct), not the demo's simulation.
+  const real = useStore((s) => s.session.mode !== "demo");
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  async function instruct(loadId: string, text: string) {
+    setNotes((n) => ({ ...n, [loadId]: "Sending…" }));
+    try {
+      const res = await fetch("/api/agent/instruct", { method: "POST", headers: { "content-type": "application/json", ...(await authHeader()) }, body: JSON.stringify({ loadId, text }) });
+      const body = (await res.json().catch(() => ({}))) as { note?: string; error?: string };
+      setNotes((n) => ({ ...n, [loadId]: body.note ?? (body.error === "no_broker_email" ? "There's no email for this broker; reach them by phone." : body.error === "email_off" ? "Email isn't set up yet." : "Couldn't send that. Try again.") }));
+    } catch {
+      setNotes((n) => ({ ...n, [loadId]: "Couldn't send that. Check your connection." }));
+    }
+  }
   const [callingLoadId, setCallingLoadId] = useState<string | null>(null);
   const [decliningLoadId, setDecliningLoadId] = useState<string | null>(null);
   const active = loads.filter((l) => l.stage === "negotiating" || l.stage === "rate_confirmed");
@@ -114,15 +128,15 @@ export default function NegotiationsPage() {
                   {load.stage === "negotiating" && (
                     <>
                       <div className="flex items-center gap-2">
-                        <button
+                        {!real && <button
                           onClick={() => setCallingLoadId(load.id)}
                           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-ink-700 hover:border-ink-300"
                           aria-label="Call AI Dispatcher about this load"
                         >
                           <Phone className="h-3.5 w-3.5" />
-                        </button>
+                        </button>}
                         <div className="flex-1">
-                          <NegotiationComposer compact onSend={(text) => sendNegotiationInstruction(load.id, "carrier", text)} />
+                          <NegotiationComposer compact onSend={(text) => (real ? void instruct(load.id, text) : sendNegotiationInstruction(load.id, "carrier", text))} />
                         </div>
                         <button
                           onClick={() => setDecliningLoadId(decliningLoadId === load.id ? null : load.id)}
@@ -136,11 +150,13 @@ export default function NegotiationsPage() {
                         <DeclineForm
                           onCancel={() => setDecliningLoadId(null)}
                           onConfirm={(reason) => {
-                            declineLoad(load.id, reason);
+                            if (real) void instruct(load.id, `walk away (${reason})`);
+                            else declineLoad(load.id, reason);
                             setDecliningLoadId(null);
                           }}
                         />
                       )}
+                      {notes[load.id] && <p className="text-xs text-ink-600">{notes[load.id]}</p>}
                     </>
                   )}
                   {lastMsg && (

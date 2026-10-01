@@ -2,7 +2,7 @@ import "server-only";
 import { admin } from "./agent/db";
 import type { Driver } from "./types";
 import { CONSENT_VERSION, FIRST_TEXT, type ConsentVia } from "./consent-words";
-import { last10 } from "./channels/texting";
+import { last10, sendText } from "./channels/texting";
 
 /**
  * A driver's consent to texts and calls from the dispatch line (docs/legal/driver-text-consent.md): the owner says the
@@ -43,23 +43,76 @@ export async function consentOf(carrierId: string, driverId: string): Promise<Co
 }
 
 /**
- * Before the first text to a driver of this carrier who hasn't said yes anywhere: the text that says who's texting
- * and how to stop it. Returned once per phone number (null after that, or for anyone who isn't this carrier's driver).
+ * What happens to a text to this number, decided once per text:
+ * - `notice`: a driver of this carrier who hasn't said yes anywhere gets the first text (who's texting, how to stop)
+ *   before anything else, once per number. Not the owner, who signed up themselves (an owner-operator is both).
+ * - `hold`: with CONSENT_REQUIRED=1, nothing else goes to that driver until they say yes (the texts wait, and go
+ *   out when they do). Off by default until your lawyer says which way (docs/legal/driver-text-consent.md).
+ * - `appOnly`: the driver asked for notifications instead of texts and has a phone that's taking them.
  */
-export async function firstTextFor(carrierId: string, to: string): Promise<string | null> {
+export interface Recipient {
+  driverId: string | null;
+  notice: string | null;
+  hold: boolean;
+  appOnly: boolean;
+}
+
+export const consentRequired = () => process.env.CONSENT_REQUIRED === "1";
+
+export async function recipientPolicy(carrierId: string, to: string): Promise<Recipient> {
+  const none: Recipient = { driverId: null, notice: null, hold: false, appOnly: false };
   const key = last10(to);
-  if (key.length !== 10) return null;
-  const { data: drivers } = await admin().from("drivers").select("data").eq("carrier_id", carrierId).eq("phone_last10", key).limit(1);
+  if (key.length !== 10) return none;
+  const [{ data: drivers }, { data: carrier }] = await Promise.all([
+    admin().from("drivers").select("data").eq("carrier_id", carrierId).eq("phone_last10", key).limit(1),
+    admin().from("carriers").select("name, owner_phone").eq("id", carrierId).maybeSingle(),
+  ]);
   const driver = drivers?.[0]?.data as Driver | undefined;
-  if (!driver) return null;
-  if ((await consentOf(carrierId, driver.id))?.granted) return null;
+  if (!driver) return none;
+  // The owner (an owner-operator drives too) agreed to Backroute's terms when they signed up.
+  if (carrier?.owner_phone && last10(carrier.owner_phone as string) === key) return { ...none, driverId: driver.id };
+  const latest = await consentOf(carrierId, driver.id);
+  const appOnly = driver.prefs?.textsToo === false && (await activeDevice(carrierId, driver.id));
+  if (latest?.granted) return { driverId: driver.id, notice: null, hold: false, appOnly };
+  // Someone who texted STOP gets nothing, not even the notice (the provider blocks it anyway).
+  if (latest && !latest.granted) return { driverId: driver.id, notice: null, hold: consentRequired(), appOnly };
   // Claimed atomically: two texts at once still bring one notice.
   const at = new Date().toISOString();
   await admin().from("text_routes").upsert({ phone_last10: key, updated_at: at }, { onConflict: "phone_last10", ignoreDuplicates: true });
   const { data: claimed } = await admin().from("text_routes").update({ notice_at: at, updated_at: at }).eq("phone_last10", key).is("notice_at", null).select("phone_last10");
-  if (!claimed?.length) return null;
-  const { data: carrier } = await admin().from("carriers").select("name").eq("id", carrierId).maybeSingle();
-  return FIRST_TEXT[driver.prefs?.language ?? "en"]((carrier?.name as string) ?? "Your carrier");
+  const notice = claimed?.length ? FIRST_TEXT[driver.prefs?.language ?? "en"]((carrier?.name as string) ?? "Your carrier") : null;
+  return { driverId: driver.id, notice, hold: consentRequired(), appOnly };
+}
+
+/** A phone of this driver's that took a notification in the last two weeks. */
+async function activeDevice(carrierId: string, driverId: string): Promise<boolean> {
+  const { data: them } = await admin().from("members").select("user_id").eq("carrier_id", carrierId).eq("driver_id", driverId);
+  if (!them?.length) return false;
+  const { count } = await admin()
+    .from("push_subscriptions")
+    .select("endpoint", { head: true, count: "exact" })
+    .eq("carrier_id", carrierId)
+    .in("user_id", them.map((m) => m.user_id as string))
+    .gte("last_ok_at", new Date(Date.now() - 14 * 86400_000).toISOString());
+  return (count ?? 0) > 0;
+}
+
+/** Texts held for a driver's yes (CONSENT_REQUIRED=1), sent once they give it: the ones from the last day. */
+export async function releaseHeld(carrierId: string, phone: string | null | undefined, send: (to: string, body: string) => Promise<unknown> = (to, body) => sendText(to, body)): Promise<number> {
+  if (!phone || last10(phone).length !== 10) return 0;
+  const since = new Date(Date.now() - 86400_000).toISOString();
+  const { data } = await admin().from("outbound").select("id, recipient, body").eq("carrier_id", carrierId).eq("status", "held").eq("channel", "sms").eq("data->>reason", "no_consent").like("recipient", `%${last10(phone)}`).gte("created_at", since).order("created_at");
+  let sent = 0;
+  for (const row of data ?? []) {
+    try {
+      await send(row.recipient as string, (row.body as string) ?? "");
+      await admin().from("outbound").update({ status: "sent" }).eq("id", row.id);
+      sent++;
+    } catch (e) {
+      console.error("[consent] couldn't send a held text", e);
+    }
+  }
+  return sent;
 }
 
 /** Whether the first text went out lately and this is the answer to it. */

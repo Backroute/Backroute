@@ -3,6 +3,7 @@ import { rowFor, type Item } from "../cloud/rows";
 import { estimateMiles, guessEquipment, makeBroker, makeLoad } from "../fleet";
 import type { Broker, Load, Truck } from "../types";
 import { admin, save, type CarrierContext } from "./db";
+import { newBatchId, recordBatch } from "./import-batches";
 
 /**
  * A carrier's history, from a spreadsheet (a TMS export, QuickBooks, their own sheet): the brokers they work with and
@@ -12,6 +13,8 @@ import { admin, save, type CarrierContext } from "./db";
  */
 
 export interface HistoryResult {
+  /** The import these went in with, to take it back out (lib/agent/import-batches). */
+  batch?: string;
   loads: number;
   brokers: number;
   skipped: { line: number; why: string }[];
@@ -111,6 +114,7 @@ const YEAR = 365 * 86400_000;
 /** Reads the spreadsheet and, unless it's a dry run, saves the brokers and loads. */
 export async function importHistory(ctx: CarrierContext, csv: string, opts: { dryRun?: boolean; now?: number } = {}): Promise<HistoryResult> {
   const now = opts.now ?? Date.now();
+  const batch = newBatchId();
   const rows = parseCsv(csv);
   const header = rows.shift() ?? [];
   const col = mapColumns(header);
@@ -157,7 +161,7 @@ export async function importHistory(ctx: CarrierContext, csv: string, opts: { dr
     if (!miles) return skipped.push({ line, why: "unknown miles between those cities" });
     const at = when.toISOString();
     const base = makeLoad({ truckId: "", brokerId: broker.id, referenceNumber: ref, originCity: from.city, originState: from.state, destinationCity: to.city, destinationState: to.state, miles: Math.round(miles), pickupWindow: at.slice(0, 10), deliveryWindow: at.slice(0, 10), rate, equipment: guessEquipment(cell(r, "equipment")) ?? "Dry Van" }, broker, truck, "booked");
-    loads.push({ ...base, truckId: null, stage: "delivered", source: "Imported history", imported: true, isChained: false, progressPct: 100, createdAt: at, updatedAt: at });
+    loads.push({ ...base, truckId: null, stage: "delivered", source: "Imported history", imported: true, importBatch: batch, isChained: false, progressPct: 100, createdAt: at, updatedAt: at });
   });
   if (rows.length > MAX_ROWS) skipped.push({ line: MAX_ROWS + 2, why: `only the first ${MAX_ROWS} rows are read` });
 
@@ -170,6 +174,7 @@ export async function importHistory(ctx: CarrierContext, csv: string, opts: { dr
       const { error } = await admin().from("loads").upsert(chunk, { onConflict: "carrier_id,id" });
       if (error) throw error;
     }
+    await recordBatch(ctx.carrier.id, batch, { via: "spreadsheet", label: "Spreadsheet", loads: loads.length, brokerIds: newBrokers.map((b) => b.id) });
   }
-  return { loads: loads.length, brokers: newBrokers.length, skipped, columns };
+  return { ...(opts.dryRun || !(loads.length || newBrokers.length) ? {} : { batch }), loads: loads.length, brokers: newBrokers.length, skipped, columns };
 }

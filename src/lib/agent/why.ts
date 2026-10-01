@@ -64,6 +64,6 @@ export function withWhy(load: Load, lines: string[]): Load {
 
 /** A line added to what's already there (a counter, an acceptance), newest last. */
 export function addWhy(load: Load, line: string): Load {
-  const lines = [...(load.why?.lines ?? []).filter((l) => !l.startsWith("Broker offered")), line].slice(-8);
+  const lines = [...(load.why?.lines ?? []).filter((l) => !l.startsWith("Broker offered") && !l.startsWith("You countered")), line].slice(-8);
   return { ...load, why: { at: new Date().toISOString(), lines } };
 }

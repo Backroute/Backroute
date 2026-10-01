@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { readRateConPdf } from "../ai/rate-con-reader";
 import { aiConfigured } from "../ai/server";
 import type { InboundEmail } from "../channels/email";
@@ -8,6 +9,7 @@ import { pushToOffice } from "../push";
 import type { Broker, Load, RateConPdfReading, Truck } from "../types";
 import { addActivity, admin, loadContext, save, type CarrierContext } from "./db";
 import { event } from "./dispatcher";
+import { newBatchId, recordBatch } from "./import-batches";
 
 /**
  * The carrier's history from the paperwork it already has: old rate confirmations, uploaded in Settings (a batch of
@@ -24,6 +26,8 @@ export interface DocFile {
 }
 
 export interface DocsResult {
+  /** The import these went in with, to take it back out (lib/agent/import-batches). */
+  batch?: string;
   read: number;
   loads: number;
   brokers: number;
@@ -52,11 +56,26 @@ async function inBatches<T, R>(items: T[], size: number, run: (t: T) => Promise<
   return out;
 }
 
-export async function importRateCons(ctx: CarrierContext, files: DocFile[], now = Date.now()): Promise<DocsResult> {
+const fingerprint = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex").slice(0, 32);
+
+export async function importRateCons(ctx: CarrierContext, files: DocFile[], opts: { now?: number; batch?: string; via?: "upload" | "email" } = {}): Promise<DocsResult> {
+  const now = opts.now ?? Date.now();
+  const batchId = opts.batch ?? newBatchId();
   const skipped: DocsResult["skipped"] = [];
   if (!aiConfigured()) return { read: 0, loads: 0, brokers: 0, skipped: files.map((f) => ({ file: f.name, why: "the AI isn't switched on" })) };
-  const batch = files.slice(0, MAX_FILES);
-  for (const f of files.slice(MAX_FILES)) skipped.push({ file: f.name, why: `only ${MAX_FILES} at a time; send the rest after` });
+  // The same file twice (sent again, or in two emails) is read once: no second load, and no second AI read.
+  const known = new Set(ctx.loads.map((l) => l.importHash).filter(Boolean));
+  const fresh: (DocFile & { hash: string })[] = [];
+  for (const f of files) {
+    const hash = fingerprint(f.bytes);
+    if (known.has(hash)) skipped.push({ file: f.name, why: "already imported" });
+    else {
+      known.add(hash);
+      fresh.push({ ...f, hash });
+    }
+  }
+  const batch = fresh.slice(0, MAX_FILES);
+  for (const f of fresh.slice(MAX_FILES)) skipped.push({ file: f.name, why: `only ${MAX_FILES} at a time; send the rest after` });
 
   const readings = await inBatches(batch, 3, async (f) => {
     try {
@@ -127,7 +146,7 @@ export async function importRateCons(ctx: CarrierContext, files: DocFile[], now 
     const base = makeLoad({ truckId: "", brokerId: broker.id, referenceNumber: ref, originCity: from.city, originState: from.state, destinationCity: to.city, destinationState: to.state, miles: Math.round(miles), pickupWindow: at.slice(0, 10), deliveryWindow: at.slice(0, 10), rate: Math.round(r.totalRate), equipment: guessEquipment(r.equipment ?? "") ?? "Dry Van" }, broker, truck, "booked");
     // The reading stays on it: the shipper and receiver names are how docks are recognized next time.
     const reading: RateConPdfReading = { ...r, mismatches: [], fileName: f.name, readAt: new Date(now).toISOString() };
-    loads.push({ ...base, truckId: null, stage: "delivered", source: "Imported rate con", imported: true, isChained: false, progressPct: 100, createdAt: at, updatedAt: at, rateConReading: reading, ...(r.brokerEmail ? { brokerContactEmail: r.brokerEmail } : {}) });
+    loads.push({ ...base, truckId: null, stage: "delivered", source: "Imported rate con", imported: true, importBatch: batchId, importHash: f.hash, isChained: false, progressPct: 100, createdAt: at, updatedAt: at, rateConReading: reading, ...(r.brokerEmail ? { brokerContactEmail: r.brokerEmail } : {}) });
   }
 
   for (const b of [...newBrokers, ...updatedBrokers.values()]) await save("records", ctx.carrier.id, b as unknown as Item, "broker");
@@ -138,7 +157,8 @@ export async function importRateCons(ctx: CarrierContext, files: DocFile[], now 
   }
   ctx.brokers.push(...newBrokers);
   ctx.loads.push(...loads);
-  return { read: readings.length, loads: loads.length, brokers: newBrokers.length, skipped };
+  await recordBatch(ctx.carrier.id, batchId, { via: opts.via ?? "upload", label: opts.via === "email" ? "Rate cons from your email" : "Uploaded rate cons", loads: loads.length, brokerIds: newBrokers.map((b) => b.id) });
+  return { batch: loads.length || newBrokers.length ? batchId : undefined, read: readings.length, loads: loads.length, brokers: newBrokers.length, skipped };
 }
 
 // ─── The history address ─────────────────────────────────────────────────────
@@ -146,18 +166,27 @@ export async function importRateCons(ctx: CarrierContext, files: DocFile[], now 
 const INBOX = "history_inbox";
 const WEEK = 7 * 86400_000;
 
-/** Opens the history address for a week. Kept apart from the settings the app saves, so it can't be overwritten. */
-export async function openHistoryInbox(carrierId: string, now = Date.now()): Promise<string> {
+/**
+ * Opens the history address for a week, with a new random part each time: brokers know the carrier's address, so the
+ * history one can't just be that address plus a word anyone could guess. Kept apart from the settings the app saves.
+ */
+export async function openHistoryInbox(carrierId: string, now = Date.now()): Promise<{ until: string; token: string }> {
   const until = new Date(now + WEEK).toISOString();
+  const token = Array.from(randomBytes(10), (b) => "abcdefghijkmnpqrstuvwxyz23456789"[b % 32]).join("");
   await admin().from("agent_marks").delete().eq("carrier_id", carrierId).eq("load_id", INBOX).eq("kind", INBOX);
-  const { error } = await admin().from("agent_marks").insert({ carrier_id: carrierId, load_id: INBOX, kind: INBOX, data: { until } });
+  const { error } = await admin().from("agent_marks").insert({ carrier_id: carrierId, load_id: INBOX, kind: INBOX, data: { until, token } });
   if (error) throw error;
-  return until;
+  return { until, token };
 }
 
-export async function historyInboxUntil(carrierId: string): Promise<string | null> {
+/** The address's mailbox part: the carrier's key, then "-h" and the token. */
+export const historyHash = (inboundKey: string, token: string) => `${inboundKey}-h${token}`;
+export const parseHistoryHash = (hash: string) => hash.match(/^([a-z0-9]+)-h([a-z0-9]{10})$/);
+
+async function historyInbox(carrierId: string): Promise<{ until: string; token: string } | null> {
   const { data } = await admin().from("agent_marks").select("data").eq("carrier_id", carrierId).eq("load_id", INBOX).eq("kind", INBOX).maybeSingle();
-  return ((data?.data as { until?: string } | null)?.until as string | undefined) ?? null;
+  const d = data?.data as { until?: string; token?: string } | null;
+  return d?.until && d.token ? { until: d.until, token: d.token } : null;
 }
 
 /** PDFs (and big photos) inside an email forwarded as an attachment (.eml): a small reader for base64 MIME parts. */
@@ -192,9 +221,11 @@ export function filesInEml(raw: string, depth = 0): DocFile[] {
 }
 
 /** An email to the history address: its rate cons (attached, or inside forwarded emails) go into the history. */
-export async function historyFromEmail(carrierId: string, email: InboundEmail): Promise<DocsResult | null> {
-  const until = await historyInboxUntil(carrierId);
-  if (!until || Date.parse(until) < Date.now()) return null;
+export async function historyFromEmail(carrierId: string, email: InboundEmail, token: string): Promise<DocsResult | null> {
+  const inbox = await historyInbox(carrierId);
+  const a = Buffer.from(inbox?.token ?? "");
+  const b = Buffer.from(token);
+  if (!inbox || Date.parse(inbox.until) < Date.now() || a.length !== b.length || !timingSafeEqual(a, b)) return null;
   const ctx = await loadContext(carrierId);
   if (!ctx) return null;
   const files: DocFile[] = [];
@@ -205,7 +236,7 @@ export async function historyFromEmail(carrierId: string, email: InboundEmail): 
     else if (/^image\/(jpeg|png|webp)$/.test(a.ContentType) && a.ContentLength >= 60 * 1024) files.push({ name: a.Name, bytes, contentType: a.ContentType });
   }
   if (!files.length) return { read: 0, loads: 0, brokers: 0, skipped: [] };
-  const result = await importRateCons(ctx, files);
+  const result = await importRateCons(ctx, files, { via: "email" });
   const line = `Read ${result.read} rate con${result.read === 1 ? "" : "s"} from your email: ${result.loads} past load${result.loads === 1 ? "" : "s"} and ${result.brokers} new broker${result.brokers === 1 ? "" : "s"} added to the history.`;
   await addActivity(ctx.carrier.id, event({ type: "tms_synced", message: "History from your email", detail: line, severity: "success" }));
   await pushToOffice(ctx.carrier.id, { title: "History added", body: line, url: "/carrier/settings", tag: "history" }).catch(() => 0);

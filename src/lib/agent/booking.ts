@@ -88,6 +88,8 @@ function bestTruck(ctx: CarrierContext, o: { equipment: Load["equipmentType"]; o
   for (const truck of ctx.trucks) {
     if (skip?.has(truck.id)) continue;
     if (!truck.driverId || truck.equipmentType !== o.equipment || truck.status === "maintenance" || truck.nextLoadId) continue;
+    // An annual DOT inspection that's past due: the truck can't legally run, so no load goes on it (Maintenance page).
+    if (truck.nextInspectionDue && Date.parse(truck.nextInspectionDue) < Date.now()) continue;
     // States the driver said they won't run into.
     if (ctx.drivers.find((d) => d.id === truck.driverId)?.prefs?.avoidStates?.includes(o.destinationState)) continue;
     const busy = ctx.loads.find((l) => l.id === truck.currentLoadId && !["delivered", "cancelled", "declined"].includes(l.stage));
@@ -178,7 +180,7 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
     };
     // A holiday, a dock that's closed then, or too little time to drive it: noted on the offer; a hard one keeps the
     // AI from asking for it on its own.
-    const warnings = await scheduleWarnings(load, fit.truck).catch(() => []);
+    const warnings = await scheduleWarnings(load, fit.truck, ctx.carrier.id, ctx.drivers.find((d) => d.id === fit.truck.driverId)).catch(() => []);
     if (warnings.length) load.scheduleWarnings = warnings;
     await save("loads", ctx.carrier.id, load as unknown as Item);
     ctx.loads.unshift(load);
@@ -419,7 +421,7 @@ export async function bookIt(ctx: CarrierContext, load: Load, rate?: number): Pr
   const agreed = rate ?? load.rateConReading?.totalRate ?? load.bookRequest?.brokerOffer ?? load.bookRequest?.ask ?? load.targetRate;
   const free = truck && !truck.currentLoadId;
   // The rate con names the docks: their hours (from drivers' notes) and the holidays are checked again.
-  const warnings = await scheduleWarnings(load, truck).catch(() => load.scheduleWarnings ?? []);
+  const warnings = await scheduleWarnings(load, truck, ctx.carrier.id, ctx.drivers.find((d) => d.id === truck?.driverId)).catch(() => load.scheduleWarnings ?? []);
   const newlyHard = warnings.filter((w) => w.hard && !(load.scheduleWarnings ?? []).some((x) => x.text === w.text));
   const booked: Load = {
     ...load,

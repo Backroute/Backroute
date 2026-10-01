@@ -55,8 +55,8 @@ const refused = (e: unknown) => {
 };
 
 /**
- * Sends a text the way this person gets their texts. `media` (a public URL) rides along on WhatsApp only: a voice
- * answer to a voice message. Returns the provider's id and which way it went.
+ * Sends a text the way this person gets their texts. `media` (a public URL) rides along: a voice answer to a voice
+ * message, on WhatsApp or as MMS (a WhatsApp template can't carry it, so then it's the words alone). Returns the provider's id and which way it went.
  */
 export async function sendText(to: string, body: string, media: string[] = []): Promise<{ sid: string | undefined; via: Via }> {
   const route = await routeFor(to).catch(() => ({ via: "sms", open: false }) as Route);
@@ -69,5 +69,5 @@ export async function sendText(to: string, body: string, media: string[] = []): 
       console.error("[texting] WhatsApp refused it, sending by SMS", e);
     }
   }
-  return { sid: await sendSms(to, body), via: "sms" };
+  return { sid: await sendSms(to, body, media), via: "sms" };
 }

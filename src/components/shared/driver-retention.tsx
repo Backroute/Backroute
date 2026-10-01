@@ -26,6 +26,7 @@ export function useDriverRetention(): { driver: Driver; view: RetentionView }[] 
   const expenses = useStore((s) => s.expenses);
   const timeOff = useStore((s) => s.timeOffRequests);
   const loads = useCarrierLoads();
+  const real = useStore((s) => s.session.mode !== "demo");
   if (now === null) return [];
   const rank = { at_risk: 0, watch: 1, good: 2 };
   return drivers
@@ -34,7 +35,7 @@ export function useDriverRetention(): { driver: Driver; view: RetentionView }[] 
       const { current } = truckActiveLoads(loads, truck);
       const at = truck ? emptiesAt(truck, current) : null;
       const late = at ? homeTimeStatus(driver, at.city, at.state, new Date(now)).state === "late" : false;
-      return { driver, view: retentionFor(driver, expenses, timeOff, late, now) };
+      return { driver, view: retentionFor(driver, expenses, timeOff, late, now, real ? { loads, truckId: truck?.id ?? null } : undefined) };
     })
     .sort((a, b) => rank[a.view.level] - rank[b.view.level]);
 }
@@ -54,7 +55,7 @@ export function DriverCheckInCard({ driver, view }: { driver: Driver; view: Rete
           <Avatar name={driver.name} size="sm" />
           <div>
             <p className="text-sm font-semibold text-ink-950">{driver.name}</p>
-            <p className="text-xs text-ink-500">Talked {view.daysSinceCheckIn === 0 ? "today" : `${view.daysSinceCheckIn} day${view.daysSinceCheckIn === 1 ? "" : "s"} ago`}</p>
+            <p className="text-xs text-ink-500">{view.daysSinceCheckIn === null ? "No check-in on record yet" : `Talked ${view.daysSinceCheckIn === 0 ? "today" : `${view.daysSinceCheckIn} day${view.daysSinceCheckIn === 1 ? "" : "s"} ago`}`}</p>
           </div>
         </div>
         <Badge tone={view.level === "at_risk" ? "danger" : view.level === "watch" ? "warning" : "success"}>

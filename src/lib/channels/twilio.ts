@@ -69,10 +69,11 @@ async function twilio(path: string, body: Record<string, string | string[]>) {
 }
 
 /** Sends a text. Twilio itself blocks numbers that replied STOP. */
-export async function sendSms(to: string, body: string): Promise<string | undefined> {
+/** A text; with `media` (a public link to an audio file or a photo) it goes as MMS, which US and Canadian phones take. */
+export async function sendSms(to: string, body: string, media: string[] = []): Promise<string | undefined> {
   const service = process.env.TWILIO_MESSAGING_SERVICE_SID;
   const from: Record<string, string> = service ? { MessagingServiceSid: service } : { From: process.env.TWILIO_FROM_NUMBER! };
-  const data = await twilio("/Messages.json", { To: to, Body: body.slice(0, 1500), ...from });
+  const data = await twilio("/Messages.json", { To: to, Body: body.slice(0, 1500), ...from, ...(media.length ? { MediaUrl: media.slice(0, 1) } : {}) });
   return data.sid;
 }
 

@@ -1,4 +1,5 @@
 import "server-only";
+import { addWhy } from "./why";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
@@ -212,7 +213,9 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
         const ours = current.bookRequest?.ask ?? current.targetRate;
         const move = respond(amount, current, ctx.settings, Date.now(), current.brokerId ? brokerMemory(ctx.loads, current.brokerId) : null);
         const request = withOurMove(withTheirOffer(current.bookRequest, ours, amount, "phone"), move, "phone");
-        await persist({ bookRequest: request, ...(move.action === "counter" ? { targetRate: move.amount } : {}), ...(move.action === "pass" ? { stage: "declined" as const } : {}) });
+        // Why, for the owner: what they offered on the phone and what the AI said back.
+        const note = `Broker offered $${amount.toLocaleString()} on the phone: ${move.action === "accept" ? "within your numbers, so the AI took it." : move.action === "counter" ? `the AI countered at $${move.amount.toLocaleString()}${move.final ? " (its last number)" : ""}. ${move.reason}` : move.why}`;
+        await persist({ bookRequest: request, why: addWhy(current, note.trim()).why, ...(move.action === "counter" ? { targetRate: move.amount } : {}), ...(move.action === "pass" ? { stage: "declined" as const } : {}) });
         if (move.action === "accept") {
           accepted.add(amount);
           return `Accept: ${amount} dollars works. Agree and book it at ${amount}.`;

@@ -110,6 +110,13 @@ export function DriverDispatchCard() {
       <div className="mt-3">
         <PhoneAlerts words={t.alerts} lang={driver.prefs?.language ?? "en"} />
       </div>
+      <div className="mt-3 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium text-ink-800">{t.textsToo}</p>
+          <p className="text-[11px] text-ink-500">{t.textsTooNote}</p>
+        </div>
+        <Switch checked={prefs.textsToo !== false} onChange={(on) => setDriverPrefs(driver.id, { textsToo: on })} label={t.textsToo} />
+      </div>
       {WHATSAPP && (
         <>
           <p className="mt-4 text-xs font-medium text-ink-800">{t.textsBy}</p>
@@ -132,15 +139,13 @@ export function DriverDispatchCard() {
         </div>
         <Switch checked={prefs.morningBrief !== false} onChange={(on) => setDriverPrefs(driver.id, { morningBrief: on })} label={t.morning} />
       </div>
-      {WHATSAPP && (
-        <div className="mt-3 flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-medium text-ink-800">{t.voice}</p>
-            <p className="text-[11px] text-ink-500">{t.voiceNote}</p>
-          </div>
-          <Switch checked={prefs.voiceReplies !== false} onChange={(on) => setDriverPrefs(driver.id, { voiceReplies: on })} label={t.voice} />
+      <div className="mt-3 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium text-ink-800">{t.voice}</p>
+          <p className="text-[11px] text-ink-500">{t.voiceNote}</p>
         </div>
-      )}
+        <Switch checked={prefs.voiceReplies !== false} onChange={(on) => setDriverPrefs(driver.id, { voiceReplies: on })} label={t.voice} />
+      </div>
     </section>
   );
 }

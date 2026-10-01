@@ -1,4 +1,5 @@
 import "server-only";
+import { restingNow } from "./quiet";
 import { REPOSITION } from "../channels/phrases";
 import { canText, textTo } from "../channels/out";
 import { toE164 } from "../cloud/phone";
@@ -58,10 +59,13 @@ export async function suggestRepositions(ctx: CarrierContext, now: number): Prom
     const best = all
       .filter((m) => m.miles >= 60 && m.miles <= limit && m.loads >= 3 && m.loads >= 2 * Math.max(1, here))
       .sort((a, b) => b.loads / (1 + b.miles / 100) - a.loads / (1 + a.miles / 100))[0];
-    if (!best || !(await claimMark(ctx.carrier.id, `truck:${truck.id}`, `reposition:${day}`))) continue;
-    const hours = Math.round((now - since) / HOUR);
+    if (!best) continue;
     const driver = ctx.drivers.find((d) => d.id === truck.driverId);
     const goes = ctx.settings.autonomy === "full" && best.miles <= limit / 2;
+    // A move order can wait until the driver's up: it's asked again on a later round.
+    if (goes && driver && restingNow(driver, truck, now)) continue;
+    if (!(await claimMark(ctx.carrier.id, `truck:${truck.id}`, `reposition:${day}`))) continue;
+    const hours = Math.round((now - since) / HOUR);
     const why = `Truck ${truck.unitNumber} has been empty in ${truck.currentCity}, ${truck.currentState} for ${hours} hours with no load that fits. ${best.city}, ${best.state} is ${best.miles} miles away and ${best.loads} of your loads came out of it in the last 3 weeks.`;
     if (goes && driver && canText(ctx.carrier) && !driver.prefs?.smsOptOut) {
       const next: Truck = { ...truck, repositionTo: { city: best.city, state: best.state, at: new Date(now).toISOString() } };

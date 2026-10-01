@@ -135,6 +135,22 @@ export function changedFields(baseJson: string | undefined, item: Item): string[
   return [...keys].filter((k) => stable((item as Record<string, unknown>)[k]) !== stable(base[k]));
 }
 
+/** The settings keys that changed since `baseJson` (a removed key is sent as null, and the database drops it). */
+export function settingsPatch(baseJson: string, now: Record<string, unknown>): Record<string, unknown> {
+  let base: Record<string, unknown> = {};
+  try {
+    base = baseJson ? (JSON.parse(baseJson) as Record<string, unknown>) : {};
+  } catch {
+    base = {};
+  }
+  const patch: Record<string, unknown> = {};
+  for (const k of new Set([...Object.keys(base), ...Object.keys(now)])) {
+    const v = now[k];
+    if (stable(v) !== stable(base[k])) patch[k] = v === undefined ? null : v;
+  }
+  return patch;
+}
+
 function remember(c: Connection, s: Spec, item: Item, json = stable(item)) {
   c.last.set(itemKey(s, item.id), { ref: item, json });
   let ids = c.known.get(specKey(s));
@@ -367,7 +383,10 @@ async function flush(c: Connection) {
       if (json !== c.settingsJson) {
         const before = c.settingsJson;
         c.settingsJson = json;
-        await write(db.from("carriers").update({ settings: s.settings, owner_operator: s.settings.ownerOperator }).eq("id", c.carrierId), () => {
+        // Only the settings this screen changed are sent, and merged into what the database has: a change the
+        // server or Backroute's team made meanwhile (moving a pilot carrier out of practice mode) isn't undone.
+        const patch = settingsPatch(before, s.settings as unknown as Record<string, unknown>);
+        await write(db.rpc("merge_carrier_settings", { p_carrier: c.carrierId, p_patch: patch, p_owner_operator: s.settings.ownerOperator ?? false }), () => {
           c.settingsJson = before;
         });
       }

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { Mail, Upload } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Mail, Undo2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { authHeader } from "@/lib/ai/client";
 
 interface Result {
+  batch?: string;
   loads: number;
   brokers: number;
   skipped: { line: number; why: string }[];
@@ -49,7 +50,9 @@ export function HistoryCard() {
     setDone(await send(csv, false).catch(() => ({ loads: 0, brokers: 0, skipped: [], columns: {}, error: "offline" })));
     setBusy(false);
     setPreview(null);
+    setRefresh((n) => n + 1);
   }
+  const [refresh, setRefresh] = useState(0);
 
   return (
     <Card>
@@ -90,13 +93,15 @@ export function HistoryCard() {
           </div>
         )}
         {done && <p className="text-sm text-ink-700">{done.error ? "The import didn't go through. Try again." : `Imported ${done.loads} loads and ${done.brokers} brokers. The AI uses them for pricing now.`}</p>}
-        <RateConHistory />
+        <RateConHistory onImported={() => setRefresh((n) => n + 1)} />
+        <RecentImports refresh={refresh} />
       </CardContent>
     </Card>
   );
 }
 
 interface DocsResult {
+  batch?: string;
   read: number;
   loads: number;
   brokers: number;
@@ -104,28 +109,72 @@ interface DocsResult {
   error?: string;
 }
 
+/** A request body has a size limit on the server: a big pick goes up in parts of up to 10 files and 4 MB. */
+const PART_FILES = 10;
+const PART_BYTES = 4 * 1024 * 1024;
+
+function parts(files: File[]): { send: File[][]; tooBig: File[] } {
+  const send: File[][] = [];
+  const tooBig: File[] = [];
+  let cur: File[] = [];
+  let size = 0;
+  for (const f of files) {
+    if (f.size > PART_BYTES) {
+      tooBig.push(f);
+      continue;
+    }
+    if (cur.length && (cur.length >= PART_FILES || size + f.size > PART_BYTES)) {
+      send.push(cur);
+      cur = [];
+      size = 0;
+    }
+    cur.push(f);
+    size += f.size;
+  }
+  if (cur.length) send.push(cur);
+  return { send, tooBig };
+}
+
+const batchId = () => `imp_${Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) => "abcdefghijkmnpqrstuvwxyz23456789"[b % 32]).join("")}`;
+
 /**
  * No spreadsheet? Old rate cons work too: upload a batch of PDFs or photos, or forward them from your email to the
  * history address (open for a week). The AI reads each one: the broker, the lane, the rate and the terms.
  */
-function RateConHistory() {
-  const [busy, setBusy] = useState(false);
+function RateConHistory({ onImported }: { onImported: () => void }) {
+  const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<DocsResult | null>(null);
   const [inbox, setInbox] = useState<{ address: string | null; until: string } | null>(null);
 
   async function upload(list: FileList | null) {
     if (!list?.length) return;
-    setBusy(true);
     setResult(null);
-    const form = new FormData();
-    for (const f of Array.from(list).slice(0, 40)) form.append("files", f);
+    const { send, tooBig } = parts(Array.from(list).slice(0, 40));
+    const total: DocsResult = { read: 0, loads: 0, brokers: 0, skipped: tooBig.map((f) => ({ file: f.name, why: "over 4 MB; forward it from your email instead" })) };
+    const batch = batchId();
     try {
-      const res = await fetch("/api/import/ratecons", { method: "POST", headers: await authHeader(), body: form });
-      setResult((await res.json()) as DocsResult);
+      for (const [n, part] of send.entries()) {
+        setBusy(send.length > 1 ? `Reading them (${n + 1} of ${send.length})…` : "Reading them…");
+        const form = new FormData();
+        form.append("batch", batch);
+        for (const f of part) form.append("files", f);
+        const res = await fetch("/api/import/ratecons", { method: "POST", headers: await authHeader(), body: form });
+        const r = (await res.json().catch(() => ({ error: "failed" }))) as DocsResult;
+        if (r.error) {
+          total.skipped.push(...part.map((f) => ({ file: f.name, why: "didn't go through; try it again" })));
+          continue;
+        }
+        total.read += r.read;
+        total.loads += r.loads;
+        total.brokers += r.brokers;
+        total.skipped.push(...r.skipped);
+      }
+      setResult(total);
     } catch {
-      setResult({ read: 0, loads: 0, brokers: 0, skipped: [], error: "offline" });
+      setResult({ ...total, error: "offline" });
     } finally {
-      setBusy(false);
+      setBusy(null);
+      onImported();
     }
   }
 
@@ -137,11 +186,11 @@ function RateConHistory() {
   return (
     <div className="mt-2 border-t border-line pt-4">
       <p className="text-sm font-medium text-ink-900">Or use your old rate cons</p>
-      <p className="mt-0.5 text-xs text-ink-500">Up to 40 PDFs or photos at a time. The AI reads the broker, lane, rate and terms off each one; nothing else is sent anywhere.</p>
+      <p className="mt-0.5 text-xs text-ink-500">Up to 40 PDFs or photos at a time. The AI reads the broker, lane, rate and terms off each one; nothing else is sent anywhere. A file already imported is skipped.</p>
       <div className="mt-2 flex flex-wrap gap-2">
         <label className="flex w-fit cursor-pointer items-center gap-2 rounded-xl border border-line px-3 py-2 text-sm font-medium text-ink-900 hover:bg-ink-50">
-          <Upload className="h-4 w-4" /> {busy ? "Reading them…" : "Upload rate cons"}
-          <input type="file" multiple accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" disabled={busy} onChange={(e) => void upload(e.target.files)} />
+          <Upload className="h-4 w-4" /> {busy ?? "Upload rate cons"}
+          <input type="file" multiple accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" disabled={!!busy} onChange={(e) => void upload(e.target.files)} />
         </label>
         <Button size="sm" variant="outline" onClick={() => void openInbox()}>
           <Mail className="h-3.5 w-3.5" /> Forward them from my email
@@ -165,6 +214,72 @@ function RateConHistory() {
             : `Read ${result.read}: ${result.loads} past load${result.loads === 1 ? "" : "s"} and ${result.brokers} new broker${result.brokers === 1 ? "" : "s"} added.${result.skipped.length ? ` Skipped ${result.skipped.length} (${result.skipped.slice(0, 3).map((s) => `${s.file}: ${s.why}`).join("; ")}${result.skipped.length > 3 ? "…" : ""}).` : ""}`}
         </p>
       )}
+    </div>
+  );
+}
+
+interface Batch {
+  id: string;
+  at: string;
+  via: "spreadsheet" | "upload" | "email";
+  label: string;
+  loads: number;
+  brokerIds: string[];
+}
+
+async function listImports(): Promise<Batch[]> {
+  const res = await fetch("/api/import/batches", { headers: await authHeader() });
+  if (!res.ok) throw new Error("load");
+  return ((await res.json()) as { batches: Batch[] }).batches;
+}
+
+/** The last imports, each with a way to take it back out if it brought in the wrong things. */
+function RecentImports({ refresh }: { refresh: number }) {
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  const [tick, setTick] = useState(0);
+  const load = useCallback(() => setTick((n) => n + 1), []);
+
+  useEffect(() => {
+    let live = true;
+    listImports()
+      .then((list) => live && setBatches(list))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [tick, refresh]);
+
+  async function undo(b: Batch) {
+    if (!window.confirm(`Take out the ${b.loads} load${b.loads === 1 ? "" : "s"} from this import? Brokers it added that nothing else uses go too.`)) return;
+    setBusy(b.id);
+    setNote(null);
+    const res = await fetch(`/api/import/batches?batch=${encodeURIComponent(b.id)}`, { method: "DELETE", headers: await authHeader() }).catch(() => null);
+    const r = res?.ok ? ((await res.json()) as { loads: number; brokers: number }) : null;
+    setNote(r ? `Took out ${r.loads} load${r.loads === 1 ? "" : "s"} and ${r.brokers} broker${r.brokers === 1 ? "" : "s"}.` : "Couldn't undo it. Try again.");
+    setBusy(null);
+    load();
+  }
+
+  if (!batches.length && !note) return null;
+  return (
+    <div className="mt-2 border-t border-line pt-4">
+      <p className="text-sm font-medium text-ink-900">Your imports</p>
+      <ul className="mt-2 flex flex-col gap-1.5">
+        {batches.map((b) => (
+          <li key={b.id} className="flex items-center justify-between gap-3 rounded-xl bg-ink-50 px-3 py-2 text-sm">
+            <span className="min-w-0 text-ink-700">
+              <span className="font-medium text-ink-900">{b.label}</span> · {new Date(b.at).toLocaleDateString()} · {b.loads} load{b.loads === 1 ? "" : "s"}, {b.brokerIds.length} new broker{b.brokerIds.length === 1 ? "" : "s"}
+            </span>
+            <Button size="sm" variant="outline" disabled={busy === b.id} onClick={() => void undo(b)}>
+              <Undo2 className="h-3.5 w-3.5" /> {busy === b.id ? "Undoing…" : "Undo"}
+            </Button>
+          </li>
+        ))}
+      </ul>
+      {note && <p className="mt-2 text-sm text-ink-700">{note}</p>}
     </div>
   );
 }

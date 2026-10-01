@@ -8,7 +8,7 @@ import { claimStatementReply } from "../agent/claims";
 import type { Item } from "../cloud/rows";
 import type { Driver, DriverMessage, Lang } from "../types";
 import { forCarrier } from "../agent/scope";
-import { awaitingYes, recordConsent, THANKS_YES } from "../consent";
+import { awaitingYes, recordConsent, releaseHeld, THANKS_YES } from "../consent";
 import { textTo } from "./out";
 import { PASSED_ON_TEXT, SMS_HELP, UNKNOWN_NUMBER, VOICE_UNHEARD } from "./phrases";
 import { noteInbound, type Via } from "./texting";
@@ -102,6 +102,7 @@ export async function receiveText(t: IncomingText): Promise<{ now?: string; late
     const updated: Driver = { ...driver, prefs: { ...driver.prefs, smsOptOut: STOP.has(word) } };
     await save("drivers", carrierId, updated as unknown as Item);
     await recordConsent({ carrierId, driverId: driver.id, phone: from, granted: !STOP.has(word), via, wording: `Texted "${body}"` }).catch((e) => console.error("[sms] couldn't record consent", e));
+    if (!STOP.has(word)) await releaseHeld(carrierId, from).catch((e) => console.error("[sms] couldn't send held texts", e));
     return {};
   }
   if (HELP.has(word)) {
@@ -111,7 +112,11 @@ export async function receiveText(t: IncomingText): Promise<{ now?: string; late
   // The answer to the first text ("Reply YES to confirm"): recorded and thanked (unless the yes was also for the
   // tracking app, which then gets its own answer).
   const consentYes = YES.has(word) && !media.length && !audio.length && (await awaitingYes(carrierId, driver.id, from).catch(() => false));
-  if (consentYes) await recordConsent({ carrierId, driverId: driver.id, phone: from, granted: true, via, wording: `Texted "${body}" to the first text` });
+  if (consentYes) {
+    await recordConsent({ carrierId, driverId: driver.id, phone: from, granted: true, via, wording: `Texted "${body}" to the first text` });
+    // Anything that waited for their yes (CONSENT_REQUIRED=1) goes now.
+    await releaseHeld(carrierId, from).catch((e) => console.error("[sms] couldn't send held texts", e));
+  }
 
   const incoming: DriverMessage = { id: uid("dm"), driverId: driver.id, from: "driver", content: body || (media.length ? `(sent ${media.length} photo${media.length === 1 ? "" : "s"})` : audio.length ? "(voice message)" : ""), timestamp: new Date().toISOString(), channel: "sms" };
   if (!audio.length) await saveDriverMessage(carrierId, incoming);
@@ -143,8 +148,9 @@ export async function receiveText(t: IncomingText): Promise<{ now?: string; late
       const result = talk && aiConfigured() ? await driverTurn(ctx, driver, "sms", said || "(sent a photo)", history) : { reply: "", effects: { done: [] as string[], failed: talk } };
       if (result.effects.failed) await passToOwner(ctx, { reason: `${driver.name} texted: "${said}". The AI couldn't answer (twice).`, label: "I'll answer", source: "sms", to: "support" });
       const text = [photos, tracked, result.reply].filter(Boolean).join(" ") || (consentYes ? THANKS_YES[lang] : PASSED_ON_TEXT[lang]);
-      // A voice message on WhatsApp gets a voice answer too, so they can listen instead of reading at the wheel.
-      const spoken = voice?.heard && via === "whatsapp" && driver.prefs?.voiceReplies !== false && spokenRepliesConfigured() && !ctx.carrier.settings?.sandbox ? await spokenAnswer(carrierId, driver.id, text) : null;
+      // A voice message gets a voice answer too (on WhatsApp, or as MMS to a phone that just sent one), so they can
+      // listen instead of reading at the wheel.
+      const spoken = voice?.heard && driver.prefs?.voiceReplies !== false && spokenRepliesConfigured() && !ctx.carrier.settings?.sandbox ? await spokenAnswer(carrierId, driver.id, text) : null;
       const sid = await textTo(ctx.carrier, from, text, spoken ? { media: [spoken] } : {}).catch((e) => {
         console.error("[sms] send failed", e);
         return undefined;

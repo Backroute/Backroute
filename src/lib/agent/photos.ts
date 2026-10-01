@@ -8,6 +8,7 @@ import { addActivity, admin, save, type CarrierContext } from "./db";
 import { event, passToOwner, uid } from "./dispatcher";
 import { DAMAGE, openClaim } from "./claims";
 import { recordReefer } from "./reefer";
+import { readingIn } from "../reefer-reading";
 
 const REEFER = /\b(reefer|temp|temperature|thermo\w*|degrees)\b|°/i;
 
@@ -122,11 +123,7 @@ async function reeferPhoto(ctx: CarrierContext, driver: Driver, load: Load, medi
     await admin().from("carrier_files").insert({ carrier_id: ctx.carrier.id, kind: "reefer_photo", load_id: load.id, name, content_type: file.contentType, size: file.bytes.length, data: file.bytes.toString("base64"), note: text.slice(0, 200) || null });
     kept++;
   }
-  const reading = text.match(/(-?\d{1,3}(?:\.\d)?)\s*(?:°|deg(?:rees)?)?\s*([FC])?\b/i);
-  if (reading) {
-    const n = Number(reading[1]);
-    const f = reading[2]?.toUpperCase() === "C" ? Math.round((n * 9) / 5 + 32) : n;
-    return recordReefer(ctx, driver, load, f, /\bpulp\b/i.test(text), "photo").then((said) => said.replace(/^Recorded/, "Got the photo and recorded"));
-  }
+  const f = readingIn(text);
+  if (f !== null) return recordReefer(ctx, driver, load, f, /\bpulp\b/i.test(text), "photo").then((said) => said.replace(/^Recorded/, "Got the photo and recorded"));
   return kept ? `Got the reefer photo for ${load.referenceNumber}. What does it read? Text me the number.` : "The photo didn't come through; send it again or use the app.";
 }

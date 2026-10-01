@@ -178,8 +178,10 @@ export interface DriverPrefs {
   textsBy?: "sms" | "whatsapp";
   /** The morning text with the day's stops, times, dock tips and weather. On unless they turn it off. */
   morningBrief?: boolean;
-  /** Answers to their WhatsApp voice messages come back as a voice message too (and as text). On unless turned off. */
+  /** Answers to their voice messages come back as a voice message too (and as text). On unless turned off. */
   voiceReplies?: boolean;
+  /** False: notifications in the driver app instead of texts, while their phone takes them (texts again if not). */
+  textsToo?: boolean;
   /**
    * Real accounts: what the driver has told the AI about themselves (family, health, what they like to run), newest
    * last, the way a good dispatcher remembers. Used in later conversations and when picking their loads.
@@ -453,6 +455,10 @@ export interface Load {
   source: string;
   /** Real accounts: a finished load from the carrier's own history (Settings, Bring your history), for pricing only. */
   imported?: boolean;
+  /** The import it came in with (lib/agent/import-batches), so it can be taken back out. */
+  importBatch?: string;
+  /** For a rate con read into the history: a fingerprint of the file, so the same one isn't read twice. */
+  importHash?: string;
   brokerId: string;
   lane: Lane;
   equipmentType: EquipmentType;
@@ -856,6 +862,8 @@ export interface RateConPdfReading {
   /** The facilities' phone numbers, and a stop still waiting on an appointment the carrier has to book. */
   shipperPhone?: string | null;
   receiverPhone?: string | null;
+  shipperZip?: string | null;
+  receiverZip?: string | null;
   appointmentNeeded?: "pickup" | "delivery" | "both" | "none";
   /** A refrigerated load's temperature terms, when the rate con has them. */
   reefer?: ReeferTerms | null;

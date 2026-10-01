@@ -43,8 +43,12 @@ export function isoWeek(at: number): string {
 }
 
 const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
-const deliveredIn = (loads: Load[], from: number, to: number) => loads.filter((l) => !l.imported && l.stage === "delivered" && Date.parse(l.updatedAt) >= from && Date.parse(l.updatedAt) < to);
+/** When it was delivered: when the driver said unloaded, else the delivery appointment, else the last change. */
+const deliveredAt = (l: Load) => Date.parse(l.tripChecklist?.unloadedAt ?? l.deliveryAt ?? l.updatedAt);
+const deliveredIn = (loads: Load[], from: number, to: number) => loads.filter((l) => !l.imported && l.stage === "delivered" && deliveredAt(l) >= from && deliveredAt(l) < to);
 const pay = (l: Load) => l.invoice?.amount ?? l.bookedRate ?? 0;
+/** What the load cleared: the figure worked out for it, else the pay less the costs known on it. */
+const netOf = (l: Load) => l.netProfit ?? pay(l) - (l.fuelCost ?? 0) - (l.tollCost ?? 0) - (l.deadheadCost ?? 0) - (l.commission ?? 0);
 
 /** The review of the 7 days before `now`. */
 export function reviewFor(ctx: CarrierContext, now: number): WeeklyReview {
@@ -52,20 +56,21 @@ export function reviewFor(ctx: CarrierContext, now: number): WeeklyReview {
   const week = deliveredIn(ctx.loads, from, now);
   const last = deliveredIn(ctx.loads, from - 7 * DAY, from);
   const gross = week.reduce((s, l) => s + pay(l), 0);
-  const net = week.reduce((s, l) => s + (l.netProfit ?? 0), 0);
+  const net = week.reduce((s, l) => s + netOf(l), 0);
   const loadedMiles = week.reduce((s, l) => s + (l.lane.miles || 0), 0);
   const emptyMiles = week.reduce((s, l) => s + (l.deadheadMiles || 0), 0);
   const emptyPct = loadedMiles + emptyMiles ? Math.round((emptyMiles / (loadedMiles + emptyMiles)) * 100) : 0;
   const nameOf = (id: string) => ctx.brokers.find((b) => b.id === id)?.company ?? "A broker";
 
-  // Best broker: the most per mile this week.
+  // Best broker: the most per mile this week, from two loads or more (one good load isn't a pattern).
   const byBroker = new Map<string, { gross: number; miles: number; loads: number }>();
   for (const l of week) {
     const b = byBroker.get(l.brokerId) ?? { gross: 0, miles: 0, loads: 0 };
     byBroker.set(l.brokerId, { gross: b.gross + pay(l), miles: b.miles + (l.lane.miles || 0), loads: b.loads + 1 });
   }
   const ranked = [...byBroker.entries()].filter(([, v]) => v.miles > 0).map(([id, v]) => ({ id, rpm: v.gross / v.miles, loads: v.loads })).sort((a, b) => b.rpm - a.rpm);
-  const best = ranked[0] ? { broker: nameOf(ranked[0].id), rpm: Math.round(ranked[0].rpm * 100) / 100, loads: ranked[0].loads } : null;
+  const top = ranked.find((r) => r.loads >= 2);
+  const best = top ? { broker: nameOf(top.id), rpm: Math.round(top.rpm * 100) / 100, loads: top.loads } : null;
 
   // Worst broker: the slowest payer over the last 90 days (two or more invoices over 35 days), else the lowest per mile.
   const paidLate = new Map<string, number[]>();
@@ -76,7 +81,7 @@ export function reviewFor(ctx: CarrierContext, now: number): WeeklyReview {
     if (days > 35) paidLate.set(l.brokerId, [...(paidLate.get(l.brokerId) ?? []), days]);
   }
   const slow = [...paidLate.entries()].filter(([, d]) => d.length >= 2).sort((a, b) => Math.max(...b[1]) - Math.max(...a[1]))[0];
-  const low = ranked.length > 1 ? ranked[ranked.length - 1] : null;
+  const low = ranked.length > 1 && ranked[ranked.length - 1].id !== top?.id ? ranked[ranked.length - 1] : null;
   const worst = slow
     ? { broker: nameOf(slow[0]), why: `${slow[1].length} invoices took ${slow[1].sort((a, b) => a - b).join(" and ")} days to pay (or still aren't paid)` }
     : low

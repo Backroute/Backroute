@@ -1,4 +1,5 @@
 import "server-only";
+import { restingNow } from "./quiet";
 import { WEEKLY_CHECKIN, WEEKLY_PAY } from "../channels/phrases";
 import { canText, textTo } from "../channels/out";
 import { toE164 } from "../cloud/phone";
@@ -82,8 +83,9 @@ export async function weeklyCare(ctx: CarrierContext, now: number): Promise<stri
   const week = isoWeek(now);
   const [from, to] = textingHours();
   for (const driver of ctx.drivers) {
-    const hour = hourAtStop(stateOf(driver), now);
-    if (hour < from || hour >= to) continue;
+    const truck = ctx.trucks.find((t) => t.driverId === driver.id || t.secondDriverId === driver.id);
+    const hour = hourAtStop(truck?.currentState || stateOf(driver), now);
+    if (hour < from || hour >= to || restingNow(driver, truck, now)) continue;
     const lang = driver.prefs?.language ?? "en";
     const first = driver.name.split(" ")[0];
     if (ctx.settings.driverCheckins !== false && (await claimMark(ctx.carrier.id, `driver:${driver.id}`, `care:${week}`))) {

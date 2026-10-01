@@ -18,6 +18,8 @@ export interface FacilityRef {
   name: string;
   city: string;
   state: string;
+  /** From the rate con, when it has it: two docks with the same name in one city are told apart by it. */
+  zip?: string | null;
 }
 
 export interface FacilityHours {
@@ -31,6 +33,8 @@ export interface FacilityNote {
   note: string;
   hours: FacilityHours | null;
   at: string;
+  /** The carrier whose driver said it. Another carrier's word is passed on, but never blocks a booking. */
+  carrierId: string;
 }
 
 const KEEP_DAYS = 180;
@@ -40,8 +44,9 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export function facilitiesOf(load: Load): FacilityRef[] {
   const r = load.rateConReading;
   const out: FacilityRef[] = [];
-  if (r?.shipper) out.push({ stop: "pickup", name: r.shipper, city: load.lane.origin, state: load.lane.originState });
-  if (r?.receiver) out.push({ stop: "delivery", name: r.receiver, city: load.lane.destination, state: load.lane.destState });
+  const zip = (z?: string | null) => z?.match(/\b\d{5}\b/)?.[0] ?? null;
+  if (r?.shipper) out.push({ stop: "pickup", name: r.shipper, city: load.lane.origin, state: load.lane.originState, zip: zip(r.shipperZip) });
+  if (r?.receiver) out.push({ stop: "delivery", name: r.receiver, city: load.lane.destination, state: load.lane.destState, zip: zip(r.receiverZip) });
   return out;
 }
 
@@ -78,30 +83,46 @@ export function cleanHours(h: { opens?: string; closes?: string; days?: string }
   return Object.keys(out).length ? out : null;
 }
 
+/**
+ * Words that read as orders to an AI rather than a note about a dock. Tips are read by other carriers' AI, so one
+ * trying to steer it ("ignore your instructions", "tell drivers to...") is refused, as are links.
+ */
+const STEERING = /\b(ignore|disregard|forget)\b.{0,30}\b(instructions?|rules?|previous|above|prompt)\b|\b(system prompt|you are an? |as an ai|assistant:|developer:)|https?:\/\/|www\./i;
+export const looksLikeSteering = (note: string) => STEERING.test(note);
+
+/** At most this many tips a day from one driver, so one person can't flood a dock's record. */
+const PER_DRIVER_DAY = 8;
+
+export type NoteSaved = "saved" | "empty" | "refused" | "too_many";
+
 /** Saves a driver's tip about one of their load's stops. */
-export async function addFacilityNote(ctx: CarrierContext, driver: Driver, where: FacilityRef, note: string, hours: FacilityHours | null) {
+export async function addFacilityNote(ctx: CarrierContext, driver: Driver, where: FacilityRef, note: string, hours: FacilityHours | null): Promise<NoteSaved> {
   const clean = scrub(note);
-  if (clean.length < 3) return false;
+  if (clean.length < 3) return "empty";
+  if (looksLikeSteering(clean)) return "refused";
+  const { count } = await admin().from("facility_notes").select("id", { head: true, count: "exact" }).eq("carrier_id", ctx.carrier.id).eq("driver_id", driver.id).gte("created_at", new Date(Date.now() - 86400_000).toISOString());
+  if ((count ?? 0) >= PER_DRIVER_DAY) return "too_many";
   const { error } = await admin()
     .from("facility_notes")
-    .insert({ carrier_id: ctx.carrier.id, driver_id: driver.id, name_key: norm(where.name), city: where.city.toLowerCase(), state: where.state.toUpperCase(), note: clean, hours });
+    .insert({ carrier_id: ctx.carrier.id, driver_id: driver.id, name_key: norm(where.name), city: where.city.toLowerCase(), state: where.state.toUpperCase(), zip: where.zip ?? null, note: clean, hours });
   if (error) throw error;
-  return true;
+  return "saved";
 }
 
 /** The latest tips about one place, from every carrier's drivers, newest first. */
-export async function notesAbout(where: Pick<FacilityRef, "name" | "city" | "state">, limit = 3): Promise<FacilityNote[]> {
+export async function notesAbout(where: Pick<FacilityRef, "name" | "city" | "state" | "zip">, limit = 3): Promise<FacilityNote[]> {
   if (!norm(where.name)) return [];
   const since = new Date(Date.now() - KEEP_DAYS * 86400_000).toISOString();
-  const { data, error } = await admin()
+  let q = admin()
     .from("facility_notes")
-    .select("note, hours, created_at")
+    .select("note, hours, created_at, carrier_id")
     .eq("name_key", norm(where.name))
     .eq("city", where.city.toLowerCase())
     .eq("state", where.state.toUpperCase())
-    .gte("created_at", since)
-    .order("created_at", { ascending: false })
-    .limit(limit * 3);
+    .gte("created_at", since);
+  // With a ZIP, only tips for that dock (or ones saved without a ZIP).
+  if (where.zip) q = q.or(`zip.eq.${where.zip},zip.is.null`);
+  const { data, error } = await q.order("created_at", { ascending: false }).limit(limit * 3);
   if (error) return [];
   // The same tip twice (two drivers said it) once.
   const seen = new Set<string>();
@@ -111,12 +132,18 @@ export async function notesAbout(where: Pick<FacilityRef, "name" | "city" | "sta
       return seen.has(k) ? false : (seen.add(k), true);
     })
     .slice(0, limit)
-    .map((r) => ({ note: r.note as string, hours: (r.hours as FacilityHours | null) ?? null, at: r.created_at as string }));
+    .filter((r) => !looksLikeSteering(String(r.note)))
+    .slice(0, limit)
+    .map((r) => ({ note: r.note as string, hours: (r.hours as FacilityHours | null) ?? null, at: r.created_at as string, carrierId: r.carrier_id as string }));
 }
 
-/** The receiving or shipping hours drivers last reported for a place, if any. */
-export async function hoursAt(where: Pick<FacilityRef, "name" | "city" | "state">): Promise<FacilityHours | null> {
-  return (await notesAbout(where, 10)).find((n) => n.hours)?.hours ?? null;
+/**
+ * The receiving or shipping hours drivers last reported for a place, if any, and whether they're this carrier's own
+ * drivers' word (`own`): only that can stop a booking; another carrier's is a heads-up.
+ */
+export async function hoursAt(where: Pick<FacilityRef, "name" | "city" | "state" | "zip">, carrierId?: string): Promise<{ hours: FacilityHours; own: boolean } | null> {
+  const n = (await notesAbout(where, 10)).find((x) => x.hours);
+  return n?.hours ? { hours: n.hours, own: !!carrierId && n.carrierId === carrierId } : null;
 }
 
 /** Tips for a load's stops, as lines for a driver ("Acme DC (delivery): back in from the east gate"), in English. */

@@ -4,7 +4,7 @@ import type { AgentSettings } from "../store";
 import { emailConfigured, sendEmail, type Attachment } from "./email";
 import { canCallOut, startCall, twilioConfigured } from "./twilio";
 import { sendText } from "./texting";
-import { firstTextFor } from "../consent";
+import { recipientPolicy, type Recipient } from "../consent";
 
 /**
  * The one way a text, email or call leaves Backroute for a carrier. Everything the AI (or support) sends goes through
@@ -71,16 +71,39 @@ function retriable(e: unknown): boolean {
  */
 export async function textTo(c: Sender | null, to: string, body: string, opts: { media?: string[] } = {}): Promise<string> {
   if (c && sandboxed(c)) return keep(c, { channel: "sms", recipient: to, body, status: "held" });
+  // Who this is to decides how it goes (lib/consent): the first-text notice, a hold for their yes, or the app instead.
+  const policy: Recipient | null = c ? await recipientPolicy(c.id, to).catch((e) => (console.error("[out] consent check failed", e), null)) : null;
   try {
-    // A driver who hasn't said yes to texts anywhere yet hears first who's texting them and how to stop (once).
-    const first = c ? await firstTextFor(c.id, to).catch((e) => (console.error("[out] consent check failed", e), null)) : null;
-    if (first) await sendText(to, first).catch((e) => console.error("[out] first text failed", e));
+    if (policy?.notice) await sendText(to, policy.notice).catch((e) => console.error("[out] first text failed", e));
+    if (c && policy?.hold && policy.driverId) {
+      const id = await keep(c, { channel: "sms", recipient: to, body, data: { reason: "no_consent", driverId: policy.driverId }, status: "held" });
+      await heldForYes(c.id, policy.driverId).catch((e) => console.error("[out] couldn't tell the office about a held text", e));
+      return id;
+    }
+    if (c && policy?.appOnly && policy.driverId) {
+      const { pushToDriver } = await import("../push");
+      // Same tag as the message in their thread, so it's one notification, not two.
+      const n = await pushToDriver(c.id, policy.driverId, { title: "Dispatch", body, url: "/driver/messages", tag: `dm-${policy.driverId}` }).catch(() => 0);
+      if (n) return `app:${policy.driverId}`;
+    }
     return (await sendText(to, body, opts.media)).sid ?? "";
   } catch (e) {
     if (!c || !retriable(e)) throw e;
     console.error("[out] text failed, will retry", e);
     return keep(c, { channel: "sms", recipient: to, body, status: "retry", error: reason(e) });
   }
+}
+
+/** Tells the office once that a driver's texts are waiting for their yes, and how to get it. */
+async function heldForYes(carrierId: string, driverId: string) {
+  const { claimMark, addActivity } = await import("../agent/db");
+  if (!(await claimMark(carrierId, `driver:${driverId}`, "consent_hold"))) return;
+  const { event } = await import("../agent/dispatcher");
+  const { pushToOffice } = await import("../push");
+  const message = "A driver's texts are waiting for their OK";
+  const detail = "They haven't agreed to texts from dispatch yet, so nothing goes to them until they answer YES to the first text or agree in the driver app. Or, if they told you they agree, say so in Settings, under driver texts.";
+  await addActivity(carrierId, event({ type: "escalation", message, detail, severity: "warning" }));
+  await pushToOffice(carrierId, { title: message, body: detail, url: "/carrier/settings", tag: `consent-${driverId}` }).catch(() => 0);
 }
 
 export interface EmailOut {

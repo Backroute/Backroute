@@ -17,6 +17,7 @@ const STATE_TZ: Record<string, string> = {
   WY: "America/Denver",
   // Canada, for cross-border runs.
   ON: "America/Toronto", QC: "America/Toronto", BC: "America/Vancouver", AB: "America/Edmonton", MB: "America/Winnipeg", SK: "America/Regina",
+  NB: "America/Moncton", NS: "America/Halifax", PE: "America/Halifax", NL: "America/St_Johns", NT: "America/Yellowknife", NU: "America/Iqaluit", YT: "America/Whitehorse",
 };
 
 export const zoneFor = (state: string) => STATE_TZ[state.trim().toUpperCase()] ?? "America/Chicago";
