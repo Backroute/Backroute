@@ -61,6 +61,7 @@ function LiveGate({ area, children }: { area: Area; children: React.ReactNode })
       if (area !== "signup") await connect(m);
       if (!cancelled) setState("ready");
     })().catch((e) => {
+      if (!(e instanceof NotSetUpError)) console.error("[cloud] couldn't load the fleet", e);
       if (!cancelled) setState(e instanceof NotSetUpError ? "not_set_up" : "error");
     });
     const { data: sub } = supabase().auth.onAuthStateChange((event) => {

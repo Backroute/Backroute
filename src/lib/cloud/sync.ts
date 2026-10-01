@@ -405,7 +405,9 @@ async function flush(c: Connection) {
 
 function listen(c: Connection, specs: Spec[]): RealtimeChannel {
   const db = supabase();
-  let channel = db.channel(`carrier:${c.carrierId}`);
+  // Its own name each time: the client hands back an existing channel with the same name, and one already subscribed
+  // (a connect run twice, as React does in development, or a quick reconnect) can't take new listeners.
+  let channel = db.channel(`carrier:${c.carrierId}:${Math.random().toString(36).slice(2, 10)}`);
   for (const table of new Set(specs.map((s) => s.table))) {
     channel = channel.on("postgres_changes", { event: "*", schema: "public", table, filter: `carrier_id=eq.${c.carrierId}` }, (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
       const row = (payload.eventType === "DELETE" ? payload.old : payload.new) as Record<string, unknown>;

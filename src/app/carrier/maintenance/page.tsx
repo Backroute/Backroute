@@ -51,7 +51,7 @@ export default function MaintenancePage() {
 
   return (
     <div>
-      <PageHeader title="Maintenance" description={`${flagged.length} trucks need attention`} />
+      <PageHeader title="Maintenance" description={flagged.length === 1 ? "1 truck needs attention" : `${flagged.length} trucks need attention`} />
 
       <div className="px-4 py-6 sm:px-8">
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -91,6 +91,7 @@ export default function MaintenancePage() {
                       <span className="text-ink-500">DOT inspection due</span>
                       <span className={inspStatus === "ok" ? "font-medium text-ink-950" : inspStatus === "due-soon" ? "font-medium text-[var(--accent-warn)]" : "font-medium text-[var(--accent-danger)]"}>
                         {formatDate(truck.nextInspectionDue)}
+                        {new Date(truck.nextInspectionDue).getFullYear() !== new Date().getFullYear() ? `, ${new Date(truck.nextInspectionDue).getFullYear()}` : ""}
                       </span>
                     </div>
 
