@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { Sheet } from "@/components/ui/sheet";
 import Link from "next/link";
-import { ChevronRight, ChevronUp, FileText, Fuel, Loader2, Sparkles, X } from "lucide-react";
+import { ChevronRight, ChevronUp, FileText, Fuel, Loader2, Sparkles } from "lucide-react";
 import { cn, formatCurrency, timeAgo } from "@/lib/utils";
-import { useEscapeKey, useNow } from "@/lib/hooks";
+import { useNow } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { cityCoords, pickupLegStart, type LatLng } from "@/lib/trip-geo";
 import { tripState } from "@/lib/trip-state";
@@ -137,40 +137,42 @@ export function TripCompactCard({
 }
 
 /** Uber-style sheet: slides up over the page on a phone, a centered panel on a larger screen. */
-export function TripSheet({ open, onClose, title, wide, children }: { open: boolean; onClose: () => void; title: string; wide?: boolean; children: React.ReactNode }) {
-  useEscapeKey(onClose, open);
-  useEffect(() => {
-    if (!open) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [open]);
-  if (!open) return null;
-
+/**
+ * The driver's Home opens on the trip, the way Uber's does: a big live map of where they're headed, with the status
+ * and time left on top. The trip card sits on a sheet under it.
+ */
+export function TripHeroMap(props: DriverTripCardProps) {
+  const { load, needsPreTrip } = props;
+  const now = useNow();
+  const s = tripState(load, now, needsPreTrip);
+  const origin = `${load.lane.origin}, ${load.lane.originState}`;
+  const destination = `${load.lane.destination}, ${load.lane.destState}`;
+  const originPt = cityCoords(load.lane.origin, load.lane.originState);
+  const destPt = cityCoords(load.lane.destination, load.lane.destState);
+  const from: LatLng | undefined = s.card === "pickup" ? pickupLegStart(load, props.truckCity, props.truckState) : originPt;
+  const to: LatLng | undefined = s.card === "pickup" ? originPt : destPt;
+  const status =
+    s.card === "booking" ? "AI is booking" : s.arrived ? (s.card === "pickup" ? "At the shipper" : "At the receiver") : s.card === "pickup" ? "Heading to pickup" : "Heading to delivery";
+  if (!from || !to) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className={cn(
-          "relative flex max-h-[94dvh] w-full animate-sheet-up flex-col overflow-hidden rounded-t-3xl bg-ink-900 sm:max-h-[90vh] sm:rounded-3xl",
-          wide ? "sm:max-w-xl" : "sm:max-w-md",
-        )}
-      >
-        <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-3 text-white">
-          <span aria-hidden className="absolute left-1/2 top-2 h-1 w-10 -translate-x-1/2 rounded-full bg-white/25 sm:hidden" />
-          <p className="mt-2 text-sm font-semibold">{title}</p>
-          <button type="button" onClick={onClose} autoFocus aria-label="Close details" className="mt-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/15">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="flex flex-col gap-3 overflow-y-auto px-3 pb-6">{children}</div>
+    <div className="theme-ink relative isolate h-[44vh] min-h-64 w-full overflow-hidden bg-ink-950 text-white" aria-label={`${status}. ${s.card === "pickup" ? origin : destination}`} role="img">
+      <TripMap from={from} to={to} laneKey={s.card === "pickup" ? undefined : `${origin}|${destination}`} progress={s.card === "booking" ? 0 : s.arrived ? 1 : s.legP} showTruck={s.card !== "booking"} />
+      <span className="pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-gradient-to-b from-ink-950/70 to-transparent" />
+      <div className="absolute inset-x-4 top-3 z-10 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2 rounded-full bg-ink-950/80 px-3 py-1.5 text-xs font-semibold backdrop-blur-md">
+          {s.card === "booking" ? <Loader2 className="h-3.5 w-3.5 animate-spin text-white/70" /> : <LiveDot />} {status}
+        </span>
+        {s.card !== "booking" && <span className="rounded-full bg-ink-950/80 px-3 py-1.5 text-xs font-semibold tabular backdrop-blur-md">{s.drive}</span>}
       </div>
     </div>
+  );
+}
+
+export function TripSheet({ open, onClose, title, wide, children }: { open: boolean; onClose: () => void; title: string; wide?: boolean; children: React.ReactNode }) {
+  return (
+    <Sheet open={open} onClose={onClose} title={title} tone="ink" size={wide ? "lg" : "md"}>
+      <div className="-mx-2 flex flex-col gap-3">{children}</div>
+    </Sheet>
   );
 }
 

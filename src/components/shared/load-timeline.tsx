@@ -4,6 +4,7 @@ import { Bot, Building2, Check, Truck, UserRound } from "lucide-react";
 import { useEffect } from "react";
 import { useMounted } from "@/lib/hooks";
 import { markSample } from "@/components/cloud/sample-fleet";
+import { formatAtStop } from "@/lib/stop-time";
 import type { Load } from "@/lib/types";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -13,6 +14,8 @@ interface Step {
   key: string;
   title: string;
   at?: string;
+  /** For a stop's own events: the state, so the time reads in the dock's zone. */
+  zone?: string;
   who?: Who;
   whoLabel?: string;
   detail?: string;
@@ -75,6 +78,7 @@ function stepsOf(load: Load, names: { broker?: string; driver?: string }): { ste
     {
       key: "pickup",
       title: "Picked up",
+      zone: load.lane.originState,
       at: load.tripChecklist?.loadedAt ?? (pickedUp ? (load.tripChecklist?.arrivedPickupAt ?? load.pickupAt) : undefined),
       who: pickedUp ? "driver" : undefined,
       whoLabel: pickedUp ? driver : undefined,
@@ -83,6 +87,7 @@ function stepsOf(load: Load, names: { broker?: string; driver?: string }): { ste
     {
       key: "delivered",
       title: "Delivered",
+      zone: load.lane.destState,
       at: delivered ? (load.tripChecklist?.unloadedAt ?? load.deliveryAt ?? load.updatedAt) : undefined,
       who: delivered ? "driver" : undefined,
       whoLabel: delivered ? driver : undefined,
@@ -149,7 +154,7 @@ export function LoadTimeline({ load, brokerName, driverName, className }: { load
                     {s.title}
                     {isNow && <span className="ml-2 text-[11px] font-normal text-ink-500">next</span>}
                   </p>
-                  {s.at && live && <p className="text-[11px] tabular text-ink-500">{when(s.at)}</p>}
+                  {s.at && live && <p className="text-[11px] tabular text-ink-500">{s.zone ? formatAtStop(s.at, s.zone) : when(s.at)}</p>}
                 </div>
                 {(s.whoLabel || s.detail) && (
                   <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-ink-600">

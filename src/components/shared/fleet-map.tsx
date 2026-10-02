@@ -60,6 +60,26 @@ function dotElement(dot: FleetDot, spot: TruckSpot, onSelect: (truckId: string) 
   return el;
 }
 
+/** Closer than this on screen, trucks share one dot. */
+const CLUSTER_PX = 44;
+
+/** A dot for several trucks: how many, colored by the most urgent among them. */
+function clusterElement(members: { unit: string; spot: TruckSpot }[], onTap: () => void): HTMLElement {
+  const order: TruckSpot[] = ["late", "stop", "moving", "empty"];
+  const worst = order.find((o) => members.some((m) => m.spot === o)) ?? "empty";
+  const el = document.createElement("button");
+  el.type = "button";
+  el.setAttribute("aria-label", `${members.length} trucks here: ${members.map((m) => m.unit).join(", ")}. Zoom in`);
+  el.className = "flex h-9 min-w-9 items-center justify-center rounded-full border-2 border-[var(--color-white)] px-2 text-xs font-semibold text-white shadow-lg";
+  el.style.background = SPOT_COLOR[worst];
+  el.textContent = String(members.length);
+  el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    onTap();
+  });
+  return el;
+}
+
 /**
  * The whole fleet at a glance: a dot per truck, colored by what it's doing. Tap a dot for that truck's trip. The map
  * is the same light or dark as the app; two fingers (or Ctrl and scroll) move it, so the page still scrolls.
@@ -125,27 +145,56 @@ export function FleetMap({ dots, onSelect, className }: { dots: FleetDot[]; onSe
     };
   }, [dark]);
 
-  // The dots: redrawn when a truck moves or changes what it's doing.
+  // The dots: redrawn when a truck moves or changes what it's doing, and regrouped when the map zooms. Trucks within
+  // a thumb's width of each other become one numbered dot; tap it to zoom in on them.
   useEffect(() => {
     let alive = true;
+    let fitted = false;
     const draw = () => {
       const lib = ml.current;
       const m = map.current;
       if (!alive || !lib || !m) return;
-      markers.current.forEach((mk) => mk.remove());
-      markers.current = placed.map(({ d, at, spot }) =>
-        new lib.Marker({ element: dotElement(d, spot, (id) => select.current(id)), anchor: "bottom" }).setLngLat([at[1], at[0]]).addTo(m),
-      );
-      if (placed.length) {
+      if (!fitted && placed.length) {
         const bounds = placed.reduce((b, p) => b.extend([p.at[1], p.at[0]]), new lib.LngLatBounds([placed[0].at[1], placed[0].at[0]], [placed[0].at[1], placed[0].at[0]]));
         m.fitBounds(bounds, { padding: 56, maxZoom: 7, duration: 0 });
+        fitted = true;
       }
+      markers.current.forEach((mk) => mk.remove());
+      const groups: { members: typeof placed; x: number; y: number }[] = [];
+      for (const p of placed) {
+        const pt = m.project([p.at[1], p.at[0]]);
+        const near = groups.find((g) => Math.hypot(g.x - pt.x, g.y - pt.y) < CLUSTER_PX);
+        if (near) near.members.push(p);
+        else groups.push({ members: [p], x: pt.x, y: pt.y });
+      }
+      markers.current = groups.map(({ members }) => {
+        if (members.length === 1) {
+          const { d, at, spot } = members[0];
+          return new lib.Marker({ element: dotElement(d, spot, (id) => select.current(id)), anchor: "bottom" }).setLngLat([at[1], at[0]]).addTo(m);
+        }
+        const lng = members.reduce((s, p) => s + p.at[1], 0) / members.length;
+        const lat = members.reduce((s, p) => s + p.at[0], 0) / members.length;
+        const zoomIn = () => {
+          const b = members.reduce((acc, p) => acc.extend([p.at[1], p.at[0]]), new lib.LngLatBounds([members[0].at[1], members[0].at[0]], [members[0].at[1], members[0].at[0]]));
+          m.fitBounds(b, { padding: 80, maxZoom: Math.max(m.getZoom() + 2.5, 9), duration: 400 });
+        };
+        return new lib.Marker({ element: clusterElement(members.map((p) => ({ unit: p.d.truck.unitNumber, spot: p.spot })), zoomIn) }).setLngLat([lng, lat]).addTo(m);
+      });
     };
-    if (map.current) draw();
-    window.addEventListener("backroute:fleet-map-ready", draw);
+    // The map is made asynchronously: hook onto it now if it's there, or the moment it's ready.
+    let hooked: MapLibreMap | null = null;
+    const hook = () => {
+      if (!map.current || hooked === map.current) return;
+      hooked = map.current;
+      hooked.on("zoomend", draw);
+      draw();
+    };
+    hook();
+    window.addEventListener("backroute:fleet-map-ready", hook);
     return () => {
       alive = false;
-      window.removeEventListener("backroute:fleet-map-ready", draw);
+      window.removeEventListener("backroute:fleet-map-ready", hook);
+      hooked?.off("zoomend", draw);
     };
     // `key` changes exactly when a dot would move or change color.
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,7 +1,7 @@
 "use client";
 
 import { MoneyCharts } from "@/components/shared/money-charts";
-import { Clock, Lightbulb, Sparkles, TrendingUp } from "lucide-react";
+import { Lightbulb, Sparkles, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
@@ -114,9 +114,6 @@ export default function EarningsPage() {
             <WeekTile label="Above posted rates" value={`+${formatCurrency(week.overPosted)}`} />
             <WeekTile label="Detention billed by AI" value={week.extras ? `+${formatCurrency(week.extras)}` : "$0"} />
           </div>
-          <p className="mt-4 flex items-center gap-1.5 text-xs text-white/55">
-            <Clock className="h-3.5 w-3.5" /> {week.hoursSaved} hours of dispatcher work done by the AI this week: broker calls, emails, rate cons, check calls and paperwork.
-          </p>
         </section>
 
         <Card>

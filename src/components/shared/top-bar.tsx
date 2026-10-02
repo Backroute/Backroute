@@ -10,6 +10,9 @@ import { ActivityFeed } from "./activity-feed";
 import { OPEN_BELL_EVENT } from "./notification-toast";
 import { Avatar } from "@/components/ui/avatar";
 import { ThemePicker } from "./theme-picker";
+import { cloudEnabled } from "@/lib/cloud/client";
+import { exitDemo, inDemo } from "@/lib/cloud/demo";
+import { signOut } from "@/lib/cloud/sync";
 import type { ActivityEvent } from "@/lib/types";
 import { ALERT_LABEL, alertKind } from "@/lib/alerts";
 
@@ -155,9 +158,20 @@ export function TopBar({
                     <Settings className="h-3.5 w-3.5" /> Settings
                   </Link>
                 )}
-                <Link href={exitHref} className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-ink-700 hover:bg-ink-50">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAccountOpen(false);
+                    // A real account signs out (and the copy kept on this device is forgotten); the demo or the sample
+                    // fleet just closes.
+                    if (cloudEnabled && !inDemo()) void signOut();
+                    else if (cloudEnabled) exitDemo(exitHref);
+                    else window.location.assign(exitHref);
+                  }}
+                  className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-ink-700 hover:bg-ink-50"
+                >
                   <LogOut className="h-3.5 w-3.5" /> Log out
-                </Link>
+                </button>
               </div>
             </div>
           )}

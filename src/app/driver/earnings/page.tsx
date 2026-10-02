@@ -90,7 +90,6 @@ export default function DriverEarningsPage() {
             sub="The AI books your next load near where you deliver."
             good={week.emptyPct < EMPTY_GOOD_PCT}
           />
-          <Row icon={Clock} label="Dispatcher work done for you" value={`${week.hoursSaved} hrs`} sub="Broker calls, emails, rate cons, check calls and paperwork." />
         </ul>
       </section>
 

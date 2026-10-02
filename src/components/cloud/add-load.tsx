@@ -1,5 +1,6 @@
 "use client";
 
+import { Sheet } from "@/components/ui/sheet";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileSearch, Loader2, Plus, X } from "lucide-react";
@@ -157,19 +158,10 @@ function AddLoadPanel({ onDone }: { onDone: () => void }) {
   const driverOf = (id: string | null) => drivers.find((d) => d.id === id)?.name;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/30 px-4 py-10" role="dialog" aria-modal="true" aria-label="Add a load">
-      <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-xl">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="font-display text-xl text-ink-950">Add a load</h2>
-            <p className="mt-0.5 text-sm text-ink-500">Upload the broker&apos;s rate con and the AI fills this in, or type it.</p>
-          </div>
-          <button type="button" aria-label="Close" onClick={onDone} className="rounded-full p-1.5 text-ink-400 hover:bg-ink-100">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+    <Sheet open onClose={onDone} title="Add a load" description="Upload the broker's rate con and the AI fills this in, or type it." size="lg">
+      <div>
 
-        <Button className="mt-4 w-full" variant="outline" disabled={!!busy} onClick={() => fileInput.current?.click()}>
+        <Button className="w-full" variant="outline" disabled={!!busy} onClick={() => fileInput.current?.click()}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSearch className="h-4 w-4" />} {busy ? `Reading ${busy}…` : "Fill in from the rate con PDF"}
         </Button>
         <input
@@ -226,7 +218,7 @@ function AddLoadPanel({ onDone }: { onDone: () => void }) {
         </Button>
         <p className="mt-2 text-center text-[11px] text-ink-400">It goes to the driver&apos;s app right away, and they get a text about it when texting is on. Fuel and profit are estimates.</p>
       </div>
-    </div>
+    </Sheet>
   );
 }
 

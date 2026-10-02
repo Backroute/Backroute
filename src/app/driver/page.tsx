@@ -11,7 +11,7 @@ import { HomeTimeCard, useHomeTime } from "@/components/shared/home-time";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { CounterOfferButton } from "@/components/shared/counter-offer-button";
 import { DriverTripCompleteCard, type DriverTripCardProps } from "@/components/shared/driver-trip-card";
-import { TripCompactCard, TripDetails, TripSheet } from "@/components/shared/trip-compact";
+import { TripCompactCard, TripHeroMap, TripDetails, TripSheet } from "@/components/shared/trip-compact";
 import { Switch } from "@/components/ui/switch";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { IncidentCard } from "@/components/shared/incident-card";
@@ -135,8 +135,18 @@ export default function DriverHomePage() {
           ? `${Math.round(homeTime.hoursHome)} h away`
           : "—";
 
+  // On a trip: the map comes first, the rest sits on a sheet over it (Uber-style).
+  const hero = !!tripProps && !completedLoad;
+
   return (
-    <div className="flex flex-col gap-5 px-5">
+    <div className="flex flex-col">
+      {hero && tripProps && (
+        <div className="-mt-3">
+          <TripHeroMap {...tripProps} />
+        </div>
+      )}
+    <div className={cn("relative z-10 flex flex-col gap-5 px-5", hero && "-mt-7 rounded-t-[1.75rem] bg-white pt-3 shadow-[0_-8px_24px_rgb(0_0_0/0.12)]")}>
+      {hero && <span aria-hidden className="mx-auto -mb-2 block h-1.5 w-10 rounded-full bg-ink-200" />}
       <ConsentCard />
       <div>
         <div className="flex items-center justify-between gap-3">
@@ -197,7 +207,7 @@ export default function DriverHomePage() {
         />
       ) : tripProps ? (
         <>
-          <TripCompactCard {...tripProps} onOpen={() => setSheetOpen(true)} />
+          <TripCompactCard {...tripProps} showMap={!hero} onOpen={() => setSheetOpen(true)} />
           <QuickReplies stage={tripProps.load.stage} onSent={(text) => setSentNote(text)} />
           <TripSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Trip details">
             <TripDetails {...tripProps} autoPick={autoPick} onAutoPick={toggleAutoPick} loadHref={`/driver/loads/${tripProps.load.id}`} />
@@ -315,7 +325,7 @@ export default function DriverHomePage() {
           onCall={callDispatch}
         />
       )}
-
+      </div>
     </div>
   );
 }

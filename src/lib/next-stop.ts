@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
+import { formatAtStop } from "./stop-time";
 import type { Load } from "./types";
 
 /**
@@ -59,7 +60,8 @@ export function nextStopText(load: Load | null | undefined): { title: string; bo
   const stop = before ? "pickup" : "delivery";
   const place = before ? `${load.lane.origin}, ${load.lane.originState}` : `${load.lane.destination}, ${load.lane.destState}`;
   const appt = load.appointments?.[stop];
-  const when = appt?.status === "set" && appt.at ? new Date(appt.at).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }) : before ? load.pickupWindow : load.deliveryWindow;
+  // In the dock's own time (with its zone), the way the appointment was made, wherever the phone is.
+  const when = appt?.status === "set" && appt.at ? formatAtStop(appt.at, before ? load.lane.originState : load.lane.destState) : before ? load.pickupWindow : load.deliveryWindow;
   const at = load.stage === "at_pickup" || load.stage === "at_delivery";
   return {
     title: `${at ? "At" : "Next:"} ${stop} · ${place}`,

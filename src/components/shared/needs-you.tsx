@@ -13,6 +13,7 @@ import { PortalApproval } from "./portal-approval";
 import { RuleSuggestion } from "@/components/cloud/owner-rules";
 import { useDriverRetention } from "./driver-retention";
 import { answerDraft } from "@/lib/cloud/agent";
+import { queueWithUndo, undo, usePending } from "@/lib/undo-queue";
 import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierLoads, useCarrierEscalations, useDriverMap, useTruckMap } from "@/lib/selectors";
 import type { DraftPurpose, Escalation, Load } from "@/lib/types";
@@ -222,6 +223,9 @@ export function NeedsYouList() {
   const respondTimeOff = useStore((s) => s.actions.respondTimeOff);
   const setAutoChain = useStore((s) => s.actions.setAutoChain);
   const later = useLater();
+  // Swiped, counting down to happen (with Undo): off the list meanwhile.
+  const pendingSwipes = usePending();
+  const waiting = new Set(pendingSwipes.map((p) => p.id));
   const [showLater, setShowLater] = useState(false);
   const batches = useBatches(listed, signedIn);
   if (!any) return null;
@@ -229,7 +233,7 @@ export function NeedsYouList() {
   // Most urgent first: decisions now, then what's waiting, then notes.
   const rank: Record<AttentionTone, number> = { urgent: 0, waiting: 1, info: 2, done: 3 };
   const sorted = [...listed].sort((a, b) => rank[toneOf(a)] - rank[toneOf(b)]);
-  const now = sorted.filter((e) => !later.has(e.id));
+  const now = sorted.filter((e) => !later.has(e.id) && !waiting.has(e.id));
   const setAside = sorted.filter((e) => later.has(e.id));
 
   function card(e: Escalation) {
@@ -240,7 +244,7 @@ export function NeedsYouList() {
     return (
       <motion.div key={e.id} layout {...enter}>
         <SwipeAction
-          onRight={oneMove ? () => resolveEscalation(e.id, e.recommendedAction === "approve") : undefined}
+          onRight={oneMove ? () => queueWithUndo(e.id, e.recommendedLabel ?? "Done", () => resolveEscalation(e.id, e.recommendedAction === "approve")) : undefined}
           rightLabel={e.recommendedLabel}
           onLeft={later.has(e.id) ? undefined : () => setLater([...later, e.id])}
         >
@@ -407,6 +411,26 @@ export function NeedsYouList() {
           {showLater ? "Hide" : "Show"} {setAside.length} set aside for later
         </button>
       )}
+      <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-[5.5rem] z-[65] flex flex-col items-center gap-2 px-4 lg:bottom-6">
+        <AnimatePresence>
+          {pendingSwipes.map((p) => (
+            <motion.div
+              key={p.id}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 16 }}
+              className="pointer-events-auto flex items-center gap-4 rounded-full bg-ink-950 py-2 pl-4 pr-2 text-sm text-white shadow-xl"
+            >
+              <span className="flex items-center gap-1.5">
+                <Check className="h-4 w-4" /> {p.label}
+              </span>
+              <button type="button" onClick={() => undo(p.id)} className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold hover:bg-white/25">
+                Undo
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
     </section>
   );
 }
