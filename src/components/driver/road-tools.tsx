@@ -9,6 +9,7 @@ import { useNow } from "@/lib/hooks";
 import { tripState } from "@/lib/trip-state";
 import { cityCoords, pickupLegStart, type LatLng } from "@/lib/trip-geo";
 import { DEFAULT_PROFILE, heightWords, NAV_APPS, navApp, profileWords } from "@/lib/nav-apps";
+import { dockOf, dockSearchText, useDockSpot, type DockTarget } from "@/lib/dock-spot";
 import { clockWords, hosNow, samplePoints, whereHoursEnd } from "@/lib/hos-clock";
 import { requestLumper } from "@/lib/lumper";
 import { updateTruck } from "@/lib/back-office";
@@ -37,34 +38,44 @@ export function RoadTools({ load, truck, driver }: { load: Load; truck: Truck; d
   const to = cityCoords(stop.city, stop.state);
   const from: LatLng | undefined = pickup ? pickupLegStart(load, truck.currentCity, truck.currentState) : cityCoords(load.lane.origin, load.lane.originState);
   const [sheet, setSheet] = useState<"directions" | "lumper" | null>(null);
+  const dock = dockOf(load, pickup ? "pickup" : "delivery");
+  const { spot, looking } = useDockSpot(dock.address);
   if (s.card === "booking") return null;
 
   const hos = now !== null ? hosNow(driver, now) : null;
   const left = hos ? Math.min(hos.drive, hos.shift) : null;
-  const end = from && to && left !== null && !s.arrived ? whereHoursEnd(from, to, s.legP, left) : null;
+  const end = from && to && left !== null && !s.arrived && s.located ? whereHoursEnd(from, to, s.legP, left) : null;
   const app = navApp(driver.prefs?.navApp);
-  const label = `${stop.city}, ${stop.state}`;
+  const label = dock.name ?? `${stop.city}, ${stop.state}`;
 
   return (
     <section aria-labelledby="road-title" className="flex flex-col gap-3 rounded-3xl border border-line p-4">
       <h2 id="road-title" className="t-label text-ink-500">
         On the road
       </h2>
+      <DockLine dock={dock} />
       <div className="grid grid-cols-2 gap-2">
-        <a
-          href={app.link({ at: to, label })}
-          onClick={() => haptic("tap")}
-          className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-ink-950 px-3 text-sm font-semibold text-white"
-        >
-          <Navigation className="h-4 w-4" /> {app.name.replace(" Truck", "")}
-        </a>
+        {spot ? (
+          <a
+            href={app.link({ at: spot, label })}
+            onClick={() => haptic("tap")}
+            className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-ink-950 px-3 text-sm font-semibold text-white"
+          >
+            <Navigation className="h-4 w-4" /> {app.name}
+          </a>
+        ) : (
+          <CopyButton text={dockSearchText(dock)} busy={looking} />
+        )}
         <button type="button" onClick={() => setSheet("directions")} className="min-h-12 rounded-2xl border border-line px-3 text-sm font-medium text-ink-800">
-          Other apps &amp; truck size
+          Truck app &amp; size
         </button>
       </div>
-      {!app.truckSafe && (
-        <p className="flex items-start gap-1.5 text-xs text-[var(--accent-warn)]">
-          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {app.name} routes like a car: it doesn&apos;t know your height or weight. Watch for low bridges, or switch to a truck app.
+      {!spot && !looking && (
+        <p className="flex items-start gap-1.5 text-xs text-ink-600">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--accent-warn)]" />
+          {dock.address
+            ? `Paste it into ${app.name}, and check the pin is on the dock before you go.`
+            : "No dock address on this load yet. It's on the rate con, or ask dispatch in Messages. Don't head for the middle of town."}
         </p>
       )}
 
@@ -75,7 +86,7 @@ export function RoadTools({ load, truck, driver }: { load: Load; truck: Truck; d
       <LumperRow load={load} driver={driver} onAsk={() => setSheet("lumper")} />
 
       <Sheet open={sheet === "directions"} onClose={() => setSheet(null)} title="Directions" description={`To ${label}`}>
-        <DirectionsSheet driver={driver} truck={truck} to={to} label={label} onDone={() => setSheet(null)} />
+        <DirectionsSheet driver={driver} truck={truck} to={spot ?? undefined} label={label} onDone={() => setSheet(null)} />
       </Sheet>
       <Sheet open={sheet === "lumper"} onClose={() => setSheet(null)} title="Lumper money" description="Dispatch sends a payment code to give the lumper service.">
         <LumperForm load={load} driver={driver} onDone={() => setSheet(null)} />
@@ -92,23 +103,37 @@ function DirectionsSheet({ driver, truck, to, label, onDone }: { driver: Driver;
   return (
     <div className="flex flex-col gap-4 pb-2">
       <ul className="flex flex-col gap-2">
-        {NAV_APPS.map((a) => (
-          <li key={a.id}>
-            <a
-              href={a.link({ at: to, label })}
-              onClick={() => {
-                setDriverPrefs(driver.id, { ...driver.prefs, navApp: a.id as NavApp });
-                onDone();
-              }}
-              className={cn("flex items-center justify-between rounded-2xl border px-4 py-3 text-sm", driver.prefs?.navApp === a.id ? "border-brand bg-brand-soft" : "border-line")}
-            >
-              <span className="font-medium text-ink-950">{a.name}</span>
-              <span className={cn("text-xs", a.truckSafe ? "text-[var(--accent-live)]" : "text-ink-500")}>{a.truckSafe ? "Truck routing" : "Car routing"}</span>
-            </a>
-          </li>
-        ))}
+        {NAV_APPS.map((a) => {
+          const picked = navApp(driver.prefs?.navApp).id === a.id;
+          const pick = () => setDriverPrefs(driver.id, { ...driver.prefs, navApp: a.id as NavApp });
+          const ios = typeof navigator !== "undefined" && /iPhone|iPad|iPod/.test(navigator.userAgent);
+          return (
+            <li key={a.id} className={cn("flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm", picked ? "border-ink-950" : "border-line")}>
+              {to ? (
+                <a
+                  href={a.link({ at: to, label })}
+                  onClick={() => {
+                    pick();
+                    onDone();
+                  }}
+                  className="font-medium text-ink-950"
+                >
+                  {a.name}
+                </a>
+              ) : (
+                <button type="button" onClick={pick} aria-pressed={picked} className="text-left font-medium text-ink-950">
+                  {a.name}
+                </button>
+              )}
+              <a href={ios ? a.store.ios : a.store.android} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-ink-500 underline">
+                Get the app
+              </a>
+            </li>
+          );
+        })}
       </ul>
-      <p className="text-xs text-ink-500">The one you pick opens next time from the big button.</p>
+      <p className="text-xs text-ink-500">Truck apps only: they route for your height and weight. Phone map apps (Google, Apple, Waze) route like a car and can send a truck under a low bridge or onto a parkway.</p>
+      <p className="text-xs text-ink-500">The one you pick opens from the big button.</p>
       <div className="rounded-2xl bg-ink-50 p-4 text-sm">
         <p className="font-medium text-ink-950">Your truck</p>
         <p className="mt-0.5 text-ink-600">{profileWords(profile)}</p>
@@ -152,6 +177,35 @@ function DirectionsSheet({ driver, truck, to, label, onDone }: { driver: Driver;
   );
 }
 
+/** Where this stop really is: the facility and its street address, as the rate con has them. */
+function DockLine({ dock }: { dock: DockTarget }) {
+  return (
+    <div className="text-sm">
+      <p className="font-medium text-ink-950">{dock.name ?? `${dock.city}, ${dock.state}`}</p>
+      <p className="text-xs text-ink-500">{dock.address ?? `${dock.city}, ${dock.state} · street address not on the load yet`}</p>
+    </div>
+  );
+}
+
+/** No exact spot to hand the truck app: copy what to search for instead. */
+function CopyButton({ text, busy }: { text: string; busy: boolean }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={() => {
+        void navigator.clipboard?.writeText(text);
+        haptic("tap");
+        setCopied(true);
+      }}
+      className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-ink-950 px-3 text-sm font-semibold text-white disabled:opacity-60"
+    >
+      <Copy className="h-4 w-4" /> {busy ? "Finding the dock…" : copied ? "Copied" : "Copy the address"}
+    </button>
+  );
+}
+
 const RESERVE = [
   { name: "Truck Parking Club", url: "https://truckparkingclub.com" },
   { name: "TA Petro", url: "https://www.ta-petro.com" },
@@ -159,13 +213,12 @@ const RESERVE = [
   { name: "Love's", url: "https://www.loves.com" },
 ];
 
-function HoursAndParking({ driver, hos, end, now }: { driver: Driver; hos: ReturnType<typeof hosNow>; end: ReturnType<typeof whereHoursEnd>; now: number }) {
+function HoursAndParking({ hos, end, now }: { driver: Driver; hos: ReturnType<typeof hosNow>; end: ReturnType<typeof whereHoursEnd>; now: number }) {
   const left = Math.min(hos.drive, hos.shift);
   const stopAt = new Date(now + left * 3600_000);
   const hour = stopAt.getHours();
   // After about 5 PM most lots near cities and on the interstates are full; before dawn they're still full.
   const late = !end.reachesStop && (hour >= 17 || hour < 6);
-  const search = `https://www.google.com/maps/search/truck+stop/@${end.at[0].toFixed(3)},${end.at[1].toFixed(3)},10z`;
   return (
     <div className="rounded-2xl bg-ink-50 p-3.5 text-sm">
       <p className="flex items-center gap-2 font-medium text-ink-950">
@@ -185,9 +238,6 @@ function HoursAndParking({ driver, hos, end, now }: { driver: Driver; hos: Retur
             </p>
           )}
           <div className="mt-2 flex flex-wrap gap-1.5">
-            <a href={search} target="_blank" rel="noreferrer" className="rounded-full bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white">
-              Truck stops there
-            </a>
             {RESERVE.map((r) => (
               <a key={r.name} href={r.url} target="_blank" rel="noreferrer" className="rounded-full border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink-800">
                 {r.name}

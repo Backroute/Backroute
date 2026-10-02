@@ -15,7 +15,7 @@ export interface PaperworkItem {
   /** Stable for this item and this due date: a renewed date is a new reminder cycle. */
   key: string;
   kind: "registration" | "inspection" | "cdl" | "med_card" | "insurance" | "ifta_return" | "ifta_decals";
-  /** "Registration for T-104", "Marcus Bell's medical card". */
+  /** "Truck T-104's registration", "Marcus Bell's medical card". */
   what: string;
   /** yyyy-mm-dd */
   due: string;
@@ -63,9 +63,9 @@ export function paperworkDue(input: { trucks: Truck[]; drivers: Driver[]; insura
   };
   for (const t of input.trucks) {
     if (t.registrationExpires)
-      add({ key: `registration:${t.id}:${dayOf(t.registrationExpires)}`, kind: "registration", what: `Registration for ${t.unitNumber}`, due: t.registrationExpires, truckId: t.id, todo: "Renew the plates (IRP) and put the new cab card in the truck." });
+      add({ key: `registration:${t.id}:${dayOf(t.registrationExpires)}`, kind: "registration", what: `Truck ${t.unitNumber}'s registration`, due: t.registrationExpires, truckId: t.id, todo: "Renew the plates (IRP) and put the new cab card in the truck." });
     if (t.nextInspectionDue)
-      add({ key: `inspection:${t.id}:${dayOf(t.nextInspectionDue)}`, kind: "inspection", what: `Annual DOT inspection for ${t.unitNumber}`, due: t.nextInspectionDue, truckId: t.id, todo: "Book it at a shop. The AI stops booking the truck once it lapses." });
+      add({ key: `inspection:${t.id}:${dayOf(t.nextInspectionDue)}`, kind: "inspection", what: `Truck ${t.unitNumber}'s annual DOT inspection`, due: t.nextInspectionDue, truckId: t.id, todo: "Book it at a shop. The AI stops booking the truck once it lapses." });
   }
   for (const d of input.drivers) {
     if (d.cdlExpires)
@@ -76,7 +76,7 @@ export function paperworkDue(input: { trucks: Truck[]; drivers: Driver[]; insura
   if (input.insuranceExpires)
     add({ key: `insurance:${dayOf(input.insuranceExpires)}`, kind: "insurance", what: "Your insurance certificate", due: input.insuranceExpires, todo: "Ask your agent for the renewed certificate (COI). Brokers check it before every load." });
   const ifta = iftaReturnDue(now);
-  add({ key: `ifta:${ifta.quarter}`, kind: "ifta_return", what: `IFTA return for ${ifta.quarter}`, due: ifta.due, todo: "Miles by state come from the trips, fuel from the fuel card imports (Money → Fuel & tolls)." });
+  add({ key: `ifta:${ifta.quarter}`, kind: "ifta_return", what: `IFTA return for ${ifta.quarter}`, due: ifta.due, todo: "Miles by state come from the trips, fuel from the fuel card statements (Money → Fuel & tolls)." });
   const y = new Date(now).getUTCFullYear();
   add({ key: `ifta-decals:${y + 1}`, kind: "ifta_decals", what: `IFTA decals for ${y + 1}`, due: `${y}-12-31`, todo: "Renew the IFTA license with your base state and put the new decals on each truck." });
   return out.sort((a, b) => a.days - b.days);

@@ -568,6 +568,9 @@ function buildLoad(
     weight: rng.int(22000, 44500),
     pickupWindow: `${pickupLabel}, ${rng.int(6, 14)}:00–${rng.int(15, 19)}:00`,
     deliveryWindow: transitWindow(lane.miles),
+    // Sample docks (made up), so the demo driver sees the dock's address rather than just a city.
+    pickupAddress: sampleDock(`${ref}:p`, lane.origin, lane.originState),
+    deliveryAddress: sampleDock(`${ref}:d`, lane.destination, lane.destState),
     listedRate,
     targetRate,
     bookedRate,
@@ -591,6 +594,14 @@ function buildLoad(
     ticksInStage: 0,
     progressPct: progressByStage[spec.stage],
   };
+}
+
+const DOCK_STREETS = ["Distribution Dr", "Logistics Pkwy", "Commerce Blvd", "Industrial Ave", "Freight Way", "Warehouse Rd"];
+/** A made-up dock address for the sample fleet, from a hash (so it doesn't disturb the seeded random numbers). */
+function sampleDock(key: string, city: string, state: string): string {
+  let h = 0;
+  for (const c of key) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return `${100 + (h % 89) * 100} ${DOCK_STREETS[h % DOCK_STREETS.length]}, ${city}, ${state}`;
 }
 
 // ---------- World builder ----------

@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GeoJSONSource, Map as MapLibreMap, Marker } from "maplibre-gl";
 import { cn } from "@/lib/utils";
 import type { LatLng } from "@/lib/trip-geo";
+import { cloudEnabled } from "@/lib/cloud/client";
+import { authHeader } from "@/lib/ai/client";
+import { DEFAULT_PROFILE } from "@/lib/nav-apps";
+import type { TruckProfile } from "@/lib/types";
 
 /** Extra room up top for the phase chip that floats over the map, and at the bottom for the fade. */
 const PADDING = { top: 60, bottom: 44, left: 36, right: 36 };
@@ -16,34 +20,28 @@ const STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
 
 const routeCache = new Map<string, LatLng[]>();
 
-/** Real road geometry from the public OSRM demo router; falls back to a straight line if it's unreachable,
- *  so the map still shows the trip offline. Failures aren't cached, so the next view retries. */
-async function fetchRoute(from: LatLng, to: LatLng): Promise<LatLng[]> {
-  const key = `${from.join(",")}|${to.join(",")}`;
+/**
+ * The line on the map is a truck's road or nothing that looks like one. With truck routing on (HERE, truck mode,
+ * from the server) it's the road a truck this size takes. Otherwise it's a plain dashed straight line marked "not
+ * directions": a car router's road (the old public OSRM line) could show a parkway or a low-bridge street, and a
+ * driver glancing at the map might follow it. Directions themselves always come from the driver's truck GPS app.
+ */
+async function truckRoute(from: LatLng, to: LatLng, size: { heightIn: number; weightLbs: number; lengthFt: number }): Promise<LatLng[] | null> {
+  if (!cloudEnabled) return null;
+  const key = `${from.join(",")}|${to.join(",")}|${size.heightIn}|${size.weightLbs}|${size.lengthFt}`;
   const cached = routeCache.get(key);
   if (cached) return cached;
   try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=simplified&geometries=geojson`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
-    const data = await res.json();
-    const coords: [number, number][] | undefined = data?.routes?.[0]?.geometry?.coordinates;
-    if (!coords?.length) throw new Error("no route");
-    const path = coords.map(([lng, lat]) => [lat, lng] as LatLng);
+    const q = `from=${from.join(",")}&to=${to.join(",")}&height=${size.heightIn}&weight=${size.weightLbs}&length=${size.lengthFt}`;
+    const res = await fetch(`/api/directions?${q}`, { headers: await authHeader(), signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const { path } = (await res.json()) as { path: LatLng[] | null };
+    if (!path || path.length < 2) return null;
     routeCache.set(key, path);
     return path;
   } catch {
-    return [from, to];
+    return null;
   }
-}
-
-/** Freight lanes are a fixed set, so their road geometry ships with the app (pre-computed from OSRM and
- *  simplified) instead of depending on a public router at runtime; only other legs hit the network. */
-async function resolveRoute(from: LatLng, to: LatLng, laneKey?: string): Promise<LatLng[]> {
-  if (laneKey) {
-    const lanes = (await import("@/lib/lane-routes.json")).default as unknown as Record<string, LatLng[]>;
-    if (lanes[laneKey]) return lanes[laneKey];
-  }
-  return fetchRoute(from, to);
 }
 
 /** The point `fraction` of the way along a polyline by distance, plus the index of the segment it sits on. */
@@ -101,22 +99,24 @@ function drawProgress(s: MapState, progress: number, showTruck: boolean) {
   }
 }
 
-/** Uber-style trip map: dark basemap, the road route, a dot at the start, a square at the end, and a live
+/** Uber-style trip map: dark basemap, the truck's road (or a dashed straight line when there's no truck route), a dot at the start, a square at the end, and a live
  *  truck marker that slides along as `progress` (0–1) moves. Non-interactive so it never fights the page
  *  scroll on a phone. */
 export function TripMap({
   from,
   to,
-  laneKey,
   progress,
   showTruck,
   compact,
+  size,
   className,
 }: {
   from: LatLng;
   to: LatLng;
-  /** "City, ST|City, ST" of a known freight lane, for its pre-computed road route. */
+  /** Kept for callers; the line no longer comes from a pre-computed car route. */
   laneKey?: string;
+  /** The truck's height, weight and length, for its road (defaults to a full 53' trailer). */
+  size?: TruckProfile;
   progress: number;
   showTruck: boolean;
   compact?: boolean;
@@ -127,6 +127,9 @@ export function TripMap({
   const latest = useRef({ progress, showTruck });
   const fromKey = from.join(",");
   const toKey = to.join(",");
+  const [straight, setStraight] = useState(false);
+  const sz = size ?? DEFAULT_PROFILE;
+  const sizeKey = `${sz.heightIn}|${sz.weightLbs}|${sz.lengthFt}`;
 
   useEffect(() => {
     latest.current = { progress, showTruck };
@@ -162,8 +165,11 @@ export function TripMap({
       new ml.Marker({ element: markerElement("start") }).setLngLat(lngLat(a)).addTo(map);
       new ml.Marker({ element: markerElement("end") }).setLngLat(lngLat(b)).addTo(map);
 
-      const [path] = await Promise.all([resolveRoute(a, b, laneKey), map.once("load")]);
+      const [h, w, l] = sizeKey.split("|").map(Number);
+      const [road] = await Promise.all([truckRoute(a, b, { heightIn: h, weightLbs: w, lengthFt: l }), map.once("load")]);
       if (cancelled) return;
+      const path = road ?? [a, b];
+      setStraight(!road);
       // Compact attribution starts expanded; on a card this small it would cover the map, so start it
       // collapsed behind its (i) button, which still opens the full credit on tap.
       el.current?.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
@@ -174,7 +180,7 @@ export function TripMap({
           type: "line",
           source: id,
           layout: { "line-cap": "round", "line-join": "round" },
-          paint: { "line-color": "#ffffff", "line-width": 4, "line-opacity": opacity },
+          paint: road ? { "line-color": "#ffffff", "line-width": 4, "line-opacity": opacity } : { "line-color": "#ffffff", "line-width": 2, "line-opacity": opacity * 0.6, "line-dasharray": [2, 2] },
         });
       }
       const bounds = path.reduce((acc, p) => acc.extend(lngLat(p)), new ml.LngLatBounds(lngLat(path[0]), lngLat(path[0])));
@@ -187,13 +193,16 @@ export function TripMap({
       state.current.map?.remove();
       state.current = {};
     };
-  }, [fromKey, toKey, laneKey, compact]);
+  }, [fromKey, toKey, sizeKey, compact]);
 
   // MapLibre's own (unlayered) CSS forces `position: relative` on the element it mounts into, so that element
   // fills an absolutely positioned wrapper rather than being positioned itself.
   return (
-    <div aria-hidden className={cn("absolute inset-0 z-0", className)} style={{ background: "#141414" }}>
-      <div ref={el} className="h-full w-full" />
+    <div className={cn("absolute inset-0 z-0", className)} style={{ background: "#141414" }}>
+      <div ref={el} aria-hidden className="h-full w-full" />
+      {straight && !compact && (
+        <span className="pointer-events-none absolute right-3 bottom-3 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white/80">Straight line · not directions</span>
+      )}
     </div>
   );
 }

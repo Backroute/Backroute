@@ -126,7 +126,7 @@ function PickupCard({ load, brokerName, truckCity, truckState, needsPreTrip, vie
   return (
     <CardShell>
       {start && originPt && (
-        <MapHeader from={start} to={originPt} progress={arrived ? 1 : s.legP} showTruck>
+        <MapHeader from={start} to={originPt} progress={arrived ? 1 : s.legP} showTruck={arrived || s.located}>
           <LiveDot /> {arrived ? "At the shipper" : "Heading to pickup"}
         </MapHeader>
       )}
@@ -200,7 +200,7 @@ function DeliveryCard({ load, brokerName, upNext, viewer = "driver", driverName,
   return (
     <CardShell>
       {from && to && (
-        <MapHeader from={from} to={to} laneKey={`${origin}|${destination}`} progress={arrived ? 1 : s.legP} showTruck>
+        <MapHeader from={from} to={to} laneKey={`${origin}|${destination}`} progress={arrived ? 1 : s.legP} showTruck={arrived || s.located}>
           <LiveDot /> {arrived ? "At the receiver" : "Heading to delivery"}
         </MapHeader>
       )}

@@ -187,7 +187,8 @@ export interface Driver {
   escrow?: { perRun: number; cap: number; held: number };
 }
 
-export type NavApp = "google" | "apple" | "waze" | "sygic" | "copilot";
+/** Truck GPS apps only (lib/nav-apps): car apps route trucks onto roads they can't use. */
+export type NavApp = "sygic" | "copilot";
 
 export interface Deduction {
   id: string;
@@ -648,6 +649,10 @@ export interface Load {
   /** Intermediate stops beyond the lane's origin/destination — absent or empty means a normal single-pickup,
    *  single-delivery load, which is most of them. */
   stops?: LoadStop[];
+  /** The pickup and delivery docks' street addresses (from the rate con, or typed by the office). Directions go here,
+   *  never to the middle of the city. */
+  pickupAddress?: string;
+  deliveryAddress?: string;
   /** Real accounts: the truck won't make a stop on time (from the ELD): which, the new arrival, when everyone was told. */
   late?: { stop: "pickup" | "delivery"; eta: string; at: string };
   /** Real accounts: why the AI went for this load, or answered the broker the way it did, in plain words (lib/agent/why). */
@@ -948,6 +953,9 @@ export interface RateConPdfReading {
   receiverPhone?: string | null;
   shipperZip?: string | null;
   receiverZip?: string | null;
+  /** The docks' street addresses, as printed: where the driver's truck GPS takes them. */
+  shipperAddress?: string | null;
+  receiverAddress?: string | null;
   appointmentNeeded?: "pickup" | "delivery" | "both" | "none";
   /** A refrigerated load's temperature terms, when the rate con has them. */
   reefer?: ReeferTerms | null;

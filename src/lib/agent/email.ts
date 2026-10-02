@@ -100,7 +100,12 @@ async function handle(carrierId: string, email: InboundEmail) {
         // Kept on the load: it's signed from, and the factoring company wants it with the invoice.
         await storeFile(carrierId, { kind: "rate_con", name: pdf.Name, contentType: isPhoto(pdf) ? pdf.ContentType : "application/pdf", bytes: Buffer.from(pdf.Content, "base64"), loadId: load.id }).catch((e) => console.error("[email] couldn't keep the rate con", e));
         const saved: RateConPdfReading = { ...reading, fileName: pdf.Name, readAt: new Date().toISOString() };
-        const updated: Load = { ...load, rateConReading: saved, updatedAt: saved.readAt };
+        // The docks' street addresses go on the load for the driver's truck GPS (one the office typed stays).
+        const addresses = {
+          ...(!load.pickupAddress && reading.shipperAddress ? { pickupAddress: reading.shipperAddress } : {}),
+          ...(!load.deliveryAddress && reading.receiverAddress ? { deliveryAddress: reading.receiverAddress } : {}),
+        };
+        const updated: Load = { ...load, ...addresses, rateConReading: saved, updatedAt: saved.readAt };
         await save("loads", carrierId, updated as unknown as Item);
         ctx.loads = ctx.loads.map((l) => (l.id === updated.id ? updated : l));
         load = updated;

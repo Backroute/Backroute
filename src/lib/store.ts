@@ -939,6 +939,8 @@ interface StoreState {
      *  history as the AI's own calls to brokers — a call is only real if it leaves a record. */
     logLoadVoiceCall: (loadId: string, call: Omit<VoiceCall, "id">) => void;
     setAiPaused: (loadId: string, paused: boolean) => void;
+    /** The office sets a dock's street address (the driver's truck GPS goes there). Empty clears it. */
+    setDockAddress: (loadId: string, stop: "pickup" | "delivery", address: string) => void;
     opsOverrideRate: (loadId: string, amount: number) => void;
     /** Ops manually re-tiers a broker — after investigating a complaint, a false-positive fraud flag,
      *  whatever the automated score missed. Same "internal action, visible to the carrier" transparency
@@ -2527,6 +2529,18 @@ export const useStore = create<StoreState>((set, get) => ({
           ].slice(0, 80),
         };
       }),
+
+    setDockAddress: (loadId, stop, address) =>
+      set((state) => ({
+        loads: state.loads.map((l) => {
+          if (l.id !== loadId) return l;
+          const key = stop === "pickup" ? "pickupAddress" : "deliveryAddress";
+          const next = { ...l, updatedAt: new Date().toISOString() };
+          if (address.trim()) next[key] = address.trim().slice(0, 200);
+          else delete next[key];
+          return next;
+        }),
+      })),
 
     setAiPaused: (loadId, paused) =>
       set((state) => {

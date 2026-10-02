@@ -30,6 +30,7 @@ import { useLoad, useBrokerMap, useTruckMap, useDriverMap, useCarrierTrucks } fr
 import { useStore } from "@/lib/store";
 import { STAGE_CONFIRM } from "@/lib/stage-confirm";
 import { aiDispatcherNote, isTransitStage } from "@/lib/load-status";
+import type { Load } from "@/lib/types";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { openFile } from "@/lib/cloud/files";
 import { BookingCard } from "@/components/cloud/booking-card";
@@ -360,6 +361,7 @@ export default function LoadDetailPage() {
                 <div className="mt-3.5">
                   <Row label="Pickup" value={load.pickupWindow} />
                 </div>
+                <DockAddresses load={load} />
                 {reassigning && (
                   <ReassignForm
                     currentTruckId={truck.id}
@@ -482,6 +484,51 @@ function DeclineForm({ onCancel, onConfirm }: { onCancel: () => void; onConfirm:
         <Button size="sm" variant="danger" onClick={() => onConfirm(reason)}>Walk away</Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>Never mind</Button>
       </div>
+    </div>
+  );
+}
+
+/** The docks' street addresses: where the driver's truck GPS goes. Fill one in when the rate con didn't have it. */
+function DockAddresses({ load }: { load: Load }) {
+  const setDockAddress = useStore((s) => s.actions.setDockAddress);
+  const [editing, setEditing] = useState<"pickup" | "delivery" | null>(null);
+  const [text, setText] = useState("");
+  const stops = [
+    { stop: "pickup" as const, label: "Pickup dock", address: load.pickupAddress ?? load.rateConReading?.shipperAddress ?? null },
+    { stop: "delivery" as const, label: "Delivery dock", address: load.deliveryAddress ?? load.rateConReading?.receiverAddress ?? null },
+  ];
+  return (
+    <div className="mt-3.5 flex flex-col gap-3.5">
+      {stops.map((x) =>
+        editing === x.stop ? (
+          <form
+            key={x.stop}
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setDockAddress(load.id, x.stop, text);
+              setEditing(null);
+            }}
+          >
+            <input autoFocus aria-label={`${x.label} street address`} className="min-w-0 flex-1 rounded-xl border border-line bg-white px-3 py-1.5 text-sm" placeholder="Street, city, state ZIP" value={text} onChange={(e) => setText(e.target.value)} />
+            <Button size="sm" type="submit">Save</Button>
+          </form>
+        ) : (
+          <div key={x.stop} className="flex items-start justify-between gap-3">
+            <span className="text-xs text-ink-500">{x.label}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setText(x.address ?? "");
+                setEditing(x.stop);
+              }}
+              className={"text-right text-sm " + (x.address ? "font-medium text-ink-950" : "font-medium text-[var(--accent-warn)] underline")}
+            >
+              {x.address ?? "Add the street address"}
+            </button>
+          </div>
+        ),
+      )}
     </div>
   );
 }

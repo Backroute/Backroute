@@ -67,7 +67,7 @@ export function TripCompactCard({
     <CardShell className="p-0">
       {showMap && mapFrom && mapTo && (
         <button type="button" onClick={onOpen} aria-label="Open trip details" className="relative isolate block h-28 w-full overflow-hidden text-left">
-          <TripMap from={mapFrom} to={mapTo} laneKey={s.card === "pickup" ? undefined : `${origin}|${destination}`} progress={progress} showTruck={s.card !== "booking"} compact />
+          <TripMap from={mapFrom} to={mapTo} laneKey={s.card === "pickup" ? undefined : `${origin}|${destination}`} progress={progress} showTruck={s.card !== "booking" && s.located} compact />
           <span className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-10 bg-gradient-to-t from-ink-950 to-transparent" />
           <span className="absolute left-3 top-3 z-10 flex items-center gap-2 rounded-full bg-ink-950/85 px-3 py-1.5 text-xs font-semibold backdrop-blur-sm">
             {s.card === "booking" ? <Loader2 className="h-3.5 w-3.5 animate-spin text-white/70" /> : <LiveDot />} {status}
@@ -157,7 +157,7 @@ export function TripHeroMap(props: DriverTripCardProps) {
   if (!from || !to) return null;
   return (
     <div className="theme-ink relative isolate h-[44vh] min-h-64 w-full overflow-hidden bg-ink-950 text-white" aria-label={`${status}. ${s.card === "pickup" ? origin : destination}`} role="img">
-      <TripMap from={from} to={to} laneKey={s.card === "pickup" ? undefined : `${origin}|${destination}`} progress={s.card === "booking" ? 0 : s.arrived ? 1 : s.legP} showTruck={s.card !== "booking"} />
+      <TripMap from={from} to={to} laneKey={s.card === "pickup" ? undefined : `${origin}|${destination}`} progress={s.card === "booking" ? 0 : s.arrived ? 1 : s.legP} showTruck={s.card !== "booking" && s.located} />
       <span className="pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-gradient-to-b from-ink-950/70 to-transparent" />
       <div className="absolute inset-x-4 top-3 z-10 flex items-center justify-between gap-2">
         <span className="flex items-center gap-2 rounded-full bg-ink-950/80 px-3 py-1.5 text-xs font-semibold backdrop-blur-md">
@@ -270,8 +270,10 @@ export function TripDetails({
 function FuelPlanSection({ load }: { load: DriverTripCardProps["load"] }) {
   const now = useNow();
   const mpg = useStore((st) => st.trucks.find((t) => t.id === load.truckId)?.mpg ?? 6.5);
+  // The prices behind it are sample numbers, so a real account doesn't get told where to fuel from them.
+  const sample = useStore((st) => st.session.mode === "demo");
   const s = tripState(load, now, false);
-  if (s.card === "booking" || load.stage === "at_delivery") return null;
+  if (!sample || s.card === "booking" || load.stage === "at_delivery") return null;
   const milesDone = s.card === "delivery" ? Math.round(load.lane.miles * s.legP) : 0;
   const plan = planFuel(load, mpg, milesDone);
   if (!plan) return null;

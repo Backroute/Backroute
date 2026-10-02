@@ -1,4 +1,4 @@
-import { formatEta, legMiles, legProgress } from "./trip-geo";
+import { formatEta, legMiles, legProgressInfo } from "./trip-geo";
 import type { Load, LoadDocument, LoadStage } from "./types";
 
 export const BOOKING_STAGES: LoadStage[] = ["sourced", "scoring", "negotiating", "rate_confirmed", "booked"];
@@ -16,6 +16,8 @@ export interface TripState {
   arrived: boolean;
   /** 0–1 along the current drive (pickup or delivery). */
   legP: number;
+  /** The progress comes from where the truck is (ELD), or the demo's drive; false: a real truck with no fresh position. */
+  located: boolean;
   milesLeft: number;
   /** "8 min · 7 mi", "Arriving now" or "Arrived". */
   drive: string;
@@ -58,7 +60,7 @@ export function tripState(load: Load, now: number | null, needsPreTrip: boolean)
 
   if (card === "booking") {
     return {
-      card, arrived: false, legP: 0, milesLeft: 0, drive: "", handled: false, docDone: false,
+      card, arrived: false, legP: 0, located: false, milesLeft: 0, drive: "", handled: false, docDone: false,
       done: BOOKING_PROGRESS[load.stage] ?? 0.2, total: 1, ready: false,
       next: { title: load.liveCall ? "On the phone with the broker" : (rateConStep(load) ?? BOOKING_NEXT[load.stage] ?? "Booking the load"), owner: "ai", action: null },
     };
@@ -66,9 +68,9 @@ export function tripState(load: Load, now: number | null, needsPreTrip: boolean)
 
   const pickup = card === "pickup";
   const arrived = load.stage === (pickup ? "at_pickup" : "at_delivery");
-  const legP = legProgress(load, now);
+  const { p: legP, located } = legProgressInfo(load, now);
   const milesLeft = Math.max(0, Math.round(legMiles(load, card) * (1 - legP)));
-  const drive = arrived ? "Arrived" : legP >= 0.98 ? "Arriving now" : `${formatEta(milesLeft)} · ${milesLeft} mi`;
+  const drive = arrived ? "Arrived" : !located ? "No GPS yet" : legP >= 0.98 ? "Arriving now" : `${formatEta(milesLeft)} · ${milesLeft} mi`;
   const handled = !!(pickup ? load.tripChecklist?.loadedAt : load.tripChecklist?.unloadedAt);
   const doc = load.documents.find((d) => d.type === (pickup ? "bol" : "pod"));
   const docDone = doc?.status === "verified";
@@ -89,5 +91,5 @@ export function tripState(load: Load, now: number | null, needsPreTrip: boolean)
   } else if (preTrip) next = { title: "Do your pre-trip inspection", owner: "driver", action: "pretrip" };
   else next = { title: pickup ? "Start the trip" : "Complete the delivery", owner: "driver", action: pickup ? "start" : "complete" };
 
-  return { card, arrived, legP, milesLeft, drive, handled, doc, docDone, done, total, ready, next };
+  return { card, arrived, legP, located, milesLeft, drive, handled, doc, docDone, done, total, ready, next };
 }

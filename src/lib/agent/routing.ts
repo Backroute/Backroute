@@ -75,3 +75,58 @@ export async function routedEta(truck: Truck, driver: Driver | undefined, city: 
   const left = clocksFresh ? Math.min(driver!.hos!.drive, driver!.hos!.shift) : Infinity;
   return now + (r.hours + (r.hours > left ? 10 : 0)) * 3600_000;
 }
+
+// ─── For the driver's screen: the dock's exact spot, and the truck's road to it ──────────────────────────────
+
+/** A dock's street address to its exact spot, for the driver's truck GPS. Null when not set up or not found. */
+export async function geocodeAddress(address: string): Promise<{ lat: number; lon: number } | null> {
+  if (!routingConfigured()) return null;
+  const key = `addr:${address.trim().toLowerCase()}`;
+  if (places.has(key)) return places.get(key)!;
+  try {
+    const body = (await get(`${GEOCODE()}/v1/geocode?q=${encodeURIComponent(address)}&in=countryCode:USA,CAN&limit=1&apiKey=${encodeURIComponent(process.env.HERE_API_KEY!)}`)) as {
+      items?: { position?: { lat: number; lng: number }; resultType?: string }[];
+    };
+    const item = body.items?.[0];
+    // Only a street-level answer: a city or ZIP match would put the pin in the wrong place.
+    const exact = item?.position && ["houseNumber", "street", "place", "intersection"].includes(item.resultType ?? "");
+    const found = exact ? { lat: item!.position!.lat, lon: item!.position!.lng } : null;
+    places.set(key, found);
+    return found;
+  } catch (e) {
+    console.error("[routing] geocode failed", e);
+    return null;
+  }
+}
+
+export interface TruckSize {
+  heightIn: number;
+  weightLbs: number;
+  lengthFt: number;
+}
+
+const paths = new Map<string, { at: number; path: [number, number][] | null }>();
+
+/** The road a truck of this size takes (HERE, truck mode: no low bridges, parkways or truck-restricted roads). */
+export async function truckPath(from: Point, to: Point, size: TruckSize): Promise<[number, number][] | null> {
+  if (!routingConfigured()) return null;
+  const key = `${from.lat.toFixed(2)},${from.lon.toFixed(2)}>${to.lat.toFixed(3)},${to.lon.toFixed(3)}:${size.heightIn}:${size.weightLbs}:${size.lengthFt}`;
+  const hit = paths.get(key);
+  if (hit && Date.now() - hit.at < FRESH) return hit.path;
+  try {
+    const vehicle = `&vehicle[height]=${Math.round(size.heightIn * 2.54)}&vehicle[grossWeight]=${Math.round(size.weightLbs * 0.4536)}&vehicle[length]=${Math.round(size.lengthFt * 30.48)}`;
+    const body = (await get(`${ROUTER()}/v8/routes?transportMode=truck&origin=${from.lat},${from.lon}&destination=${to.lat},${to.lon}&return=polyline${vehicle}&apiKey=${encodeURIComponent(process.env.HERE_API_KEY!)}`)) as {
+      routes?: { sections?: { polyline?: string }[] }[];
+    };
+    const { decodeFlexPolyline } = await import("../flexpolyline");
+    const all = (body.routes?.[0]?.sections ?? []).flatMap((x) => (x.polyline ? decodeFlexPolyline(x.polyline) : []));
+    // Thinned for the phone: about 400 points is plenty for a map line.
+    const step = Math.max(1, Math.ceil(all.length / 400));
+    const path = all.length >= 2 ? all.filter((_, i) => i % step === 0 || i === all.length - 1) : null;
+    paths.set(key, { at: Date.now(), path });
+    return path;
+  } catch (e) {
+    console.error("[routing] truck path failed", e);
+    return null;
+  }
+}

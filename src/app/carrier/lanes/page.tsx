@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useChartColors } from "@/components/shared/money-charts";
 import { useCarrierLoads } from "@/lib/selectors";
+import { useStore } from "@/lib/store";
 import { laneHistory } from "@/lib/lane-history";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +15,11 @@ const monthLabel = (m: string) => new Date(`${m}-15T12:00:00Z`).toLocaleDateStri
 
 export default function LanesPage() {
   const loads = useCarrierLoads();
-  const lanes = useMemo(() => laneHistory(loads), [loads]);
+  // A real account compares only against market rates from a rate service (Settings → Integrations); a load typed
+  // in by hand carries its own rate, which isn't the market's.
+  const real = useStore((s) => s.session.mode !== "demo");
+  const lanes = useMemo(() => laneHistory(loads, { serviceOnly: real }), [loads, real]);
+  const anyMarket = lanes.some((l) => l.market !== null);
   const [picked, setPicked] = useState<string | null>(null);
   const lane = lanes.find((l) => l.key === picked) ?? lanes[0];
   const c = useChartColors();
@@ -22,12 +27,12 @@ export default function LanesPage() {
 
   return (
     <div>
-      <PageHeader title="Lanes" description="What you get paid on each lane against the market, month by month." />
+      <PageHeader title="Lanes" description={anyMarket || lanes.length === 0 ? "What you get paid on each lane against the market, month by month." : "What you get paid on each lane, month by month."} />
       <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
         {lanes.length === 0 ? (
           <Card>
             <CardContent>
-              <p className="text-sm text-ink-500">Once a lane has two booked loads it shows here, with your rate per mile next to the market&apos;s.</p>
+              <p className="text-sm text-ink-500">Once a lane has two booked loads it shows here, with your rate per mile month by month.</p>
             </CardContent>
           </Card>
         ) : (
@@ -38,11 +43,18 @@ export default function LanesPage() {
                   <div>
                     <CardTitle>{lane.label}</CardTitle>
                     <CardDescription>
-                      {lane.loads} loads · you ${lane.yours.toFixed(2)}/mi, market ${lane.market.toFixed(2)}/mi ·{" "}
-                      <span className={lane.vsMarket >= 0 ? "text-[var(--accent-live)]" : "text-[var(--accent-danger)]"}>
-                        {lane.vsMarket >= 0 ? "+" : ""}
-                        {Math.round(lane.vsMarket * 100)}% {lane.vsMarket >= 0 ? "over" : "under"} market
-                      </span>
+                      {lane.loads} loads · you ${lane.yours.toFixed(2)}/mi
+                      {lane.market !== null && lane.vsMarket !== null ? (
+                        <>
+                          , market ${lane.market.toFixed(2)}/mi ·{" "}
+                          <span className={lane.vsMarket >= 0 ? "text-[var(--accent-live)]" : "text-[var(--accent-danger)]"}>
+                            {lane.vsMarket >= 0 ? "+" : ""}
+                            {Math.round(lane.vsMarket * 100)}% {lane.vsMarket >= 0 ? "over" : "under"} market
+                          </span>
+                        </>
+                      ) : (
+                        " · no market rate yet (connect a rate service in Settings → Integrations)"
+                      )}
                     </CardDescription>
                   </div>
                 </CardHeader>
@@ -57,7 +69,7 @@ export default function LanesPage() {
                           contentStyle={{ background: c.surface, border: `1px solid ${c.line}`, borderRadius: 12, fontSize: 12 }}
                           formatter={(v, n) => [`$${Number(v).toFixed(2)}/mi`, n === "yours" ? "You" : "Market"]}
                         />
-                        <Line type="monotone" dataKey="market" stroke={c.muted} strokeDasharray="4 4" strokeWidth={2} dot={false} name="market" />
+                        {lane.market !== null && <Line type="monotone" dataKey="market" stroke={c.muted} strokeDasharray="4 4" strokeWidth={2} dot={false} name="market" connectNulls />}
                         <Line type="monotone" dataKey="yours" stroke={brand} strokeWidth={2.5} dot={{ r: 3, fill: brand }} name="yours" />
                       </LineChart>
                     </ResponsiveContainer>
@@ -66,9 +78,11 @@ export default function LanesPage() {
                     <span className="flex items-center gap-1.5">
                       <span className="h-0.5 w-4 rounded bg-brand" /> You
                     </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="h-0.5 w-4 rounded border-t-2 border-dashed border-ink-400" /> Market
-                    </span>
+                    {lane.market !== null && (
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-0.5 w-4 rounded border-t-2 border-dashed border-ink-400" /> Market
+                      </span>
+                    )}
                   </p>
                 </CardContent>
               </Card>
@@ -88,15 +102,17 @@ export default function LanesPage() {
                         <span className="min-w-0">
                           <span className="block text-sm font-medium text-ink-950">{l.label}</span>
                           <span className="block text-xs text-ink-500">
-                            {l.loads} loads · ${l.yours.toFixed(2)} vs ${l.market.toFixed(2)}/mi
+                            {l.loads} loads · ${l.yours.toFixed(2)}/mi{l.market !== null ? ` vs $${l.market.toFixed(2)} market` : ""}
                           </span>
                         </span>
                         <span className="flex shrink-0 items-center gap-2 text-sm font-semibold tabular">
                           {l.trend !== 0 && (l.trend > 0 ? <TrendingUp className="h-4 w-4 text-[var(--accent-live)]" aria-label="Going up" /> : <TrendingDown className="h-4 w-4 text-[var(--accent-danger)]" aria-label="Going down" />)}
-                          <span className={l.vsMarket >= 0 ? "text-[var(--accent-live)]" : "text-[var(--accent-danger)]"}>
-                            {l.vsMarket >= 0 ? "+" : ""}
-                            {Math.round(l.vsMarket * 100)}%
-                          </span>
+                          {l.vsMarket !== null && (
+                            <span className={l.vsMarket >= 0 ? "text-[var(--accent-live)]" : "text-[var(--accent-danger)]"}>
+                              {l.vsMarket >= 0 ? "+" : ""}
+                              {Math.round(l.vsMarket * 100)}%
+                            </span>
+                          )}
                         </span>
                       </button>
                     </li>

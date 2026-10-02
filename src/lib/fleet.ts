@@ -106,6 +106,9 @@ export interface NewLoad {
   rate: number;
   equipment: EquipmentType;
   weight?: number;
+  /** The docks' street addresses, when known. */
+  pickupAddress?: string;
+  deliveryAddress?: string;
 }
 
 /** Road miles from the straight line between two known cities (about 1.2×), when the owner doesn't give them. */
@@ -138,6 +141,8 @@ export function makeLoad(input: NewLoad, broker: Broker, truck: Truck, stage: "d
     },
     equipmentType: input.equipment,
     weight: input.weight ?? 0,
+    ...(input.pickupAddress?.trim() ? { pickupAddress: input.pickupAddress.trim() } : {}),
+    ...(input.deliveryAddress?.trim() ? { deliveryAddress: input.deliveryAddress.trim() } : {}),
     pickupWindow: input.pickupWindow.trim(),
     deliveryWindow: input.deliveryWindow.trim(),
     ...(input.pickupAt ? { pickupAt: input.pickupAt } : {}),

@@ -95,14 +95,38 @@ export function legFor(stage: LoadStage): TripLeg | null {
   return null;
 }
 
-/** 0–1 along the current leg. Arrival stages (at_pickup / at_delivery) are the end of their leg; a leg that's
- *  still driving tops out just short of 1 until the driver actually swipes that they've arrived. */
-export function legProgress(load: Load, now: number | null): number {
-  if (load.stage === "at_pickup" || load.stage === "at_delivery") return 1;
+/**
+ * Real accounts: where a truck is right now (its ELD position, when fresh), set by the sync layer. The demo and the
+ * sample fleet keep the simulated drive ("simulate"). A real truck with no fresh position is "not located": the app
+ * says so instead of moving a dot along a made-up timer.
+ */
+export type Locate = (load: Load) => { lat: number; lon: number } | null | "simulate";
+let locate: Locate | null = null;
+export function setLocator(fn: Locate | null) {
+  locate = fn;
+}
+
+/** 0–1 along the current leg, and whether that comes from where the truck really is. Arrival stages (at_pickup /
+ *  at_delivery) are the end of their leg; a leg that's still driving tops out just short of 1 until the driver
+ *  actually swipes that they've arrived. */
+export function legProgressInfo(load: Load, now: number | null): { p: number; located: boolean } {
+  if (load.stage === "at_pickup" || load.stage === "at_delivery") return { p: 1, located: true };
   const leg = legFor(load.stage);
-  if (!leg || now === null) return 0;
+  const at = locate ? locate(load) : "simulate";
+  if (at !== "simulate") {
+    if (!leg || !at) return { p: 0, located: false };
+    const stop = leg === "pickup" ? cityCoords(load.lane.origin, load.lane.originState) : cityCoords(load.lane.destination, load.lane.destState);
+    if (!stop) return { p: 0, located: false };
+    const left = distanceMiles([at.lat, at.lon], stop) * 1.2;
+    return { p: Math.min(0.98, Math.max(0, 1 - left / legMiles(load, leg))), located: true };
+  }
+  if (!leg || now === null) return { p: 0, located: true };
   const started = Math.max(Date.parse(load.updatedAt), SESSION_START - SEEDED_HEAD_START_MS);
-  return Math.min(0.98, Math.max(0, (now - started) / DEMO_LEG_MS[leg]));
+  return { p: Math.min(0.98, Math.max(0, (now - started) / DEMO_LEG_MS[leg])), located: true };
+}
+
+export function legProgress(load: Load, now: number | null): number {
+  return legProgressInfo(load, now).p;
 }
 
 export function legMiles(load: Load, leg: TripLeg): number {

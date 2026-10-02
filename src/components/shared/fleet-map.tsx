@@ -8,6 +8,7 @@ import { isTransitStage, transitProgress } from "@/lib/load-status";
 import { placeCoords, roughCoords, type LatLng } from "@/lib/trip-geo";
 import type { Driver, Load, Truck } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useStore } from "@/lib/store";
 
 /** What each dot's color means, the same words as everywhere else. */
 export type TruckSpot = "moving" | "stop" | "late" | "empty";
@@ -47,11 +48,13 @@ function whereIs({ truck, current }: FleetDot): LatLng | undefined {
   return placeCoords(truck.currentCity, truck.currentState) ?? roughCoords(truck.currentCity, truck.currentState)?.at;
 }
 
-function dotElement(dot: FleetDot, spot: TruckSpot, onSelect: (truckId: string) => void): HTMLElement {
+function dotElement(dot: FleetDot, spot: TruckSpot, onSelect: (truckId: string) => void, estimated = false): HTMLElement {
   const el = document.createElement("button");
   el.type = "button";
-  el.setAttribute("aria-label", `${dot.truck.unitNumber}${dot.driver ? `, ${dot.driver.name}` : ""}: ${SPOT_LABEL[spot]}`);
+  el.setAttribute("aria-label", `${dot.truck.unitNumber}${dot.driver ? `, ${dot.driver.name}` : ""}: ${SPOT_LABEL[spot]}${estimated ? ", spot estimated (no GPS)" : ""}`);
   el.className = "group flex flex-col items-center";
+  // A real truck with no ELD reading is placed along its trip or at its city: faded, so it isn't read as GPS.
+  if (estimated) el.style.opacity = "0.5";
   el.innerHTML = `<span class="rounded-full bg-[var(--color-white)] px-1.5 py-0.5 text-[10px] font-semibold text-ink-950 shadow ring-1 ring-black/5">${dot.truck.unitNumber.replace(/[<>&]/g, "")}</span><span class="mt-1 block h-3.5 w-3.5 rounded-full border-2 border-[var(--color-white)] shadow" style="background:${SPOT_COLOR[spot]}"></span>`;
   el.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -90,6 +93,8 @@ export function FleetMap({ dots, onSelect, className }: { dots: FleetDot[]; onSe
   const markers = useRef<Marker[]>([]);
   const ml = useRef<typeof import("maplibre-gl") | null>(null);
   const dark = useIsDark();
+  const realAccount = useStore((s) => s.session.mode !== "demo");
+  const estimatedCount = realAccount ? dots.filter((d) => !d.truck.position).length : 0;
   const select = useRef(onSelect);
   useEffect(() => {
     select.current = onSelect;
@@ -102,7 +107,7 @@ export function FleetMap({ dots, onSelect, className }: { dots: FleetDot[]; onSe
         .filter((p): p is { d: FleetDot; at: LatLng; spot: TruckSpot } => !!p.at),
     [dots],
   );
-  const key = placed.map((p) => `${p.d.truck.id}:${p.at.map((n) => n.toFixed(3)).join(",")}:${p.spot}`).join("|");
+  const key = `${realAccount ? "real" : "demo"}#` + placed.map((p) => `${p.d.truck.id}:${p.at.map((n) => n.toFixed(3)).join(",")}:${p.spot}:${p.d.truck.position ? "gps" : "est"}`).join("|");
   const counts = useMemo(() => {
     const c: Record<TruckSpot, number> = { moving: 0, stop: 0, late: 0, empty: 0 };
     for (const d of dots) c[spotOf(d)]++;
@@ -171,7 +176,7 @@ export function FleetMap({ dots, onSelect, className }: { dots: FleetDot[]; onSe
       markers.current = groups.map(({ members }) => {
         if (members.length === 1) {
           const { d, at, spot } = members[0];
-          return new lib.Marker({ element: dotElement(d, spot, (id) => select.current(id)), anchor: "bottom" }).setLngLat([at[1], at[0]]).addTo(m);
+          return new lib.Marker({ element: dotElement(d, spot, (id) => select.current(id), realAccount && !d.truck.position), anchor: "bottom" }).setLngLat([at[1], at[0]]).addTo(m);
         }
         const lng = members.reduce((s, p) => s + p.at[1], 0) / members.length;
         const lat = members.reduce((s, p) => s + p.at[0], 0) / members.length;
@@ -214,6 +219,11 @@ export function FleetMap({ dots, onSelect, className }: { dots: FleetDot[]; onSe
               {SPOT_LABEL[s]} <span className="tabular text-ink-400">{counts[s]}</span>
             </li>
           ))}
+          {estimatedCount > 0 && (
+            <li className="flex items-center gap-1.5 text-ink-500">
+              <span className="h-2.5 w-2.5 rounded-full bg-ink-400 opacity-50" /> Faded: no GPS, spot estimated
+            </li>
+          )}
         </ul>
       </div>
       <div className="relative h-72 sm:h-80" style={{ background: "var(--ink-100)" }}>

@@ -5,6 +5,7 @@ import type { Membership } from "./account";
 import { useStore } from "../store";
 import { PRIMARY_CARRIER_ID } from "../mock-data";
 import { switchToRealDockClock } from "../detention";
+import { setLocator } from "../trip-geo";
 import { conflictKey, CREATED_ONLY, rowFor, type Item, type RecordKind, type Table } from "./rows";
 
 /**
@@ -223,6 +224,7 @@ export async function connect(m: Membership, opts: { fresh?: boolean; userId?: s
   if (mode === "driver" && !loaded.get("drivers")?.some((d) => d.id === m.driverId)) throw new NotSetUpError();
 
   switchToRealDockClock();
+  followRealPositions();
   const c: Connection = {
     carrierId: m.carrierId,
     mode,
@@ -342,7 +344,19 @@ export function cachedView(userId: string): View | null {
 }
 
 /** Shows a kept view right away, read-only in effect until connect() has the latest (it replaces it all). */
+/** A real account's trips move by where the truck really is (its ELD position, fresh within 30 minutes); the sample
+ *  fleet a signed-in owner practices on keeps the simulated drive. */
+function followRealPositions() {
+  setLocator((load) => {
+    const s = useStore.getState();
+    if (s.session.mode === "demo") return "simulate";
+    const pos = s.trucks.find((t) => t.id === load.truckId)?.position;
+    return pos && Date.now() - Date.parse(pos.at) < 30 * 60_000 ? pos : null;
+  });
+}
+
 export function showCached(v: View) {
+  followRealPositions();
   useStore.setState((s) => {
     const next: Partial<State> = {
       session: { mode: v.mode, carrierId: v.carrierId, driverId: v.driverId, fresh: false },
@@ -377,6 +391,7 @@ export function disconnect() {
   if (conn.timer) clearTimeout(conn.timer);
   if (conn.channel) void supabase().removeChannel(conn.channel);
   conn = null;
+  setLocator(null);
 }
 
 /** Signs out and reloads, so the next person on this device starts clean. */

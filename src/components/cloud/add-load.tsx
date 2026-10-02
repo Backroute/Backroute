@@ -28,6 +28,9 @@ interface Form {
   /** "YYYY-MM-DDTHH:mm" in the stop's local time. */
   pickupLocal: string;
   deliveryLocal: string;
+  /** The docks' street addresses: where the driver's truck GPS goes. */
+  pickupAddress: string;
+  deliveryAddress: string;
   rate: string;
   equipment: EquipmentType;
 }
@@ -73,6 +76,8 @@ function AddLoadPanel({ onDone }: { onDone: () => void }) {
     deliveryWindow: "",
     pickupLocal: "",
     deliveryLocal: "",
+    pickupAddress: "",
+    deliveryAddress: "",
     rate: "",
     equipment: trucks[0]?.equipmentType ?? "Dry Van",
   });
@@ -102,6 +107,8 @@ function AddLoadPanel({ onDone }: { onDone: () => void }) {
       deliveryWindow: r.delivery ?? x.deliveryWindow,
       pickupLocal: r.pickupLocal?.slice(0, 16) ?? x.pickupLocal,
       deliveryLocal: r.deliveryLocal?.slice(0, 16) ?? x.deliveryLocal,
+      pickupAddress: r.shipperAddress ?? x.pickupAddress,
+      deliveryAddress: r.receiverAddress ?? x.deliveryAddress,
       rate: r.totalRate != null ? String(r.totalRate) : x.rate,
       equipment: guessEquipment(r.equipment) ?? x.equipment,
     }));
@@ -142,6 +149,8 @@ function AddLoadPanel({ onDone }: { onDone: () => void }) {
       deliveryWindow: f.deliveryWindow.trim() || formatAtStop(deliveryAt!, f.destinationState),
       pickupAt: pickupAt!,
       deliveryAt: deliveryAt!,
+      pickupAddress: f.pickupAddress,
+      deliveryAddress: f.deliveryAddress,
       rate,
       equipment: f.equipment,
       rateConReading: reading ?? undefined,
@@ -198,11 +207,13 @@ function AddLoadPanel({ onDone }: { onDone: () => void }) {
             <input className={input} placeholder="Pickup city" aria-label="Pickup city" value={f.originCity} onChange={(e) => set({ originCity: e.target.value })} />
             <input className={input} placeholder="State" aria-label="Pickup state" maxLength={2} value={f.originState} onChange={(e) => set({ originState: e.target.value.toUpperCase() })} />
           </div>
+          <input className={`${input} col-span-2`} placeholder="Pickup street address (for the driver's truck GPS)" aria-label="Pickup address" autoComplete="off" value={f.pickupAddress} onChange={(e) => set({ pickupAddress: e.target.value })} />
           <StopTime label="Pickup" state={f.originState} local={f.pickupLocal} note={f.pickupWindow} onLocal={(v) => set({ pickupLocal: v })} onNote={(v) => set({ pickupWindow: v })} />
           <div className="col-span-2 grid grid-cols-[1fr_4.5rem] gap-2">
             <input className={input} placeholder="Delivery city" aria-label="Delivery city" value={f.destinationCity} onChange={(e) => set({ destinationCity: e.target.value })} />
             <input className={input} placeholder="State" aria-label="Delivery state" maxLength={2} value={f.destinationState} onChange={(e) => set({ destinationState: e.target.value.toUpperCase() })} />
           </div>
+          <input className={`${input} col-span-2`} placeholder="Delivery street address (for the driver's truck GPS)" aria-label="Delivery address" autoComplete="off" value={f.deliveryAddress} onChange={(e) => set({ deliveryAddress: e.target.value })} />
           <StopTime label="Delivery" state={f.destinationState} local={f.deliveryLocal} note={f.deliveryWindow} onLocal={(v) => set({ deliveryLocal: v })} onNote={(v) => set({ deliveryWindow: v })} />
           <input className={input} placeholder={estimate ? `Miles (about ${estimate})` : "Miles"} aria-label="Miles" inputMode="numeric" value={f.miles} onChange={(e) => set({ miles: e.target.value.replace(/\D/g, "") })} />
           <select className={input} aria-label="Equipment" value={f.equipment} onChange={(e) => set({ equipment: e.target.value as EquipmentType })}>

@@ -42,6 +42,8 @@ export const Reading = z.object({
   receiver: z.string().nullable().describe("The delivery facility's company name, as printed."),
   shipperZip: z.string().nullable().describe("The pickup facility's 5-digit ZIP code, as printed; null if not on it."),
   receiverZip: z.string().nullable().describe("The delivery facility's 5-digit ZIP code, as printed; null if not on it."),
+  shipperAddress: z.string().nullable().describe("The pickup facility's street address with city, state and ZIP, as printed (e.g. \"4500 Industrial Pkwy, Memphis, TN 38118\"); null if not on it."),
+  receiverAddress: z.string().nullable().describe("The delivery facility's street address with city, state and ZIP, as printed; null if not on it."),
   shipperPhone: z.string().nullable().describe("The pickup facility's phone number (shipping or scheduling), as printed; null if not on it."),
   receiverPhone: z.string().nullable().describe("The delivery facility's phone number (receiving or scheduling), as printed; null if not on it."),
   reefer: z

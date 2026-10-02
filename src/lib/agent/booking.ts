@@ -469,8 +469,9 @@ export async function textNewLoad(ctx: CarrierContext, load: Load): Promise<bool
     ref: load.referenceNumber,
     from: `${load.lane.origin}, ${load.lane.originState}`,
     to: `${load.lane.destination}, ${load.lane.destState}`,
-    pickup: load.pickupWindow,
-    delivery: load.deliveryWindow,
+    // The dock's street address with the time, when known: what the driver types into the truck GPS.
+    pickup: load.pickupAddress ? `${load.pickupWindow} (${load.pickupAddress})` : load.pickupWindow,
+    delivery: load.deliveryAddress ? `${load.deliveryWindow} (${load.deliveryAddress})` : load.deliveryWindow,
   }), ...slow, ...(extra ? [await translateForDriver(extra, lang)] : [])].join(" ");
   const sid = await textTo(ctx.carrier, to, text);
   await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: new Date().toISOString(), channel: "sms" }, "/driver");

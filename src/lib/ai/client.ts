@@ -108,6 +108,10 @@ export interface RateConReading {
   equipment: string | null;
   detention: string | null;
   paymentTerms: string | null;
+  shipper?: string | null;
+  receiver?: string | null;
+  shipperAddress?: string | null;
+  receiverAddress?: string | null;
   finesAndFees: string[];
   mismatches: RateConMismatch[];
   otherConcerns: string[];
