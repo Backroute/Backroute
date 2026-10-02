@@ -1,5 +1,6 @@
 import "server-only";
 import { pushToOffice } from "../push";
+import { answerToken } from "./answer-token";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
@@ -81,7 +82,15 @@ async function raise(ctx: CarrierContext, p: { reason: string; loadId?: string; 
   ctx.escalations.unshift(escalation);
   // The owner's phone buzzes for what needs them (and for an emergency support has, so they know).
   if (to === "owner" || p.critical)
-    await pushToOffice(ctx.carrier.id, { title: p.critical ? "Urgent" : to === "owner" ? "Needs you" : "Support is on it", body: p.reason, url: p.loadId ? `/carrier/loads/${p.loadId}` : "/carrier", tag: escalation.id, urgent: !!p.critical }).catch((e) => console.error("[push] failed", e));
+    await pushToOffice(ctx.carrier.id, {
+      title: p.critical ? "Urgent" : to === "owner" ? "Needs you" : "Support is on it",
+      body: p.reason,
+      url: p.loadId ? `/carrier/loads/${p.loadId}` : "/carrier",
+      tag: escalation.id,
+      urgent: !!p.critical,
+      // A routine call for the owner is answered right on the notification: their label, or not this one.
+      ...(to === "owner" && !p.critical ? { actions: [{ action: "yes" as const, title: (p.label ?? "Got it").slice(0, 30) }, ...(p.label && p.label !== "Got it" ? [{ action: "no" as const, title: "No" }] : [])], answer: answerToken(ctx.carrier.id, escalation.id) } : {}),
+    }).catch((e) => console.error("[push] failed", e));
   if (to === "support" && p.critical) await alertSupport(ctx.carrier, `Backroute support, urgent: ${ctx.carrier.name}. ${p.reason}`.slice(0, 600)).catch((e) => console.error("[support] alert failed", e));
   return escalation;
 }

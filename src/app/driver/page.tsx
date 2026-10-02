@@ -16,6 +16,9 @@ import { Switch } from "@/components/ui/switch";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { IncidentCard } from "@/components/shared/incident-card";
 import { ConsentCard } from "@/components/cloud/driver-dispatch-card";
+import { QuickReplies } from "@/components/shared/quick-replies";
+import { useMoving } from "@/lib/moving";
+import { OfflineBadge } from "@/components/shared/offline-badge";
 import { useNow } from "@/lib/hooks";
 import { weekEarnings } from "@/lib/earnings";
 import { computeDriverPay } from "@/lib/settlements";
@@ -52,6 +55,8 @@ export default function DriverHomePage() {
   const callDispatch = () => startInboundCall(driver.id);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [driving, setDriving] = useState(false);
+  const [sentNote, setSentNote] = useState<string | null>(null);
+  const payDay = useStore((s) => s.settings.payDay) ?? "Friday";
   const reportIncident = useStore((s) => s.actions.reportIncident);
 
   const truck = trucks.find((t) => t.id === driver.truckId);
@@ -104,6 +109,17 @@ export default function DriverHomePage() {
   const homeTime = useHomeTime(driver, truck, currentLoad);
   const ownerWeek = useOwnerProfit(truck);
   const weekPay = weekEarnings(loads.filter((l) => l.truckId === truck?.id)).loads.reduce((s, l) => s + computeDriverPay(l, driver, !!truck?.secondDriverId), 0);
+  // What the load they're on adds, when it's not counted in the week yet.
+  const loadPay = currentLoad && !weekEarnings([currentLoad]).loads.length ? computeDriverPay({ ...currentLoad, bookedRate: currentLoad.bookedRate ?? currentLoad.targetRate }, driver, !!truck?.secondDriverId) : 0;
+  // Hands-free by itself when the truck starts moving (and back when it stops), unless the driver closed it.
+  const moving = useMoving(!!currentLoad && !completedLoad);
+  const [closedWhileMoving, setClosedWhileMoving] = useState(false);
+  const [wasMoving, setWasMoving] = useState(false);
+  if (moving !== wasMoving) {
+    setWasMoving(moving);
+    if (!moving) setClosedWhileMoving(false);
+  }
+  const showDriving = driving || (moving && !closedWhileMoving && !!currentLoad && !completedLoad);
   // The one thing every driver wants to know besides pay: when they're home.
   const homeWhen =
     driver.runType === "local" || driver.runType === "intown"
@@ -122,11 +138,12 @@ export default function DriverHomePage() {
       <div>
         <div className="flex items-center justify-between gap-3">
           <h1 className="font-display text-2xl text-ink-950">{t.hi(driver.name.split(" ")[0])}</h1>
+          <OfflineBadge />
           {currentLoad && !completedLoad && (
             <button
               type="button"
               onClick={() => setDriving(true)}
-              className="flex items-center gap-1.5 rounded-full bg-ink-950 px-3.5 py-2 text-xs font-semibold text-white"
+              className="flex min-h-11 items-center gap-1.5 rounded-full bg-ink-950 px-4 py-2 text-sm font-semibold text-white"
             >
               <Navigation className="h-3.5 w-3.5" /> {t.drivingMode}
             </button>
@@ -145,6 +162,11 @@ export default function DriverHomePage() {
             {/* An owner-operator keeps what the truck makes, so the number that matters is profit, not driver pay. */}
             <p className="font-display text-2xl tabular text-ink-950">{formatCurrency(solo ? ownerWeek.net : weekPay)}</p>
             <p className="text-xs text-ink-500">{solo ? t.profitWeek : t.payWeek}</p>
+            {!solo && (
+              <p className="mt-1 text-xs text-ink-700">
+                {currentLoad && loadPay > 0 ? `+${formatCurrency(loadPay)} this load · ` : ""}Paid {payDay}
+              </p>
+            )}
           </Link>
           <div className="rounded-2xl border border-line px-4 py-3">
             <p className="font-display text-2xl text-ink-950">{homeWhen}</p>
@@ -173,6 +195,7 @@ export default function DriverHomePage() {
       ) : tripProps ? (
         <>
           <TripCompactCard {...tripProps} onOpen={() => setSheetOpen(true)} />
+          <QuickReplies stage={tripProps.load.stage} onSent={(text) => setSentNote(text)} />
           <TripSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Trip details">
             <TripDetails {...tripProps} autoPick={autoPick} onAutoPick={toggleAutoPick} loadHref={`/driver/loads/${tripProps.load.id}`} />
           </TripSheet>
@@ -192,6 +215,13 @@ export default function DriverHomePage() {
         </div>
       )}
 
+      {completedLoad && <QuickReplies stage={null} onSent={(text) => setSentNote(text)} />}
+      {sentNote && (
+        <p className="-mt-2 text-xs text-ink-600" role="status">
+          Sent to dispatch: &ldquo;{sentNote}&rdquo;
+        </p>
+      )}
+
       {homeTime && <HomeTimeCard status={homeTime} />}
 
       <CallStatusLine driver={driver} />
@@ -200,7 +230,7 @@ export default function DriverHomePage() {
         <div className="rounded-3xl border border-line p-5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-[var(--accent-info)]">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-info-soft text-[var(--accent-info)]">
                 <Link2 className="h-3.5 w-3.5" />
               </span>
               <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Up next</span>
@@ -268,11 +298,14 @@ export default function DriverHomePage() {
         </Link>
       )}
 
-      {driving && currentLoad && truck && (
+      {showDriving && currentLoad && truck && (
         <DrivingMode
           load={currentLoad}
           needsPreTrip={needsPreTrip}
-          onClose={() => setDriving(false)}
+          onClose={() => {
+            setDriving(false);
+            if (moving) setClosedWhileMoving(true);
+          }}
           onArrive={() => driverConfirmStage(currentLoad.id)}
           onTripStep={(step) => confirmTripStep(currentLoad.id, step)}
           onLate={() => reportIncident(driver.id, truck.id, "delay", "Reported hands-free while driving")}

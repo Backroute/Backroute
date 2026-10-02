@@ -72,7 +72,7 @@ export { title as homeTimeTitle };
 export function HomeTimeCard({ status }: { status: HomeTimeStatus }) {
   const tone = status.state === "late" ? "warn" : status.state === "head_home" ? "info" : "calm";
   return (
-    <div className={cn("flex items-start gap-3 rounded-2xl border px-4 py-3.5", tone === "warn" ? "border-[var(--accent-warn)]/40 bg-amber-50/60" : "border-line")}>
+    <div className={cn("flex items-start gap-3 rounded-2xl border px-4 py-3.5", tone === "warn" ? "border-[var(--accent-warn)]/40 bg-warn-soft/60" : "border-line")}>
       <Home className={cn("mt-0.5 h-4 w-4 shrink-0", tone === "warn" ? "text-[var(--accent-warn)]" : tone === "info" ? "text-[var(--accent-info)]" : "text-ink-400")} />
       <div className="min-w-0">
         <p className="text-sm font-medium text-ink-950">{title(status)}</p>

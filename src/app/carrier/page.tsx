@@ -19,6 +19,9 @@ import { IncidentCard } from "@/components/shared/incident-card";
 import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { DailyTextPreview } from "@/components/shared/daily-text";
 import { WeeklyReviewCard } from "@/components/cloud/weekly-review-card";
+import { GoingOutCard } from "@/components/cloud/going-out";
+import { MoneyCard } from "@/components/cloud/money-card";
+import { SetupProgress } from "@/components/cloud/setup-progress";
 import { DriverCallsBoard } from "@/components/shared/driver-calls-board";
 import { DraftApproval, SourceTag } from "@/components/shared/draft-approval";
 import { PortalApproval } from "@/components/shared/portal-approval";
@@ -160,6 +163,9 @@ export default function CarrierOverviewPage() {
           </div>
         </div>
 
+        <SetupProgress />
+        <GoingOutCard />
+
         {incidents.length > 0 && (
           <section aria-label="Incidents the AI is handling" className="grid gap-3 md:grid-cols-2">
             {incidents.map((incident) => {
@@ -191,7 +197,7 @@ export default function CarrierOverviewPage() {
                 const truck = group[0]?.truckId ? truckMap.get(group[0].truckId) : undefined;
                 const driver = truck?.driverId ? driverMap.get(truck.driverId) : undefined;
                 return (
-                  <div key={groupId} className="rounded-2xl border border-[var(--accent-warn)]/40 bg-amber-50/70 p-4">
+                  <div key={groupId} className="rounded-2xl border border-[var(--accent-warn)]/40 bg-warn-soft/70 p-4">
                     {(truck || driver) && <TruckDriverChip truck={truck} driver={driver} className="mb-2 !bg-white/60" />}
                     <p className="text-sm font-medium text-ink-900">Pick the next load</p>
                     <p className="mt-0.5 text-xs text-ink-600">
@@ -218,7 +224,7 @@ export default function CarrierOverviewPage() {
                 const truck = load?.truckId ? truckMap.get(load.truckId) : undefined;
                 const driver = truck?.driverId ? driverMap.get(truck.driverId) : undefined;
                 return (
-                  <div key={e.id} className={cn("rounded-2xl p-4", e.status === "with_support" ? "border border-line bg-ink-50" : "border border-[var(--accent-warn)]/40 bg-amber-50/70")}>
+                  <div key={e.id} className={cn("rounded-2xl p-4", e.status === "with_support" ? "border border-line bg-ink-50" : "border border-[var(--accent-warn)]/40 bg-warn-soft/70")}>
                     {(truck || driver) && <TruckDriverChip truck={truck} driver={driver} className="mb-2 !bg-white/60" />}
                     {e.complexity === "critical" && e.status !== "with_support" && (
                       <Badge tone="danger" className="mb-1.5">Needs a human judgment call</Badge>
@@ -287,7 +293,7 @@ export default function CarrierOverviewPage() {
               })}
 
               {driversAtRisk.map(({ driver, view }) => (
-                <div key={driver.id} className="rounded-2xl border border-[var(--accent-warn)]/40 bg-amber-50/70 p-4">
+                <div key={driver.id} className="rounded-2xl border border-[var(--accent-warn)]/40 bg-warn-soft/70 p-4">
                   <p className="flex items-center gap-2 text-sm font-medium text-ink-900">
                     <UserRound className="h-4 w-4 text-ink-400" /> Check in with {driver.name}
                   </p>
@@ -414,6 +420,7 @@ export default function CarrierOverviewPage() {
 
         {dailyText && <DailyTextPreview />}
 
+        <MoneyCard />
         <WeeklyReviewCard />
 
         <div className="grid gap-6 lg:grid-cols-3">

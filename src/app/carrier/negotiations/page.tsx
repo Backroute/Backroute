@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyNextStep } from "@/components/shared/empty-next-step";
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Ban, Mail, MessageSquare, Phone } from "lucide-react";
@@ -65,7 +66,7 @@ export default function NegotiationsPage() {
 
         <div className="mt-6 flex flex-col gap-4">
           {active.length === 0 && (
-            <p className="py-12 text-center text-sm text-ink-400">No active negotiations right now. The AI is scanning boards for the next load.</p>
+            <EmptyNextStep what="negotiations" fallback="No active negotiations right now. The AI answers the next offer as it comes in." />
           )}
           {active.map((load) => {
             const broker = brokers.get(load.brokerId);
@@ -185,7 +186,7 @@ function DeclineForm({ onCancel, onConfirm }: { onCancel: () => void; onConfirm:
   const [reason, setReason] = useState(DECLINE_REASONS[0]);
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl border border-[var(--accent-danger)]/30 bg-red-50/50 p-3.5">
+    <div className="flex flex-col gap-2.5 rounded-xl border border-[var(--accent-danger)]/30 bg-danger-soft/50 p-3.5">
       <label className="flex flex-col gap-1 text-xs text-ink-500">
         Reason for walking away
         <select value={reason} onChange={(e) => setReason(e.target.value)} className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm text-ink-900">

@@ -39,7 +39,7 @@ export function OwnerNeedsYou({ driver, truck }: { driver: Driver; truck: Truck 
   if (!mine.length) return null;
 
   return (
-    <section aria-labelledby="owner-needs-you" className="rounded-3xl border border-[var(--accent-warn)]/40 bg-amber-50/60 p-4">
+    <section aria-labelledby="owner-needs-you" className="rounded-3xl border border-[var(--accent-warn)]/40 bg-warn-soft/60 p-4">
       <h2 id="owner-needs-you" className="text-sm font-semibold text-ink-950">
         {t.needsYou} · {mine.length}
       </h2>

@@ -29,11 +29,13 @@ import { PhoneAlerts } from "@/components/cloud/phone-alerts";
 import { ExportsCard } from "@/components/cloud/exports-card";
 import { ConnectionsCard } from "@/components/cloud/connections-card";
 import { HistoryCard } from "@/components/cloud/history-card";
+import { BasicsCard } from "@/components/cloud/basics-card";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Aggressiveness } from "@/lib/store";
 
 const TABS = [
-  { key: "general", label: "General" },
+  { key: "basics", label: "Basics" },
+  { key: "general", label: "More" },
   { key: "integrations", label: "Integrations" },
   { key: "addons", label: "AI Add-ons" },
   { key: "billing", label: "Billing & Team" },
@@ -72,7 +74,13 @@ export default function SettingsPage() {
   const [connections, setConnections] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(INTEGRATION_CATEGORIES.flatMap((c) => c.items).map((i) => [i.id, i.connected])),
   );
-  const [tab, setTab] = useState<TabKey>("general");
+  // A real account opens on the five questions that matter; the demo, on everything.
+  const [tab, setTab] = useState<TabKey>(() => {
+    // A link can open a tab (?tab=basics); the page renders after sign-in, in the browser only.
+    const asked = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
+    return TABS.some((t) => t.key === asked) && (signedIn || asked !== "basics") ? (asked as TabKey) : signedIn ? "basics" : "general";
+  });
+  const tabs = TABS.filter((t) => signedIn || t.key !== "basics").map((t) => (t.key === "general" && !signedIn ? { ...t, label: "General" } : t));
   const [card, setCard] = useState({ brand: "Visa", last4: "4242", expiry: "08/29" });
   const [editingCard, setEditingCard] = useState(false);
   const [cardNumberInput, setCardNumberInput] = useState("");
@@ -91,9 +99,10 @@ export default function SettingsPage() {
       <PageHeader title="Settings" />
 
       <div className="px-4 py-6 sm:px-8">
-        <Tabs tabs={TABS.map((t) => ({ key: t.key, label: t.label }))} active={tab} onChange={(k) => setTab(k as TabKey)} />
+        <Tabs tabs={tabs.map((t) => ({ key: t.key, label: t.label }))} active={tab} onChange={(k) => setTab(k as TabKey)} />
 
         <div className="mt-5 flex flex-col gap-6">
+          {tab === "basics" && signedIn && <BasicsCard />}
           {tab === "general" && (
             <>
               <Card>

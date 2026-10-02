@@ -108,7 +108,7 @@ export default function MaintenancePage() {
                     ) : (
                       <>
                         {svcStatus !== "ok" && (
-                          <div className={`flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs ${svcStatus === "overdue" ? "bg-red-50 text-[var(--accent-danger)]" : "bg-amber-50 text-[var(--accent-warn)]"}`}>
+                          <div className={`flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs ${svcStatus === "overdue" ? "bg-danger-soft text-[var(--accent-danger)]" : "bg-warn-soft text-[var(--accent-warn)]"}`}>
                             {svcStatus === "overdue" ? <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : <Wrench className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
                             <span>
                               {svcStatus === "overdue"
@@ -118,7 +118,7 @@ export default function MaintenancePage() {
                           </div>
                         )}
                         {inspStatus !== "ok" && (
-                          <div className={`flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs ${inspStatus === "overdue" ? "bg-red-50 text-[var(--accent-danger)]" : "bg-amber-50 text-[var(--accent-warn)]"}`}>
+                          <div className={`flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs ${inspStatus === "overdue" ? "bg-danger-soft text-[var(--accent-danger)]" : "bg-warn-soft text-[var(--accent-warn)]"}`}>
                             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                             <span>
                               {inspStatus === "overdue"
@@ -128,7 +128,7 @@ export default function MaintenancePage() {
                           </div>
                         )}
                         {svcStatus === "ok" && inspStatus === "ok" && (
-                          <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2.5 text-xs text-[var(--accent-live)]">
+                          <div className="flex items-center gap-2 rounded-xl bg-live-soft px-3 py-2.5 text-xs text-[var(--accent-live)]">
                             <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> Cleared for any load length
                           </div>
                         )}

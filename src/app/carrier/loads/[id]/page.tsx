@@ -20,6 +20,7 @@ import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 import { RateConCard } from "@/components/shared/rate-con-card";
 import { RateConReader } from "@/components/shared/rate-con-reader";
 import { WhyCard } from "@/components/cloud/why-card";
+import { TeachAi } from "@/components/cloud/teach-ai";
 import { LiveDot } from "@/components/shared/live-dot";
 import { StopsTimeline } from "@/components/shared/stops-timeline";
 import { TripStepper } from "@/components/shared/trip-stepper";
@@ -117,7 +118,7 @@ export default function LoadDetailPage() {
           </div>
         )}
         {load.aiPaused && (
-          <p className="mt-4 flex items-center gap-1.5 rounded-xl bg-amber-50 px-3.5 py-2.5 text-xs font-medium text-[var(--accent-warn)]">
+          <p className="mt-4 flex items-center gap-1.5 rounded-xl bg-warn-soft px-3.5 py-2.5 text-xs font-medium text-[var(--accent-warn)]">
             <ShieldAlert className="h-3.5 w-3.5" /> Backroute support has paused the AI on this load while they take a look.
           </p>
         )}
@@ -127,7 +128,7 @@ export default function LoadDetailPage() {
           </div>
         )}
         {load.stage === "cancelled" && (
-          <div className="mt-4 rounded-xl bg-red-50 px-3.5 py-2.5 text-xs font-medium text-[var(--accent-danger)]">
+          <div className="mt-4 rounded-xl bg-danger-soft px-3.5 py-2.5 text-xs font-medium text-[var(--accent-danger)]">
             <p className="flex items-center gap-1.5"><Ban className="h-3.5 w-3.5" /> Cancelled: {load.cancellationReason}</p>
             {load.tonuFee && <p className="mt-1 text-[var(--accent-warn)]">TONU fee of {formatCurrency(load.tonuFee)} invoiced to the broker.</p>}
           </div>
@@ -172,6 +173,7 @@ export default function LoadDetailPage() {
       <div className="grid gap-6 px-4 py-6 sm:px-8 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
           {real && <WhyCard load={load} />}
+          {real && <TeachAi load={load} />}
           {real ? (
             <BookingCard load={load} broker={broker} />
           ) : (
@@ -438,7 +440,7 @@ function CancelForm({ stage, onCancel, onConfirm }: { stage: LoadStage; onCancel
   const tonuApplies = TONU_STAGES.includes(stage);
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl border border-[var(--accent-danger)]/30 bg-red-50/50 p-3.5">
+    <div className="flex flex-col gap-2.5 rounded-xl border border-[var(--accent-danger)]/30 bg-danger-soft/50 p-3.5">
       {tonuApplies && (
         <p className="flex items-start gap-1.5 text-xs font-medium text-[var(--accent-warn)]">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />

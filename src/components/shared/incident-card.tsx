@@ -36,7 +36,7 @@ export function IncidentCard({ incident, viewer, label, onApprove }: {
     <section className="animate-rise-in overflow-hidden rounded-3xl bg-ink-950 p-5 text-white" aria-label={`${TITLE[incident.type]}, handled by the AI`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <span className={cn("flex h-9 w-9 items-center justify-center rounded-full", resolved ? "bg-emerald-400/20 text-emerald-200" : "bg-red-500/20 text-red-200")}>
+          <span className={cn("flex h-9 w-9 items-center justify-center rounded-full", resolved ? "bg-emerald-400/20 text-emerald-200" : "bg-danger-soft0/20 text-red-200")}>
             <Icon className="h-4 w-4" />
           </span>
           <div>

@@ -25,6 +25,9 @@ export interface PushMessage {
   /** One notification per thing: a newer push with the same tag replaces it. */
   tag?: string;
   urgent?: boolean;
+  /** Buttons on the notification (Android, desktop): answered without opening the app, with the signed token. */
+  actions?: { action: "yes" | "no"; title: string }[];
+  answer?: string;
 }
 
 /** To everyone in the carrier's office (owner and dispatchers) who turned on phone alerts. Returns how many got it. */

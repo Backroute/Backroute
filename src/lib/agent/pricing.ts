@@ -9,8 +9,13 @@ import type { Load } from "../types";
 const round25 = (n: number) => Math.ceil(n / 25) * 25;
 
 /** The lowest total the carrier takes for this load: their lowest rate per mile times its loaded miles. */
-export function floorFor(load: Pick<Load, "lane">, settings: Pick<AgentSettings, "minRpm">): number | null {
-  return settings.minRpm ? round25(settings.minRpm * load.lane.miles) : null;
+/** The key a lane's own lowest rate is kept under: "TX>TN". */
+export const laneKey = (lane: Pick<Load["lane"], "originState" | "destState">) => `${lane.originState.toUpperCase()}>${lane.destState.toUpperCase()}`;
+
+/** The lowest the AI goes on a load: the owner's lowest rate a mile, or their own number for that lane if higher. */
+export function floorFor(load: Pick<Load, "lane">, settings: Pick<AgentSettings, "minRpm" | "laneFloors">): number | null {
+  const rpm = Math.max(settings.minRpm ?? 0, settings.laneFloors?.[laneKey(load.lane)] ?? 0);
+  return rpm ? round25(rpm * load.lane.miles) : null;
 }
 
 /** How a broker has dealt with this carrier before (lib/agent/memory), for pricing the next load with them. */

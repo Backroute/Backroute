@@ -92,7 +92,7 @@ export default function EscalationsPage() {
                 <Card key={e.id} className="border-[var(--accent-warn)]/40">
                   <CardContent className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-start gap-3">
-                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-50 text-[var(--accent-warn)]">
+                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warn-soft text-[var(--accent-warn)]">
                         <AlertTriangle className="h-4 w-4" />
                       </span>
                       <div>

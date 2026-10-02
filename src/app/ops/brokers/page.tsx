@@ -8,9 +8,9 @@ import { cn } from "@/lib/utils";
 import type { Broker } from "@/lib/types";
 
 const TIER_TONE: Record<Broker["tier"], string> = {
-  preferred: "bg-emerald-50 text-[var(--accent-live)]",
+  preferred: "bg-live-soft text-[var(--accent-live)]",
   standard: "bg-ink-100 text-ink-700",
-  watch: "bg-amber-50 text-[var(--accent-warn)]",
+  watch: "bg-warn-soft text-[var(--accent-warn)]",
 };
 const TIERS = ["preferred", "standard", "watch"] as const;
 

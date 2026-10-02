@@ -189,7 +189,7 @@ function Undelivered({ items }: { items: NonNullable<Status["outbound"]> }) {
       <ul className="mt-1.5 flex flex-col gap-1.5">
         {items.slice(0, 10).map((m, n) => (
           <li key={n} className="flex items-start gap-2 text-xs">
-            <span className={cn("shrink-0 rounded px-1 py-0.5 text-[10px] font-medium", m.status === "retry" ? "bg-ink-100 text-ink-600" : "bg-red-50 text-red-700")}>
+            <span className={cn("shrink-0 rounded px-1 py-0.5 text-[10px] font-medium", m.status === "retry" ? "bg-ink-100 text-ink-600" : "bg-danger-soft text-red-700")}>
               {m.status === "retry" ? "sending again" : "not sent"}
             </span>
             <span className="min-w-0 flex-1 truncate text-ink-600">

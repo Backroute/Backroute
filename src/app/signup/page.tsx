@@ -190,7 +190,7 @@ function Signup() {
                   </ul>
                   <p className="mt-3 text-[11px] text-ink-400">From FMCSA, just now.{real ? "" : " The trucks and drivers below are still the demo fleet."}</p>
                   {!fmcsa.allowedToOperate && (
-                    <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-[var(--accent-danger)]">
+                    <p className="mt-3 rounded-xl bg-danger-soft px-3 py-2 text-xs text-[var(--accent-danger)]">
                       FMCSA shows this authority isn&apos;t active. Brokers won&apos;t book you and Backroute can&apos;t dispatch until it is.
                     </p>
                   )}

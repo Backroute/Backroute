@@ -107,7 +107,7 @@ function DvirInspection() {
             onClick={() => toggle(label)}
             className={cn(
               "flex items-center justify-between rounded-2xl border p-3.5 text-left transition-colors",
-              items[label] === "defect" ? "border-[var(--accent-danger)]/40 bg-red-50" : "border-line",
+              items[label] === "defect" ? "border-[var(--accent-danger)]/40 bg-danger-soft" : "border-line",
             )}
           >
             <span className="text-sm font-medium text-ink-900">{label}</span>

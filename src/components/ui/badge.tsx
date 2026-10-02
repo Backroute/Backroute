@@ -1,14 +1,17 @@
 import * as React from "react";
+import { STATUS_CLASS } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
 type Tone = "neutral" | "success" | "warning" | "danger" | "info" | "dark";
 
+// The same colors as every status in the app (lib/status): success is done, warning is waiting on someone, danger
+// needs you, info is in progress.
 const toneClasses: Record<Tone, string> = {
   neutral: "bg-ink-100 text-ink-700",
-  success: "bg-emerald-50 text-[var(--accent-live)]",
-  warning: "bg-amber-50 text-[var(--accent-warn)]",
-  danger: "bg-red-50 text-[var(--accent-danger)]",
-  info: "bg-blue-50 text-[var(--accent-info)]",
+  success: STATUS_CLASS.done,
+  warning: STATUS_CLASS.waiting,
+  danger: STATUS_CLASS.needs_you,
+  info: STATUS_CLASS.moving,
   dark: "bg-ink-950 text-white",
 };
 

@@ -106,7 +106,7 @@ export function BillingCard() {
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} {subscribed ? "Manage billing" : b.status === "canceled" ? "Start again" : "Start subscription"}
           </Button>
         </div>
-        {b.hold && <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-ink-700">The AI isn&apos;t booking new loads: {b.hold}. Loads already booked keep running.</p>}
+        {b.hold && <p className="rounded-xl bg-warn-soft px-3 py-2 text-xs text-ink-700">The AI isn&apos;t booking new loads: {b.hold}. Loads already booked keep running.</p>}
         {b.invoices?.length ? (
           <ul className="flex flex-col divide-y divide-line">
             {b.invoices.map((i) => (

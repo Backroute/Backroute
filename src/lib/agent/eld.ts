@@ -5,10 +5,13 @@ import { formatAtStop } from "../stop-time";
 import type { Driver, HosStatus, Load, Truck } from "../types";
 import { canCall } from "../channels/out";
 import { needAppointment } from "./appointments";
-import { claimMark, save, type CarrierContext } from "./db";
+import { pushToOffice } from "../push";
+import { addActivity, claimMark, save, type CarrierContext } from "./db";
+import { event } from "./dispatcher";
 import { sendOrQueue } from "./outbox";
 import { routedEta } from "./routing";
 import * as mail from "./templates";
+import { addWhy } from "./why";
 
 /**
  * The carrier's ELD (Samsara or Motive): where each truck is and how many hours each driver has left. The AI uses it
@@ -213,6 +216,13 @@ export async function lateNotices(ctx: CarrierContext, now: number): Promise<str
       why: `Truck ${truck!.unitNumber} won't make the ${stop} on ${load.referenceNumber} on time (ETA ${etaText}). Tell the broker?`,
     });
     done.push(`${load.referenceNumber}: late notice for ${stop} ${result}`);
+    // The owner hears it the same moment, with the new time, before anyone has to ask them.
+    const line = `Running late to the ${stop} in ${city}, ${state}: new arrival about ${etaText}. ${result === "sent" ? "The AI told the broker." : "The note to the broker is waiting for your OK."}`;
+    const marked = addWhy({ ...load, late: { stop, eta: new Date(eta).toISOString(), at: new Date(now).toISOString() } }, line);
+    await save("loads", ctx.carrier.id, marked as unknown as Item);
+    ctx.loads = ctx.loads.map((l) => (l.id === load.id ? marked : l));
+    await addActivity(ctx.carrier.id, event({ type: "check_call", loadId: load.id, message: `Truck ${truck!.unitNumber} running late on ${load.referenceNumber}`, detail: line, severity: "warning" }));
+    await pushToOffice(ctx.carrier.id, { title: `Truck ${truck!.unitNumber} running late`, body: `${load.referenceNumber}: ${line}`, url: `/carrier/loads/${load.id}`, tag: `late-${load.id}-${stop}` }).catch(() => 0);
   }
   return done;
 }

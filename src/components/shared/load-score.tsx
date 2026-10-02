@@ -2,9 +2,9 @@ import { cn } from "@/lib/utils";
 import { scoreTone } from "@/lib/scoring";
 
 const TONE_CLASSES = {
-  success: "bg-emerald-50 text-[var(--accent-live)]",
-  warning: "bg-amber-50 text-[var(--accent-warn)]",
-  danger: "bg-red-50 text-[var(--accent-danger)]",
+  success: "bg-live-soft text-[var(--accent-live)]",
+  warning: "bg-warn-soft text-[var(--accent-warn)]",
+  danger: "bg-danger-soft text-[var(--accent-danger)]",
 };
 
 const RING_COLOR = {

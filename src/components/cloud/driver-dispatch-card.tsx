@@ -134,6 +134,13 @@ export function DriverDispatchCard() {
       )}
       <div className="mt-4 flex items-start justify-between gap-3">
         <div>
+          <p className="text-xs font-medium text-ink-800">{t.autoDrive}</p>
+          <p className="text-[11px] text-ink-500">{t.autoDriveNote}</p>
+        </div>
+        <Switch checked={prefs.handsFreeAuto !== false} onChange={(on) => setDriverPrefs(driver.id, { handsFreeAuto: on })} label={t.autoDrive} />
+      </div>
+      <div className="mt-3 flex items-start justify-between gap-3">
+        <div>
           <p className="text-xs font-medium text-ink-800">{t.morning}</p>
           <p className="text-[11px] text-ink-500">{t.morningNote}</p>
         </div>

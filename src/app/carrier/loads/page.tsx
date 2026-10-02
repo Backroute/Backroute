@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyNextStep } from "@/components/shared/empty-next-step";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Download } from "lucide-react";
@@ -157,7 +158,7 @@ export default function CarrierLoadsPage() {
                   </Link>
                 );
               })}
-              {filtered.length === 0 && <p className="py-12 text-center text-sm text-ink-400">No loads in this view.</p>}
+              {filtered.length === 0 && (loads.length ? <p className="py-12 text-center text-sm text-ink-500">No loads in this view. Try another tab.</p> : <EmptyNextStep what="loads" fallback="No loads yet." />)}
             </div>
 
             {/* Desktop: dense table */}

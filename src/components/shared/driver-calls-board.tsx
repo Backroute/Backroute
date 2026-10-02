@@ -206,7 +206,7 @@ function OwnerControls({ call, driverFirst }: { call: DispatchCall; driverFirst:
         <button type="button" onClick={send} aria-label="Send" className="rounded-full bg-ink-950 p-2 text-white">
           <Send className="h-3.5 w-3.5" />
         </button>
-        <button type="button" onClick={() => hangUpDispatchCall(call.id)} className="flex items-center gap-1 rounded-full bg-red-500 px-3 py-1.5 text-xs font-semibold text-white">
+        <button type="button" onClick={() => hangUpDispatchCall(call.id)} className="flex items-center gap-1 rounded-full bg-danger-soft0 px-3 py-1.5 text-xs font-semibold text-white">
           <PhoneOff className="h-3.5 w-3.5" /> End call
         </button>
       </div>

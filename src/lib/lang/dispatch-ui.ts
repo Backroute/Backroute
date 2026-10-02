@@ -2,6 +2,8 @@ import type { AlertWords } from "@/components/cloud/phone-alerts";
 import type { Lang } from "../types";
 
 /** The driver app's words for how dispatch reaches them: notifications, SMS or WhatsApp, the morning text, consent. */
+export type QuickKey = "onWay" | "late" | "loaded" | "waiting" | "lumper" | "onTime" | "parking" | "unloaded" | "nextLoad" | "goHome" | "dayOff" | "address";
+
 export interface DispatchUi {
   title: string;
   alerts: AlertWords;
@@ -15,6 +17,10 @@ export interface DispatchUi {
   voiceNote: string;
   textsToo: string;
   textsTooNote: string;
+  autoDrive: string;
+  autoDriveNote: string;
+  /** One-tap answers to dispatch, so a driver doesn't have to type. */
+  quick: Record<QuickKey, string>;
   consentTitle: string;
   consentAsk: string;
   agree: string;
@@ -47,6 +53,9 @@ const en: DispatchUi = {
   voiceNote: "Send a voice message (by text or WhatsApp) and the answer comes back spoken too.",
   textsToo: "Texts too",
   textsTooNote: "Off: notifications only, while this phone is getting them. If it stops for two weeks, texts come back.",
+  autoDrive: "Hands-free when driving",
+  autoDriveNote: "Big buttons and voice come on by themselves once the truck is rolling (with location allowed).",
+  quick: {"onWay": "On my way to pickup", "late": "Running late", "loaded": "Loaded", "waiting": "Still waiting at the dock", "lumper": "Lumper fee here", "onTime": "On time", "parking": "Need parking", "unloaded": "Unloaded", "nextLoad": "Ready for the next load", "goHome": "I want to go home next", "dayOff": "I need a day off", "address": "What's the address?"},
   consentTitle: "Texts and calls from dispatch",
   consentAsk: "Dispatch needs your OK to text and call you about your loads.",
   agree: "I agree",
@@ -79,6 +88,9 @@ const es: DispatchUi = {
   voiceNote: "Manda un mensaje de voz (por texto o WhatsApp) y la respuesta también llega en voz.",
   textsToo: "También mensajes de texto",
   textsTooNote: "Apagado: solo notificaciones, mientras este teléfono las reciba. Si deja de recibirlas por dos semanas, vuelven los textos.",
+  autoDrive: "Manos libres al manejar",
+  autoDriveNote: "Los botones grandes y la voz se activan solos cuando el camión va en marcha (con la ubicación permitida).",
+  quick: {"onWay": "Voy en camino a la carga", "late": "Voy tarde", "loaded": "Ya cargué", "waiting": "Sigo esperando en el muelle", "lumper": "Aquí cobran lumper", "onTime": "Voy a tiempo", "parking": "Necesito estacionamiento", "unloaded": "Ya descargué", "nextLoad": "Listo para la siguiente carga", "goHome": "Quiero ir a casa después", "dayOff": "Necesito un día libre", "address": "¿Cuál es la dirección?"},
   consentTitle: "Mensajes y llamadas del despacho",
   consentAsk: "El despacho necesita tu permiso para enviarte mensajes y llamarte sobre tus cargas.",
   agree: "Acepto",
@@ -111,6 +123,9 @@ const pa: DispatchUi = {
   voiceNote: "ਵੌਇਸ ਮੈਸੇਜ ਭੇਜੋ (ਟੈਕਸਟ ਜਾਂ WhatsApp 'ਤੇ), ਜਵਾਬ ਵੀ ਆਵਾਜ਼ ਵਿੱਚ ਆਵੇਗਾ।",
   textsToo: "ਟੈਕਸਟ ਵੀ",
   textsTooNote: "ਬੰਦ: ਸਿਰਫ਼ ਨੋਟੀਫਿਕੇਸ਼ਨ, ਜਦੋਂ ਤੱਕ ਇਹ ਫ਼ੋਨ ਉਹਨਾਂ ਨੂੰ ਲੈ ਰਿਹਾ ਹੈ। ਜੇ ਦੋ ਹਫ਼ਤੇ ਬੰਦ ਰਹੇ, ਤਾਂ ਟੈਕਸਟ ਫਿਰ ਆਉਣਗੇ।",
+  autoDrive: "ਚਲਾਉਂਦੇ ਸਮੇਂ ਹੈਂਡਸ-ਫ੍ਰੀ",
+  autoDriveNote: "ਟਰੱਕ ਚੱਲਣ 'ਤੇ ਵੱਡੇ ਬਟਨ ਅਤੇ ਆਵਾਜ਼ ਆਪੇ ਚਾਲੂ ਹੋ ਜਾਂਦੇ ਹਨ (ਲੋਕੇਸ਼ਨ ਦੀ ਇਜਾਜ਼ਤ ਨਾਲ)।",
+  quick: {"onWay": "ਪਿਕਅੱਪ ਵੱਲ ਜਾ ਰਿਹਾ ਹਾਂ", "late": "ਦੇਰ ਹੋ ਰਹੀ ਹੈ", "loaded": "ਲੋਡ ਹੋ ਗਿਆ", "waiting": "ਅਜੇ ਡੌਕ 'ਤੇ ਉਡੀਕ ਰਿਹਾ ਹਾਂ", "lumper": "ਇੱਥੇ ਲੰਪਰ ਫੀਸ ਹੈ", "onTime": "ਸਮੇਂ ਸਿਰ ਹਾਂ", "parking": "ਪਾਰਕਿੰਗ ਚਾਹੀਦੀ ਹੈ", "unloaded": "ਅਨਲੋਡ ਹੋ ਗਿਆ", "nextLoad": "ਅਗਲੇ ਲੋਡ ਲਈ ਤਿਆਰ", "goHome": "ਅਗਲੀ ਵਾਰ ਘਰ ਜਾਣਾ ਹੈ", "dayOff": "ਇੱਕ ਦਿਨ ਦੀ ਛੁੱਟੀ ਚਾਹੀਦੀ ਹੈ", "address": "ਪਤਾ ਕੀ ਹੈ?"},
   consentTitle: "ਡਿਸਪੈਚ ਦੇ ਮੈਸੇਜ ਅਤੇ ਕਾਲਾਂ",
   consentAsk: "ਲੋਡਾਂ ਬਾਰੇ ਮੈਸੇਜ ਅਤੇ ਕਾਲ ਕਰਨ ਲਈ ਡਿਸਪੈਚ ਨੂੰ ਤੁਹਾਡੀ ਹਾਂ ਚਾਹੀਦੀ ਹੈ।",
   agree: "ਮੈਂ ਸਹਿਮਤ ਹਾਂ",
@@ -143,6 +158,9 @@ const hi: DispatchUi = {
   voiceNote: "वॉइस मैसेज भेजें (टेक्स्ट या WhatsApp पर), जवाब भी आवाज़ में आएगा।",
   textsToo: "टेक्स्ट भी",
   textsTooNote: "बंद: सिर्फ़ नोटिफ़िकेशन, जब तक यह फ़ोन उन्हें ले रहा है। दो हफ़्ते तक न आएँ तो टेक्स्ट फिर आने लगेंगे।",
+  autoDrive: "चलाते समय हैंड्स-फ़्री",
+  autoDriveNote: "ट्रक चलने पर बड़े बटन और आवाज़ अपने आप चालू हो जाते हैं (लोकेशन की अनुमति के साथ)।",
+  quick: {"onWay": "पिकअप की ओर जा रहा हूँ", "late": "देर हो रही है", "loaded": "लोड हो गया", "waiting": "अभी डॉक पर इंतज़ार कर रहा हूँ", "lumper": "यहाँ लम्पर फ़ीस है", "onTime": "समय पर हूँ", "parking": "पार्किंग चाहिए", "unloaded": "अनलोड हो गया", "nextLoad": "अगले लोड के लिए तैयार", "goHome": "अगली बार घर जाना है", "dayOff": "एक दिन की छुट्टी चाहिए", "address": "पता क्या है?"},
   consentTitle: "डिस्पैच के मैसेज और कॉल",
   consentAsk: "लोड के बारे में मैसेज और कॉल करने के लिए डिस्पैच को आपकी हाँ चाहिए।",
   agree: "मैं सहमत हूँ",
@@ -175,6 +193,9 @@ const ru: DispatchUi = {
   voiceNote: "Отправьте голосовое (сообщением или в WhatsApp), и ответ тоже придёт голосом.",
   textsToo: "И SMS тоже",
   textsTooNote: "Выключено: только уведомления, пока этот телефон их получает. Если две недели не получает, SMS вернутся.",
+  autoDrive: "Без рук за рулём",
+  autoDriveNote: "Крупные кнопки и голос включаются сами, когда грузовик едет (если разрешена геолокация).",
+  quick: {"onWay": "Еду на погрузку", "late": "Опаздываю", "loaded": "Загрузился", "waiting": "Всё ещё жду у дока", "lumper": "Здесь платный лампер", "onTime": "Иду по графику", "parking": "Нужна парковка", "unloaded": "Разгрузился", "nextLoad": "Готов к следующему грузу", "goHome": "Хочу домой после этого", "dayOff": "Нужен выходной", "address": "Какой адрес?"},
   consentTitle: "Сообщения и звонки от диспетчера",
   consentAsk: "Диспетчеру нужно ваше согласие, чтобы писать и звонить вам о грузах.",
   agree: "Согласен",
@@ -207,6 +228,9 @@ const uk: DispatchUi = {
   voiceNote: "Надішліть голосове (повідомленням або у WhatsApp), і відповідь теж прийде голосом.",
   textsToo: "І SMS теж",
   textsTooNote: "Вимкнено: лише сповіщення, поки цей телефон їх отримує. Якщо два тижні не отримує, SMS повернуться.",
+  autoDrive: "Без рук за кермом",
+  autoDriveNote: "Великі кнопки й голос вмикаються самі, коли вантажівка їде (якщо дозволено геолокацію).",
+  quick: {"onWay": "Їду на завантаження", "late": "Запізнююсь", "loaded": "Завантажився", "waiting": "Досі чекаю біля доку", "lumper": "Тут платний лампер", "onTime": "Іду за графіком", "parking": "Потрібна парковка", "unloaded": "Розвантажився", "nextLoad": "Готовий до наступного вантажу", "goHome": "Хочу додому після цього", "dayOff": "Потрібен вихідний", "address": "Яка адреса?"},
   consentTitle: "Повідомлення й дзвінки від диспетчера",
   consentAsk: "Диспетчеру потрібна ваша згода, щоб писати й дзвонити вам щодо вантажів.",
   agree: "Погоджуюся",
@@ -239,6 +263,9 @@ const fr: DispatchUi = {
   voiceNote: "Envoie un message vocal (par texto ou WhatsApp) et la réponse revient aussi en vocal.",
   textsToo: "Les textos aussi",
   textsTooNote: "Désactivé : seulement les notifications, tant que ce téléphone les reçoit. S'il ne les reçoit plus pendant deux semaines, les textos reviennent.",
+  autoDrive: "Mains libres en conduisant",
+  autoDriveNote: "Les gros boutons et la voix s'activent d'eux-mêmes quand le camion roule (si la localisation est permise).",
+  quick: {"onWay": "En route vers le chargement", "late": "Je suis en retard", "loaded": "Chargé", "waiting": "J'attends encore au quai", "lumper": "Frais de lumper ici", "onTime": "Je suis à l'heure", "parking": "J'ai besoin d'un stationnement", "unloaded": "Déchargé", "nextLoad": "Prêt pour le prochain chargement", "goHome": "Je veux rentrer à la maison après", "dayOff": "J'ai besoin d'un jour de congé", "address": "Quelle est l'adresse ?"},
   consentTitle: "Textos et appels de la répartition",
   consentAsk: "La répartition a besoin de ton accord pour t'écrire et t'appeler au sujet de tes voyages.",
   agree: "J'accepte",

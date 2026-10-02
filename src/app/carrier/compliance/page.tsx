@@ -85,7 +85,7 @@ export default function CompliancePage() {
                 </div>
               ))}
             </div>
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-emerald-50 px-4 py-3">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-live-soft px-4 py-3">
               <span className="flex items-center gap-2 text-sm text-[var(--accent-live)]"><CheckCircle2 className="h-4 w-4" /> Draft filing ready, no missing receipts</span>
               {filed ? (
                 <Badge tone="success"><CheckCircle2 className="h-3 w-3" /> Filed</Badge>
@@ -124,14 +124,14 @@ export default function CompliancePage() {
                 <div className="mt-4 flex flex-col gap-2.5">
                   {activeAccidents.map((incident) =>
                     incident.claimStartedAt ? (
-                      <div key={incident.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-emerald-50 px-4 py-3">
+                      <div key={incident.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-live-soft px-4 py-3">
                         <span className="flex items-center gap-2 text-sm text-[var(--accent-live)]">
                           <CheckCircle2 className="h-4 w-4" /> Claim started, {INSURANCE_POLICY.carrier} notified
                         </span>
                         <Badge tone="success">In progress</Badge>
                       </div>
                     ) : (
-                      <div key={incident.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 px-4 py-3">
+                      <div key={incident.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-warn-soft px-4 py-3">
                         <span className="flex items-center gap-2 text-sm text-[var(--accent-warn)]">
                           <AlertTriangle className="h-4 w-4" /> Accident reported, claim assist ready
                         </span>

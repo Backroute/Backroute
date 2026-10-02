@@ -18,6 +18,7 @@ interface Review {
   best: { broker: string; rpm: number } | null;
   worst: { broker: string; why: string } | null;
   change: string;
+  learned?: string[];
 }
 
 /** Home, real accounts: last week in a minute: the numbers, best and worst broker, and the one thing to change. */
@@ -72,6 +73,16 @@ export function WeeklyReviewCard() {
           <span className="font-medium">One thing to change: </span>
           {review.change}
         </p>
+        {review.learned?.length ? (
+          <div>
+            <p className="text-xs font-semibold text-ink-700">What the AI learned</p>
+            <ul className="mt-1 flex list-disc flex-col gap-1 pl-5 text-sm text-ink-800">
+              {review.learned.map((l) => (
+                <li key={l}>{l}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

@@ -8,6 +8,8 @@ import { usePrimaryDriver } from "@/lib/selectors";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { AiTyping, LiveAiMark } from "@/components/shared/ai-typing";
 import { useAiTyping } from "@/lib/ai/client";
+import { QuickReplies } from "@/components/shared/quick-replies";
+import { truckActiveLoads, useCarrierLoads, useCarrierTrucks } from "@/lib/selectors";
 
 export default function DriverMessagesPage() {
   const driver = usePrimaryDriver();
@@ -16,6 +18,8 @@ export default function DriverMessagesPage() {
   const [value, setValue] = useState("");
   const startInboundCall = useStore((s) => s.actions.startInboundCall);
   const endRef = useRef<HTMLDivElement>(null);
+  const truck = useCarrierTrucks().find((t) => t.id === driver.truckId);
+  const { current } = truckActiveLoads(useCarrierLoads(), truck);
 
   const typing = useAiTyping((s) => !!s.threads[`driver:${driver.id}`]);
   useEffect(() => {
@@ -37,7 +41,7 @@ export default function DriverMessagesPage() {
         </div>
         <button
           onClick={() => startInboundCall(driver.id)}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink-100 text-ink-700"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink-100 text-ink-700"
           aria-label="Call AI Dispatcher"
         >
           <Phone className="h-4 w-4" />
@@ -61,7 +65,8 @@ export default function DriverMessagesPage() {
         <div ref={endRef} />
       </div>
 
-      <div className="flex items-center gap-2 border-t border-line px-5 py-3">
+      <QuickReplies stage={current?.stage ?? null} className="border-t border-line px-5 pt-3" />
+      <div className="flex items-center gap-2 px-5 py-3">
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -71,7 +76,8 @@ export default function DriverMessagesPage() {
         />
         <button
           onClick={handleSend}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ink-950 text-white disabled:bg-ink-300"
+          aria-label="Send"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink-950 text-white disabled:bg-ink-300"
           disabled={!value.trim()}
         >
           <Send className="h-4 w-4" />

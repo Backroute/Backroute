@@ -182,6 +182,8 @@ export interface DriverPrefs {
   voiceReplies?: boolean;
   /** False: notifications in the driver app instead of texts, while their phone takes them (texts again if not). */
   textsToo?: boolean;
+  /** Hands-free comes on by itself when the phone is moving at road speed. On unless turned off. */
+  handsFreeAuto?: boolean;
   /**
    * Real accounts: what the driver has told the AI about themselves (family, health, what they like to run), newest
    * last, the way a good dispatcher remembers. Used in later conversations and when picking their loads.
@@ -566,6 +568,8 @@ export interface Load {
   /** Intermediate stops beyond the lane's origin/destination — absent or empty means a normal single-pickup,
    *  single-delivery load, which is most of them. */
   stops?: LoadStop[];
+  /** Real accounts: the truck won't make a stop on time (from the ELD): which, the new arrival, when everyone was told. */
+  late?: { stop: "pickup" | "delivery"; eta: string; at: string };
   /** Real accounts: why the AI went for this load, or answered the broker the way it did, in plain words (lib/agent/why). */
   why?: { at: string; lines: string[] };
   /** Real accounts: what's wrong with the load's times: a holiday, a dock's hours, not enough hours to drive it (lib/agent/schedule). */

@@ -55,9 +55,9 @@ export const TYPE_ICON: Record<ActivityType, typeof Radar> = {
 
 export const SEVERITY_TONE: Record<ActivityEvent["severity"], string> = {
   info: "bg-ink-100 text-ink-600",
-  success: "bg-emerald-50 text-[var(--accent-live)]",
-  warning: "bg-amber-50 text-[var(--accent-warn)]",
-  danger: "bg-red-50 text-[var(--accent-danger)]",
+  success: "bg-live-soft text-[var(--accent-live)]",
+  warning: "bg-warn-soft text-[var(--accent-warn)]",
+  danger: "bg-danger-soft text-[var(--accent-danger)]",
 };
 
 export function ActivityFeed({ events, className, dense }: { events: ActivityEvent[]; className?: string; dense?: boolean }) {

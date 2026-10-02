@@ -4,6 +4,7 @@ import type { Item } from "../cloud/rows";
 import type { DraftMessage, DraftPurpose, Escalation, Load, OwnerRule } from "../types";
 import { addActivity, filesById, logChannel, save, type CarrierContext } from "./db";
 import { event, passToOwner } from "./dispatcher";
+import { HELD_PURPOSES, hold, undoWindow } from "./held";
 import { roundsOf } from "./negotiation";
 import { translateEmail } from "../ai/translate";
 
@@ -53,7 +54,11 @@ export function goesNow(settings: Pick<CarrierContext["settings"], "autonomy" | 
 export async function sendOrQueue(ctx: CarrierContext, original: Outgoing): Promise<"sent" | "queued"> {
   const o = await inTheirLanguage(ctx, original);
   if (canEmail(ctx.carrier) && (o.ownerAsked || goesNow(ctx.settings, o))) {
-    await deliver(ctx, { channel: "email", to: o.to, toName: o.toName, subject: o.subject, body: o.body, inReplyTo: o.inReplyTo, purpose: o.purpose, amount: o.amount, attachments: o.attachments }, o.loadId, { auto: true });
+    const draft: DraftMessage = { channel: "email", to: o.to, toName: o.toName, subject: o.subject, body: o.body, inReplyTo: o.inReplyTo, purpose: o.purpose, amount: o.amount, attachments: o.attachments };
+    // What the AI decided on its own to book, counter or accept waits a moment for the owner's Undo (lib/agent/held).
+    const wait = o.ownerAsked || !HELD_PURPOSES.has(o.purpose) ? 0 : undoWindow(ctx.settings);
+    if (wait > 0) await hold(ctx, draft, o.loadId, wait);
+    else await deliver(ctx, draft, o.loadId, { auto: true });
     return "sent";
   }
   await queue(ctx, o);

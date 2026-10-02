@@ -34,7 +34,7 @@ export default function CarriersPage() {
 
         <div className="mt-5 flex flex-col gap-3 lg:hidden">
           {filtered.map((c) => (
-            <div key={c.id} className={cn("rounded-2xl border p-4", c.flaggedForReview ? "border-[var(--accent-warn)]/40 bg-amber-50/30" : "border-line bg-white")}>
+            <div key={c.id} className={cn("rounded-2xl border p-4", c.flaggedForReview ? "border-[var(--accent-warn)]/40 bg-warn-soft/30" : "border-line bg-white")}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-medium text-ink-950">{c.name}</p>
@@ -81,7 +81,7 @@ export default function CarriersPage() {
             </thead>
             <tbody>
               {filtered.map((c) => (
-                <tr key={c.id} className={cn("border-b border-line last:border-0 hover:bg-ink-50/60", c.flaggedForReview && "bg-amber-50/30")}>
+                <tr key={c.id} className={cn("border-b border-line last:border-0 hover:bg-ink-50/60", c.flaggedForReview && "bg-warn-soft/30")}>
                   <td className="px-5 py-3.5">
                     <p className="font-medium text-ink-950">{c.name}</p>
                     <p className="text-xs text-ink-400">{c.mc} · {c.city}, {c.state}</p>

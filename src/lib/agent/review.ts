@@ -31,6 +31,8 @@ export interface WeeklyReview {
   worst: { broker: string; why: string } | null;
   change: string;
   byTruck: { unit: string; gross: number; loads: number }[];
+  /** What the AI picked up about the carrier's brokers and lanes, and what it does differently now. */
+  learned?: string[];
 }
 
 /** "2026-W40" for the week an instant is in (ISO weeks, Monday first). */
@@ -128,7 +130,59 @@ export function reviewFor(ctx: CarrierContext, now: number): WeeklyReview {
     worst,
     change,
     byTruck,
+    learned: learnedFrom(ctx, now),
   };
+}
+
+const WEEKDAYS = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
+
+/**
+ * What the record shows that it didn't before, the way a dispatcher would mention it on Monday: a broker paying
+ * slower (or faster) than their terms, a lane that pays more on one day of the week, a broker who takes the first
+ * number. Each says what it means for the carrier. At most three.
+ */
+export function learnedFrom(ctx: Pick<CarrierContext, "loads" | "brokers">, now: number): string[] {
+  const out: string[] = [];
+  const nameOf = (id: string) => ctx.brokers.find((b) => b.id === id)?.company ?? "A broker";
+  // Pay speed, from invoices paid in the last 90 days.
+  const paid = new Map<string, number[]>();
+  for (const l of ctx.loads) {
+    const inv = l.invoice;
+    if (!inv?.sentAt || !inv.paidAt || Date.parse(inv.paidAt) < now - 90 * DAY) continue;
+    paid.set(l.brokerId, [...(paid.get(l.brokerId) ?? []), (Date.parse(inv.paidAt) - Date.parse(inv.sentAt)) / DAY]);
+  }
+  for (const [id, days] of paid) {
+    if (days.length < 2) continue;
+    const avg = Math.round(days.reduce((a, b) => a + b, 0) / days.length);
+    const terms = ctx.brokers.find((b) => b.id === id)?.avgDaysToPay ?? 30;
+    if (avg >= terms + 7) out.push(`${nameOf(id)} now pays in about ${avg} days (their terms say ${terms}). Worth asking them for quick pay, or a little more on the rate.`);
+    else if (avg <= terms - 10) out.push(`${nameOf(id)} pays fast: about ${avg} days. Their loads are worth taking when the rate is close.`);
+  }
+  // A lane that pays more on one weekday, from the last 60 days of delivered loads.
+  const lanes = new Map<string, { label: string; byDay: number[][] }>();
+  for (const l of ctx.loads) {
+    if (l.stage !== "delivered" || !l.lane.miles || !l.bookedRate || !l.pickupAt || Date.parse(l.pickupAt) < now - 60 * DAY) continue;
+    const key = `${l.lane.origin}|${l.lane.originState}`;
+    const lane = lanes.get(key) ?? { label: `${l.lane.origin} loads`, byDay: [[], [], [], [], [], [], []] };
+    lane.byDay[new Date(l.pickupAt).getUTCDay()].push(l.bookedRate / l.lane.miles);
+    lanes.set(key, lane);
+  }
+  for (const { label, byDay } of lanes.values()) {
+    const all = byDay.flat();
+    if (all.length < 4) continue;
+    const avg = all.reduce((a, b) => a + b, 0) / all.length;
+    const best = byDay.map((r, d) => ({ d, n: r.length, v: r.length ? r.reduce((a, b) => a + b, 0) / r.length : 0 })).filter((x) => x.n >= 2).sort((a, b) => b.v - a.v)[0];
+    const pct = best ? Math.round(((best.v - avg) / avg) * 100) : 0;
+    if (best && pct >= 10) out.push(`${label} pay ${pct}% more on ${WEEKDAYS[best.d]}. Worth keeping a truck there for those days.`);
+  }
+  // A broker who keeps taking our first number: the AI opens higher with them.
+  const tookFirst = new Map<string, number>();
+  for (const l of ctx.loads) {
+    const h = l.bookRequest?.history ?? [];
+    if (l.bookRequest?.status === "accepted" && !h.some((x) => x.by === "them") && Date.parse(l.updatedAt) > now - 60 * DAY) tookFirst.set(l.brokerId, (tookFirst.get(l.brokerId) ?? 0) + 1);
+  }
+  for (const [id, n] of tookFirst) if (n >= 3) out.push(`${nameOf(id)} took the AI's first number ${n} times lately. It opens a little higher with them now.`);
+  return out.slice(0, 3);
 }
 
 /** The review as a text: the numbers in two lines, then the one change. */
@@ -138,6 +192,7 @@ export function reviewText(r: WeeklyReview, carrier: string): string {
     `${carrier}, your week: ${r.loads} load${r.loads === 1 ? "" : "s"}, ${money(r.gross)}${delta !== null ? ` (${delta >= 0 ? "+" : ""}${delta}% on last week)` : ""}, ${money(r.net)} after costs.`,
     `${r.rpm ? `$${r.rpm.toFixed(2)} a loaded mile, ` : ""}${r.emptyPct}% empty miles.${r.best ? ` Best: ${r.best.broker} ($${r.best.rpm.toFixed(2)}/mi).` : ""}${r.worst ? ` Worst: ${r.worst.broker}, ${r.worst.why}.` : ""}`,
     `One thing: ${r.change}`,
+    ...(r.learned?.length ? [`Learned: ${r.learned[0]}`] : []),
   ].join("\n");
 }
 

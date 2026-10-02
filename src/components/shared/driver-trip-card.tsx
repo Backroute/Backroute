@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowRight, Camera, Check, ChevronRight, ClipboardCheck, Clock, FileText, LifeBuoy, Loader2, MessageCircle, Phone, Timer } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { checkPhoto } from "@/lib/photo-check";
 import { useNow } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { cityCoords, pickupLegStart, type LatLng } from "@/lib/trip-geo";
@@ -586,33 +587,66 @@ export function PillButton({ onClick, children }: { onClick: () => void; childre
 }
 
 /** Upload slot for a stop document: take a photo (or pick a file), see the AI read it, retake if needed. */
+const PHOTO_PROBLEM = { dark: "Too dark to read. Turn on a light or move to one, then retake.", bright: "Too much glare to read. Tilt it away from the light and retake.", blurry: "Too blurry to read. Hold still, tap to focus, and retake." };
+
 export function DocumentSlot({ doc, label, readOnly, onFile }: { doc?: LoadDocument; label: string; readOnly?: boolean; onFile: (file: UploadedFile) => void }) {
   const input = useRef<HTMLInputElement>(null);
+  // A photo that looks unreadable waits here: retake it, or send it anyway.
+  const [doubt, setDoubt] = useState<{ file: File; why: keyof typeof PHOTO_PROBLEM } | null>(null);
 
-  function handle(e: React.ChangeEvent<HTMLInputElement>) {
+  const send = (file: File) => onFile({ name: file.name, previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined, file });
+
+  async function handle(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    onFile({ name: file.name, previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined, file });
+    const verdict = await checkPhoto(file);
+    if (!verdict.ok) return setDoubt({ file, why: verdict.why });
+    setDoubt(null);
+    send(file);
   }
 
   const picker = readOnly ? null : (
-    <input ref={input} type="file" accept="image/*,application/pdf" onChange={handle} className="sr-only" tabIndex={-1} aria-label={label} />
+    <input ref={input} type="file" accept="image/*,application/pdf" onChange={(e) => void handle(e)} className="sr-only" tabIndex={-1} aria-label={label} />
   );
+
+  if (doubt)
+    return (
+      <div className="flex flex-col gap-2 rounded-2xl bg-amber-400/15 p-3" role="alert">
+        {picker}
+        <p className="text-xs leading-snug text-amber-100">{PHOTO_PROBLEM[doubt.why]}</p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => input.current?.click()} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-semibold text-ink-950">
+            <Camera className="h-3.5 w-3.5" /> Retake
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              send(doubt.file);
+              setDoubt(null);
+            }}
+            className="min-h-11 rounded-full border border-white/25 px-4 py-2 text-xs font-medium text-white/80"
+          >
+            Send it anyway
+          </button>
+        </div>
+      </div>
+    );
 
   if (!doc) {
     if (readOnly) return <p className="text-xs text-white/50">Waiting on the driver</p>;
     return (
-      <>
+      <div className="flex flex-col items-start gap-1.5">
         {picker}
         <button
           type="button"
           onClick={() => input.current?.click()}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-semibold text-ink-950"
+          className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-semibold text-ink-950"
         >
-          <Camera className="h-3.5 w-3.5" /> {label}
+          <Camera className="h-4 w-4" /> {label}
         </button>
-      </>
+        <p className="text-[11px] text-white/60">Lay it flat in good light, all four corners in the picture.</p>
+      </div>
     );
   }
 
@@ -639,7 +673,7 @@ export function DocumentSlot({ doc, label, readOnly, onFile }: { doc?: LoadDocum
         )}
       </div>
       {!readOnly && (
-        <button type="button" onClick={() => input.current?.click()} className="shrink-0 px-1 text-[11px] font-semibold text-white/70 underline-offset-2 hover:underline">
+        <button type="button" onClick={() => input.current?.click()} className="min-h-11 shrink-0 px-2 text-xs font-semibold text-white/80 underline-offset-2 hover:underline">
           Retake
         </button>
       )}
@@ -691,7 +725,7 @@ function CardFooter({ load, rate, onCall }: { load: Load; rate: number; onCall: 
         <Link href="/driver/messages" aria-label="Message AI Dispatcher" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/15">
           <MessageCircle className="h-4 w-4" />
         </Link>
-        <Link href="/driver/incident" aria-label="Report an issue or emergency" className="flex h-11 w-11 items-center justify-center rounded-full bg-red-500/20 text-red-200 hover:bg-red-500/30">
+        <Link href="/driver/incident" aria-label="Report an issue or emergency" className="flex h-11 w-11 items-center justify-center rounded-full bg-danger-soft0/20 text-red-200 hover:bg-danger-soft0/30">
           <LifeBuoy className="h-4 w-4" />
         </Link>
       </div>

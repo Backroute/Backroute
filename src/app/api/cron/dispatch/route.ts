@@ -1,4 +1,5 @@
 import { admin, dbConfigured, loadContext } from "@/lib/agent/db";
+import { releaseDue } from "@/lib/agent/held";
 import { runRounds } from "@/lib/agent/rounds";
 import { flagStuck } from "@/lib/agent/stuck";
 import { retryOutbound } from "@/lib/channels/out";
@@ -25,6 +26,9 @@ export async function GET(request: Request) {
     if (retried.sent) done.push(`${retried.sent} held-up message${retried.sent === 1 ? "" : "s"} sent`);
     if (retried.gaveUp.length) done.push(`${retried.gaveUp.length} message${retried.gaveUp.length === 1 ? "" : "s"} too old to send`);
     done.push(...(await flagStuck(retried.gaveUp, now)));
+    // Emails the AI held for the owner's Undo whose short wait was cut off.
+    const released = await releaseDue(now);
+    if (released) done.push(`${released} held email${released === 1 ? "" : "s"} sent`);
   } catch (e) {
     console.error("[cron] retrying messages failed", e);
   }

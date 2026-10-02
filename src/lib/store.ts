@@ -734,6 +734,15 @@ export interface AgentSettings {
   morningBriefs?: boolean;
   /** Real accounts: the owner's one-minute review of the week, Monday mornings. On unless turned off. */
   weeklyReview?: boolean;
+  /**
+   * Real accounts: seconds an email the AI wrote on its own to book, counter or accept waits before it goes, so the
+   * owner can stop it (default 90; 0 sends at once).
+   */
+  undoSeconds?: number;
+  /** Real accounts: the owner's lowest rate per loaded mile on a lane, by "TX>TN" (origin state > destination state). */
+  laneFloors?: Record<string, number>;
+  /** Real accounts: the weekday drivers are paid, shown on their pay card (default Friday). */
+  payDay?: string;
 }
 
 export interface LiveMetrics {
@@ -1832,7 +1841,11 @@ export const useStore = create<StoreState>((set, get) => ({
             };
           });
         if (!file.file) return settle({ status: "failed", aiNote: "Didn't upload." }, `The ${DRIVER_DOC_LABEL[type]} didn't upload`, "Retake it", "warning");
-        void uploadFile(type, file.file, { loadId }).then((r) => {
+        const onQueued = () =>
+          set((state) => ({
+            loads: state.loads.map((l) => (l.id === loadId ? { ...l, documents: l.documents.map((d) => (d.id === docId ? { ...d, aiNote: "Saved on this phone. It sends when you have signal." } : d)) } : l)),
+          }));
+        void uploadFile(type, file.file, { loadId, onQueued }).then((r) => {
           if (!r.ok) return settle({ status: "failed", aiNote: r.reason }, `The ${DRIVER_DOC_LABEL[type]} didn't upload`, r.reason, "warning");
           const note = r.note ?? "Saved.";
           settle(

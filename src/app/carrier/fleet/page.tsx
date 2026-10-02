@@ -212,12 +212,12 @@ export default function FleetPage() {
                     <p className="text-xs text-ink-400">{currentLoad.lane.origin} → {currentLoad.lane.destination}</p>
                   )}
                   {nextLoad && (
-                    <div className="mt-1 flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs text-[var(--accent-info)]">
+                    <div className="mt-1 flex items-center gap-1.5 rounded-lg bg-info-soft px-2.5 py-1.5 text-xs text-[var(--accent-info)]">
                       <Link2 className="h-3 w-3" /> Next: {nextLoad.lane.origin} → {nextLoad.lane.destination}
                     </div>
                   )}
                   {pendingOffers.length > 0 && (
-                    <Link href="/carrier/loads" className="mt-1 flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-[var(--accent-warn)]">
+                    <Link href="/carrier/loads" className="mt-1 flex items-center gap-1.5 rounded-lg bg-warn-soft px-2.5 py-1.5 text-xs text-[var(--accent-warn)]">
                       <Sparkles className="h-3 w-3" /> {pendingOffers.length} load options awaiting a pick
                     </Link>
                   )}
