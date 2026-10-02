@@ -6,7 +6,6 @@ import { TrendingDown, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useChartColors } from "@/components/shared/money-charts";
-import { useToken } from "@/lib/theme";
 import { useCarrierLoads } from "@/lib/selectors";
 import { laneHistory } from "@/lib/lane-history";
 import { cn } from "@/lib/utils";
@@ -19,7 +18,7 @@ export default function LanesPage() {
   const [picked, setPicked] = useState<string | null>(null);
   const lane = lanes.find((l) => l.key === picked) ?? lanes[0];
   const c = useChartColors();
-  const brand = useToken("--brand", "#4f46e5");
+  const brand = c.ink;
 
   return (
     <div>

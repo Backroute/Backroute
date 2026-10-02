@@ -91,7 +91,7 @@ function SidebarContent({
                   active
                     ? dark
                       ? "bg-white text-ink-950"
-                      : "bg-brand-soft text-brand"
+                      : "bg-ink-950 text-white"
                     : dark
                       ? "text-white/60 hover:bg-white/10 hover:text-white"
                       : "text-ink-600 hover:bg-ink-100 hover:text-ink-950",
@@ -232,10 +232,10 @@ function BottomTabs({ navItems, pathname }: { navItems: NavItem[]; pathname: str
             aria-current={active ? "page" : undefined}
             className={cn(
               "relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-[11px] font-medium transition-colors",
-              active ? "text-brand" : "text-ink-500",
+              active ? "text-ink-950" : "text-ink-500",
             )}
           >
-            <span className={cn("flex h-7 w-12 items-center justify-center rounded-full transition-colors", active && "bg-brand-soft")}>
+            <span className={cn("flex h-7 w-12 items-center justify-center rounded-full transition-colors", active && "bg-ink-100")}>
               <Icon className="h-5 w-5" strokeWidth={active ? 2.25 : 2} />
             </span>
             {item.label}

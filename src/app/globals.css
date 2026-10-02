@@ -33,12 +33,12 @@
   --accent-danger-soft: #fbeceb;
   --accent-info-soft: #eaf0fa;
 
-  /* Backroute's own color: indigo, for where you are and what you picked (the active tab, a selected choice, a
-     switch that's on, keyboard focus). Never a status: green, amber and red keep meaning done, waiting, needs you. */
-  --brand: #4f46e5;
-  --brand-strong: #4338ca;
-  --brand-soft: #eef0ff;
-  --brand-ink: #ffffff;
+  /* Where you are and what you picked (the active tab, a selected choice, a switch that's on, keyboard focus): the
+     same ink as everything else, so the app stays black and white. Green, amber and red only ever mean a status. */
+  --brand: var(--ink-950);
+  --brand-strong: var(--ink-800);
+  --brand-soft: var(--ink-100);
+  --brand-ink: var(--color-white);
 }
 
 /*
@@ -79,11 +79,6 @@
   --accent-danger-soft: #2e1715;
   --accent-info-soft: #151e30;
 
-  --brand: #8f95ff;
-  --brand-strong: #a5aaff;
-  --brand-soft: #1f2046;
-  --brand-ink: #0d0d1a;
-
   --surface-shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset;
 }
 
@@ -117,11 +112,6 @@
   --accent-warn-soft: #fdf3e1;
   --accent-danger-soft: #fbeceb;
   --accent-info-soft: #eaf0fa;
-  /* On the dark panels the indigo goes lighter so it still reads. */
-  --brand: #8f95ff;
-  --brand-strong: #a5aaff;
-  --brand-soft: rgb(143 149 255 / 0.16);
-  --brand-ink: #0d0d1a;
   color-scheme: dark;
 }
 :root[data-theme="dark"] .theme-ink {
@@ -245,8 +235,8 @@ body {
 }
 
 ::selection {
-  background: var(--brand-soft);
-  color: var(--ink-950);
+  background: var(--ink-950);
+  color: var(--color-white);
 }
 
 /* subtle grain / noise overlay used on dark hero panels */

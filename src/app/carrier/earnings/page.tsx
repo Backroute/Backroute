@@ -168,12 +168,16 @@ export default function EarningsPage() {
   );
 }
 
+// Numbers stay in ink, like the rest of the page; `tone` only adds a small dot next to the label.
 function BentoTile({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "live" | "danger" }) {
   return (
     <section className="flex min-h-[7.5rem] flex-col justify-between rounded-3xl border border-line bg-white p-4">
-      <p className="t-label text-ink-500">{label}</p>
+      <p className="t-label flex items-center gap-1.5 text-ink-500">
+        {tone && <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${tone === "live" ? "bg-[var(--accent-live)]" : "bg-[var(--accent-danger)]"}`} />}
+        {label}
+      </p>
       <div className="mt-2">
-        <p className={`text-2xl font-semibold tabular tracking-tight ${tone === "live" ? "text-[var(--accent-live)]" : tone === "danger" ? "text-[var(--accent-danger)]" : "text-ink-950"}`}>{value}</p>
+        <p className="text-2xl font-semibold tabular tracking-tight text-ink-950">{value}</p>
         {sub && <p className="mt-0.5 truncate text-xs text-ink-500">{sub}</p>}
       </div>
     </section>

@@ -97,7 +97,7 @@ function DriverShell({ children }: { children: React.ReactNode }) {
                 transitionTypes={slideTypes(TAB_ORDER, currentTab, tab.href)}
                 className={cn(
                   "flex flex-1 flex-col items-center gap-1 rounded-2xl py-2 text-[10px] font-medium transition-colors",
-                  active ? "bg-brand-soft text-brand" : "text-ink-400 hover:text-ink-700",
+                  active ? "bg-ink-950 text-white" : "text-ink-400 hover:text-ink-700",
                 )}
               >
                 <Icon className="h-5 w-5" strokeWidth={2} />
