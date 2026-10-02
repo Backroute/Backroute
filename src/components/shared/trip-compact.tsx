@@ -124,6 +124,7 @@ export function TripCompactCard({
               }
               disabledLabel={action === "arrive" ? undefined : lockReason(s, docName, s.card === "pickup" && needsPreTrip)}
               onConfirm={() => onConfirm(load.id)}
+              chime={action === "complete" ? "delivered" : undefined}
             />
           </div>
         )}

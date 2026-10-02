@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { usePrimaryDriver, useCarrierTrucks } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import type { IncidentType } from "@/lib/types";
+import { LargeTitle } from "@/components/ui/large-title";
 
 const TYPES: { key: IncidentType; label: string; icon: typeof Wrench; desc: string }[] = [
   { key: "breakdown", label: "Breakdown", icon: Wrench, desc: "Mechanical issue, need roadside help" },
@@ -59,7 +60,7 @@ export default function ReportIncidentPage() {
       </button>
 
       <div>
-        <h1 className="font-display text-2xl text-ink-950">Report an issue</h1>
+        <LargeTitle className="font-display text-2xl text-ink-950">Report an issue</LargeTitle>
         <p className="mt-1 text-sm text-ink-500">Tell us what&apos;s going on. The AI dispatcher takes it from here.</p>
       </div>
 

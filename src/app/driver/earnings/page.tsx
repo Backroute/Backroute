@@ -8,6 +8,7 @@ import { weekEarnings } from "@/lib/earnings";
 import { useStore } from "@/lib/store";
 import { OwnerMoney } from "@/components/shared/owner-operator";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
+import { LargeTitle } from "@/components/ui/large-title";
 
 /** Empty miles at or under this show as good. */
 const EMPTY_GOOD_PCT = 20;
@@ -32,7 +33,7 @@ export default function DriverEarningsPage() {
   return (
     <div className="flex flex-col gap-5 px-5">
       <div>
-        <h1 className="font-display text-2xl text-ink-950">Earnings</h1>
+        <LargeTitle className="font-display text-2xl text-ink-950">Earnings</LargeTitle>
         <p className="mt-1 text-sm text-ink-500">This week, from every load the AI booked for you.</p>
       </div>
 

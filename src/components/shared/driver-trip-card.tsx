@@ -244,7 +244,7 @@ function DeliveryCard({ load, brokerName, upNext, viewer = "driver", driverName,
         ) : !arrived ? (
           <SwipeToConfirm label="Swipe when you arrive" onConfirm={() => onConfirm(load.id)} />
         ) : (
-          <SwipeToConfirm label="Swipe to complete delivery" disabledLabel={lockReason(s, "POD", false)} onConfirm={() => onConfirm(load.id)} />
+          <SwipeToConfirm label="Swipe to complete delivery" disabledLabel={lockReason(s, "POD", false)} onConfirm={() => onConfirm(load.id)} chime="delivered" />
         )}
       </div>
       <p className="mt-3 flex items-center gap-1.5 text-xs text-white/50">

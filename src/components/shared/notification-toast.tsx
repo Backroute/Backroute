@@ -7,6 +7,7 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ActivityEvent } from "@/lib/types";
 import { TYPE_ICON, SEVERITY_TONE } from "./activity-feed";
+import { chime } from "@/lib/feedback";
 
 // Two at most, so they never cover the page; the rest wait in the bell.
 const MAX_VISIBLE = 2;
@@ -69,6 +70,9 @@ export function NotificationToastHost({ events, hrefFor }: { events: ActivityEve
     const fresh = events.filter((e) => !seen.current!.has(e.id));
     if (fresh.length === 0) return;
     fresh.forEach((e) => seen.current!.add(e.id));
+    // The two moments worth hearing when they happen elsewhere: a load delivered, money in.
+    if (fresh.some((e) => e.severity === "success" && /\bpaid\b|payment (in|received)|funded/i.test(e.message))) chime("paid");
+    else if (fresh.some((e) => e.type === "delivered")) chime("delivered");
     if (fresh.length > MAX_VISIBLE) setOverflow((n) => n + fresh.length - MAX_VISIBLE);
 
     setToasts((prev) => {

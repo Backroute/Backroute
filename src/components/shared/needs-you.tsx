@@ -18,6 +18,7 @@ import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierLoads, useCarrierEscalations, useDriverMap, useTruckMap } from "@/lib/selectors";
 import type { DraftPurpose, Escalation, Load } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
+import { celebrate, haptic } from "@/lib/feedback";
 
 /** Everything waiting on the owner, counted one way for the hero line, the badge and the list. */
 export function useNeedsYou() {
@@ -244,7 +245,14 @@ export function NeedsYouList() {
     return (
       <motion.div key={e.id} layout {...enter}>
         <SwipeAction
-          onRight={oneMove ? () => queueWithUndo(e.id, e.recommendedLabel ?? "Done", () => resolveEscalation(e.id, e.recommendedAction === "approve")) : undefined}
+          onRight={
+            oneMove
+              ? () => {
+                  if (e.recommendedAction === "approve") celebrate("approve");
+                  queueWithUndo(e.id, e.recommendedLabel ?? "Done", () => resolveEscalation(e.id, e.recommendedAction === "approve"));
+                }
+              : undefined
+          }
           rightLabel={e.recommendedLabel}
           onLeft={later.has(e.id) ? undefined : () => setLater([...later, e.id])}
         >
@@ -283,7 +291,14 @@ export function NeedsYouList() {
                     <Phone className="h-3.5 w-3.5" /> Call {driver.name.split(" ")[0]}
                   </Button>
                 )}
-                <Button size="sm" variant="outline" onClick={() => resolveEscalation(e.id, true)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    celebrate("approve");
+                    resolveEscalation(e.id, true);
+                  }}
+                >
                   <Check className="h-3.5 w-3.5" /> I&apos;ve handled it
                 </Button>
               </div>
@@ -293,7 +308,15 @@ export function NeedsYouList() {
               </p>
             ) : e.complexity === "routine" && e.recommendedAction && e.recommendedLabel ? (
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <Button size="sm" variant="primary" onClick={() => resolveEscalation(e.id, e.recommendedAction === "approve")}>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => {
+                    if (e.recommendedAction === "approve") celebrate("approve");
+                    else haptic("tap");
+                    resolveEscalation(e.id, e.recommendedAction === "approve");
+                  }}
+                >
                   <Check className="h-3.5 w-3.5" /> {e.recommendedLabel}
                 </Button>
                 {e.loadId && (
@@ -391,7 +414,14 @@ export function NeedsYouList() {
                     {formatDate(r.startDate)} – {formatDate(r.endDate)} · {r.reason}
                   </p>
                   <div className="mt-3 flex items-center gap-2">
-                    <Button size="sm" variant="primary" onClick={() => respondTimeOff(r.id, true)}>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={() => {
+                        celebrate("approve");
+                        respondTimeOff(r.id, true);
+                      }}
+                    >
                       <Check className="h-3.5 w-3.5" /> Approve
                     </Button>
                     <Button size="sm" variant="danger" onClick={() => respondTimeOff(r.id, false)}>

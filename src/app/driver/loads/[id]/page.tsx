@@ -18,6 +18,8 @@ import { LOAD_STATUS_HEADLINE, aiDispatcherNote, isTransitStage } from "@/lib/lo
 import { LOAD_STAGE_LABEL } from "@/lib/types";
 import type { Expense } from "@/lib/types";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { ViewTransition } from "react";
+import { BACK } from "@/lib/nav-direction";
 
 const EXPENSE_CATEGORIES: { key: Expense["category"]; label: string }[] = [
   { key: "lumper", label: "Lumper fee" },
@@ -101,12 +103,13 @@ export default function DriverLoadDetailPage() {
   return (
     <div className="flex flex-col gap-5 px-5">
       <div className="flex items-center gap-3">
-        <Link href="/driver" aria-label="Back to home" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-ink-700 hover:bg-ink-50">
+        <Link href="/driver" transitionTypes={BACK} aria-label="Back to home" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-ink-700 hover:bg-ink-50">
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <h1 className="text-sm font-semibold text-ink-950">Load detail</h1>
       </div>
 
+      <ViewTransition name={`load-${load.id}`} share="morph" default="none">
       <div className="theme-ink rounded-3xl bg-ink-950 p-5 text-white">
         <div className="flex items-center justify-between">
           <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-medium text-white/70">
@@ -158,6 +161,7 @@ export default function DriverLoadDetailPage() {
           </div>
         )}
       </div>
+      </ViewTransition>
 
       <SectionCard title="Trip details" icon={MapPin}>
         {load.stops && load.stops.length > 0 ? (

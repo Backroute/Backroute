@@ -537,6 +537,27 @@ export function applyFromServer(slice: "loads" | "escalations" | "trucks" | "bro
   }
 }
 
+/**
+ * Pull to refresh: saves what's waiting, then reads every list again, so what another screen or the server changed
+ * shows now (Realtime normally brings it, but a phone that slept or lost signal can miss some). False when there's no
+ * account to read from (the demo).
+ */
+export async function refresh(): Promise<boolean> {
+  const c = conn;
+  if (!c) return false;
+  await flush(c);
+  const specs = SPECS.filter((s) => c.mode === "office" || driverSees(s));
+  const lists = await Promise.all(specs.map((s) => selectAll(s, c.carrierId)));
+  if (conn !== c) return false;
+  specs.forEach((spec, n) => {
+    const there = new Set(lists[n].map((i) => i.id));
+    for (const item of lists[n]) applyRemote(c, spec, item);
+    // Gone from the database (removed on another screen), as long as the list isn't one cut to its newest rows.
+    if (!spec.limit) for (const id of [...(c.known.get(specKey(spec)) ?? [])]) if (!there.has(id)) removeRemote(c, spec, id);
+  });
+  return true;
+}
+
 function applyRemote(c: Connection, spec: Spec, item: Item) {
   const key = itemKey(spec, item.id);
   const json = stable(item);

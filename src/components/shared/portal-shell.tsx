@@ -5,8 +5,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowLeftRight, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { slideTypes } from "@/lib/nav-direction";
 import { useEscapeKey } from "@/lib/hooks";
 import { Logo } from "./logo";
+import { LargeTitle } from "@/components/ui/large-title";
+import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 
 export interface NavItem {
   href: string;
@@ -74,19 +77,21 @@ function SidebarContent({
 
         <nav className="mt-8 flex flex-col gap-0.5">
           {navItems.map((item) => {
-            const active = item.href === bestMatchHref(pathname, navItems);
+            const current = bestMatchHref(pathname, navItems);
+            const active = item.href === current;
             const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                transitionTypes={slideTypes(navItems.map((n) => n.href), current, item.href)}
                 onClick={onNavigate}
                 className={cn(
                   "flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                   active
                     ? dark
                       ? "bg-white text-ink-950"
-                      : "bg-ink-950 text-white"
+                      : "bg-brand-soft text-brand"
                     : dark
                       ? "text-white/60 hover:bg-white/10 hover:text-white"
                       : "text-ink-600 hover:bg-ink-100 hover:text-ink-950",
@@ -200,6 +205,7 @@ export function PortalShell({
 
       <main className={cn("min-w-0 flex-1 bg-ink-50/40", bottomTabs && "pb-24 lg:pb-0")}>
         {topBarWithMenu && <div className="sticky top-0 z-20">{topBarWithMenu}</div>}
+        <PullToRefresh />
         {children}
       </main>
 
@@ -222,13 +228,14 @@ function BottomTabs({ navItems, pathname }: { navItems: NavItem[]; pathname: str
           <Link
             key={item.href}
             href={item.href}
+            transitionTypes={slideTypes(navItems.map((n) => n.href), activeHref, item.href)}
             aria-current={active ? "page" : undefined}
             className={cn(
               "relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-[11px] font-medium transition-colors",
-              active ? "text-ink-950" : "text-ink-500",
+              active ? "text-brand" : "text-ink-500",
             )}
           >
-            <span className={cn("flex h-7 w-12 items-center justify-center rounded-full transition-colors", active && "bg-ink-100")}>
+            <span className={cn("flex h-7 w-12 items-center justify-center rounded-full transition-colors", active && "bg-brand-soft")}>
               <Icon className="h-5 w-5" strokeWidth={active ? 2.25 : 2} />
             </span>
             {item.label}
@@ -256,7 +263,7 @@ export function PageHeader({
   return (
     <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line bg-white/70 px-4 py-6 sm:px-8 backdrop-blur-sm">
       <div>
-        <h1 className="t-page text-ink-950">{title}</h1>
+        <LargeTitle>{title}</LargeTitle>
         {description && <p className="mt-1 text-sm text-ink-500">{description}</p>}
       </div>
       {right && <div className="flex items-center gap-3">{right}</div>}

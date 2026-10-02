@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronsRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { celebrate, haptic, type Chime } from "@/lib/feedback";
 
 const KNOB = 52;
 const PAD = 4;
@@ -16,8 +17,11 @@ export function SwipeToConfirm({
   delayMs = 0,
   disabledLabel,
   onConfirm,
+  chime: sound,
 }: {
   label: string;
+  /** A short sound with the buzz, for the moments worth hearing (a delivery done). */
+  chime?: Chime;
   /** When set, the bar is locked and shows this instead — e.g. what still has to happen first. */
   disabledLabel?: string;
   /** Shown while the confirmation "works" (e.g. capturing a document photo) before `onConfirm` fires. */
@@ -46,6 +50,8 @@ export function SwipeToConfirm({
     if (busy) return;
     setX(max);
     setBusy(true);
+    if (sound) celebrate(sound);
+    else haptic("success");
     if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
     onConfirm();
     setBusy(false);

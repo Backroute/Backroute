@@ -32,6 +32,13 @@
   --accent-warn-soft: #fdf3e1;
   --accent-danger-soft: #fbeceb;
   --accent-info-soft: #eaf0fa;
+
+  /* Backroute's own color: indigo, for where you are and what you picked (the active tab, a selected choice, a
+     switch that's on, keyboard focus). Never a status: green, amber and red keep meaning done, waiting, needs you. */
+  --brand: #4f46e5;
+  --brand-strong: #4338ca;
+  --brand-soft: #eef0ff;
+  --brand-ink: #ffffff;
 }
 
 /*
@@ -72,6 +79,11 @@
   --accent-danger-soft: #2e1715;
   --accent-info-soft: #151e30;
 
+  --brand: #8f95ff;
+  --brand-strong: #a5aaff;
+  --brand-soft: #1f2046;
+  --brand-ink: #0d0d1a;
+
   --surface-shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset;
 }
 
@@ -105,6 +117,11 @@
   --accent-warn-soft: #fdf3e1;
   --accent-danger-soft: #fbeceb;
   --accent-info-soft: #eaf0fa;
+  /* On the dark panels the indigo goes lighter so it still reads. */
+  --brand: #8f95ff;
+  --brand-strong: #a5aaff;
+  --brand-soft: rgb(143 149 255 / 0.16);
+  --brand-ink: #0d0d1a;
   color-scheme: dark;
 }
 :root[data-theme="dark"] .theme-ink {
@@ -148,6 +165,11 @@
   --color-warn-soft: var(--accent-warn-soft);
   --color-danger-soft: var(--accent-danger-soft);
   --color-info-soft: var(--accent-info-soft);
+
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-ink: var(--brand-ink);
 }
 
 * {
@@ -223,8 +245,8 @@ body {
 }
 
 ::selection {
-  background: var(--ink-950);
-  color: var(--color-white);
+  background: var(--brand-soft);
+  color: var(--ink-950);
 }
 
 /* subtle grain / noise overlay used on dark hero panels */
@@ -347,7 +369,7 @@ body {
 
 /* Keyboard and switch users always see where they are. */
 :where(a, button, input, select, textarea, [role="switch"], [role="radio"], [tabindex]):focus-visible {
-  outline: 2px solid var(--ink-950);
+  outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
 
@@ -360,5 +382,72 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ─── Page transitions (React's ViewTransition; see app/carrier/template.tsx) ─────────────────── */
+
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-old(.nav-forward) {
+  --slide-offset: -48px;
+  animation:
+    140ms ease-in both vt-fade reverse,
+    320ms cubic-bezier(0.32, 0.72, 0, 1) both vt-slide reverse;
+}
+::view-transition-new(.nav-forward) {
+  --slide-offset: 48px;
+  animation:
+    200ms ease-out 100ms both vt-fade,
+    320ms cubic-bezier(0.32, 0.72, 0, 1) both vt-slide;
+}
+::view-transition-old(.nav-back) {
+  --slide-offset: 48px;
+  animation:
+    140ms ease-in both vt-fade reverse,
+    320ms cubic-bezier(0.32, 0.72, 0, 1) both vt-slide reverse;
+}
+::view-transition-new(.nav-back) {
+  --slide-offset: -48px;
+  animation:
+    200ms ease-out 100ms both vt-fade,
+    320ms cubic-bezier(0.32, 0.72, 0, 1) both vt-slide;
+}
+/* A load card growing into the load's page. */
+::view-transition-group(.morph) {
+  animation-duration: 360ms;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+::view-transition-image-pair(.morph) {
+  animation-name: vt-soften;
+}
+@keyframes vt-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes vt-slide {
+  from {
+    translate: var(--slide-offset);
+  }
+  to {
+    translate: 0;
+  }
+}
+@keyframes vt-soften {
+  35% {
+    filter: blur(2px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 }

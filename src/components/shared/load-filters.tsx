@@ -161,7 +161,7 @@ export function LoadFilterBar({
             type="button"
             aria-pressed={filter.view === v.key}
             onClick={() => set({ view: filter.view === v.key ? "" : v.key })}
-            className={cn("rounded-full border px-3 py-1 text-xs font-medium", filter.view === v.key ? "border-ink-950 bg-ink-950 text-white" : "border-line text-ink-700 hover:border-ink-400")}
+            className={cn("rounded-full border px-3 py-1 text-xs font-medium", filter.view === v.key ? "border-brand bg-brand text-brand-ink" : "border-line text-ink-700 hover:border-ink-400")}
           >
             {v.label}
           </button>

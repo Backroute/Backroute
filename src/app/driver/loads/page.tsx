@@ -7,6 +7,9 @@ import { LoadOfferCard } from "@/components/shared/load-offer-card";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { LargeTitle } from "@/components/ui/large-title";
+import { ViewTransition } from "react";
+import { FORWARD } from "@/lib/nav-direction";
 
 export default function DriverLoadsPage() {
   const driver = usePrimaryDriver();
@@ -53,7 +56,7 @@ export default function DriverLoadsPage() {
       )}
 
       <div>
-        <h1 className="font-display text-2xl text-ink-950">Your loads</h1>
+        <LargeTitle className="font-display text-2xl text-ink-950">Your loads</LargeTitle>
 
         {myLoads.length === 0 ? (
           <p className="py-10 text-center text-sm text-ink-400">
@@ -62,7 +65,8 @@ export default function DriverLoadsPage() {
         ) : (
           <div className="mt-4 flex flex-col gap-3">
             {myLoads.map((load) => (
-              <Link key={load.id} href={`/driver/loads/${load.id}`} className="block rounded-2xl border border-line p-4">
+              <ViewTransition key={load.id} name={`load-${load.id}`} share="morph" default="none">
+              <Link href={`/driver/loads/${load.id}`} transitionTypes={FORWARD} className="block rounded-2xl border border-line p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-sm font-medium text-ink-950">
@@ -87,6 +91,7 @@ export default function DriverLoadsPage() {
                   )}
                 </div>
               </Link>
+              </ViewTransition>
             ))}
           </div>
         )}

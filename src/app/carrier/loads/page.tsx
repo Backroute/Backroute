@@ -21,6 +21,8 @@ import { useStore } from "@/lib/store";
 import { cn, formatCurrency } from "@/lib/utils";
 import { downloadCsv } from "@/lib/csv-export";
 import type { Broker, Load, LoadStage, Truck } from "@/lib/types";
+import { ViewTransition } from "react";
+import { FORWARD } from "@/lib/nav-direction";
 
 function exportLoads(loads: Load[], brokers: Map<string, Broker>, trucks: Map<string, Truck>) {
   downloadCsv(
@@ -139,7 +141,8 @@ export default function CarrierLoadsPage() {
                 const broker = brokers.get(load.brokerId);
                 const truck = load.truckId ? trucks.get(load.truckId) : undefined;
                 return (
-                  <Link key={load.id} href={`/carrier/loads/${load.id}`} className="block rounded-2xl border border-line bg-white p-4">
+                  <ViewTransition key={load.id} name={`load-${load.id}`} share="morph" default="none">
+                  <Link href={`/carrier/loads/${load.id}`} transitionTypes={FORWARD} className="block rounded-2xl border border-line bg-white p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-medium text-ink-950">
@@ -169,6 +172,7 @@ export default function CarrierLoadsPage() {
                       </span>
                     </div>
                   </Link>
+                  </ViewTransition>
                 );
               })}
               {filtered.length === 0 && (loads.length ? <p className="py-12 text-center text-sm text-ink-500">No loads in this view. Try another tab.</p> : <EmptyNextStep what="loads" fallback="No loads yet." />)}
@@ -196,7 +200,7 @@ export default function CarrierLoadsPage() {
                   return (
                     <tr key={load.id} className="border-b border-line last:border-0 hover:bg-ink-50/60">
                       <td className="px-5 py-3.5">
-                        <Link href={`/carrier/loads/${load.id}`} className="block">
+                        <Link href={`/carrier/loads/${load.id}`} transitionTypes={FORWARD} className="block">
                           <p className="font-medium text-ink-950">
                             {load.lane.origin}, {load.lane.originState} <span className="text-ink-300">→</span> {load.lane.destination}, {load.lane.destState}
                             {load.stops && load.stops.length > 0 && <Badge tone="info" className="ml-1.5 align-middle">+{load.stops.length} stop{load.stops.length === 1 ? "" : "s"}</Badge>}

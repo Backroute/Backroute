@@ -8,6 +8,7 @@ import { LayoutGrid, Monitor, Moon, Pause, Play, Settings, Sun, Truck, Users, Wa
 import { useRouter } from "next/navigation";
 import { setTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { slideTypes } from "@/lib/nav-direction";
 import { isAlert } from "@/lib/alerts";
 import { PortalShell, type NavItem } from "@/components/shared/portal-shell";
 import { TopBar } from "@/components/shared/top-bar";
@@ -21,6 +22,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierLoads } from "@/lib/selectors";
+import { InstallPrompt } from "@/components/shared/install-prompt";
 
 /** Five sections instead of eleven pages; each section's pages sit on tabs inside it. */
 const SECTIONS: { nav: NavItem; tabs: { href: string; label: string }[] }[] = [
@@ -44,6 +46,7 @@ function SectionTabs() {
   const pathname = usePathname();
   const section = SECTIONS.find((sec) => sec.tabs.some((t) => pathname === t.href || (t.href !== "/carrier" && pathname.startsWith(`${t.href}/`))));
   if (!section || section.tabs.length < 2) return null;
+  const currentTab = section.tabs.find((t) => pathname === t.href || (t.href !== "/carrier" && pathname.startsWith(`${t.href}/`)));
   return (
     <nav aria-label={`${section.nav.label} sections`} className="flex gap-1 overflow-x-auto border-b border-line px-4 pt-3 no-scrollbar sm:px-8">
       {section.tabs.map((t) => {
@@ -52,10 +55,11 @@ function SectionTabs() {
           <Link
             key={t.href}
             href={t.href}
+            transitionTypes={slideTypes(section.tabs.map((x) => x.href), currentTab?.href, t.href)}
             aria-current={active ? "page" : undefined}
             className={cn(
               "-mb-px whitespace-nowrap border-b-2 px-3 pb-2.5 text-sm font-medium transition-colors",
-              active ? "border-ink-950 text-ink-950" : "border-transparent text-ink-500 hover:text-ink-950",
+              active ? "border-brand text-ink-950" : "border-transparent text-ink-500 hover:text-ink-950",
             )}
           >
             {t.label}
@@ -168,6 +172,7 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
           router.push("/carrier/messages");
         }}
       />
+      <InstallPrompt />
       <SampleTracker />
       <SectionTabs />
       {children}

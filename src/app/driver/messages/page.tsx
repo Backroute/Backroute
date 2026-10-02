@@ -11,6 +11,7 @@ import { useAiTyping } from "@/lib/ai/client";
 import { QuickReplies } from "@/components/shared/quick-replies";
 import { DictateButton } from "@/components/shared/dictate";
 import { truckActiveLoads, useCarrierLoads, useCarrierTrucks } from "@/lib/selectors";
+import { LargeTitle } from "@/components/ui/large-title";
 
 export default function DriverMessagesPage() {
   const driver = usePrimaryDriver();
@@ -37,7 +38,7 @@ export default function DriverMessagesPage() {
     <div className="flex h-full flex-col">
       <div className="flex items-start justify-between px-5">
         <div>
-          <h1 className="font-display text-2xl text-ink-950">AI Dispatcher</h1>
+          <LargeTitle className="font-display text-2xl text-ink-950">AI Dispatcher</LargeTitle>
           <p className="text-xs text-ink-500">Available 24/7 · responds in seconds</p>
         </div>
         <button

@@ -3,8 +3,6 @@
 import { MoneyCharts } from "@/components/shared/money-charts";
 import { Lightbulb, Sparkles, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { StatTile } from "@/components/ui/stat-tile";
 import { useCarrierLoads, useCarrierTrucks, useBrokerMap, useDriverMap } from "@/lib/selectors";
 import { weekEarnings } from "@/lib/earnings";
 import { formatCurrency } from "@/lib/utils";
@@ -93,127 +91,91 @@ export default function EarningsPage() {
       <PageHeader title="Earnings" />
 
       <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
-        <section className="theme-ink rounded-3xl bg-ink-950 p-5 text-white sm:p-6" aria-labelledby="week-title">
-          <p id="week-title" className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-white/50">
-            <Sparkles className="h-3.5 w-3.5" /> This week
-          </p>
-          <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+        {/* Bento: the week's number is the big tile, everything that explains it sits around it in smaller ones. */}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <section className="theme-ink col-span-2 flex flex-col justify-between rounded-3xl bg-ink-950 p-5 text-white sm:p-6 lg:row-span-2" aria-labelledby="week-title">
             <div>
-              <p className="text-4xl font-semibold tabular tracking-tight">{formatCurrency(week.net)}</p>
-              <p className="mt-1 text-sm text-white/60">net profit on {formatCurrency(week.gross)} revenue · {week.loads.length} loads</p>
+              <p id="week-title" className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-white/50">
+                <Sparkles className="h-3.5 w-3.5" /> This week
+              </p>
+              <p className="mt-3 text-5xl font-semibold tabular tracking-tight">{formatCurrency(week.net)}</p>
+              <p className="mt-1 text-sm text-white/60">
+                net profit on {formatCurrency(week.gross)} revenue · {week.loads.length} loads
+              </p>
             </div>
             {week.overMarket > 0 && (
-              <p className="flex items-center gap-1.5 rounded-2xl bg-emerald-400/15 px-3.5 py-2 text-sm font-medium text-emerald-200">
+              <p className="mt-6 flex w-fit items-center gap-1.5 rounded-2xl bg-emerald-400/15 px-3.5 py-2 text-sm font-medium text-emerald-200">
                 <TrendingUp className="h-4 w-4" /> AI earned you {formatCurrency(week.overMarket)} more than market
               </p>
             )}
-          </div>
-          <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <WeekTile label="Revenue / mile, all miles" value={`$${week.rpmAll.toFixed(2)}`} />
-            <WeekTile label="Empty miles" value={`${week.emptyPct.toFixed(0)}%`} />
-            <WeekTile label="Above posted rates" value={`+${formatCurrency(week.overPosted)}`} />
-            <WeekTile label="Detention billed by AI" value={week.extras ? `+${formatCurrency(week.extras)}` : "$0"} />
-          </div>
-        </section>
+          </section>
+          <BentoTile label="Revenue / mile, all miles" value={`$${week.rpmAll.toFixed(2)}`} />
+          <BentoTile label="Empty miles" value={`${week.emptyPct.toFixed(0)}%`} tone={week.emptyPct > 20 ? "danger" : undefined} />
+          <BentoTile label="Above posted rates" value={`+${formatCurrency(week.overPosted)}`} tone={week.overPosted > 0 ? "live" : undefined} />
+          <BentoTile label="Detention billed by AI" value={week.extras ? `+${formatCurrency(week.extras)}` : "$0"} />
 
-        <Card>
-          <CardHeader>
-            <div>
-              <CardTitle>Profit by truck</CardTitle>
-              <CardDescription>This week. The AI plans each truck&apos;s next loads to lift the weakest ones.</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="!pt-3">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px] text-sm">
-                <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-wider text-ink-400">
-                    <th className="pb-2 font-medium">Truck</th>
-                    <th className="pb-2 font-medium">Loads</th>
-                    <th className="pb-2 text-right font-medium">Revenue</th>
-                    <th className="pb-2 text-right font-medium">Net</th>
-                    <th className="pb-2 text-right font-medium">$/mi all miles</th>
-                    <th className="pb-2 text-right font-medium">Empty</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {perTruck.map(({ truck, driver, w }) => (
-                    <tr key={truck.id}>
-                      <td className="py-2.5">
-                        <p className="font-medium text-ink-950">{truck.unitNumber}</p>
-                        <p className="text-xs text-ink-500">{driver?.name ?? "Unassigned"}</p>
-                      </td>
-                      <td className="py-2.5 tabular text-ink-700">{w.loads.length}</td>
-                      <td className="py-2.5 text-right tabular text-ink-700">{formatCurrency(w.gross)}</td>
-                      <td className="py-2.5 text-right font-semibold tabular text-ink-950">{formatCurrency(w.net)}</td>
-                      <td className="py-2.5 text-right tabular text-ink-700">{w.rpmAll ? `$${w.rpmAll.toFixed(2)}` : "—"}</td>
-                      <td className={`py-2.5 text-right tabular ${w.emptyPct > 20 ? "text-[var(--accent-danger)]" : "text-ink-700"}`}>
-                        {w.loads.length ? `${w.emptyPct.toFixed(0)}%` : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+          <section aria-labelledby="trucks-title" className="col-span-2 rounded-3xl border border-line bg-white p-5 lg:row-span-2">
+            <h3 id="trucks-title" className="t-section text-ink-950">
+              Profit by truck
+            </h3>
+            <p className="mt-0.5 text-xs text-ink-500">This week. The AI plans each truck&apos;s next loads to lift the weakest ones.</p>
+            <ul className="mt-4 flex flex-col gap-3">
+              {perTruck.slice(0, 5).map(({ truck, driver, w }) => {
+                const top = Math.max(1, ...perTruck.map((p) => p.w.net));
+                return (
+                  <li key={truck.id}>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="min-w-0 truncate text-sm">
+                        <span className="font-medium text-ink-950">{truck.unitNumber}</span> <span className="text-ink-500">{driver?.name ?? "Unassigned"}</span>
+                      </p>
+                      <p className="text-sm font-semibold tabular text-ink-950">{formatCurrency(w.net)}</p>
+                    </div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-ink-100">
+                      <div className="h-full rounded-full bg-brand" style={{ width: `${Math.max(2, (Math.max(0, w.net) / top) * 100)}%` }} />
+                    </div>
+                    <p className="mt-1 text-[11px] tabular text-ink-500">
+                      {w.loads.length} load{w.loads.length === 1 ? "" : "s"} · {formatCurrency(w.gross)} revenue · {w.rpmAll ? `$${w.rpmAll.toFixed(2)}/mi` : "—"} ·{" "}
+                      <span className={w.emptyPct > 20 ? "text-[var(--accent-danger)]" : undefined}>{w.loads.length ? `${w.emptyPct.toFixed(0)}% empty` : "no miles"}</span>
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+            {perTruck.length > 5 && <p className="mt-3 text-xs text-ink-500">and {perTruck.length - 5} more, lowest last</p>}
+          </section>
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Card><CardContent><StatTile label="Net profit" value={formatCurrency(netProfitTotal)} sublabel="This cycle" /></CardContent></Card>
-          <Card><CardContent><StatTile label="Avg rate / mile" value={`$${avgRpm.toFixed(2)}`} /></CardContent></Card>
-          <Card><CardContent><StatTile label="Loads delivered" value={delivered.length} /></CardContent></Card>
-          <Card><CardContent><StatTile label="Empty-mile rate" value={`${emptyRate.toFixed(1)}%`} sublabel="Of all miles driven" /></CardContent></Card>
+          {priced.length > 0 && bestLane && <BentoTile label="Best lane" value={formatCurrency(bestLane.avg)} sub={`${bestLane.key} · avg net`} tone="live" />}
+          {priced.length > 0 && worstBrokerEntry && worstBrokerName && (
+            <BentoTile label="Lowest-margin broker" value={formatCurrency(worstBrokerEntry.avg)} sub={`${worstBrokerName} · avg net`} tone="danger" />
+          )}
+          {priced.length > 0 && bestEquip && <BentoTile label="Most profitable equipment" value={formatCurrency(bestEquip.avg)} sub={`${bestEquip.key} · avg net`} />}
+          <section className="flex flex-col justify-between rounded-3xl bg-brand-soft p-4">
+            <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-brand">
+              <Lightbulb className="h-3.5 w-3.5" /> Rate floor
+            </p>
+            <p className="mt-2 text-sm font-medium text-ink-950">{priced.length ? rateFloorNote : "Not enough delivered loads yet to say."}</p>
+          </section>
+
+          <BentoTile label="Net profit, this cycle" value={formatCurrency(netProfitTotal)} />
+          <BentoTile label="Avg rate / mile" value={`$${avgRpm.toFixed(2)}`} />
+          <BentoTile label="Loads delivered" value={String(delivered.length)} />
+          <BentoTile label="Empty-mile rate" value={`${emptyRate.toFixed(1)}%`} sub="Of all miles driven" />
         </div>
 
         <MoneyCharts loads={loads} trucks={trucks} drivers={driverMap} />
-
-        <Card>
-          <CardHeader>
-            <div>
-              <CardTitle className="flex items-center gap-2"><Lightbulb className="h-4 w-4" /> Weekly insights</CardTitle>
-              <CardDescription>Where your fleet makes the most and least money.</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="!pt-3">
-            {priced.length === 0 ? (
-              <p className="text-sm text-ink-400">Not enough delivered loads yet to generate insights.</p>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {bestLane && (
-                  <InsightRow label="Best lane" detail={bestLane.key} value={`${formatCurrency(bestLane.avg)} avg net`} tone="success" />
-                )}
-                {worstBrokerEntry && worstBrokerName && (
-                  <InsightRow label="Lowest-margin broker" detail={worstBrokerName} value={`${formatCurrency(worstBrokerEntry.avg)} avg net`} tone="danger" />
-                )}
-                {bestEquip && (
-                  <InsightRow label="Most profitable equipment" detail={bestEquip.key} value={`${formatCurrency(bestEquip.avg)} avg net`} tone="success" />
-                )}
-                <InsightRow label="Rate floor" detail={rateFloorNote} tone="info" />
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
 }
 
-function InsightRow({ label, detail, value, tone }: { label: string; detail: string; value?: string; tone: "success" | "danger" | "info" }) {
-  const toneClass = tone === "success" ? "text-[var(--accent-live)]" : tone === "danger" ? "text-[var(--accent-danger)]" : "text-ink-500";
+function BentoTile({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "live" | "danger" }) {
   return (
-    <div className="rounded-2xl border border-line p-4">
-      <p className="text-[11px] font-medium uppercase tracking-wider text-ink-400">{label}</p>
-      <p className="mt-1 text-sm font-medium text-ink-950">{detail}</p>
-      {value && <p className={`mt-0.5 text-xs font-medium tabular ${toneClass}`}>{value}</p>}
-    </div>
-  );
-}
-
-function WeekTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="rounded-2xl bg-white/5 px-3.5 py-3">
-      <p className="text-lg font-semibold tabular">{value}</p>
-      <p className="text-[11px] text-white/50">{label}{sub ? ` · ${sub}` : ""}</p>
-    </div>
+    <section className="flex min-h-[7.5rem] flex-col justify-between rounded-3xl border border-line bg-white p-4">
+      <p className="t-label text-ink-500">{label}</p>
+      <div className="mt-2">
+        <p className={`text-2xl font-semibold tabular tracking-tight ${tone === "live" ? "text-[var(--accent-live)]" : tone === "danger" ? "text-[var(--accent-danger)]" : "text-ink-950"}`}>{value}</p>
+        {sub && <p className="mt-0.5 truncate text-xs text-ink-500">{sub}</p>}
+      </div>
+    </section>
   );
 }

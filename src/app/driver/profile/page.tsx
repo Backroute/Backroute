@@ -19,6 +19,7 @@ import { computeDriverPay, payLabel } from "@/lib/settlements";
 import { HOME_TIME_OPTIONS, RUN_TYPE_DETAIL, RUN_TYPE_LABEL, RUN_TYPES } from "@/lib/run-types";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { HosStatus, TimeOffRequest } from "@/lib/types";
+import { LargeTitle } from "@/components/ui/large-title";
 
 const TIME_OFF_TONE: Record<TimeOffRequest["status"], "warning" | "success" | "danger"> = {
   pending: "warning",
@@ -72,7 +73,7 @@ export default function DriverProfilePage() {
     <div className="flex flex-col gap-5 px-5">
       <div className="flex flex-col items-center gap-2 py-4 text-center">
         <Avatar name={driver.name} size="lg" />
-        <h1 className="font-display text-2xl text-ink-950">{driver.name}</h1>
+        <LargeTitle title={driver.name} className="font-display text-2xl text-ink-950">{driver.name}</LargeTitle>
         <p className="text-xs text-ink-500">{carrier.name}</p>
         <div className="mt-1 flex items-center gap-1 text-xs text-ink-600">
           <Star className="h-3.5 w-3.5 fill-current text-ink-950" /> {driver.rating.toFixed(1)} rating

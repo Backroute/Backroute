@@ -4,6 +4,7 @@ import * as React from "react";
 import { animate, motion, useMotionValue, useTransform, type PanInfo } from "framer-motion";
 import { Check, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { haptic } from "@/lib/feedback";
 
 /**
  * How much something needs the owner, shown the same way everywhere: a thin colored edge on a plain card. Red needs a
@@ -77,7 +78,7 @@ export function SwipeAction({
     const go = info.offset.x > THRESHOLD || info.velocity.x > 600 ? "right" : info.offset.x < -THRESHOLD || info.velocity.x < -600 ? "left" : null;
     const fn = go === "right" ? onRight : go === "left" ? onLeft : undefined;
     if (fn) {
-      if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(12);
+      haptic("tap");
       void animate(x, go === "right" ? 480 : -480, { duration: 0.18 }).then(fn);
     } else void animate(x, 0, { type: "spring", stiffness: 500, damping: 40 });
   }

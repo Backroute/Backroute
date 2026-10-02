@@ -34,6 +34,8 @@ import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { openFile } from "@/lib/cloud/files";
 import { BookingCard } from "@/components/cloud/booking-card";
 import type { Driver, LoadStage, Truck } from "@/lib/types";
+import { ViewTransition } from "react";
+import { BACK } from "@/lib/nav-direction";
 
 /** Cancellable once rate is locked in; once in transit the freight is already moving, so that's a
  *  claim situation, not a cancellation. Dispatched/at_pickup carry a TONU fee since the truck already committed. */
@@ -89,9 +91,10 @@ export default function LoadDetailPage() {
 
   return (
     <div>
+      <ViewTransition name={`load-${load.id}`} share="morph" default="none">
       <div className="border-b border-line bg-white/70 px-4 py-6 sm:px-8 backdrop-blur-sm">
         <div className="flex items-center justify-between gap-3">
-          <Link href="/carrier/loads" className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-500 hover:text-ink-950">
+          <Link href="/carrier/loads" transitionTypes={BACK} className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-500 hover:text-ink-950">
             <ArrowLeft className="h-3.5 w-3.5" /> Back to loads
           </Link>
           <LiveDot label={aiDispatcherNote(load.stage)} />
@@ -170,6 +173,7 @@ export default function LoadDetailPage() {
           </div>
         )}
       </div>
+      </ViewTransition>
 
       <div className="grid gap-6 px-4 py-6 sm:px-8 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">

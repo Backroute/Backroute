@@ -20,3 +20,52 @@ export function alertKind(e: ActivityEvent): AlertKind | null {
 export function isAlert(e: ActivityEvent): boolean {
   return alertKind(e) !== null;
 }
+
+/** Alerts of one kind close together, shown as one line ("3 loads delivered") that opens to the list. */
+export interface AlertGroup {
+  id: string;
+  lead: ActivityEvent;
+  items: ActivityEvent[];
+  /** The one line for the group; the lead's own message when it's just one. */
+  title: string;
+}
+
+const GROUP_WINDOW_MS = 6 * 3600_000;
+
+const GROUP_TITLE: Partial<Record<ActivityEvent["type"], (n: number) => string>> = {
+  delivered: (n) => `${n} loads delivered`,
+  rate_confirmed: (n) => `${n} rates locked in`,
+  booked: (n) => `${n} loads booked`,
+  load_offered: (n) => `${n} new loads to pick from`,
+  escalation: (n) => `${n} things need you`,
+  call_completed: (n) => `${n} broker calls done`,
+  time_off: (n) => `${n} time-off requests`,
+  expense: (n) => `${n} driver expenses to check`,
+  load_cancelled: (n) => `${n} loads cancelled`,
+  incident: (n) => `${n} incidents reported`,
+  dvir: (n) => `${n} inspection issues`,
+  maintenance: (n) => `${n} maintenance alerts`,
+};
+
+/**
+ * Groups newest-first alerts: same kind, same severity, within six hours of the newest in the group. Safety alerts
+ * never fold into a group of other ones, and a group keeps the worst-looking one on top.
+ */
+export function groupAlerts(events: ActivityEvent[]): AlertGroup[] {
+  const groups: AlertGroup[] = [];
+  const open = new Map<string, AlertGroup>();
+  for (const e of events) {
+    const key = `${e.type}|${e.severity}`;
+    const g = open.get(key);
+    const titleFor = GROUP_TITLE[e.type];
+    if (g && titleFor && Date.parse(g.lead.timestamp) - Date.parse(e.timestamp) <= GROUP_WINDOW_MS) {
+      g.items.push(e);
+      g.title = titleFor(g.items.length);
+      continue;
+    }
+    const fresh: AlertGroup = { id: e.id, lead: e, items: [e], title: e.message };
+    groups.push(fresh);
+    open.set(key, fresh);
+  }
+  return groups;
+}

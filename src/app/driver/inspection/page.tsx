@@ -9,6 +9,7 @@ import { cn, formatDate } from "@/lib/utils";
 import { usePrimaryDriver, useCarrierTrucks } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import type { DvirItem } from "@/lib/types";
+import { LargeTitle } from "@/components/ui/large-title";
 
 const CHECKLIST = [
   "Brakes",
@@ -81,7 +82,7 @@ function DvirInspection() {
       </button>
 
       <div>
-        <h1 className="font-display text-2xl text-ink-950">Vehicle inspection</h1>
+        <LargeTitle className="font-display text-2xl text-ink-950">Vehicle inspection</LargeTitle>
         <p className="mt-1 text-sm text-ink-500">{truck ? `${truck.unitNumber} · ${truck.equipmentType}` : "No truck assigned"}</p>
       </div>
 

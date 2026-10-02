@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bell, LogOut, Menu, Search, Settings } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { useCompactTitle } from "@/lib/large-title";
 import { useEscapeKey, useNow } from "@/lib/hooks";
 import { openCommandPalette } from "./command-palette";
-import { ActivityFeed } from "./activity-feed";
+import { GroupedAlertFeed } from "./activity-feed";
 import { OPEN_BELL_EVENT } from "./notification-toast";
 import { Avatar } from "@/components/ui/avatar";
 import { ThemePicker } from "./theme-picker";
@@ -67,13 +69,15 @@ export function TopBar({
   }, []);
 
   const now = useNow();
+  const compactTitle = useCompactTitle();
   const recentCount = now === null ? 0 : notifications.filter((n) => now - new Date(n.timestamp).getTime() < 120_000).length;
 
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-2 border-b px-4 py-3 sm:gap-4 sm:px-8",
-        dark ? "theme-ink border-white/10 bg-ink-950" : "border-line bg-white",
+        "flex items-center justify-between gap-2 border-b px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] transition-colors sm:gap-4 sm:px-8",
+        // Frosted glass: the page shows through, blurred, as it scrolls underneath.
+        dark ? "theme-ink border-white/10 bg-ink-950/80 backdrop-blur-xl backdrop-saturate-150" : "border-line/70 bg-white/75 backdrop-blur-xl backdrop-saturate-150",
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -93,7 +97,9 @@ export function TopBar({
           onClick={openCommandPalette}
           aria-label="Search"
           className={cn(
-            "flex w-full max-w-xs items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm transition-colors",
+            "flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm transition-colors",
+            // Once the page's name moves up here, the search shrinks to its icon on a phone to make room.
+            compactTitle ? "w-auto shrink-0 sm:w-full sm:max-w-xs" : "w-full max-w-xs",
             dark ? "border-white/15 text-white/40 hover:border-white/30" : "border-line text-ink-400 hover:border-ink-300",
           )}
         >
@@ -103,6 +109,21 @@ export function TopBar({
             &#8984;K
           </kbd>
         </button>
+        <AnimatePresence>
+          {compactTitle && (
+            <motion.span
+              key={compactTitle}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.18 }}
+              aria-hidden
+              className={cn("min-w-0 truncate text-[15px] font-semibold", dark ? "text-white" : "text-ink-950")}
+            >
+              {compactTitle}
+            </motion.span>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="flex items-center gap-2">
@@ -132,7 +153,7 @@ export function TopBar({
                 )}
               </div>
               <div className="max-h-96 overflow-y-auto px-4">
-                <ActivityFeed events={notifications.slice(0, 8)} dense />
+                <GroupedAlertFeed events={notifications.slice(0, 40)} />
               </div>
             </div>
           )}
