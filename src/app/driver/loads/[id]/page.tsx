@@ -107,7 +107,7 @@ export default function DriverLoadDetailPage() {
         <h1 className="text-sm font-semibold text-ink-950">Load detail</h1>
       </div>
 
-      <div className="rounded-3xl bg-ink-950 p-5 text-white">
+      <div className="theme-ink rounded-3xl bg-ink-950 p-5 text-white">
         <div className="flex items-center justify-between">
           <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-medium text-white/70">
             <span className="relative flex h-1.5 w-1.5">

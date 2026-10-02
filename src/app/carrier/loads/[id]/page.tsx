@@ -203,7 +203,7 @@ export default function LoadDetailPage() {
             </CardHeader>
             <CardContent className="!pt-4">
               {(load.liveCall || (load.stage === "negotiating" && !load.calls.length)) && (
-                <div className="mb-4 rounded-2xl bg-ink-950 p-3 text-white">
+                <div className="theme-ink mb-4 rounded-2xl bg-ink-950 p-3 text-white">
                   <BrokerCallRow load={load} brokerName={broker?.company ?? "the broker"} contactName={broker?.contact} onCall={() => startBrokerCall(load.id)} />
                 </div>
               )}

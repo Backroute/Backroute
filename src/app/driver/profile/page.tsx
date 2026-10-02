@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CalendarClock, DollarSign, Home, Phone, Star, Users } from "lucide-react";
 import { CallSettingsCard, LanguageCard } from "@/components/shared/call-settings";
 import { BusinessCard } from "@/components/shared/owner-operator";
+import { AppearanceCard } from "@/components/shared/appearance-card";
 import { SignOutButton } from "@/components/cloud/app-access";
 import { ConsentCard, DriverDispatchCard } from "@/components/cloud/driver-dispatch-card";
 import { useDriverUi } from "@/lib/lang/use-driver-ui";
@@ -89,6 +90,8 @@ export default function DriverProfilePage() {
       <BusinessCard />
 
       <LanguageCard driver={driver} />
+
+      <AppearanceCard />
 
       <CallSettingsCard driver={driver} />
 

@@ -40,7 +40,7 @@ export function IncomingCallHost({ driverId }: { driverId: string }) {
   if (active?.status === "live") return <LiveCall key={active.id} call={active} />;
   if (ended) {
     return (
-      <div role="status" className="fixed inset-x-0 top-4 z-[80] mx-auto flex w-[min(92vw,24rem)] items-center gap-3 rounded-2xl bg-ink-950 px-4 py-3 text-white shadow-lg">
+      <div role="status" className="theme-ink fixed inset-x-0 top-4 z-[80] mx-auto flex w-[min(92vw,24rem)] items-center gap-3 rounded-2xl bg-ink-950 px-4 py-3 text-white shadow-lg">
         <MessageSquareText className="h-5 w-5 shrink-0 text-emerald-300" />
         <div className="min-w-0">
           <p className="text-sm font-semibold">{t.callEnded}</p>
@@ -57,7 +57,7 @@ function Ringing({ call }: { call: DispatchCall }) {
   const { t } = useDriverUi();
   useRingtone();
   return (
-    <div role="alertdialog" aria-modal="true" aria-label="Incoming call from AI Dispatch" className="fixed inset-0 z-[80] flex flex-col items-center bg-ink-950 px-6 pb-12 pt-24 text-white">
+    <div role="alertdialog" aria-modal="true" aria-label="Incoming call from AI Dispatch" className="theme-ink fixed inset-0 z-[80] flex flex-col items-center bg-ink-950 px-6 pb-12 pt-24 text-white">
       <span className="relative flex h-24 w-24 items-center justify-center">
         <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/25" />
         <span className="relative flex h-24 w-24 items-center justify-center rounded-full bg-white text-2xl font-semibold text-ink-950">AI</span>
@@ -77,7 +77,7 @@ function Ringing({ call }: { call: DispatchCall }) {
           {t.laterText}
         </button>
         <button type="button" onClick={() => answerDispatchCall(call.id)} className="flex flex-col items-center gap-2 text-sm font-semibold">
-          <span className="flex h-18 w-18 items-center justify-center rounded-full bg-live-soft0 p-5">
+          <span className="flex h-18 w-18 items-center justify-center rounded-full bg-[var(--accent-live)] p-5">
             <Phone className="h-8 w-8" />
           </span>
           {t.answer}
@@ -167,7 +167,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
   const bookedSomething = call.effects.some((e) => e.type === "book" || e.type === "reserve_parking");
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Call with AI Dispatch" className="fixed inset-0 z-[80] flex flex-col bg-ink-950 px-5 pb-6 pt-8 text-white">
+    <div role="dialog" aria-modal="true" aria-label="Call with AI Dispatch" className="theme-ink fixed inset-0 z-[80] flex flex-col bg-ink-950 px-5 pb-6 pt-8 text-white">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-lg font-semibold">{call.ownerTookOver ? `${OWNER_NAME} · Titan Freight` : t.aiDispatch}</p>
@@ -219,7 +219,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
               onClick={() => replyDispatchCall(call.id, ch.reply)}
               className={cn(
                 "rounded-2xl py-4 text-lg font-semibold active:scale-[0.99]",
-                ch.reply === "cancel" ? "bg-danger-soft0/90 text-white" : i === 0 && !bookedSomething ? "bg-white text-ink-950" : "bg-white/10",
+                ch.reply === "cancel" ? "bg-[var(--accent-danger)]/90 text-white" : i === 0 && !bookedSomething ? "bg-white text-ink-950" : "bg-white/10",
               )}
             >
               <span aria-hidden className="mr-2 text-sm font-medium opacity-50">{i + 1}</span>
@@ -245,7 +245,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
           </span>
           {t.sayAgain}
         </button>
-        <button type="button" onClick={() => hangUpDispatchCall(call.id)} aria-label={t.hangUp} className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-danger-soft0">
+        <button type="button" onClick={() => hangUpDispatchCall(call.id)} aria-label={t.hangUp} className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--accent-danger)]">
           <PhoneOff className="h-7 w-7" />
         </button>
         {call.ownerTookOver ? (

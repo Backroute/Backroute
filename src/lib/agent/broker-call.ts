@@ -57,7 +57,7 @@ export async function callBroker(ctx: CarrierContext, load: Load, url: string | 
   const broker = ctx.brokers.find((b) => b.id === load.brokerId);
   const to = broker?.phone ? toE164(broker.phone) : null;
   // A broker who told the AI they won't deal with it on the phone gets email only.
-  if (!to || broker?.noAiCalls || (!url && !sandboxed(ctx.carrier)) || !canCall(ctx.carrier)) return false;
+  if (!to || broker?.noAiCalls || ctx.settings.paused || (!url && !sandboxed(ctx.carrier)) || !canCall(ctx.carrier)) return false;
   if (!(await claimMark(ctx.carrier.id, load.id, "broker_call"))) return false;
   const sid = await callTo(ctx.carrier, to, url, { kind: "broker_call", ref: load.id, opening: brokerCallOpening(ctx, load), machineDetection: true });
   await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "out", providerId: sid ? `${sid}:dial` : null, counterparty: to, body: `Calling ${broker!.company} about ${load.referenceNumber}`, data: { kind: "broker_call", loadId: load.id } });

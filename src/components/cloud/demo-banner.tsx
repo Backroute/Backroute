@@ -14,7 +14,7 @@ export function DemoBanner() {
     { href: "/driver", label: "Driver app" },
   ];
   return (
-    <div role="note" aria-label="Demo" className="flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-amber-100 px-4 py-1.5 text-xs text-amber-950">
+    <div role="note" aria-label="Demo" className="flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-amber-100 px-4 py-1.5 text-xs text-amber-950 dark:bg-amber-950/70 dark:text-amber-100">
       <span>
         <span className="font-semibold">Demo</span> · sample fleet, nothing is saved or sent
       </span>
@@ -23,7 +23,7 @@ export function DemoBanner() {
           <Link
             key={v.href}
             href={v.href}
-            className={cn("rounded-full px-2 py-0.5 font-medium", pathname.startsWith(v.href) ? "bg-amber-950 text-amber-50" : "underline")}
+            className={cn("rounded-full px-2 py-0.5 font-medium", pathname.startsWith(v.href) ? "bg-amber-950 text-amber-50 dark:bg-amber-100 dark:text-amber-950" : "underline")}
           >
             {v.label}
           </Link>

@@ -235,7 +235,7 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
           : [];
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Voice call with AI Dispatcher" className="fixed inset-0 z-50 flex flex-col bg-ink-950 text-white">
+    <div role="dialog" aria-modal="true" aria-label="Voice call with AI Dispatcher" className="theme-ink fixed inset-0 z-50 flex flex-col bg-ink-950 text-white">
       <div className="flex flex-col items-center gap-2 px-6 pb-4 pt-10">
         <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-white/10">
           {phase === "connecting" && (

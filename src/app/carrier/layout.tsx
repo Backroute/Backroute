@@ -9,6 +9,9 @@ import { cn } from "@/lib/utils";
 import { isAlert } from "@/lib/alerts";
 import { PortalShell, type NavItem } from "@/components/shared/portal-shell";
 import { TopBar } from "@/components/shared/top-bar";
+import { AiStatus } from "@/components/shared/ai-status";
+import { useNeedsYou } from "@/components/shared/needs-you";
+import { useAppBadge } from "@/lib/app-badge";
 import { CommandPalette, type CommandGroup } from "@/components/shared/command-palette";
 import { NotificationToastHost } from "@/components/shared/notification-toast";
 import { Avatar } from "@/components/ui/avatar";
@@ -79,7 +82,12 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
   const pendingOffers = loads.filter((l) => l.stage === "offered").length;
   // Matches exactly what the Negotiations page itself lists, so the badge never disagrees with the page it labels.
   const activeNegotiations = loads.filter((l) => l.stage === "negotiating" || l.stage === "rate_confirmed").length;
-  const navWithBadge = NAV.map((n) => (n.href === "/carrier/loads" ? { ...n, badge: pendingOffers + activeNegotiations } : n));
+  const needsYou = useNeedsYou().count;
+  // The number on the app's icon (home screen, dock): what's waiting for the owner.
+  useAppBadge(needsYou);
+  const navWithBadge = NAV.map((n) =>
+    n.href === "/carrier/loads" ? { ...n, badge: pendingOffers + activeNegotiations } : n.href === "/carrier" ? { ...n, badge: needsYou } : n,
+  );
 
   const commandGroups: CommandGroup[] = [
     { heading: "Go to", items: ALL_PAGES.map((n) => ({ id: n.href, label: n.label, icon: n.icon, href: n.href })) },
@@ -104,6 +112,7 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
   return (
     <PortalShell
       variant="light"
+      bottomTabs
       portalLabel="Carrier Dashboard"
       navItems={navWithBadge}
       switchTo={{ href: "/", label: "Back to home" }}
@@ -115,6 +124,7 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
           accountSubtitle={carrier.mc}
           settingsHref="/carrier/settings"
           exitHref="/"
+          status={<AiStatus needsYou={needsYou} />}
         />
       }
       footer={

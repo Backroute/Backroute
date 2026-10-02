@@ -7,7 +7,9 @@ import { cn } from "@/lib/utils";
 import { useEscapeKey, useNow } from "@/lib/hooks";
 import { openCommandPalette } from "./command-palette";
 import { ActivityFeed } from "./activity-feed";
+import { OPEN_BELL_EVENT } from "./notification-toast";
 import { Avatar } from "@/components/ui/avatar";
+import { ThemePicker } from "./theme-picker";
 import type { ActivityEvent } from "@/lib/types";
 import { ALERT_LABEL, alertKind } from "@/lib/alerts";
 
@@ -30,6 +32,7 @@ export function TopBar({
   exitHref,
   onMenuClick,
   alertsOnly,
+  status,
 }: {
   dark?: boolean;
   notifications: ActivityEvent[];
@@ -40,6 +43,8 @@ export function TopBar({
   settingsHref?: string;
   exitHref: string;
   onMenuClick?: () => void;
+  /** Shown left of the bell: the AI's status pill on the owner's dashboard. */
+  status?: React.ReactNode;
 }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -49,6 +54,11 @@ export function TopBar({
   useClickOutside(accountRef, () => setAccountOpen(false));
   useEscapeKey(() => setNotifOpen(false), notifOpen);
   useEscapeKey(() => setAccountOpen(false), accountOpen);
+  useEffect(() => {
+    const open = () => setNotifOpen(true);
+    window.addEventListener(OPEN_BELL_EVENT, open);
+    return () => window.removeEventListener(OPEN_BELL_EVENT, open);
+  }, []);
 
   const now = useNow();
   const recentCount = now === null ? 0 : notifications.filter((n) => now - new Date(n.timestamp).getTime() < 120_000).length;
@@ -57,7 +67,7 @@ export function TopBar({
     <div
       className={cn(
         "flex items-center justify-between gap-2 border-b px-4 py-3 sm:gap-4 sm:px-8",
-        dark ? "border-white/10 bg-ink-950" : "border-line bg-white",
+        dark ? "theme-ink border-white/10 bg-ink-950" : "border-line bg-white",
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -90,6 +100,7 @@ export function TopBar({
       </div>
 
       <div className="flex items-center gap-2">
+        {status}
         <div className="relative" ref={notifRef}>
           <button
             onClick={() => setNotifOpen((o) => !o)}
@@ -126,10 +137,14 @@ export function TopBar({
             <Avatar name={accountName} size="sm" />
           </button>
           {accountOpen && (
-            <div className="absolute right-0 z-40 mt-2 w-56 overflow-hidden rounded-2xl border border-line bg-white shadow-xl">
+            <div className="absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-2xl border border-line bg-white shadow-xl">
               <div className="border-b border-line px-4 py-3">
                 <p className="truncate text-sm font-semibold text-ink-950">{accountName}</p>
                 <p className="truncate text-xs text-ink-400">{accountSubtitle}</p>
+              </div>
+              <div className="border-b border-line px-3 py-2.5">
+                <p className="mb-1.5 px-1 text-[11px] font-medium text-ink-500">Appearance</p>
+                <ThemePicker compact />
               </div>
               <div className="flex flex-col p-1.5">
                 {settingsHref && (

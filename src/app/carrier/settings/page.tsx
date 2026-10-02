@@ -19,6 +19,7 @@ import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { DailyTextPreview } from "@/components/shared/daily-text";
 import { DispatchLineCard } from "@/components/shared/dispatch-line-card";
 import { OwnerLanguageCard } from "@/components/shared/owner-language-card";
+import { AppearanceCard } from "@/components/shared/appearance-card";
 import { AppAccessCard } from "@/components/cloud/app-access";
 import { DriverConsentsCard } from "@/components/cloud/driver-consents";
 import { ChannelsCard } from "@/components/cloud/channels-card";
@@ -148,6 +149,7 @@ function Settings() {
               )}
 
               <OwnerLanguageCard />
+              <AppearanceCard />
 
               {/* The demo's simulated negotiation style; in a real account the owner's lowest rate per mile sets the price. */}
               {!signedIn && (

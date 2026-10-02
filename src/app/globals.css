@@ -34,6 +34,88 @@
   --accent-info-soft: #eaf0fa;
 }
 
+/*
+ * Dark mode: the same names, darker values. The neutral scale flips (ink-950 is the brightest text, white is the
+ * card surface), so every screen follows without its own dark classes. The theme comes from the phone unless the
+ * person picked one (lib/theme.ts sets data-theme before the first paint).
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0d0d0c;
+  --foreground: #f4f4ef;
+  --color-white: #171716;
+
+  --ink-0: #171716;
+  --ink-50: #121211;
+  --ink-100: #1f1f1d;
+  --ink-150: #262624;
+  --ink-200: #2e2e2b;
+  --ink-300: #42423d;
+  --ink-400: #94948b;
+  --ink-500: #a6a69d;
+  --ink-600: #bcbcb3;
+  --ink-700: #d2d2ca;
+  --ink-800: #e4e4de;
+  --ink-900: #efefea;
+  --ink-950: #f7f7f2;
+
+  --line: #2a2a27;
+  --line-strong: #3b3b37;
+
+  --accent-live: #45d08b;
+  --accent-warn: #e9ad45;
+  --accent-danger: #f27d71;
+  --accent-info: #8eaef0;
+
+  --accent-live-soft: #12271c;
+  --accent-warn-soft: #2a2110;
+  --accent-danger-soft: #2e1715;
+  --accent-info-soft: #151e30;
+
+  --surface-shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset;
+}
+
+/*
+ * Panels designed dark (the Today and money heroes, trip cards, call screens, driving mode) look the same in both
+ * themes: inside them the light values come back. In dark mode they sit a step lighter than the page so they still
+ * read as a panel.
+ */
+.theme-ink {
+  --color-white: #ffffff;
+  --ink-0: #ffffff;
+  --ink-50: #fafafa;
+  --ink-100: #f2f2f0;
+  --ink-150: #e9e9e6;
+  --ink-200: #dfdfdb;
+  --ink-300: #c6c6c0;
+  --ink-400: #73736b;
+  --ink-500: #63635c;
+  --ink-600: #55554f;
+  --ink-700: #38382f;
+  --ink-800: #232320;
+  --ink-900: #131311;
+  --ink-950: #0a0a08;
+  --line: #e4e4e0;
+  --line-strong: #d3d3cc;
+  --accent-live: #0f8a4b;
+  --accent-warn: #b3760b;
+  --accent-danger: #b23a2f;
+  --accent-info: #2b4c8c;
+  --accent-live-soft: #e8f5ee;
+  --accent-warn-soft: #fdf3e1;
+  --accent-danger-soft: #fbeceb;
+  --accent-info-soft: #eaf0fa;
+  color-scheme: dark;
+}
+:root[data-theme="dark"] .theme-ink {
+  --ink-950: #1c1c1a;
+  --ink-900: #242422;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -72,6 +154,14 @@
   border-color: var(--line);
 }
 
+/* A grid cell may be narrower than its longest line (a phone number, a long log line): without this one card can
+   push the whole page wider than a phone. Utilities still win (base layer). */
+@layer base {
+  .grid > * {
+    min-width: 0;
+  }
+}
+
 html {
   background: var(--background);
 }
@@ -94,9 +184,47 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * One type scale for the whole app. Big money and counts are the loudest thing on a screen, then page titles, then
+ * card titles; small uppercase labels name what a number is. Numbers always line up (tabular figures).
+ */
+@utility t-hero {
+  font-size: clamp(2rem, 1.6rem + 1.6vw, 2.75rem);
+  line-height: 1;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+}
+@utility t-stat {
+  font-size: 1.75rem;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+@utility t-page {
+  font-size: 1.625rem;
+  line-height: 1.15;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+@utility t-section {
+  font-size: 0.9375rem;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+}
+@utility t-label {
+  font-size: 11px;
+  line-height: 1.3;
+  font-weight: 550;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
 ::selection {
-  background: #0a0a0a;
-  color: #ffffff;
+  background: var(--ink-950);
+  color: var(--color-white);
 }
 
 /* subtle grain / noise overlay used on dark hero panels */
@@ -152,11 +280,23 @@ body {
   animation: wave 0.9s ease-in-out infinite;
 }
 
+/* Loading outlines (components/ui/skeleton): a slow light sweep across a grey block. */
+.skeleton {
+  background: linear-gradient(90deg, var(--ink-100) 0%, var(--ink-150) 40%, var(--ink-100) 80%);
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-sweep {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-sheet-up,
   .animate-indeterminate,
   .animate-rise-in,
-  .animate-wave {
+  .animate-wave,
+  .skeleton {
     animation: none;
   }
 }

@@ -3,11 +3,9 @@
 import { useState } from "react";
 import { Loader2, Mail, Paperclip, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { authHeader } from "@/lib/ai/client";
-import { applyFromServer } from "@/lib/cloud/sync";
+import { answerDraft } from "@/lib/cloud/agent";
 import { openFile } from "@/lib/cloud/files";
-import type { Item } from "@/lib/cloud/rows";
-import type { Escalation, Load } from "@/lib/types";
+import type { Escalation } from "@/lib/types";
 
 /**
  * A reply the AI wrote for a broker, waiting for the owner. They can fix the wording, then send it or not. Nothing
@@ -23,25 +21,14 @@ export function DraftApproval({ escalation }: { escalation: Escalation }) {
     setBusy(send ? "send" : "skip");
     setError(null);
     try {
-      const res = await fetch("/api/agent/approve", {
-        method: "POST",
-        headers: { "content-type": "application/json", ...(await authHeader()) },
-        body: JSON.stringify({ escalationId: escalation.id, send, body: body.trim() === draft.body.trim() ? undefined : body }),
-      });
-      const data = (await res.json().catch(() => null)) as { escalation?: Escalation; loads?: Load[]; error?: string } | null;
-      if (!res.ok || !data?.escalation) {
-        setError(data?.error === "email_off" ? "Email isn't switched on yet, so it can't be sent." : "Couldn't do that. Check your connection and try again.");
-        return;
-      }
-      applyFromServer("escalations", [data.escalation as unknown as Item]);
-      if (data.loads?.length) applyFromServer("loads", data.loads as unknown as Item[]);
+      setError(await answerDraft(escalation.id, send, body.trim() === draft.body.trim() ? undefined : body));
     } finally {
       setBusy(null);
     }
   }
 
   return (
-    <div className="mt-3 rounded-xl bg-white p-3">
+    <div className="mt-3 rounded-xl border border-line bg-ink-50 p-3">
       <p className="flex items-center gap-1.5 text-[11px] text-ink-500">
         <Mail className="h-3.5 w-3.5" /> To {draft.toName ? `${draft.toName} <${draft.to}>` : draft.to} · {draft.subject}
       </p>
@@ -53,7 +40,7 @@ export function DraftApproval({ escalation }: { escalation: Escalation }) {
         value={body}
         onChange={(e) => setBody(e.target.value)}
         rows={Math.min(10, Math.max(4, body.split("\n").length + 1))}
-        className="mt-2 w-full resize-y rounded-lg border border-line bg-ink-50/50 px-3 py-2 text-sm leading-relaxed text-ink-900 outline-none focus:border-ink-400"
+        className="mt-2 w-full resize-y rounded-lg border border-line bg-white px-3 py-2 text-sm leading-relaxed text-ink-900 outline-none focus:border-ink-400"
       />
       {draft.attachments?.length ? <Attachments files={draft.attachments} /> : null}
       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -90,5 +77,5 @@ const SOURCE_LABEL = { sms: "By text", voice: "On a call", email: "By email", ap
 
 export function SourceTag({ source }: { source: Escalation["source"] }) {
   if (!source || source === "app") return null;
-  return <span className="mb-1.5 inline-block rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-500">{SOURCE_LABEL[source]}</span>;
+  return <span className="mb-1.5 inline-block rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-500">{SOURCE_LABEL[source]}</span>;
 }

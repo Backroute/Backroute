@@ -119,7 +119,7 @@ export function DrivingMode({
 
   const big = "flex flex-col items-center justify-center gap-2 rounded-3xl py-6 text-lg font-semibold active:scale-[0.98] transition-transform";
   return (
-    <div role="dialog" aria-modal="true" aria-label="Driving mode" className="fixed inset-0 z-[70] flex flex-col bg-ink-950 p-5 text-white">
+    <div role="dialog" aria-modal="true" aria-label="Driving mode" className="theme-ink fixed inset-0 z-[70] flex flex-col bg-ink-950 p-5 text-white">
       <div className="flex items-center justify-between">
         <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-300">
           <Navigation className="h-4 w-4" /> {t.drivingMode}

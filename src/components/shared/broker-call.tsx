@@ -233,7 +233,7 @@ export function BrokerCallModal({
 
   return (
     <div role="dialog" aria-modal="true" aria-label={`Call with ${brokerName}`} className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 sm:items-center sm:p-6">
-      <div className="flex h-[88dvh] w-full max-w-md animate-sheet-up flex-col rounded-t-3xl bg-ink-950 p-5 text-white sm:h-[80vh] sm:rounded-3xl">
+      <div className="theme-ink flex h-[88dvh] w-full max-w-md animate-sheet-up flex-col rounded-t-3xl bg-ink-950 p-5 text-white sm:h-[80vh] sm:rounded-3xl">
         <div className="mb-4 flex items-center justify-between">
           <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/50">
             <Headphones className="h-3.5 w-3.5" /> {live ? "Listening in" : "Call replay"}

@@ -103,7 +103,7 @@ async function callFacility(ctx: CarrierContext, load: Load, stop: Stop): Promis
   const to = toE164(phoneOf(load, stop) ?? "");
   const appt = load.appointments?.[stop];
   const url = absoluteUrl(`/api/channels/voice/facility?carrier=${encodeURIComponent(ctx.carrier.id)}&load=${encodeURIComponent(load.id)}&stop=${stop}`);
-  if (!to || !appt || (!url && !sandboxed(ctx.carrier)) || !canCall(ctx.carrier)) return false;
+  if (!to || !appt || ctx.settings.paused || (!url && !sandboxed(ctx.carrier)) || !canCall(ctx.carrier)) return false;
   const saved = await saveAppt(ctx, load, stop, { ...appt, status: "calling", tries: appt.tries + 1, lastCallAt: new Date().toISOString() });
   const sid = await callTo(ctx.carrier, to, url, { kind: "facility_call", ref: `${load.id}:${stop}`, opening: facilityOpening(ctx, saved, stop), machineDetection: true });
   await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "out", providerId: sid ? `${sid}:dial` : null, counterparty: to, body: `Calling ${nameOf(load, stop)} to ${appt.purpose} the ${stop} appointment on ${load.referenceNumber}`, data: { kind: "facility_call", loadId: load.id, stop } });

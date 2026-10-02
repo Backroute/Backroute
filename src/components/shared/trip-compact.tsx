@@ -333,7 +333,7 @@ function loadHistory(load: DriverTripCardProps["load"], broker: string, rate: nu
 
 function Section({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="rounded-3xl bg-ink-950 p-5 text-white">
+    <section className="theme-ink rounded-3xl bg-ink-950 p-5 text-white">
       <h3 className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/50">
         {icon} {title}
       </h3>

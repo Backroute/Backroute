@@ -18,12 +18,12 @@ export function StatTile({
 }) {
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <span className="text-[11px] font-medium uppercase tracking-wider text-ink-500">{label}</span>
+      <span className="t-label text-ink-500">{label}</span>
       <div className="flex items-baseline gap-2">
         <span
           className={cn(
-            "font-display tabular text-ink-950",
-            size === "lg" ? "text-4xl" : size === "md" ? "text-3xl" : "text-2xl",
+            "text-ink-950",
+            size === "lg" ? "t-hero" : size === "md" ? "t-stat" : "t-stat !text-2xl",
           )}
         >
           {value}

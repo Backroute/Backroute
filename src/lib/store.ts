@@ -743,6 +743,13 @@ export interface AgentSettings {
   laneFloors?: Record<string, number>;
   /** Real accounts: the weekday drivers are paid, shown on their pay card (default Friday). */
   payDay?: string;
+  /**
+   * The owner's emergency stop. The AI keeps reading everything and answering drivers, but books nothing, sends
+   * nothing to brokers and calls no broker or dock: all of it waits in Needs you until they resume.
+   */
+  paused?: boolean;
+  /** When they paused, to show how long it's been. */
+  pausedAt?: string;
 }
 
 export interface LiveMetrics {

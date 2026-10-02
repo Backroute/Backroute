@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
 import { useStore } from "@/lib/store";
+import { useChartColors } from "@/components/shared/money-charts";
 import { computeFactoringCommission, INSURANCE_REFERRAL_FEE, IFTA_FILING_FEE } from "@/lib/commissions";
 import { formatCompact, formatCurrency } from "@/lib/utils";
 
@@ -26,10 +27,12 @@ const TRAJECTORY = [
   { year: "Year 5", revenue: 109, detail: "8,000 carriers · ~16k trucks" },
 ];
 
-const PLAN_COLORS: Record<string, string> = { Starter: "#c6c6c0", Growth: "#55554f", Fleet: "#0a0a0a" };
+// CSS colors, so the plan mix follows light and dark.
+const PLAN_COLORS: Record<string, string> = { Starter: "var(--ink-300)", Growth: "var(--ink-600)", Fleet: "var(--ink-950)" };
 
 export default function RevenuePage() {
   const carriers = useStore((s) => s.carriers);
+  const colors = useChartColors();
 
   const takeRate = carriers.reduce((s, c) => s + c.takeRateRevenue, 0);
   const mrr = carriers.reduce((s, c) => s + c.mrr, 0);
@@ -92,15 +95,15 @@ export default function RevenuePage() {
               <div className="h-72 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={TRAJECTORY} margin={{ left: -12, right: 12, top: 8 }}>
-                    <CartesianGrid stroke="#e4e4e0" vertical={false} />
-                    <XAxis dataKey="year" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#9d9d95" }} />
-                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#9d9d95" }} tickFormatter={(v) => `$${v}M`} width={48} />
+                    <CartesianGrid stroke={colors.line} vertical={false} />
+                    <XAxis dataKey="year" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: colors.muted }} />
+                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: colors.muted }} tickFormatter={(v) => `$${v}M`} width={48} />
                     <Tooltip
                       formatter={(value) => [`$${value}M`, "Revenue"]}
                       labelFormatter={(label, payload) => `${label}: ${payload?.[0]?.payload?.detail ?? ""}`}
-                      contentStyle={{ borderRadius: 12, border: "1px solid #e4e4e0", fontSize: 12 }}
+                      contentStyle={{ borderRadius: 12, border: `1px solid ${colors.line}`, fontSize: 12, background: colors.surface, color: colors.ink }}
                     />
-                    <Bar dataKey="revenue" radius={[8, 8, 0, 0]} fill="#0a0a0a" />
+                    <Bar dataKey="revenue" radius={[8, 8, 0, 0]} fill={colors.ink} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

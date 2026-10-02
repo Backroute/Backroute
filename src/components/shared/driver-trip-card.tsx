@@ -439,7 +439,7 @@ export function DriverTripCompleteCard({
 // ---------- Building blocks (shared with the compact card and details sheet) ----------
 
 export function CardShell({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn("overflow-hidden rounded-3xl bg-ink-950 p-5 text-white shadow-xl shadow-ink-950/10", className)}>{children}</div>;
+  return <div className={cn("theme-ink overflow-hidden rounded-3xl bg-ink-950 p-5 text-white shadow-xl shadow-ink-950/10", className)}>{children}</div>;
 }
 
 export function LiveDot() {
@@ -725,7 +725,7 @@ function CardFooter({ load, rate, onCall }: { load: Load; rate: number; onCall: 
         <Link href="/driver/messages" aria-label="Message AI Dispatcher" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/15">
           <MessageCircle className="h-4 w-4" />
         </Link>
-        <Link href="/driver/incident" aria-label="Report an issue or emergency" className="flex h-11 w-11 items-center justify-center rounded-full bg-danger-soft0/20 text-red-200 hover:bg-danger-soft0/30">
+        <Link href="/driver/incident" aria-label="Report an issue or emergency" className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--accent-danger)]/20 text-red-200 hover:bg-[var(--accent-danger)]/30">
           <LifeBuoy className="h-4 w-4" />
         </Link>
       </div>

@@ -82,6 +82,9 @@ export async function loadContext(carrierId: string): Promise<CarrierContext | n
     rows<Broker>("records", carrierId, "broker"),
   ]);
   const settings = { ...DEFAULT_SETTINGS, ...carrier.settings, ownerOperator: carrier.owner_operator } as AgentSettings;
+  // Paused by the owner: every autonomy check reads "Ask me first", so everything the AI would send waits for them.
+  // (Only this in-memory copy changes; the saved setting keeps their real choice for when they resume.)
+  if (settings.paused) settings.autonomy = "ask";
   return { carrier, settings, drivers, trucks, loads, escalations, brokers };
 }
 

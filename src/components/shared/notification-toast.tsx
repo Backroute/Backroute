@@ -2,13 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ActivityEvent } from "@/lib/types";
 import { TYPE_ICON, SEVERITY_TONE } from "./activity-feed";
 
-const MAX_VISIBLE = 3;
-const DISMISS_MS = 5000;
+// Two at most, so they never cover the page; the rest wait in the bell.
+const MAX_VISIBLE = 2;
+const DISMISS_MS = 6000;
+
+const OPEN_BELL = "backroute:open-bell";
+/** Opens the bell's list (top bar), e.g. from "3 more" under the pop-ups. */
+export function openBell() {
+  window.dispatchEvent(new Event(OPEN_BELL));
+}
+export const OPEN_BELL_EVENT = OPEN_BELL;
 
 /**
  * Simulates a phone push notification for real activity — not a toast on every render, only for
@@ -25,6 +34,8 @@ const DISMISS_MS = 5000;
  */
 export function NotificationToastHost({ events, hrefFor }: { events: ActivityEvent[]; hrefFor?: (e: ActivityEvent) => string | undefined }) {
   const [toasts, setToasts] = useState<ActivityEvent[]>([]);
+  // Ones that arrived while two were already showing: counted, not shown.
+  const [overflow, setOverflow] = useState(0);
   const seen = useRef<Set<string> | null>(null);
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -58,6 +69,7 @@ export function NotificationToastHost({ events, hrefFor }: { events: ActivityEve
     const fresh = events.filter((e) => !seen.current!.has(e.id));
     if (fresh.length === 0) return;
     fresh.forEach((e) => seen.current!.add(e.id));
+    if (fresh.length > MAX_VISIBLE) setOverflow((n) => n + fresh.length - MAX_VISIBLE);
 
     setToasts((prev) => {
       const incoming = fresh.slice(0, MAX_VISIBLE);
@@ -79,15 +91,30 @@ export function NotificationToastHost({ events, hrefFor }: { events: ActivityEve
     };
   }, []);
 
-  if (toasts.length === 0) return null;
+  // Pausing while the pointer is on them: nothing disappears while it's being read.
+  function hold() {
+    timers.current.forEach((t) => clearTimeout(t));
+    timers.current.clear();
+  }
+  function resume() {
+    toasts.forEach((t) => schedule(t.id));
+  }
+
+  if (toasts.length === 0 && overflow === 0) return null;
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[60] flex max-h-[60vh] flex-col gap-2 overflow-hidden sm:bottom-6 sm:right-6">
+    <div
+      aria-live="polite"
+      onMouseEnter={hold}
+      onMouseLeave={resume}
+      className="pointer-events-none fixed bottom-[5.5rem] right-4 z-[60] flex flex-col items-end gap-2 lg:bottom-6 lg:right-6"
+    >
+      <AnimatePresence initial={false}>
       {toasts.map((t) => {
         const Icon = TYPE_ICON[t.type];
         const href = hrefFor?.(t);
         const inner = (
-          <div className="pointer-events-auto flex w-[19rem] max-w-[calc(100vw-2rem)] items-start gap-3 rounded-2xl border border-line bg-white p-3.5 shadow-2xl animate-rise-in">
+          <div className="pointer-events-auto flex w-[19rem] max-w-[calc(100vw-2rem)] items-start gap-3 rounded-2xl border border-line bg-white p-3.5 shadow-xl">
             <span className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full", SEVERITY_TONE[t.severity])}>
               <Icon className="h-3.5 w-3.5" strokeWidth={2} />
             </span>
@@ -108,14 +135,38 @@ export function NotificationToastHost({ events, hrefFor }: { events: ActivityEve
             </button>
           </div>
         );
-        return href ? (
-          <Link key={t.id} href={href} onClick={() => dismiss(t.id)}>
-            {inner}
-          </Link>
-        ) : (
-          <div key={t.id}>{inner}</div>
+        return (
+          <motion.div
+            key={t.id}
+            layout
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 24, transition: { duration: 0.15 } }}
+            transition={{ type: "spring", stiffness: 420, damping: 34 }}
+          >
+            {href ? (
+              <Link href={href} onClick={() => dismiss(t.id)}>
+                {inner}
+              </Link>
+            ) : (
+              inner
+            )}
+          </motion.div>
         );
       })}
+      </AnimatePresence>
+      {overflow > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            setOverflow(0);
+            openBell();
+          }}
+          className="pointer-events-auto rounded-full border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink-700 shadow-md hover:text-ink-950"
+        >
+          {overflow} more in alerts
+        </button>
+      )}
     </div>
   );
 }

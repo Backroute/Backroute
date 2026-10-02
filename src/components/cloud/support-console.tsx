@@ -487,7 +487,7 @@ function SystemHealth() {
     return () => clearInterval(id);
   }, [load]);
   if (!checks) return <p className="text-sm text-ink-500">Checking…</p>;
-  const dot: Record<HealthCheck["level"], string> = { ok: "bg-live-soft0", warn: "bg-warn-soft0", down: "bg-red-600", off: "bg-ink-300" };
+  const dot: Record<HealthCheck["level"], string> = { ok: "bg-[var(--accent-live)]", warn: "bg-[var(--accent-warn)]", down: "bg-red-600", off: "bg-ink-300" };
   const word: Record<HealthCheck["level"], string> = { ok: "Working", warn: "Look at it", down: "Down", off: "Not set up" };
   const down = checks.filter((c) => c.level === "down").length;
   return (

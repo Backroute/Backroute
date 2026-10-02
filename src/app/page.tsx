@@ -175,7 +175,7 @@ export default function Home() {
                 key={p.name}
                 className={
                   p.featured
-                    ? "flex flex-col rounded-3xl bg-ink-950 p-8 text-white ring-1 ring-ink-950"
+                    ? "theme-ink flex flex-col rounded-3xl bg-ink-950 p-8 text-white ring-1 ring-ink-950"
                     : "flex flex-col rounded-3xl border border-line bg-white p-8"
                 }
               >

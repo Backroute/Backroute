@@ -138,9 +138,12 @@ export function PortalShell({
   switchTo,
   footer,
   topBar,
+  bottomTabs,
   children,
 }: {
   variant: "light" | "dark";
+  /** Phones: the sections as a tab bar along the bottom, within thumb reach, like the driver app. */
+  bottomTabs?: boolean;
   portalLabel: string;
   navItems: NavItem[];
   switchTo?: { href: string; label: string };
@@ -159,11 +162,11 @@ export function PortalShell({
   useEscapeKey(() => setMobileNavOpen(false), mobileNavOpen);
 
   return (
-    <div className="flex min-h-screen w-full bg-white">
+    <div className="flex min-h-screen w-full bg-background">
       <aside
         className={cn(
           "sticky top-0 hidden h-screen w-64 shrink-0 flex-col justify-between border-r px-5 py-6 lg:flex",
-          dark ? "border-white/10 bg-ink-950" : "border-line bg-white",
+          dark ? "theme-ink border-white/10 bg-ink-950" : "border-line bg-white",
         )}
       >
         <SidebarContent dark={dark} portalLabel={portalLabel} navItems={navItems} switchTo={switchTo} footer={footer} pathname={pathname} />
@@ -178,7 +181,7 @@ export function PortalShell({
             aria-label="Navigation menu"
             className={cn(
               "relative flex h-full w-72 max-w-[80vw] flex-col justify-between px-5 py-6 shadow-2xl",
-              dark ? "bg-ink-950" : "bg-white",
+              dark ? "theme-ink bg-ink-950" : "bg-white",
             )}
           >
             <SidebarContent
@@ -195,11 +198,49 @@ export function PortalShell({
         </div>
       )}
 
-      <main className="min-w-0 flex-1 bg-ink-50/40">
+      <main className={cn("min-w-0 flex-1 bg-ink-50/40", bottomTabs && "pb-24 lg:pb-0")}>
         {topBarWithMenu && <div className="sticky top-0 z-20">{topBarWithMenu}</div>}
         {children}
       </main>
+
+      {bottomTabs && <BottomTabs navItems={navItems} pathname={pathname} />}
     </div>
+  );
+}
+
+function BottomTabs({ navItems, pathname }: { navItems: NavItem[]; pathname: string | null }) {
+  const activeHref = bestMatchHref(pathname, navItems);
+  return (
+    <nav
+      aria-label="Sections"
+      className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-line bg-white/95 px-1 pb-[max(env(safe-area-inset-bottom),0.25rem)] pt-1 backdrop-blur-md lg:hidden"
+    >
+      {navItems.map((item) => {
+        const active = item.href === activeHref;
+        const Icon = item.icon;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-[11px] font-medium transition-colors",
+              active ? "text-ink-950" : "text-ink-500",
+            )}
+          >
+            <span className={cn("flex h-7 w-12 items-center justify-center rounded-full transition-colors", active && "bg-ink-100")}>
+              <Icon className="h-5 w-5" strokeWidth={active ? 2.25 : 2} />
+            </span>
+            {item.label}
+            {typeof item.badge === "number" && item.badge > 0 && (
+              <span className="absolute right-[calc(50%-1.6rem)] top-0.5 min-w-4 rounded-full bg-[var(--accent-warn)] px-1 text-center text-[10px] font-semibold leading-4 text-white">
+                {item.badge}
+              </span>
+            )}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -215,7 +256,7 @@ export function PageHeader({
   return (
     <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line bg-white/70 px-4 py-6 sm:px-8 backdrop-blur-sm">
       <div>
-        <h1 className="font-display text-2xl text-ink-950">{title}</h1>
+        <h1 className="t-page text-ink-950">{title}</h1>
         {description && <p className="mt-1 text-sm text-ink-500">{description}</p>}
       </div>
       {right && <div className="flex items-center gap-3">{right}</div>}

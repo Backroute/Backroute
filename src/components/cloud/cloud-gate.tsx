@@ -10,6 +10,7 @@ import { cloudEnabled, supabase } from "@/lib/cloud/client";
 import { claimInvites, homeFor, myMemberships, pickMembership, useMemberships } from "@/lib/cloud/account";
 import { cachedView, connect, NotSetUpError, showCached, signOut, useSyncStatus } from "@/lib/cloud/sync";
 import { demoAllowed, inDemo } from "@/lib/cloud/demo";
+import { AppSkeleton } from "@/components/ui/skeleton";
 import { NotAvailable } from "./not-available";
 import { DemoBanner } from "./demo-banner";
 import { FleetForm } from "./fleet-form";
@@ -97,14 +98,11 @@ function LiveGate({ area, children }: { area: Area; children: React.ReactNode })
       </>
     );
   if (state === "ready") return <ReadyOrSetUp area={area}>{children}</ReadyOrSetUp>;
+  // Loading: the outline of the page it's about to show, not a spinner on a blank screen.
+  if (state === "checking") return <AppSkeleton area={area} />;
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-ink-50 px-6 text-center">
       <Logo />
-      {state === "checking" && (
-        <p className="flex items-center gap-2 text-sm text-ink-500">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading your fleet
-        </p>
-      )}
       {state === "not_set_up" && (
         <>
           <p className="max-w-xs text-sm text-ink-700">Your fleet isn&apos;t set up in Backroute yet. Ask whoever runs your trucks to open their dashboard once, then try again.</p>

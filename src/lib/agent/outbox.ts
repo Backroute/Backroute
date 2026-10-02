@@ -41,7 +41,9 @@ export interface Outgoing {
   why: string;
 }
 
-export function goesNow(settings: Pick<CarrierContext["settings"], "autonomy" | "ownerRules">, o: Pick<Outgoing, "purpose" | "withinRules" | "rule">): boolean {
+export function goesNow(settings: Pick<CarrierContext["settings"], "autonomy" | "ownerRules" | "paused">, o: Pick<Outgoing, "purpose" | "withinRules" | "rule">): boolean {
+  // Paused: nothing goes on its own, not even a short "got it".
+  if (settings.paused) return false;
   const on = (r?: OwnerRule) => !!r && !!settings.ownerRules?.[r];
   if (!o.withinRules && !on(o.rule)) return false;
   // A short note with no price or promise in it ("got it, thanks", "send the rate con") goes the way a dispatcher's would.

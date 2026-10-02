@@ -13,7 +13,10 @@ export function SimulationProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (!inDemo()) return;
     const seedTimeout = setTimeout(() => useStore.getState().actions.seedInitialOffers(), 1200);
-    const interval = setInterval(() => useStore.getState().actions.tick(), 4200);
+    // Paused (the owner's emergency stop): the sample fleet's AI waits too.
+    const interval = setInterval(() => {
+      if (!useStore.getState().settings.paused) useStore.getState().actions.tick();
+    }, 4200);
     return () => {
       clearTimeout(seedTimeout);
       clearInterval(interval);

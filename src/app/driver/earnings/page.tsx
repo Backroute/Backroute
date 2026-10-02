@@ -39,7 +39,7 @@ export default function DriverEarningsPage() {
       {solo ? (
         <OwnerMoney truck={truck} />
       ) : (
-        <section className="rounded-3xl bg-ink-950 p-5 text-white">
+        <section className="theme-ink rounded-3xl bg-ink-950 p-5 text-white">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Your pay this week</p>
           <p className="mt-1 text-4xl font-semibold tabular tracking-tight">{formatCurrency(pay)}</p>
           <p className="mt-1 text-xs text-white/55">

@@ -42,3 +42,24 @@ export async function markBooked(loadId: string): Promise<string | null> {
   const r = await call("/api/agent/booked", { loadId });
   return r.ok ? null : (REASON[r.error] ?? "Couldn't do that. Check your connection and try again.");
 }
+
+/**
+ * The owner's answer on a draft the AI wrote (send it, edited or as is, or don't). Returns null when done, else what
+ * went wrong in plain words. Used by the draft card and by "send all" on Home.
+ */
+export async function answerDraft(escalationId: string, send: boolean, body?: string): Promise<string | null> {
+  try {
+    const res = await fetch("/api/agent/approve", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...(await authHeader()) },
+      body: JSON.stringify({ escalationId, send, body }),
+    });
+    const data = (await res.json().catch(() => null)) as { escalation?: Item; loads?: Item[]; error?: string } | null;
+    if (!res.ok || !data?.escalation) return data?.error === "email_off" ? "Email isn't switched on yet, so it can't be sent." : "Couldn't do that. Check your connection and try again.";
+    applyFromServer("escalations", [data.escalation]);
+    if (data.loads?.length) applyFromServer("loads", data.loads);
+    return null;
+  } catch {
+    return "Couldn't do that. Check your connection and try again.";
+  }
+}

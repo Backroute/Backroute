@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUpRight, CalendarClock, Check, LifeBuoy, Phone, Sparkles, UserRound, X } from "lucide-react";
+import { ArrowUpRight, Sparkles } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
@@ -14,7 +13,6 @@ import { TripCompactCard, TripDetails, TripSheet } from "@/components/shared/tri
 import type { DriverTripCardProps } from "@/components/shared/driver-trip-card";
 import { Switch } from "@/components/ui/switch";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
-import { TruckDriverChip } from "@/components/shared/truck-driver-chip";
 import { IncidentCard } from "@/components/shared/incident-card";
 import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { DailyTextPreview } from "@/components/shared/daily-text";
@@ -23,19 +21,20 @@ import { GoingOutCard } from "@/components/cloud/going-out";
 import { MoneyCard } from "@/components/cloud/money-card";
 import { SetupProgress } from "@/components/cloud/setup-progress";
 import { DriverCallsBoard } from "@/components/shared/driver-calls-board";
-import { DraftApproval, SourceTag } from "@/components/shared/draft-approval";
-import { PortalApproval } from "@/components/shared/portal-approval";
-import { RuleSuggestion } from "@/components/cloud/owner-rules";
-import { useDriverRetention } from "@/components/shared/driver-retention";
+import { NeedsYouList, useNeedsYou } from "@/components/shared/needs-you";
+import { PausedBanner } from "@/components/shared/ai-status";
+import { SinceLastVisit } from "@/components/shared/since-last-visit";
+import { FleetMap } from "@/components/shared/fleet-map";
+import { useRouter } from "next/navigation";
 import { RUN_TYPE_LABEL } from "@/lib/run-types";
 import { weekEarnings } from "@/lib/earnings";
 import { useNow } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
-import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks, useCarrierDrivers, useCarrierEscalations, useDriverMap, useBrokerMap, useTruckMap, truckActiveLoads } from "@/lib/selectors";
+import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks, useCarrierDrivers, useDriverMap, useBrokerMap, useTruckMap, truckActiveLoads } from "@/lib/selectors";
 import { isTransitStage } from "@/lib/load-status";
 import { PRE_TRIP_STAGES } from "@/lib/trip-state";
 import type { Driver, Load, Truck } from "@/lib/types";
-import { cn, formatCurrency, formatNumber, formatDate } from "@/lib/utils";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 
 export default function CarrierOverviewPage() {
   const carrier = usePrimaryCarrier();
@@ -45,20 +44,17 @@ export default function CarrierOverviewPage() {
   const driverMap = useDriverMap();
   const brokers = useBrokerMap();
   const truckMap = useTruckMap();
-  const escalations = useCarrierEscalations().filter((e) => e.status !== "resolved");
+  const { escalations, offerGroups, count: needsYouCount } = useNeedsYou();
   const activity = useStore((s) => s.activity).filter((e) => e.carrierId === carrier.id);
   const selectLoadOffer = useStore((s) => s.actions.selectLoadOffer);
   const requestOfferDetail = useStore((s) => s.actions.requestOfferDetail);
   const resolveOfferDetail = useStore((s) => s.actions.resolveOfferDetail);
   const resolveEscalation = useStore((s) => s.actions.resolveEscalation);
-  const signedIn = useStore((s) => s.session.mode !== "demo");
-  const routeEscalationToSupport = useStore((s) => s.actions.routeEscalationToSupport);
-  const respondTimeOff = useStore((s) => s.actions.respondTimeOff);
-  const pendingTimeOff = useStore((s) => s.timeOffRequests).filter((r) => r.carrierId === carrier.id && r.status === "pending");
   const dvirs = useStore((s) => s.dvirInspections);
   const setAutoChain = useStore((s) => s.actions.setAutoChain);
   const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
   const [openTruckId, setOpenTruckId] = useState<string | null>(null);
+  const router = useRouter();
   const now = useNow();
   const incidents = useStore((s) => s.incidents).filter(
     (i) => i.carrierId === carrier.id && (i.status === "active" || (now !== null && now - Date.parse(i.steps.at(-1)?.timestamp ?? i.createdAt) < 20_000)),
@@ -66,7 +62,6 @@ export default function CarrierOverviewPage() {
   const liveCalls = loads.filter((l) => l.liveCall).length;
   const weekProfit = weekEarnings(loads).net;
   const dailyText = useStore((s) => s.settings.dailyText);
-  const driversAtRisk = useDriverRetention().filter((r) => r.view.level === "at_risk");
 
   const activeLoads = loads.filter((l) => l.stage !== "delivered");
   const netProfitMonth = loads.reduce((sum, l) => sum + (l.netProfit ?? 0), 0);
@@ -79,14 +74,6 @@ export default function CarrierOverviewPage() {
   const savingsMonth = carrier.avgSavingsPerTruck * trucks.length;
   const chainedCount = trucks.filter((t) => t.nextLoadId).length;
 
-  const offerGroups = (() => {
-    const map = new Map<string, typeof loads>();
-    for (const load of loads) {
-      if (load.stage !== "offered" || !load.offerGroupId) continue;
-      map.set(load.offerGroupId, [...(map.get(load.offerGroupId) ?? []), load]);
-    }
-    return Array.from(map.entries());
-  })();
   const trucksWithOffers = new Set(offerGroups.map(([, group]) => group[0]?.truckId).filter(Boolean));
 
   const fleet = trucks.map((truck) => ({ truck, driver: driverMap.get(truck.driverId ?? ""), ...truckActiveLoads(loads, truck) }));
@@ -119,10 +106,6 @@ export default function CarrierOverviewPage() {
   const booking = fleet.filter((f) => f.current && !isTransitStage(f.current.stage)).length;
   const available = fleet.filter((f) => !f.current).length;
 
-  // Escalations already handed to Backroute Support are listed but no longer wait on the carrier.
-  const waitingEscalations = escalations.filter((e) => e.status !== "with_support");
-  const needsYouCount = waitingEscalations.length + pendingTimeOff.length + offerGroups.length + driversAtRisk.length;
-  const hasNeedsYouItems = escalations.filter((e) => !e.incidentId).length + pendingTimeOff.length + offerGroups.length + driversAtRisk.length > 0;
 
   return (
     <div>
@@ -133,7 +116,9 @@ export default function CarrierOverviewPage() {
       />
 
       <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
-        <div className="rounded-3xl bg-ink-950 p-5 text-white sm:p-6">
+        <PausedBanner />
+        <SinceLastVisit needsYou={needsYouCount} />
+        <div className="theme-ink rounded-3xl bg-ink-950 p-5 text-white sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <p className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-white/50">
               <Sparkles className="h-3.5 w-3.5" /> AI Dispatcher
@@ -185,149 +170,7 @@ export default function CarrierOverviewPage() {
           </section>
         )}
 
-        {hasNeedsYouItems && (
-          <section id="needs-you" aria-labelledby="needs-you-title">
-            <div className="mb-3 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-[var(--accent-warn)]" />
-              <h2 id="needs-you-title" className="text-sm font-semibold text-ink-950">Needs you</h2>
-              {needsYouCount > 0 && <Badge tone="warning">{needsYouCount}</Badge>}
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {offerGroups.map(([groupId, group]) => {
-                const truck = group[0]?.truckId ? truckMap.get(group[0].truckId) : undefined;
-                const driver = truck?.driverId ? driverMap.get(truck.driverId) : undefined;
-                return (
-                  <div key={groupId} className="rounded-2xl border border-[var(--accent-warn)]/40 bg-warn-soft/70 p-4">
-                    {(truck || driver) && <TruckDriverChip truck={truck} driver={driver} className="mb-2 !bg-white/60" />}
-                    <p className="text-sm font-medium text-ink-900">Pick the next load</p>
-                    <p className="mt-0.5 text-xs text-ink-600">
-                      {signedIn
-                        ? `${group.length} load${group.length === 1 ? "" : "s"} from broker emails fit${group.length === 1 ? "s" : ""}. Pick one and the AI asks the broker to book it.`
-                        : `AI found the top ${group.length}. Your pick, then AI books it.`}
-                    </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-3">
-                      <Button href="#next-load" size="sm" variant="primary">
-                        Choose <ArrowDown className="h-3.5 w-3.5" />
-                      </Button>
-                      {truck && !signedIn && (
-                        <Button size="sm" variant="outline" onClick={() => setAutoChain(truck.id, true)}>
-                          <Sparkles className="h-3.5 w-3.5" /> Let AI pick
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {escalations.filter((e) => !e.incidentId).map((e) => {
-                const load = loads.find((l) => l.id === e.loadId);
-                const truck = load?.truckId ? truckMap.get(load.truckId) : undefined;
-                const driver = truck?.driverId ? driverMap.get(truck.driverId) : undefined;
-                return (
-                  <div key={e.id} className={cn("rounded-2xl p-4", e.status === "with_support" ? "border border-line bg-ink-50" : "border border-[var(--accent-warn)]/40 bg-warn-soft/70")}>
-                    {(truck || driver) && <TruckDriverChip truck={truck} driver={driver} className="mb-2 !bg-white/60" />}
-                    {e.complexity === "critical" && e.status !== "with_support" && (
-                      <Badge tone="danger" className="mb-1.5">Needs a human judgment call</Badge>
-                    )}
-                    <SourceTag source={e.source} />
-                    <p className="text-sm leading-relaxed text-ink-800">{e.reason}</p>
-                    {e.suggestRule && signedIn ? (
-                      <RuleSuggestion escalation={e} />
-                    ) : e.portalTaskId && signedIn && e.status === "open" ? (
-                      <PortalApproval escalation={e} />
-                    ) : e.draft && !(signedIn && e.status === "with_support") ? (
-                      <DraftApproval escalation={e} />
-                    ) : signedIn && e.status === "with_support" ? (
-                      // A real account: Backroute's support team has it. The owner can still step in on an emergency.
-                      <div className="mt-2 flex flex-wrap items-center gap-3">
-                        <p className="flex items-center gap-1.5 text-xs font-medium text-ink-500">
-                          <LifeBuoy className="h-3.5 w-3.5" /> Backroute support is on it. Nothing needed from you.
-                        </p>
-                        {e.complexity === "critical" && driver && (
-                          <Button size="sm" variant="outline" href={`tel:${driver.phone.replace(/[^\d+]/g, "")}`}>
-                            <Phone className="h-3.5 w-3.5" /> Call {driver.name.split(" ")[0]}
-                          </Button>
-                        )}
-                      </div>
-                    ) : signedIn && e.complexity === "critical" ? (
-                      // A real account: no simulated support desk. The owner calls the driver and closes it out.
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
-                        {driver && (
-                          <Button size="sm" variant="primary" href={`tel:${driver.phone.replace(/[^\d+]/g, "")}`}>
-                            <Phone className="h-3.5 w-3.5" /> Call {driver.name.split(" ")[0]}
-                          </Button>
-                        )}
-                        <Button size="sm" variant="outline" onClick={() => resolveEscalation(e.id, true)}>
-                          <Check className="h-3.5 w-3.5" /> I&apos;ve handled it
-                        </Button>
-                      </div>
-                    ) : e.status === "with_support" ? (
-                      <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-ink-500">
-                        <LifeBuoy className="h-3.5 w-3.5 animate-pulse" /> Backroute Support is reviewing this. You&apos;ll be notified.
-                      </p>
-                    ) : e.complexity === "routine" && e.recommendedAction && e.recommendedLabel ? (
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
-                        <Button size="sm" variant="primary" onClick={() => resolveEscalation(e.id, e.recommendedAction === "approve")}>
-                          <Check className="h-3.5 w-3.5" /> {e.recommendedLabel}
-                        </Button>
-                        {e.loadId && (
-                          <Link href={`/carrier/loads/${e.loadId}`} className="text-xs font-medium text-ink-500 hover:underline">
-                            Review manually
-                          </Link>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
-                        <Button size="sm" variant="outline" onClick={() => routeEscalationToSupport(e.id)}>
-                          <LifeBuoy className="h-3.5 w-3.5" /> Get human support
-                        </Button>
-                        {e.loadId && (
-                          <Link href={`/carrier/loads/${e.loadId}`} className="text-xs font-medium text-ink-500 hover:underline">
-                            Review load →
-                          </Link>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {driversAtRisk.map(({ driver, view }) => (
-                <div key={driver.id} className="rounded-2xl border border-[var(--accent-warn)]/40 bg-warn-soft/70 p-4">
-                  <p className="flex items-center gap-2 text-sm font-medium text-ink-900">
-                    <UserRound className="h-4 w-4 text-ink-400" /> Check in with {driver.name}
-                  </p>
-                  <p className="mt-0.5 text-xs text-ink-600">{view.signals.slice(0, 2).map((s) => s.text).join(" · ")}</p>
-                  <div className="mt-3">
-                    <Button size="sm" variant="primary" href="/carrier/fleet#retention">
-                      See what to do
-                    </Button>
-                  </div>
-                </div>
-              ))}
-
-              {pendingTimeOff.map((r) => {
-                const requester = driverMap.get(r.driverId);
-                return (
-                  <div key={r.id} className="rounded-2xl border border-line bg-white p-4">
-                    <p className="flex items-center gap-2 text-sm font-medium text-ink-900">
-                      <CalendarClock className="h-4 w-4 text-ink-400" /> Time off: {requester?.name ?? "Driver"}
-                    </p>
-                    <p className="mt-0.5 text-xs text-ink-500">{formatDate(r.startDate)} – {formatDate(r.endDate)} · {r.reason}</p>
-                    <div className="mt-3 flex items-center gap-2">
-                      <Button size="sm" variant="primary" onClick={() => respondTimeOff(r.id, true)}>
-                        <Check className="h-3.5 w-3.5" /> Approve
-                      </Button>
-                      <Button size="sm" variant="danger" onClick={() => respondTimeOff(r.id, false)}>
-                        <X className="h-3.5 w-3.5" /> Deny
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
+        <NeedsYouList />
 
         {offerGroups.length > 0 && (
           <div id="next-load" className="scroll-mt-4">
@@ -342,6 +185,11 @@ export default function CarrierOverviewPage() {
             />
           </div>
         )}
+
+        <FleetMap
+          dots={fleet.map(({ truck, driver, current }) => ({ truck, driver, current }))}
+          onSelect={(id) => (fleet.find((f) => f.truck.id === id)?.current ? setOpenTruckId(id) : router.push("/carrier/fleet"))}
+        />
 
         <section aria-labelledby="live-loads-title">
           <div className="mb-3 flex items-end justify-between gap-3">
@@ -424,7 +272,7 @@ export default function CarrierOverviewPage() {
         <WeeklyReviewCard />
 
         <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
+          <Card className="min-w-0 lg:col-span-2">
             <CardHeader>
               <CardTitle>AI log</CardTitle>
               <Button href="/carrier/negotiations" variant="ghost" size="sm">
@@ -436,7 +284,7 @@ export default function CarrierOverviewPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Driver roster</CardTitle>
               {drivers.length > 5 && (
