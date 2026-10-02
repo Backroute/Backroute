@@ -17,6 +17,7 @@ import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { IncidentCard } from "@/components/shared/incident-card";
 import { ConsentCard } from "@/components/cloud/driver-dispatch-card";
 import { QuickReplies } from "@/components/shared/quick-replies";
+import { RoadTools } from "@/components/driver/road-tools";
 import { useNextStopNotice } from "@/lib/next-stop";
 import { useMoving } from "@/lib/moving";
 import { OfflineBadge } from "@/components/shared/offline-badge";
@@ -209,6 +210,7 @@ export default function DriverHomePage() {
         <>
           <TripCompactCard {...tripProps} showMap={!hero} onOpen={() => setSheetOpen(true)} />
           <QuickReplies stage={tripProps.load.stage} onSent={(text) => setSentNote(text)} />
+          {truck && <RoadTools load={tripProps.load} truck={truck} driver={driver} />}
           <TripSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Trip details">
             <TripDetails {...tripProps} autoPick={autoPick} onAutoPick={toggleAutoPick} loadHref={`/driver/loads/${tripProps.load.id}`} />
           </TripSheet>

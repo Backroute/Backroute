@@ -19,6 +19,9 @@ export interface DispatchUi {
   textsTooNote: string;
   autoDrive: string;
   autoDriveNote: string;
+  hosVoice: string;
+  hosVoiceNote: string;
+  locationNote: string;
   /** One-tap answers to dispatch, so a driver doesn't have to type. */
   quick: Record<QuickKey, string>;
   consentTitle: string;
@@ -55,6 +58,9 @@ const en: DispatchUi = {
   textsTooNote: "Off: notifications only, while this phone is getting them. If it stops for two weeks, texts come back.",
   autoDrive: "Hands-free when driving",
   autoDriveNote: "Big buttons and voice come on by themselves once the truck is rolling (with location allowed).",
+  hosVoice: "Hours heads-ups out loud",
+  hosVoiceNote: "A voice says it at 1 hour, 30 and 15 minutes left on your drive or shift.",
+  locationNote: "Your phone's location is only looked at while you're on duty. Off duty, the app doesn't look at where you are, and the truck's spot isn't updated.",
   quick: {"onWay": "On my way to pickup", "late": "Running late", "loaded": "Loaded", "waiting": "Still waiting at the dock", "lumper": "Lumper fee here", "onTime": "On time", "parking": "Need parking", "unloaded": "Unloaded", "nextLoad": "Ready for the next load", "goHome": "I want to go home next", "dayOff": "I need a day off", "address": "What's the address?"},
   consentTitle: "Texts and calls from dispatch",
   consentAsk: "Dispatch needs your OK to text and call you about your loads.",
@@ -90,6 +96,9 @@ const es: DispatchUi = {
   textsTooNote: "Apagado: solo notificaciones, mientras este teléfono las reciba. Si deja de recibirlas por dos semanas, vuelven los textos.",
   autoDrive: "Manos libres al manejar",
   autoDriveNote: "Los botones grandes y la voz se activan solos cuando el camión va en marcha (con la ubicación permitida).",
+  hosVoice: "Avisos de horas en voz alta",
+  hosVoiceNote: "Una voz avisa cuando quedan 1 hora, 30 y 15 minutos de manejo o de turno.",
+  locationNote: "La ubicación del teléfono solo se usa mientras estás en servicio. Fuera de servicio, la app no mira dónde estás y no se actualiza dónde está el camión.",
   quick: {"onWay": "Voy en camino a la carga", "late": "Voy tarde", "loaded": "Ya cargué", "waiting": "Sigo esperando en el muelle", "lumper": "Aquí cobran lumper", "onTime": "Voy a tiempo", "parking": "Necesito estacionamiento", "unloaded": "Ya descargué", "nextLoad": "Listo para la siguiente carga", "goHome": "Quiero ir a casa después", "dayOff": "Necesito un día libre", "address": "¿Cuál es la dirección?"},
   consentTitle: "Mensajes y llamadas del despacho",
   consentAsk: "El despacho necesita tu permiso para enviarte mensajes y llamarte sobre tus cargas.",
@@ -125,6 +134,9 @@ const pa: DispatchUi = {
   textsTooNote: "ਬੰਦ: ਸਿਰਫ਼ ਨੋਟੀਫਿਕੇਸ਼ਨ, ਜਦੋਂ ਤੱਕ ਇਹ ਫ਼ੋਨ ਉਹਨਾਂ ਨੂੰ ਲੈ ਰਿਹਾ ਹੈ। ਜੇ ਦੋ ਹਫ਼ਤੇ ਬੰਦ ਰਹੇ, ਤਾਂ ਟੈਕਸਟ ਫਿਰ ਆਉਣਗੇ।",
   autoDrive: "ਚਲਾਉਂਦੇ ਸਮੇਂ ਹੈਂਡਸ-ਫ੍ਰੀ",
   autoDriveNote: "ਟਰੱਕ ਚੱਲਣ 'ਤੇ ਵੱਡੇ ਬਟਨ ਅਤੇ ਆਵਾਜ਼ ਆਪੇ ਚਾਲੂ ਹੋ ਜਾਂਦੇ ਹਨ (ਲੋਕੇਸ਼ਨ ਦੀ ਇਜਾਜ਼ਤ ਨਾਲ)।",
+  hosVoice: "ਘੰਟਿਆਂ ਦੀ ਚੇਤਾਵਨੀ ਬੋਲ ਕੇ",
+  hosVoiceNote: "ਡਰਾਈਵ ਜਾਂ ਸ਼ਿਫਟ ਵਿੱਚ 1 ਘੰਟਾ, 30 ਅਤੇ 15 ਮਿੰਟ ਬਾਕੀ ਹੋਣ 'ਤੇ ਆਵਾਜ਼ ਦੱਸਦੀ ਹੈ।",
+  locationNote: "ਫ਼ੋਨ ਦੀ ਲੋਕੇਸ਼ਨ ਸਿਰਫ਼ ਡਿਊਟੀ ਦੌਰਾਨ ਵਰਤੀ ਜਾਂਦੀ ਹੈ। ਡਿਊਟੀ ਤੋਂ ਬਾਹਰ ਐਪ ਇਹ ਨਹੀਂ ਦੇਖਦੀ ਕਿ ਤੁਸੀਂ ਕਿੱਥੇ ਹੋ, ਅਤੇ ਟਰੱਕ ਦੀ ਥਾਂ ਅੱਪਡੇਟ ਨਹੀਂ ਹੁੰਦੀ।",
   quick: {"onWay": "ਪਿਕਅੱਪ ਵੱਲ ਜਾ ਰਿਹਾ ਹਾਂ", "late": "ਦੇਰ ਹੋ ਰਹੀ ਹੈ", "loaded": "ਲੋਡ ਹੋ ਗਿਆ", "waiting": "ਅਜੇ ਡੌਕ 'ਤੇ ਉਡੀਕ ਰਿਹਾ ਹਾਂ", "lumper": "ਇੱਥੇ ਲੰਪਰ ਫੀਸ ਹੈ", "onTime": "ਸਮੇਂ ਸਿਰ ਹਾਂ", "parking": "ਪਾਰਕਿੰਗ ਚਾਹੀਦੀ ਹੈ", "unloaded": "ਅਨਲੋਡ ਹੋ ਗਿਆ", "nextLoad": "ਅਗਲੇ ਲੋਡ ਲਈ ਤਿਆਰ", "goHome": "ਅਗਲੀ ਵਾਰ ਘਰ ਜਾਣਾ ਹੈ", "dayOff": "ਇੱਕ ਦਿਨ ਦੀ ਛੁੱਟੀ ਚਾਹੀਦੀ ਹੈ", "address": "ਪਤਾ ਕੀ ਹੈ?"},
   consentTitle: "ਡਿਸਪੈਚ ਦੇ ਮੈਸੇਜ ਅਤੇ ਕਾਲਾਂ",
   consentAsk: "ਲੋਡਾਂ ਬਾਰੇ ਮੈਸੇਜ ਅਤੇ ਕਾਲ ਕਰਨ ਲਈ ਡਿਸਪੈਚ ਨੂੰ ਤੁਹਾਡੀ ਹਾਂ ਚਾਹੀਦੀ ਹੈ।",
@@ -160,6 +172,9 @@ const hi: DispatchUi = {
   textsTooNote: "बंद: सिर्फ़ नोटिफ़िकेशन, जब तक यह फ़ोन उन्हें ले रहा है। दो हफ़्ते तक न आएँ तो टेक्स्ट फिर आने लगेंगे।",
   autoDrive: "चलाते समय हैंड्स-फ़्री",
   autoDriveNote: "ट्रक चलने पर बड़े बटन और आवाज़ अपने आप चालू हो जाते हैं (लोकेशन की अनुमति के साथ)।",
+  hosVoice: "घंटों की चेतावनी बोलकर",
+  hosVoiceNote: "ड्राइव या शिफ्ट में 1 घंटा, 30 और 15 मिनट बचने पर आवाज़ बताती है।",
+  locationNote: "फ़ोन की लोकेशन सिर्फ़ ड्यूटी के दौरान देखी जाती है। ड्यूटी से बाहर ऐप नहीं देखती कि आप कहाँ हैं, और ट्रक की जगह अपडेट नहीं होती।",
   quick: {"onWay": "पिकअप की ओर जा रहा हूँ", "late": "देर हो रही है", "loaded": "लोड हो गया", "waiting": "अभी डॉक पर इंतज़ार कर रहा हूँ", "lumper": "यहाँ लम्पर फ़ीस है", "onTime": "समय पर हूँ", "parking": "पार्किंग चाहिए", "unloaded": "अनलोड हो गया", "nextLoad": "अगले लोड के लिए तैयार", "goHome": "अगली बार घर जाना है", "dayOff": "एक दिन की छुट्टी चाहिए", "address": "पता क्या है?"},
   consentTitle: "डिस्पैच के मैसेज और कॉल",
   consentAsk: "लोड के बारे में मैसेज और कॉल करने के लिए डिस्पैच को आपकी हाँ चाहिए।",
@@ -195,6 +210,9 @@ const ru: DispatchUi = {
   textsTooNote: "Выключено: только уведомления, пока этот телефон их получает. Если две недели не получает, SMS вернутся.",
   autoDrive: "Без рук за рулём",
   autoDriveNote: "Крупные кнопки и голос включаются сами, когда грузовик едет (если разрешена геолокация).",
+  hosVoice: "Голосовые напоминания о часах",
+  hosVoiceNote: "Голос предупредит, когда до конца вождения или смены останется 1 час, 30 и 15 минут.",
+  locationNote: "Геолокация телефона используется только на смене. Вне смены приложение не смотрит, где вы, а место грузовика не обновляется.",
   quick: {"onWay": "Еду на погрузку", "late": "Опаздываю", "loaded": "Загрузился", "waiting": "Всё ещё жду у дока", "lumper": "Здесь платный лампер", "onTime": "Иду по графику", "parking": "Нужна парковка", "unloaded": "Разгрузился", "nextLoad": "Готов к следующему грузу", "goHome": "Хочу домой после этого", "dayOff": "Нужен выходной", "address": "Какой адрес?"},
   consentTitle: "Сообщения и звонки от диспетчера",
   consentAsk: "Диспетчеру нужно ваше согласие, чтобы писать и звонить вам о грузах.",
@@ -230,6 +248,9 @@ const uk: DispatchUi = {
   textsTooNote: "Вимкнено: лише сповіщення, поки цей телефон їх отримує. Якщо два тижні не отримує, SMS повернуться.",
   autoDrive: "Без рук за кермом",
   autoDriveNote: "Великі кнопки й голос вмикаються самі, коли вантажівка їде (якщо дозволено геолокацію).",
+  hosVoice: "Голосові нагадування про години",
+  hosVoiceNote: "Голос попередить, коли до кінця водіння або зміни залишиться 1 година, 30 і 15 хвилин.",
+  locationNote: "Геолокація телефона використовується лише на зміні. Поза зміною застосунок не дивиться, де ви, а місце вантажівки не оновлюється.",
   quick: {"onWay": "Їду на завантаження", "late": "Запізнююсь", "loaded": "Завантажився", "waiting": "Досі чекаю біля доку", "lumper": "Тут платний лампер", "onTime": "Іду за графіком", "parking": "Потрібна парковка", "unloaded": "Розвантажився", "nextLoad": "Готовий до наступного вантажу", "goHome": "Хочу додому після цього", "dayOff": "Потрібен вихідний", "address": "Яка адреса?"},
   consentTitle: "Повідомлення й дзвінки від диспетчера",
   consentAsk: "Диспетчеру потрібна ваша згода, щоб писати й дзвонити вам щодо вантажів.",
@@ -265,6 +286,9 @@ const fr: DispatchUi = {
   textsTooNote: "Désactivé : seulement les notifications, tant que ce téléphone les reçoit. S'il ne les reçoit plus pendant deux semaines, les textos reviennent.",
   autoDrive: "Mains libres en conduisant",
   autoDriveNote: "Les gros boutons et la voix s'activent d'eux-mêmes quand le camion roule (si la localisation est permise).",
+  hosVoice: "Alertes d'heures à voix haute",
+  hosVoiceNote: "Une voix prévient quand il reste 1 heure, 30 et 15 minutes de conduite ou de service.",
+  locationNote: "La localisation du téléphone n'est utilisée que pendant le service. Hors service, l'app ne regarde pas où vous êtes et la position du camion n'est pas mise à jour.",
   quick: {"onWay": "En route vers le chargement", "late": "Je suis en retard", "loaded": "Chargé", "waiting": "J'attends encore au quai", "lumper": "Frais de lumper ici", "onTime": "Je suis à l'heure", "parking": "J'ai besoin d'un stationnement", "unloaded": "Déchargé", "nextLoad": "Prêt pour le prochain chargement", "goHome": "Je veux rentrer à la maison après", "dayOff": "J'ai besoin d'un jour de congé", "address": "Quelle est l'adresse ?"},
   consentTitle: "Textos et appels de la répartition",
   consentAsk: "La répartition a besoin de ton accord pour t'écrire et t'appeler au sujet de tes voyages.",

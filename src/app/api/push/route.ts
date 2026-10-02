@@ -8,6 +8,9 @@ const Body = z.discriminatedUnion("op", [
   z.object({ op: z.literal("subscribe"), subscription: Sub }),
   z.object({ op: z.literal("unsubscribe"), endpoint: z.string().max(1000) }),
   z.object({ op: z.literal("test"), lang: z.string().max(5).optional() }),
+  // Lumper money: a driver at the dock asks (the office's phones buzz), and the office sent the code (the driver's does).
+  z.object({ op: z.literal("lumper_ask"), amount: z.number().positive().max(5000), facility: z.string().max(80).optional() }),
+  z.object({ op: z.literal("lumper_code"), driverId: z.string().min(1).max(80) }),
 ]);
 
 const TEST_DRIVER: Record<string, string> = {
@@ -40,6 +43,23 @@ export async function POST(request: Request) {
   if (b.op === "unsubscribe") {
     await db.from("push_subscriptions").delete().eq("endpoint", b.endpoint).eq("user_id", who.me.userId);
     return Response.json({ ok: true });
+  }
+  if (b.op === "lumper_ask") {
+    if (who.me.role !== "driver" || !who.me.driverId) return Response.json({ error: "drivers_only" }, { status: 403 });
+    const { data: d } = await db.from("drivers").select("name").eq("carrier_id", who.me.carrierId).eq("id", who.me.driverId).maybeSingle();
+    const sent = await pushToOffice(who.me.carrierId, {
+      title: `Lumper money: $${Math.round(b.amount)}`,
+      body: `${(d?.name as string | undefined) ?? "A driver"} is at the dock${b.facility ? ` (${b.facility})` : ""} and needs a code to pay the lumper.`,
+      url: "/carrier",
+      tag: `lumper-${who.me.driverId}`,
+    });
+    return Response.json({ ok: true, sent });
+  }
+  if (b.op === "lumper_code") {
+    if (who.me.role !== "owner" && who.me.role !== "dispatcher") return Response.json({ error: "office_only" }, { status: 403 });
+    // The code itself stays in the app, not on the lock screen.
+    const sent = await pushToDriver(who.me.carrierId, b.driverId, { title: "Lumper code is ready", body: "Open the app to see the code to give the lumper service.", url: "/driver", tag: "lumper-code" });
+    return Response.json({ ok: true, sent });
   }
   const sent =
     who.me.role === "driver"

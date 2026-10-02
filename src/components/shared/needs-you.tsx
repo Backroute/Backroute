@@ -19,6 +19,7 @@ import { usePrimaryCarrier, useCarrierLoads, useCarrierEscalations, useDriverMap
 import type { DraftPurpose, Escalation, Load } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { celebrate, haptic } from "@/lib/feedback";
+import { LumperAsk } from "@/components/owner/lumper-ask";
 
 /** Everything waiting on the owner, counted one way for the hero line, the badge and the list. */
 export function useNeedsYou() {
@@ -26,6 +27,8 @@ export function useNeedsYou() {
   const loads = useCarrierLoads();
   const escalations = useCarrierEscalations().filter((e) => e.status !== "resolved");
   const pendingTimeOff = useStore((s) => s.timeOffRequests).filter((r) => r.carrierId === carrier.id && r.status === "pending");
+  // A driver at a dock waiting on lumper money: the most time-sensitive thing a driver can ask for.
+  const lumperAsks = useStore((s) => s.expenses).filter((e) => e.carrierId === carrier.id && e.upfront && e.status === "pending");
   const driversAtRisk = useDriverRetention().filter((r) => r.view.level === "at_risk");
   const offerGroups = useMemo(() => {
     const map = new Map<string, Load[]>();
@@ -37,9 +40,9 @@ export function useNeedsYou() {
   }, [loads]);
   // Escalations already handed to Backroute Support are listed but no longer wait on the carrier.
   const waiting = escalations.filter((e) => e.status !== "with_support");
-  const count = waiting.length + pendingTimeOff.length + offerGroups.length + driversAtRisk.length;
+  const count = waiting.length + pendingTimeOff.length + offerGroups.length + driversAtRisk.length + lumperAsks.length;
   const listed = escalations.filter((e) => !e.incidentId);
-  return { escalations, listed, pendingTimeOff, driversAtRisk, offerGroups, count, any: listed.length + pendingTimeOff.length + offerGroups.length + driversAtRisk.length > 0 };
+  return { escalations, listed, pendingTimeOff, lumperAsks, driversAtRisk, offerGroups, count, any: listed.length + pendingTimeOff.length + offerGroups.length + driversAtRisk.length + lumperAsks.length > 0 };
 }
 
 // ── Set aside for later (a left swipe): this browser tab only, back next visit. ───────────────────────────────────
@@ -214,7 +217,7 @@ function toneOf(e: Escalation): AttentionTone {
 }
 
 export function NeedsYouList() {
-  const { listed, pendingTimeOff, driversAtRisk, offerGroups, count, any } = useNeedsYou();
+  const { listed, pendingTimeOff, lumperAsks, driversAtRisk, offerGroups, count, any } = useNeedsYou();
   const loads = useCarrierLoads();
   const truckMap = useTruckMap();
   const driverMap = useDriverMap();
@@ -399,6 +402,12 @@ export function NeedsYouList() {
                   </Button>
                 </div>
               </AttentionCard>
+            </motion.div>
+          ))}
+
+          {lumperAsks.map((e) => (
+            <motion.div key={e.id} layout {...enter}>
+              <LumperAsk ask={e} driverName={driverMap.get(e.driverId)?.name ?? "Driver"} loadRef={loads.find((l) => l.id === e.loadId)?.referenceNumber} />
             </motion.div>
           ))}
 

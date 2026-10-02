@@ -187,6 +187,8 @@ export interface Driver {
   escrow?: { perRun: number; cap: number; held: number };
 }
 
+export type NavApp = "google" | "apple" | "waze" | "sygic" | "copilot";
+
 export interface Deduction {
   id: string;
   label: string;
@@ -225,6 +227,10 @@ export interface DriverPrefs {
   textsToo?: boolean;
   /** Hands-free comes on by itself when the phone is moving at road speed. On unless turned off. */
   handsFreeAuto?: boolean;
+  /** The navigation app "Directions" opens. */
+  navApp?: NavApp;
+  /** Spoken heads-ups as the drive and shift clocks run down. On unless turned off. */
+  hosVoice?: boolean;
   /**
    * Real accounts: what the driver has told the AI about themselves (family, health, what they like to run), newest
    * last, the way a good dispatcher remembers. Used in later conversations and when picking their loads.
@@ -272,6 +278,16 @@ export interface Truck {
   faults?: TruckFault[];
   /** Plates and registration (IRP cab card): the date it runs out. */
   registrationExpires?: string;
+  /** What truck GPS apps route around: low bridges, weight limits, hazmat tunnels. */
+  profile?: TruckProfile;
+}
+
+export interface TruckProfile {
+  /** Inches: 13'6" is 162. */
+  heightIn: number;
+  weightLbs: number;
+  lengthFt: number;
+  hazmat: boolean;
 }
 
 export interface TruckFault {
@@ -358,6 +374,12 @@ export interface Expense {
   status: "pending" | "approved" | "denied";
   createdAt: string;
   respondedAt?: string;
+  /** Asked for before paying (a lumper at the dock): the owner sends a payment code instead of paying it back later. */
+  upfront?: boolean;
+  /** The code the driver gives the lumper service (a Comdata or EFS express code, or a card's one-time number). */
+  payCode?: string;
+  /** Where: the receiver or shipper the lumper is at. */
+  facility?: string;
 }
 
 /** A booked appointment at a repair shop — created by "Schedule at a shop" on the Maintenance page.

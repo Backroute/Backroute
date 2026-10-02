@@ -18,6 +18,7 @@ import { TripMap } from "./trip-map";
 import { BrokerCallRow } from "./broker-call";
 import type { DriverDocType } from "@/lib/store";
 import type { Load, LoadDocument } from "@/lib/types";
+import { autoCrop } from "@/lib/doc-scan";
 
 /** `file` goes to the server in a real account; the demo only keeps the name and a preview. */
 export type UploadedFile = { name: string; previewUrl?: string; file?: File };
@@ -603,7 +604,8 @@ export function DocumentSlot({ doc, label, readOnly, onFile }: { doc?: LoadDocum
     const verdict = await checkPhoto(file);
     if (!verdict.ok) return setDoubt({ file, why: verdict.why });
     setDoubt(null);
-    send(file);
+    // Cropped to the paper and cleaned up, like a scanner would (the original if it can't find the sheet).
+    send((await autoCrop(file)).file);
   }
 
   const picker = readOnly ? null : (
@@ -621,9 +623,10 @@ export function DocumentSlot({ doc, label, readOnly, onFile }: { doc?: LoadDocum
           </button>
           <button
             type="button"
-            onClick={() => {
-              send(doubt.file);
+            onClick={async () => {
+              const f = doubt.file;
               setDoubt(null);
+              send((await autoCrop(f)).file);
             }}
             className="min-h-11 rounded-full border border-white/25 px-4 py-2 text-xs font-medium text-white/80"
           >

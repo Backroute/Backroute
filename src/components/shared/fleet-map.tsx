@@ -155,9 +155,10 @@ export function FleetMap({ dots, onSelect, className }: { dots: FleetDot[]; onSe
       const m = map.current;
       if (!alive || !lib || !m) return;
       if (!fitted && placed.length) {
+        // Marked first: fitting fires "zoomend" right away, which calls draw again.
+        fitted = true;
         const bounds = placed.reduce((b, p) => b.extend([p.at[1], p.at[0]]), new lib.LngLatBounds([placed[0].at[1], placed[0].at[0]], [placed[0].at[1], placed[0].at[0]]));
         m.fitBounds(bounds, { padding: 56, maxZoom: 7, duration: 0 });
-        fitted = true;
       }
       markers.current.forEach((mk) => mk.remove());
       const groups: { members: typeof placed; x: number; y: number }[] = [];

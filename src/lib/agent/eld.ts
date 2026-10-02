@@ -202,25 +202,6 @@ export async function applyEld(ctx: CarrierContext, kind: EldKind, data: { vehic
   let trucks = 0;
   let drivers = 0;
   const unmatched: string[] = [];
-  for (const v of data.vehicles) {
-    const truck = ctx.trucks.find((t) => sameUnit(t.unitNumber, v.unit));
-    if (!truck) {
-      unmatched.push(`truck ${v.unit}`);
-      continue;
-    }
-    const place = cityState(v.description);
-    const next: Truck = {
-      ...truck,
-      position: { lat: v.lat, lon: v.lon, at: v.at, description: v.description, source: kind },
-      ...(place ? { currentCity: place.city, currentState: place.state } : {}),
-      // The odometer only goes up: a reading lower than what's known (a swapped ECU) is left alone.
-      ...(v.odometerMiles && v.odometerMiles >= (truck.odometer ?? 0) ? { odometer: v.odometerMiles, odometerAt: v.at } : {}),
-      ...(data.faults ? { faults: await faultsFor(ctx, truck, kind, data.faults.filter((f) => sameUnit(truck.unitNumber, f.unit))) } : {}),
-    };
-    await save("trucks", ctx.carrier.id, next as unknown as Item);
-    ctx.trucks = ctx.trucks.map((t) => (t.id === truck.id ? next : t));
-    trucks++;
-  }
   const at = new Date().toISOString();
   for (const c of data.clocks) {
     const driver = ctx.drivers.find((d) => sameName(d.name, c.driverName));
@@ -233,6 +214,30 @@ export async function applyEld(ctx: CarrierContext, kind: EldKind, data: { vehic
     await save("drivers", ctx.carrier.id, next as unknown as Item);
     ctx.drivers = ctx.drivers.map((d) => (d.id === driver.id ? next : d));
     drivers++;
+  }
+  for (const v of data.vehicles) {
+    const truck = ctx.trucks.find((t) => sameUnit(t.unitNumber, v.unit));
+    if (!truck) {
+      unmatched.push(`truck ${v.unit}`);
+      continue;
+    }
+    const place = cityState(v.description);
+    // Off duty (or in the sleeper), where the truck goes is the driver's own time: the last on-duty spot stays, and
+    // a personal-conveyance trip isn't followed. Odometer and engine codes still come in.
+    const driver = ctx.drivers.find((d) => d.id === truck.driverId);
+    const offDuty = !!driver && (driver.hosStatus === "off_duty" || driver.hosStatus === "sleeper") && !!driver.hos && Date.now() - Date.parse(driver.hos.at) < 15 * 60_000;
+    const next: Truck = {
+      ...truck,
+      ...(offDuty && truck.position
+        ? {}
+        : { position: { lat: v.lat, lon: v.lon, at: v.at, description: v.description, source: kind }, ...(place ? { currentCity: place.city, currentState: place.state } : {}) }),
+      // The odometer only goes up: a reading lower than what's known (a swapped ECU) is left alone.
+      ...(v.odometerMiles && v.odometerMiles >= (truck.odometer ?? 0) ? { odometer: v.odometerMiles, odometerAt: v.at } : {}),
+      ...(data.faults ? { faults: await faultsFor(ctx, truck, kind, data.faults.filter((f) => sameUnit(truck.unitNumber, f.unit))) } : {}),
+    };
+    await save("trucks", ctx.carrier.id, next as unknown as Item);
+    ctx.trucks = ctx.trucks.map((t) => (t.id === truck.id ? next : t));
+    trucks++;
   }
   return { trucks, drivers, unmatched };
 }

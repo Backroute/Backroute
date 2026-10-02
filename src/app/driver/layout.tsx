@@ -11,6 +11,7 @@ import { slideTypes } from "@/lib/nav-direction";
 import { useCompactTitle } from "@/lib/large-title";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { LiveTripPill } from "@/components/shared/live-trip-pill";
+import { HosClock } from "@/components/driver/hos-clock";
 import { Logo } from "@/components/shared/logo";
 import { Avatar } from "@/components/ui/avatar";
 import { NotificationToastHost } from "@/components/shared/notification-toast";
@@ -72,9 +73,12 @@ function DriverShell({ children }: { children: React.ReactNode }) {
               </motion.span>
             )}
           </AnimatePresence>
-          <Link href="/driver/profile" aria-label="Your profile">
-            <Avatar name={driver.name} size="sm" />
-          </Link>
+          <span className="flex items-center gap-2">
+            <HosClock driver={driver} />
+            <Link href="/driver/profile" aria-label="Your profile">
+              <Avatar name={driver.name} size="sm" />
+            </Link>
+          </span>
         </div>
         <PullToRefresh />
         {/* On a trip, away from Home (whose map already shows it): the trip stays in view at the top. */}
