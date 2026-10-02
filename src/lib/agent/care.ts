@@ -118,7 +118,9 @@ export async function recordFeedback(ctx: CarrierContext, driver: Driver, f: { m
   const first = driver.name.split(" ")[0];
   await addActivity(ctx.carrier.id, event({ type: "call_completed", message: `${first}'s check-in: ${f.mood === "good" ? "doing well" : f.mood === "ok" ? "doing OK" : "not happy"}`, detail: f.note ?? "", severity: f.mood === "bad" ? "warning" : "info" }));
   const said: string[] = [];
-  if (homeBy) said.push(`wants to be home by ${homeBy}${driver.runType === "otr" ? "; the AI is planning loads to get there" : ""}`);
+  // Noon UTC keeps the calendar day the driver named in every US time zone.
+  const homeDay = homeBy ? new Date(`${homeBy}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }) : "";
+  if (homeBy) said.push(`wants to be home by ${homeDay}${driver.runType === "otr" ? "; the AI is planning loads to get there" : ""}`);
   if (f.mood === "bad" || f.wantsOwner) {
     await passToOwner(ctx, {
       reason: `${driver.name} ${f.mood === "bad" ? "isn't happy" : "wants to talk to you"}: ${f.note ?? "no details"}${said.length ? `. Also ${said.join(", ")}` : ""}. Worth a call from you.`,
@@ -130,7 +132,7 @@ export async function recordFeedback(ctx: CarrierContext, driver: Driver, f: { m
   }
   if (homeBy) {
     await passToOwner(ctx, { reason: `${driver.name} ${said.join(", ")}.`, label: "OK", source: "sms", to: "owner" });
-    return `Noted: home by ${homeBy}. The AI will plan loads toward home and the owner knows.`;
+    return `Noted: home by ${homeDay}. The AI will plan loads toward home and the owner knows.`;
   }
   return "Noted. Thank them.";
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { CheckCircle2, CreditCard, Download, FileText, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { INTEGRATION_CATEGORIES } from "@/lib/integrations";
 import { ADDONS } from "@/lib/addons";
@@ -60,6 +61,14 @@ const AGGRESSIVENESS_OPTIONS: { key: Aggressiveness; label: string; desc: string
 ];
 
 export default function SettingsPage() {
+  return (
+    <Suspense>
+      <Settings />
+    </Suspense>
+  );
+}
+
+function Settings() {
   const carrier = usePrimaryCarrier();
   const trucks = useCarrierTrucks();
   const settings = useStore((s) => s.settings);
@@ -75,11 +84,18 @@ export default function SettingsPage() {
     Object.fromEntries(INTEGRATION_CATEGORIES.flatMap((c) => c.items).map((i) => [i.id, i.connected])),
   );
   // A real account opens on the five questions that matter; the demo, on everything.
-  const [tab, setTab] = useState<TabKey>(() => {
-    // A link can open a tab (?tab=basics); the page renders after sign-in, in the browser only.
-    const asked = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
-    return TABS.some((t) => t.key === asked) && (signedIn || asked !== "basics") ? (asked as TabKey) : signedIn ? "basics" : "general";
-  });
+  // A link can open a tab (?tab=general). The owner's own pick holds until a link asks for another one.
+  const asked = useSearchParams().get("tab");
+  const [picked, setPicked] = useState<{ asked: string | null; tab: TabKey } | null>(null);
+  const tab: TabKey =
+    picked && picked.asked === asked
+      ? picked.tab
+      : TABS.some((t) => t.key === asked) && (signedIn || asked !== "basics")
+        ? (asked as TabKey)
+        : signedIn
+          ? "basics"
+          : "general";
+  const setTab = (next: TabKey) => setPicked({ asked, tab: next });
   const tabs = TABS.filter((t) => signedIn || t.key !== "basics").map((t) => (t.key === "general" && !signedIn ? { ...t, label: "General" } : t));
   const [card, setCard] = useState({ brand: "Visa", last4: "4242", expiry: "08/29" });
   const [editingCard, setEditingCard] = useState(false);
