@@ -16,7 +16,7 @@ export function asUser(request: Request): SupabaseClient | null {
 export interface Caller {
   userId: string;
   carrierId: string;
-  role: "owner" | "dispatcher" | "driver";
+  role: "owner" | "dispatcher" | "driver" | "bookkeeper";
   driverId: string | null;
 }
 

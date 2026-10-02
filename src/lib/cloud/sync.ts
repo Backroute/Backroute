@@ -31,7 +31,11 @@ type Slice =
   | "timeOffRequests"
   | "expenses"
   | "carrierMessages"
-  | "brokers";
+  | "brokers"
+  | "fuelTx"
+  | "tollTx"
+  | "payRuns"
+  | "advances";
 
 interface Spec {
   slice: Slice;
@@ -48,6 +52,8 @@ interface Spec {
   driverReads?: boolean;
   /** Logs that only grow: load the newest this many. */
   limit?: number;
+  /** A bookkeeper's session reads it, and writes it too when "write". */
+  books?: "read" | "write";
 }
 
 const ours = (i: Item) => i.carrierId === PRIMARY_CARRIER_ID;
@@ -55,9 +61,9 @@ const at = (k: string) => (i: Item) => String(i[k] ?? "");
 const none = () => "";
 
 const SPECS: Spec[] = [
-  { slice: "drivers", table: "drivers", time: none, newestFirst: false, driver: "update" },
-  { slice: "trucks", table: "trucks", time: none, newestFirst: false, driver: null, driverReads: true },
-  { slice: "loads", table: "loads", mine: ours, time: at("createdAt"), newestFirst: true, driver: "update" },
+  { slice: "drivers", table: "drivers", time: none, newestFirst: false, driver: "update", books: "read" },
+  { slice: "trucks", table: "trucks", time: none, newestFirst: false, driver: null, driverReads: true, books: "read" },
+  { slice: "loads", table: "loads", mine: ours, time: at("createdAt"), newestFirst: true, driver: "update", books: "read" },
   { slice: "escalations", table: "escalations", mine: ours, time: at("createdAt"), newestFirst: true, driver: null },
   { slice: "dispatchCalls", table: "dispatch_calls", time: at("createdAt"), newestFirst: true, driver: "upsert" },
   { slice: "driverMessages", table: "driver_messages", time: at("timestamp"), newestFirst: false, driver: "insert", limit: 500 },
@@ -66,13 +72,23 @@ const SPECS: Spec[] = [
   { slice: "maintenanceAppointments", table: "records", kind: "maintenance", time: at("createdAt"), newestFirst: true, driver: null },
   { slice: "dvirInspections", table: "records", kind: "dvir", time: at("createdAt"), newestFirst: true, driver: "upsert" },
   { slice: "timeOffRequests", table: "records", kind: "time_off", time: at("createdAt"), newestFirst: true, driver: "upsert" },
-  { slice: "expenses", table: "records", kind: "expense", time: at("createdAt"), newestFirst: true, driver: "upsert" },
+  { slice: "expenses", table: "records", kind: "expense", time: at("createdAt"), newestFirst: true, driver: "upsert", books: "write" },
   { slice: "carrierMessages", table: "records", kind: "carrier_message", time: at("timestamp"), newestFirst: false, driver: null, limit: 300 },
   // Brokers the carrier added with a load; the sample brokers stay in the app only.
-  { slice: "brokers", table: "records", kind: "broker", mine: ours, time: none, newestFirst: false, driver: null, driverReads: true },
+  { slice: "brokers", table: "records", kind: "broker", mine: ours, time: none, newestFirst: false, driver: null, driverReads: true, books: "read" },
+  // The back office (lib/back-office): fuel and tolls, pay runs and advances. Drivers read their own pay.
+  { slice: "fuelTx", table: "records", kind: "fuel", time: at("date"), newestFirst: true, driver: null, books: "write" },
+  { slice: "tollTx", table: "records", kind: "toll", time: at("date"), newestFirst: true, driver: null, books: "write" },
+  { slice: "payRuns", table: "records", kind: "pay_run", time: at("period"), newestFirst: true, driver: null, driverReads: true, books: "write" },
+  { slice: "advances", table: "records", kind: "advance", time: at("at"), newestFirst: true, driver: null, driverReads: true, books: "write" },
 ];
 
 const driverSees = (s: Spec) => s.driver !== null || !!s.driverReads;
+/** What a session loads: the office everything, a driver their own things, a bookkeeper the books and the fleet. */
+const sees = (mode: Connection["mode"], s: Spec) => (mode === "office" ? true : mode === "books" ? !!s.books : driverSees(s));
+/** How a session saves a list, if at all. */
+const writes = (mode: Connection["mode"], s: Spec): "update" | "upsert" | "insert" | null =>
+  mode === "office" ? "upsert" : mode === "books" ? (s.books === "write" ? "upsert" : null) : s.driver;
 const specKey = (s: Spec) => `${s.table}/${s.kind ?? ""}`;
 const conflictOf = (s: Spec) => conflictKey(s.kind);
 
@@ -101,7 +117,7 @@ interface Connection {
   /** Who's signed in, for the view kept on this device, and when it was last kept. */
   userId?: string;
   viewAt?: number;
-  mode: "office" | "driver";
+  mode: "office" | "driver" | "books";
   /** What the database holds for each item, as far as this browser knows: the object last saved or loaded. */
   last: Map<string, { ref: unknown; json: string }>;
   /** Ids per table, to notice deletions. */
@@ -190,12 +206,12 @@ export class NotSetUpError extends Error {}
 export async function connect(m: Membership, opts: { fresh?: boolean; userId?: string } = {}) {
   if (conn?.carrierId === m.carrierId) return;
   disconnect();
-  const mode = m.role === "driver" ? "driver" : "office";
+  const mode = m.role === "driver" ? "driver" : m.role === "bookkeeper" ? "books" : "office";
   const db = supabase();
   const { data: carrier, error } = await db.from("carriers").select("id, name, mc, dot, owner_operator, settings").eq("id", m.carrierId).single();
   if (error) throw error;
 
-  const specs = SPECS.filter((s) => mode === "office" || driverSees(s));
+  const specs = SPECS.filter((s) => sees(mode, s));
   const loaded = new Map<Slice, Item[]>();
   if (!opts.fresh) {
     const lists = await Promise.all(specs.map((s) => selectAll(s, m.carrierId)));
@@ -238,8 +254,8 @@ export async function connect(m: Membership, opts: { fresh?: boolean; userId?: s
         const others = spec.mine ? (s[spec.slice] as unknown as Item[]).filter((i) => !spec.mine!(i)) : [];
         (next as Record<string, unknown>)[spec.slice] = spec.newestFirst ? [...rows, ...others] : [...others, ...rows];
       }
-      // A driver's phone holds only their own things: the rest of the sample world goes.
-      if (mode === "driver") for (const spec of SPECS.filter((x) => !driverSees(x))) (next as Record<string, unknown>)[spec.slice] = spec.mine ? (s[spec.slice] as unknown as Item[]).filter((i) => !spec.mine!(i)) : [];
+      // A driver's phone (or a bookkeeper's screen) holds only what they can see: the rest of the sample world goes.
+      if (mode !== "office") for (const spec of SPECS.filter((x) => !sees(mode, x))) (next as Record<string, unknown>)[spec.slice] = spec.mine ? (s[spec.slice] as unknown as Item[]).filter((i) => !spec.mine!(i)) : [];
     }
     return next;
   });
@@ -275,7 +291,7 @@ const VIEW_MAX_CHARS = 2_500_000;
 interface View {
   userId: string;
   carrierId: string;
-  mode: "office" | "driver";
+  mode: "office" | "driver" | "books";
   driverId: string | null;
   at: number;
   carrier: { name: string; mc: string; dot: string };
@@ -295,7 +311,7 @@ function saveView(c: Connection, force = false) {
   c.viewAt = Date.now();
   try {
     const s = useStore.getState();
-    const specs = SPECS.filter((x) => c.mode === "office" || driverSees(x));
+    const specs = SPECS.filter((x) => sees(c.mode, x));
     const cap: Partial<Record<Slice, number>> = { loads: 300, driverMessages: 100, activity: 50, carrierMessages: 100, escalations: 100 };
     const slices: View["slices"] = {};
     for (const spec of specs) {
@@ -336,7 +352,7 @@ export function showCached(v: View) {
     for (const spec of SPECS) {
       const rows = v.slices[spec.slice];
       if (!rows) {
-        if (v.mode === "driver" && !driverSees(spec)) (next as Record<string, unknown>)[spec.slice] = spec.mine ? (s[spec.slice] as unknown as Item[]).filter((i) => !spec.mine!(i)) : [];
+        if (v.mode !== "office" && !sees(v.mode, spec)) (next as Record<string, unknown>)[spec.slice] = spec.mine ? (s[spec.slice] as unknown as Item[]).filter((i) => !spec.mine!(i)) : [];
         continue;
       }
       const others = spec.mine ? (s[spec.slice] as unknown as Item[]).filter((i) => !spec.mine!(i)) : [];
@@ -404,7 +420,7 @@ async function flush(c: Connection) {
 
   try {
     for (const spec of SPECS) {
-      const how = c.mode === "office" ? "upsert" : spec.driver;
+      const how = writes(c.mode, spec);
       if (!how) continue;
       const items = (s[spec.slice] as unknown as Item[]).filter((i) => !spec.mine || spec.mine(i));
       const changed: Item[] = [];
@@ -546,7 +562,7 @@ export async function refresh(): Promise<boolean> {
   const c = conn;
   if (!c) return false;
   await flush(c);
-  const specs = SPECS.filter((s) => c.mode === "office" || driverSees(s));
+  const specs = SPECS.filter((s) => sees(c.mode, s));
   const lists = await Promise.all(specs.map((s) => selectAll(s, c.carrierId)));
   if (conn !== c) return false;
   specs.forEach((spec, n) => {

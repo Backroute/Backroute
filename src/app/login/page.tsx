@@ -11,6 +11,7 @@ import { claimInvites, homeFor, myMemberships, pickMembership } from "@/lib/clou
 import { authHeader } from "@/lib/ai/client";
 import { formatPhone, toE164 } from "@/lib/cloud/phone";
 import { demoAllowed, leaveDemo } from "@/lib/cloud/demo";
+import { needsSecondStep, passSecondStep } from "@/lib/cloud/security";
 
 /** Sign in with a phone number and a texted code: no passwords for drivers to forget. */
 export default function LoginPage() {
@@ -58,7 +59,9 @@ function DemoNotice() {
 function PhoneSignIn() {
   const router = useRouter();
   const params = useSearchParams();
-  const [step, setStep] = useState<"phone" | "code">("phone");
+  // "second": the account has two-step sign-in on, so the authenticator app's code comes after the texted one.
+  const [step, setStep] = useState<"phone" | "code" | "second">(() => (params.get("step") === "second" ? "second" : "phone"));
+  const [appCode, setAppCode] = useState("");
   const [raw, setRaw] = useState("");
   const [phone, setPhone] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -98,6 +101,29 @@ function PhoneSignIn() {
       setBusy(false);
       return setError("That code didn't work. Check it, or send a new one.");
     }
+    if (await needsSecondStep().catch(() => false)) {
+      setBusy(false);
+      setStep("second");
+      return;
+    }
+    await enter();
+  }
+
+  async function second() {
+    if (appCode.length < 6) return;
+    setBusy(true);
+    setError(null);
+    if (!(await passSecondStep(appCode).catch(() => false))) {
+      setBusy(false);
+      setAppCode("");
+      return setError("That code didn't match. Use the newest one in your authenticator app.");
+    }
+    await enter();
+  }
+
+  /** Signed in all the way: on to their side of the app. */
+  async function enter() {
+    setBusy(true);
     try {
       await claimInvites();
       const m = pickMembership(await myMemberships());
@@ -115,6 +141,38 @@ function PhoneSignIn() {
       setError("Signed in, but couldn't load your account. Check your connection and try again.");
     }
   }
+
+  if (step === "second")
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void second();
+        }}
+      >
+        <h1 className="font-display text-2xl text-ink-950">One more code</h1>
+        <p className="mt-1 text-sm text-ink-500">Two-step sign-in is on for this account. Open your authenticator app and enter the 6-digit code for Backroute.</p>
+        <label htmlFor="app-code" className="sr-only">
+          Code from your authenticator app
+        </label>
+        <input
+          id="app-code"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          autoFocus
+          value={appCode}
+          onChange={(e) => setAppCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          placeholder="123456"
+          className="mt-5 w-full rounded-full border border-line px-4 py-2.5 text-center text-lg tracking-[0.4em] tabular outline-none focus:border-ink-400"
+        />
+        {error && <p className="mt-3 text-sm text-[var(--accent-danger)]">{error}</p>}
+        <Button type="submit" className="mt-5 w-full" disabled={appCode.length < 6 || busy}>
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
+        </Button>
+        <p className="mt-4 text-center text-xs text-ink-500">Lost the phone with the app? Backroute support can turn two-step off after checking it&apos;s you.</p>
+      </form>
+    );
 
   if (step === "phone")
     return (

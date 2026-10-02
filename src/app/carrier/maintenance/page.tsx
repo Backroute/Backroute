@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, Wrench } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
+import { EldHealthCard } from "@/components/owner/eld-health-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,9 @@ export default function MaintenancePage() {
       <PageHeader title="Maintenance" description={flagged.length === 1 ? "1 truck needs attention" : `${flagged.length} trucks need attention`} />
 
       <div className="px-4 py-6 sm:px-8">
+        <div className="mb-6">
+          <EldHealthCard />
+        </div>
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {trucks.map((truck) => {
               const remaining = milesUntilService(truck);

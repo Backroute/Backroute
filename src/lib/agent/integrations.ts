@@ -3,7 +3,7 @@ import { admin } from "./db";
 
 /** A carrier's connections to outside services, kept server-side (see migration 20260927000000_support.sql). */
 
-export type IntegrationKind = "samsara" | "motive" | "load_feed" | "truckstop" | "dat" | `board:${string}`;
+export type IntegrationKind = "samsara" | "motive" | "load_feed" | "fuel_feed" | "toll_feed" | "truckstop" | "dat" | `board:${string}`;
 
 export interface EldConfig {
   apiKey: string;
@@ -14,6 +14,15 @@ export interface FeedConfig {
   /** An optional header the feed needs, e.g. Authorization: Bearer … */
   headerName?: string;
   headerValue?: string;
+  name?: string;
+}
+
+/** A fuel card or toll statement published as CSV at an address (lib/agent/costs). */
+export interface StatementConfig {
+  url: string;
+  headerName?: string;
+  headerValue?: string;
+  /** "WEX", "Comdata", "BestPass"... */
   name?: string;
 }
 
@@ -38,7 +47,7 @@ export interface CustomBoardConfig {
   listPath: string;
   fields: Record<string, string>;
 }
-export type AnyConfig = EldConfig | FeedConfig | TruckstopConfig | DatConfig | CustomBoardConfig;
+export type AnyConfig = EldConfig | FeedConfig | StatementConfig | TruckstopConfig | DatConfig | CustomBoardConfig;
 
 export interface IntegrationRow {
   carrier_id: string;

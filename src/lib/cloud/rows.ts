@@ -4,7 +4,7 @@
  */
 
 export type Item = { id: string } & Record<string, unknown>;
-export type RecordKind = "incident" | "maintenance" | "dvir" | "time_off" | "expense" | "carrier_message" | "broker";
+export type RecordKind = "incident" | "maintenance" | "dvir" | "time_off" | "expense" | "carrier_message" | "broker" | "fuel" | "toll" | "pay_run" | "advance";
 export type Table = "drivers" | "trucks" | "loads" | "escalations" | "dispatch_calls" | "driver_messages" | "activity" | "records";
 
 const str = (v: unknown) => (typeof v === "string" ? v : null);
@@ -25,6 +25,11 @@ export const COLUMNS: Record<Exclude<Table, "records"> | RecordKind, (i: Item) =
   expense: (i) => ({ driver_id: str(i.driverId) }),
   carrier_message: () => ({ driver_id: null }),
   broker: () => ({ driver_id: null }),
+  fuel: () => ({ driver_id: null }),
+  toll: () => ({ driver_id: null }),
+  // A driver sees their own pay runs and advances (the access rules go by driver_id).
+  pay_run: (i) => ({ driver_id: str(i.driverId) }),
+  advance: (i) => ({ driver_id: str(i.driverId) }),
 };
 
 /** Tables whose rows carry a creation time instead of an update time. */

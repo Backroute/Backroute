@@ -1,41 +1,31 @@
 import "server-only";
-import { claimMark, type CarrierContext } from "./db";
+import { claimMark, latestFiles, type CarrierContext } from "./db";
+import { dueWords, paperworkDue } from "../expiry";
 import { passToOwner } from "./dispatcher";
 
 /**
- * The deadlines a small carrier's dispatcher usually keeps for the owner: each truck's annual DOT inspection, the
- * quarterly IFTA return, the yearly UCR registration and the heavy vehicle use tax (Form 2290). The AI reminds the owner
+ * The deadlines a small carrier's dispatcher usually keeps for the owner: each truck's plates and annual DOT
+ * inspection, each driver's CDL and medical card, the insurance certificate, IFTA (the quarterly return and the yearly
+ * decals), the yearly UCR registration and the heavy vehicle use tax (Form 2290). The AI reminds the owner
  * ahead of each one, once, and says what's needed. It doesn't file anything.
  */
 
 const DAY = 86400_000;
 
-/** IFTA returns are due the last day of the month after each quarter. */
-function iftaDue(now: Date): { due: Date; quarter: string } {
-  const y = now.getUTCFullYear();
-  const dues = [
-    { due: new Date(Date.UTC(y, 0, 31)), quarter: `Q4 ${y - 1}` },
-    { due: new Date(Date.UTC(y, 3, 30)), quarter: `Q1 ${y}` },
-    { due: new Date(Date.UTC(y, 6, 31)), quarter: `Q2 ${y}` },
-    { due: new Date(Date.UTC(y, 9, 31)), quarter: `Q3 ${y}` },
-    { due: new Date(Date.UTC(y + 1, 0, 31)), quarter: `Q4 ${y}` },
-  ];
-  return dues.find((d) => d.due.getTime() >= now.getTime() - DAY)!;
-}
-
-export function deadlines(ctx: Pick<CarrierContext, "trucks">, now: number): { key: string; due: string; days: number; text: string }[] {
+export function deadlines(ctx: Pick<CarrierContext, "trucks" | "drivers">, now: number, insuranceExpires?: string | null): { key: string; due: string; days: number; text: string }[] {
   const out: { key: string; due: string; days: number; text: string }[] = [];
+  // Plates, inspections, CDLs, medical cards, insurance and IFTA: a reminder 30, 14 and 7 days out, and once it's run
+  // out (lib/expiry). Each is its own mark, so each goes once.
+  for (const p of paperworkDue({ trucks: ctx.trucks, drivers: ctx.drivers, insuranceExpires, now })) {
+    if (p.stage === null) continue;
+    const when = p.days < 0 ? `ran out ${p.due}` : p.days === 0 ? "runs out today" : `is due ${p.due}, ${dueWords(p.days)}`;
+    out.push({ key: `${p.key}:${p.stage}`, due: p.due, days: p.days, text: `${p.what} ${when}. ${p.todo}` });
+  }
   const d = new Date(now);
   const add = (key: string, due: Date, warnDays: number, text: string) => {
     const days = Math.ceil((due.getTime() - now) / DAY);
-    if (days <= warnDays) out.push({ key, due: due.toISOString().slice(0, 10), days, text });
+    if (days <= warnDays) out.push({ key, due: due.toISOString().slice(0, 10), days, text: `${text} by ${due.toISOString().slice(0, 10)}, ${dueWords(days)}.` });
   };
-  for (const t of ctx.trucks) {
-    const due = Date.parse(t.nextInspectionDue ?? "");
-    if (Number.isFinite(due)) add(`inspection:${t.id}:${t.nextInspectionDue}`, new Date(due), 30, `Truck ${t.unitNumber}'s annual DOT inspection is due`);
-  }
-  const ifta = iftaDue(d);
-  add(`ifta:${ifta.quarter}`, ifta.due, 21, `The IFTA return for ${ifta.quarter} is due. Miles by state come from the ELD or the drivers' trip logs, and fuel from the fuel card report`);
   // Yearly deadlines: the next one that hasn't passed by more than a week.
   const next = (month: number, day: number) => {
     const y = d.getUTCFullYear();
@@ -51,10 +41,12 @@ export function deadlines(ctx: Pick<CarrierContext, "trucks">, now: number): { k
 
 export async function complianceReminders(ctx: CarrierContext, now: number): Promise<string[]> {
   const done: string[] = [];
-  for (const item of deadlines(ctx, now)) {
+  // The insurance date: the newest certificate on file with one, or the date the owner typed in.
+  const coi = (await latestFiles(ctx.carrier.id, ["coi"]).catch(() => []))[0];
+  for (const item of deadlines(ctx, now, coi?.expires_on ?? ctx.settings.insuranceExpires ?? null)) {
     if (!(await claimMark(ctx.carrier.id, "compliance", item.key))) continue;
     await passToOwner(ctx, {
-      reason: `${item.text} ${item.days < 0 ? `(it was due ${item.due})` : item.days === 0 ? "today" : `by ${item.due}, in ${item.days} day${item.days === 1 ? "" : "s"}`}.`,
+      reason: item.text,
       label: "Done",
       source: "app",
       to: "owner",

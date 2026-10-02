@@ -32,6 +32,8 @@ import { BillingCard } from "@/components/cloud/billing-card";
 import { PhoneAlerts } from "@/components/cloud/phone-alerts";
 import { ExportsCard } from "@/components/cloud/exports-card";
 import { ConnectionsCard } from "@/components/cloud/connections-card";
+import { SecurityCard } from "@/components/cloud/security-card";
+import { AuditLogCard } from "@/components/cloud/audit-log-card";
 import { HistoryCard } from "@/components/cloud/history-card";
 import { BasicsCard } from "@/components/cloud/basics-card";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
@@ -43,6 +45,7 @@ const TABS = [
   { key: "integrations", label: "Integrations" },
   { key: "addons", label: "AI Add-ons" },
   { key: "billing", label: "Billing & Team" },
+  { key: "security", label: "Security" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -122,6 +125,12 @@ function Settings() {
 
         <div className="mt-5 flex flex-col gap-6">
           {tab === "basics" && signedIn && <BasicsCard />}
+          {tab === "security" && (
+            <>
+              <SecurityCard />
+              <AuditLogCard />
+            </>
+          )}
           {tab === "general" && (
             <>
               <Card>

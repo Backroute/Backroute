@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { CloudGate } from "@/components/cloud/cloud-gate";
 import { CarrierSwitcher } from "@/components/cloud/carrier-switcher";
 import Link from "next/link";
@@ -27,18 +28,27 @@ import { InstallPrompt } from "@/components/shared/install-prompt";
 /** Five sections instead of eleven pages; each section's pages sit on tabs inside it. */
 const SECTIONS: { nav: NavItem; tabs: { href: string; label: string }[] }[] = [
   { nav: { href: "/carrier", label: "Home", icon: LayoutGrid }, tabs: [{ href: "/carrier", label: "Today" }, { href: "/carrier/messages", label: "Ask the AI" }] },
-  { nav: { href: "/carrier/loads", label: "Loads", icon: Truck }, tabs: [{ href: "/carrier/loads", label: "All loads" }, { href: "/carrier/negotiations", label: "Negotiating" }] },
+  { nav: { href: "/carrier/loads", label: "Loads", icon: Truck }, tabs: [{ href: "/carrier/loads", label: "All loads" }, { href: "/carrier/negotiations", label: "Negotiating" }, { href: "/carrier/customers", label: "Customers" }] },
   {
     nav: { href: "/carrier/fleet", label: "Fleet", icon: Users },
     tabs: [{ href: "/carrier/fleet", label: "Drivers & trucks" }, { href: "/carrier/maintenance", label: "Maintenance" }, { href: "/carrier/compliance", label: "Compliance" }],
   },
   {
     nav: { href: "/carrier/earnings", label: "Money", icon: Wallet },
-    tabs: [{ href: "/carrier/earnings", label: "Earnings" }, { href: "/carrier/settlements", label: "Getting paid" }, { href: "/carrier/brokers", label: "Brokers" }],
+    tabs: [
+      { href: "/carrier/earnings", label: "Earnings" },
+      { href: "/carrier/settlements", label: "Getting paid" },
+      { href: "/carrier/pay", label: "Driver pay" },
+      { href: "/carrier/costs", label: "Fuel & tolls" },
+      { href: "/carrier/lanes", label: "Lanes" },
+      { href: "/carrier/brokers", label: "Brokers" },
+    ],
   },
   { nav: { href: "/carrier/settings", label: "Settings", icon: Settings }, tabs: [] },
 ];
 const NAV: NavItem[] = SECTIONS.map((sec) => ({ ...sec.nav, match: sec.tabs.map((t) => t.href).filter((h) => h !== sec.nav.href) }));
+const BOOKS_NAV = new Set(["/carrier/fleet", "/carrier/earnings", "/carrier/settings"]);
+const BOOKS_PAGES = SECTIONS.filter((sec) => BOOKS_NAV.has(sec.nav.href)).flatMap((sec) => (sec.tabs.length ? sec.tabs.map((t) => t.href) : [sec.nav.href]));
 const ALL_PAGES = SECTIONS.flatMap((sec) => (sec.tabs.length ? sec.tabs : [{ href: sec.nav.href, label: sec.nav.label }]).map((t) => ({ ...t, icon: sec.nav.icon })));
 
 /** The tabs of whichever section the current page belongs to. */
@@ -90,13 +100,19 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
   // Matches exactly what the Negotiations page itself lists, so the badge never disagrees with the page it labels.
   const activeNegotiations = loads.filter((l) => l.stage === "negotiating" || l.stage === "rate_confirmed").length;
   const needsYou = useNeedsYou().count;
+  const router = useRouter();
   // The number on the app's icon (home screen, dock): what's waiting for the owner.
   useAppBadge(needsYou);
-  const navWithBadge = NAV.map((n) =>
+  // A bookkeeper keeps the books: Money, the fleet's papers, and Settings. Dispatching isn't theirs.
+  const books = useStore((s) => s.session.mode === "books");
+  const pathname = usePathname();
+  useEffect(() => {
+    if (books && !BOOKS_PAGES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) router.replace("/carrier/earnings");
+  }, [books, pathname, router]);
+  const navWithBadge = NAV.filter((n) => !books || BOOKS_NAV.has(n.href)).map((n) =>
     n.href === "/carrier/loads" ? { ...n, badge: pendingOffers + activeNegotiations } : n.href === "/carrier" ? { ...n, badge: needsYou } : n,
   );
 
-  const router = useRouter();
   const paused = useStore((s) => !!s.settings.paused);
   const updateSettings = useStore((s) => s.actions.updateSettings);
   const sendCarrierMessage = useStore((s) => s.actions.sendCarrierMessage);

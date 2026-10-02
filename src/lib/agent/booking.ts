@@ -33,6 +33,7 @@ import { addWhy, whyBook, withWhy } from "./why";
 import { hardProblem, scheduleWarnings } from "./schedule";
 import { reeferLine } from "./reefer";
 import { translateForDriver } from "../ai/translate";
+import { cantRun } from "../expiry";
 
 /**
  * Booking by email, the way a small carrier's dispatcher does it: loads brokers send in are matched to a truck that
@@ -83,13 +84,14 @@ function emptyNow(ctx: Pick<CarrierContext, "trucks" | "loads">, truckId: string
 }
 
 /** The truck that can take a load soonest with the least empty driving, if any. */
-function bestTruck(ctx: CarrierContext, o: { equipment: Load["equipmentType"]; originCity: string; originState: string; destinationState: string; pickupAt: number | null; miles: number }, skip?: Set<string>) {
+export function bestTruck(ctx: CarrierContext, o: { equipment: Load["equipmentType"]; originCity: string; originState: string; destinationState: string; pickupAt: number | null; miles: number }, skip?: Set<string>) {
   let best: { truck: Truck; deadhead: number } | null = null;
   for (const truck of ctx.trucks) {
     if (skip?.has(truck.id)) continue;
     if (!truck.driverId || truck.equipmentType !== o.equipment || truck.status === "maintenance" || truck.nextLoadId) continue;
-    // An annual DOT inspection that's past due: the truck can't legally run, so no load goes on it (Maintenance page).
-    if (truck.nextInspectionDue && Date.parse(truck.nextInspectionDue) < Date.now()) continue;
+    // Can't legally run: an inspection or plates past due, a critical engine fault, a driver whose CDL or medical card
+    // ran out (lib/expiry). No load goes on it; the owner was reminded ahead of time.
+    if (cantRun(truck, ctx.drivers.find((d) => d.id === truck.driverId), Date.now())) continue;
     // States the driver said they won't run into.
     if (ctx.drivers.find((d) => d.id === truck.driverId)?.prefs?.avoidStates?.includes(o.destinationState)) continue;
     const busy = ctx.loads.find((l) => l.id === truck.currentLoadId && !["delivered", "cancelled", "declined"].includes(l.stage));

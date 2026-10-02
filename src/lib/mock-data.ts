@@ -3,7 +3,12 @@ import { computeEconomics, computeLoadScore } from "./scoring";
 import { assessBroker } from "./broker-policy";
 import { transitWindow } from "./trip-geo";
 import { laneFits } from "./run-types";
+import { seedBackOffice } from "./back-office-seed";
 import type {
+  Advance,
+  FuelTx,
+  PayRun,
+  TollTx,
   ActivityEvent,
   Broker,
   Lang,
@@ -605,6 +610,10 @@ export interface World {
   dvirInspections: DvirInspection[];
   timeOffRequests: TimeOffRequest[];
   expenses: Expense[];
+  fuelTx: FuelTx[];
+  tollTx: TollTx[];
+  payRuns: PayRun[];
+  advances: Advance[];
 }
 
 export function generateWorld(seed = 20260916): World {
@@ -813,8 +822,10 @@ export function generateWorld(seed = 20260916): World {
     },
   ];
 
+  const office = seedBackOffice({ trucks, drivers, loads, brokers, carrierId: PRIMARY_CARRIER_ID, now: BASE_TIME });
   return {
-    carriers, brokers, trucks, drivers, loads, activity, escalations, driverMessages, carrierMessages,
+    carriers, brokers: office.brokers, trucks: office.trucks, drivers: office.drivers, loads: [...office.contractLoads, ...loads], activity, escalations, driverMessages, carrierMessages,
     incidents: [], maintenanceAppointments: [], dvirInspections: [], timeOffRequests, expenses: [],
+    fuelTx: office.fuelTx, tollTx: office.tollTx, payRuns: office.payRuns, advances: office.advances,
   };
 }

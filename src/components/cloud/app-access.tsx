@@ -25,6 +25,7 @@ export function AppAccessCard() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [phone, setPhone] = useState("");
+  const [role, setRole] = useState<"dispatcher" | "bookkeeper">("dispatcher");
   const [copied, setCopied] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -50,7 +51,7 @@ export function AppAccessCard() {
     try {
       await invite(carrierId, e164, role, driverId);
       await refresh();
-      if (role === "dispatcher") setPhone("");
+      if (role !== "driver") setPhone("");
     } catch {
       setError("Only the owner can add people. If that's you, check your connection and try again.");
     } finally {
@@ -63,13 +64,14 @@ export function AppAccessCard() {
   const statusOf = (driverId: string) =>
     data?.members.some((m) => m.driver_id === driverId) ? "in" : data?.invites.some((i) => i.driver_id === driverId) ? "invited" : "none";
   const dispatchers = data?.members.filter((m) => m.role === "dispatcher").length ?? 0;
-  const pendingDispatchers = data?.invites.filter((i) => i.role === "dispatcher") ?? [];
+  const bookkeepers = data?.members.filter((m) => m.role === "bookkeeper").length ?? 0;
+  const pendingDispatchers = data?.invites.filter((i) => i.role === "dispatcher" || i.role === "bookkeeper") ?? [];
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Who can sign in</CardTitle>
-        <CardDescription>Drivers see only their own loads, calls and pay. Dispatchers see everything you do.</CardDescription>
+        <CardDescription>Drivers see only their own loads, calls and pay. Dispatchers see everything you do. Bookkeepers see the money and the fleet, keep the books, and can&apos;t dispatch.</CardDescription>
       </CardHeader>
       <CardContent className="!pt-3 flex flex-col gap-4">
         <ul className="flex flex-col divide-y divide-line rounded-2xl border border-line">
@@ -115,25 +117,30 @@ export function AppAccessCard() {
 
         <div>
           <p className="text-xs font-medium text-ink-700">
-            Dispatchers{dispatchers ? ` · ${dispatchers} signed in` : ""}
-            {pendingDispatchers.length ? ` · ${pendingDispatchers.map((i) => formatPhone(i.phone)).join(", ")} can sign in` : ""}
+            Office{dispatchers ? ` · ${dispatchers} dispatcher${dispatchers === 1 ? "" : "s"}` : ""}
+            {bookkeepers ? ` · ${bookkeepers} bookkeeper${bookkeepers === 1 ? "" : "s"}` : ""}
+            {pendingDispatchers.length ? ` · ${pendingDispatchers.map((i) => `${formatPhone(i.phone)} (${i.role})`).join(", ")} can sign in` : ""}
           </p>
           <form
             className="mt-2 flex items-center gap-2"
             onSubmit={(e) => {
               e.preventDefault();
-              void letIn("dispatcher", phone, "dispatcher", null);
+              void letIn("office", phone, role, null);
             }}
           >
             <input
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="Dispatcher's phone number"
+              placeholder="Their phone number"
               aria-label="Dispatcher's phone number"
               className="min-w-0 flex-1 rounded-full border border-line bg-ink-50/60 px-4 py-2 text-sm outline-none focus:border-ink-400"
             />
-            <Button size="sm" type="submit" disabled={!toE164(phone) || busy === "dispatcher"}>
+            <select aria-label="Role" value={role} onChange={(e) => setRole(e.target.value as "dispatcher" | "bookkeeper")} className="h-9 rounded-full border border-line bg-white px-3 text-sm">
+              <option value="dispatcher">Dispatcher</option>
+              <option value="bookkeeper">Bookkeeper</option>
+            </select>
+            <Button size="sm" type="submit" disabled={!toE164(phone) || busy === "office"}>
               <Plus className="h-3.5 w-3.5" /> Add
             </Button>
           </form>

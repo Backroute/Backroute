@@ -15,6 +15,7 @@ import { NotAvailable } from "./not-available";
 import { DemoBanner } from "./demo-banner";
 import { FleetForm } from "./fleet-form";
 import { useStore } from "@/lib/store";
+import { needsSecondStep, registerDevice } from "@/lib/cloud/security";
 
 type Area = "carrier" | "driver" | "signup";
 
@@ -50,9 +51,11 @@ function LiveGate({ area, children }: { area: Area; children: React.ReactNode })
       if (inDemo()) return setState("demo");
       const { data } = await supabase().auth.getSession();
       if (!data.session) return router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+      // Two-step sign-in on and not passed in this session: the code first (the data stays locked until then).
+      if (await needsSecondStep().catch(() => false)) return router.replace(`/login?step=second&next=${encodeURIComponent(pathname)}`);
       const userId = data.session.user.id;
       const kept = area !== "signup" ? cachedView(userId) : null;
-      if (kept && (area === "carrier" ? kept.mode === "office" : kept.mode === "driver" || !!kept.driverId)) {
+      if (kept && (area === "carrier" ? kept.mode !== "driver" : kept.mode === "driver" || !!kept.driverId)) {
         showCached(kept);
         showingKept = true;
         if (!cancelled) setState("ready");
@@ -69,6 +72,7 @@ function LiveGate({ area, children }: { area: Area; children: React.ReactNode })
       if (area === "carrier" && m.role === "driver") return router.replace("/driver");
       if (area === "driver" && m.role !== "driver" && !m.driverId) return router.replace("/carrier");
       if (area !== "signup") await connect(m, { userId });
+      void registerDevice();
       if (!cancelled) setState("ready");
     })().catch((e) => {
       if (!(e instanceof NotSetUpError)) console.error("[cloud] couldn't load the fleet", e);

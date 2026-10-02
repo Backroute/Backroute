@@ -82,6 +82,31 @@ export interface Broker {
   noAiCalls?: { at: string; said: string };
   /** Real accounts: the broker's credit, from a credit service and the carrier's own paid invoices (lib/agent/credit). */
   credit?: { score: number | null; daysToPay: number | null; source: string; at: string };
+  /** A shipper the carrier hauls for directly (no broker): invoiced on its own terms, with contract lanes. */
+  direct?: boolean;
+  /** Days the customer has to pay (net 30). */
+  terms?: number;
+  billingAddress?: string;
+  lanes?: ContractLane[];
+}
+
+/** Freight a direct shipper has on a schedule: the same lane at the same rate on set days. */
+export interface ContractLane {
+  id: string;
+  origin: string;
+  originState: string;
+  destination: string;
+  destState: string;
+  miles: number;
+  rate: number;
+  equipmentType: EquipmentType;
+  /** Pickup weekdays, 0 = Sunday. */
+  days: number[];
+  /** Pickup time at the shipper, local. */
+  pickupTime: string;
+  active: boolean;
+  /** The last pickup date a load was made for, so each one is made once. */
+  madeThrough?: string;
 }
 
 export interface Lane {
@@ -151,6 +176,22 @@ export interface Driver {
   care?: { at: string; mood: "good" | "ok" | "bad"; note?: string; homeBy?: string };
   /** How the driver wants the AI dispatcher to reach them, set on a setup call or in Profile. */
   prefs?: DriverPrefs;
+  /** The dates their CDL and DOT medical card run out. */
+  cdlExpires?: string;
+  medCardExpires?: string;
+  /** How they're paid for tax: contractors (1099) get a 1099-NEC each January; employees (W-2) are payroll's. */
+  taxForm?: "1099" | "w2";
+  /** Taken out of each pay run (insurance, ELD, truck lease) unless "once", which comes out of the next one only. */
+  deductions?: Deduction[];
+  /** Held back each pay run up to a cap and paid back when they leave: per run, the cap, and what's held so far. */
+  escrow?: { perRun: number; cap: number; held: number };
+}
+
+export interface Deduction {
+  id: string;
+  label: string;
+  amount: number;
+  every: "run" | "once";
 }
 
 /** Languages the AI dispatcher speaks with drivers and owners. Brokers are always worked in English. */
@@ -225,6 +266,21 @@ export interface Truck {
   lastServiceMiles: number;
   serviceIntervalMiles: number;
   nextInspectionDue: string;
+  /** Real accounts with an ELD: when the odometer was last read from it. */
+  odometerAt?: string;
+  /** Engine fault codes the ELD reported (Samsara, Motive), newest first; cleared ones drop off. */
+  faults?: TruckFault[];
+  /** Plates and registration (IRP cab card): the date it runs out. */
+  registrationExpires?: string;
+}
+
+export interface TruckFault {
+  code: string;
+  description: string;
+  /** critical: stop and get it looked at (engine derate, oil pressure, coolant); warn: book it in soon. */
+  severity: "info" | "warn" | "critical";
+  at: string;
+  source: "samsara" | "motive" | "manual";
 }
 
 export interface RoadsideShop {
@@ -968,4 +1024,74 @@ export interface DetentionClaim {
   amount: number;
   draftedAt: string;
   sentAt?: string;
+}
+
+
+// ─── Back office: fuel and tolls, driver pay ─────────────────────────────────
+
+/** A fuel card transaction (WEX, Comdata, EFS...), from an imported statement, matched to the load it fueled. */
+export interface FuelTx {
+  id: string;
+  carrierId: string;
+  /** Day of the purchase, yyyy-mm-dd. */
+  date: string;
+  truckId: string | null;
+  /** The unit or card as the statement shows it. */
+  unit: string;
+  merchant: string;
+  city: string;
+  state: string;
+  gallons: number;
+  amount: number;
+  product: "diesel" | "def" | "reefer" | "other";
+  loadId: string | null;
+  importedAt: string;
+}
+
+/** A toll (transponder or plate), matched to the load that ran that road. */
+export interface TollTx {
+  id: string;
+  carrierId: string;
+  date: string;
+  truckId: string | null;
+  unit: string;
+  agency: string;
+  plaza: string;
+  state: string;
+  amount: number;
+  loadId: string | null;
+  importedAt: string;
+}
+
+/** A driver's pay for one week: the loads, what's added and taken out, and whether it's been paid. */
+export interface PayRun {
+  id: string;
+  carrierId: string;
+  driverId: string;
+  /** Monday of the week, yyyy-mm-dd, and the Sunday it ends. */
+  period: string;
+  periodEnd: string;
+  lines: { loadId: string; ref: string; lane: string; pay: number }[];
+  /** Reimbursed (lumpers, scales) and extra pay (detention, layover). */
+  extras: { label: string; amount: number }[];
+  gross: number;
+  deductions: { label: string; amount: number }[];
+  advances: { id: string; amount: number }[];
+  escrow: number;
+  net: number;
+  status: "draft" | "paid";
+  paidAt?: string;
+  createdAt: string;
+}
+
+/** Money paid to a driver ahead of their pay run, taken back out of the next one. */
+export interface Advance {
+  id: string;
+  carrierId: string;
+  driverId: string;
+  amount: number;
+  note: string;
+  at: string;
+  /** The pay run it came out of. */
+  repaidIn?: string;
 }

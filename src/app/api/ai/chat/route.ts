@@ -37,6 +37,8 @@ export async function POST(request: Request) {
     const turns = history.map((m) => ({ from: m.from === "user" ? ("them" as const) : ("ai" as const), text: m.text }));
     const driver = who.me.role === "driver" ? ctx.drivers.find((d) => d.id === who.me.driverId) : undefined;
     if (who.me.role === "driver" && !driver) return json({ error: "not_found" }, 404);
+    // The AI acts on what it's told (books, counters, texts drivers): that's the owner's and dispatchers' to ask.
+    if (who.me.role === "bookkeeper") return json({ error: "owner_only" }, 403);
     const result = await forCarrier(ctx.carrier.id, () => (driver ? driverTurn(ctx, driver, "chat", question, turns) : ownerTurn(ctx, "chat", question, turns)));
     if (result.effects.failed || !result.reply) return json({ error: "ai_error" }, 502);
     return json({ reply: result.reply, who: access.who, did: result.effects.done });

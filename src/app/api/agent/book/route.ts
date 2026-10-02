@@ -14,7 +14,7 @@ const Body = z.object({ loadId: z.string().min(1), ask: z.number().positive().ma
 export async function POST(request: Request) {
   if (!dbConfigured()) return Response.json({ error: "not_set_up" }, { status: 503 });
   const who = await caller(request);
-  if (!who || who.me.role === "driver") return Response.json({ error: "sign_in" }, { status: 401 });
+  if (!who || who.me.role === "driver" || who.me.role === "bookkeeper") return Response.json({ error: "sign_in" }, { status: 401 });
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "bad_request" }, { status: 400 });
   const ctx = await loadContext(who.me.carrierId);

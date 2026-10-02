@@ -2,8 +2,9 @@ import { z } from "zod";
 import { dbConfigured, loadContext } from "@/lib/agent/db";
 import { applyEld, EldError, readEld } from "@/lib/agent/eld";
 import { FeedError, readFeed } from "@/lib/agent/feeds";
-import { integrationsFor, removeIntegration, saveIntegration, type CustomBoardConfig, type FeedConfig, type IntegrationKind, type TruckstopConfig } from "@/lib/agent/integrations";
+import { integrationsFor, removeIntegration, saveIntegration, type CustomBoardConfig, type FeedConfig, type IntegrationKind, type StatementConfig, type TruckstopConfig } from "@/lib/agent/integrations";
 import { boardFor } from "@/lib/agent/boards";
+import { importStatementText, readStatement, StatementError } from "@/lib/agent/costs";
 import { datConfigured } from "@/lib/agent/boards/dat";
 import { truckstopConfigured } from "@/lib/agent/boards/truckstop";
 import { BoardError } from "@/lib/agent/boards/types";
@@ -25,6 +26,13 @@ const Body = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("board"), config: Custom }),
   z.object({ kind: z.enum(["samsara", "motive"]), apiKey: z.string().trim().min(8).max(500) }),
   z.object({
+    kind: z.enum(["fuel_feed", "toll_feed"]),
+    url: z.string().url().max(2000).refine((u) => u.startsWith("https://") || process.env.NODE_ENV !== "production", "https only"),
+    headerName: z.string().trim().max(100).optional(),
+    headerValue: z.string().trim().max(2000).optional(),
+    name: z.string().trim().max(60).optional(),
+  }),
+  z.object({
     kind: z.literal("load_feed"),
     url: z.string().url().max(2000).refine((u) => u.startsWith("https://") || process.env.NODE_ENV !== "production", "https only"),
     format: z.enum(["json", "csv"]),
@@ -38,7 +46,7 @@ const Body = z.discriminatedUnion("kind", [
 export async function GET(request: Request) {
   if (!dbConfigured()) return Response.json({ error: "not_set_up" }, { status: 503 });
   const who = await caller(request);
-  if (!who || who.me.role === "driver") return Response.json({ error: "sign_in" }, { status: 401 });
+  if (!who || who.me.role === "driver" || who.me.role === "bookkeeper") return Response.json({ error: "sign_in" }, { status: 401 });
   const rows = await integrationsFor(who.me.carrierId);
   return Response.json({
     // Whether Backroute's own side of each board is in place (its partner agreement and login).
@@ -47,7 +55,7 @@ export async function GET(request: Request) {
       kind: r.kind,
       status: r.status,
       checkedAt: r.checked_at,
-      ...(r.kind === "load_feed" ? { name: (r.config as FeedConfig).name ?? null, host: new URL((r.config as FeedConfig).url).host } : {}),
+      ...(r.kind === "load_feed" || r.kind === "fuel_feed" || r.kind === "toll_feed" ? { name: (r.config as FeedConfig).name ?? null, host: new URL((r.config as FeedConfig).url).host } : {}),
       ...(r.kind.startsWith("board:") ? { name: (r.config as CustomBoardConfig).name } : {}),
       ...(r.kind === "truckstop" || r.kind === "dat" ? { postTrucks: !!(r.config as TruckstopConfig).postTrucks } : {}),
     })),
@@ -58,7 +66,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!dbConfigured()) return Response.json({ error: "not_set_up" }, { status: 503 });
   const who = await caller(request);
-  if (!who || who.me.role === "driver") return Response.json({ error: "sign_in" }, { status: 401 });
+  if (!who || who.me.role === "driver" || who.me.role === "bookkeeper") return Response.json({ error: "sign_in" }, { status: 401 });
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "bad_request", reason: "Check the address and the key." }, { status: 400 });
   const b = parsed.data;
@@ -82,6 +90,16 @@ export async function POST(request: Request) {
       await saveIntegration(who.me.carrierId, kind, config, status);
       return Response.json({ ok: true, status });
     }
+    if (b.kind === "fuel_feed" || b.kind === "toll_feed") {
+      // Read once now, so a wrong address or key shows here; the lines found are imported right away.
+      const cfg: StatementConfig = { url: b.url, headerName: b.headerName || undefined, headerValue: b.headerValue || undefined, name: b.name || (b.kind === "fuel_feed" ? "Fuel card" : "Tolls") };
+      const text = await readStatement(cfg);
+      const ctx = await loadContext(who.me.carrierId);
+      const r = ctx ? await importStatementText(ctx, b.kind === "fuel_feed" ? "fuel" : "toll", text) : { read: 0, matched: 0 };
+      const status = `Connected · ${r.read} line${r.read === 1 ? "" : "s"} read, ${r.matched} on a load`;
+      await saveIntegration(who.me.carrierId, b.kind, cfg, status);
+      return Response.json({ ok: true, status });
+    }
     if (b.kind === "load_feed") {
       const cfg: FeedConfig = { url: b.url, format: b.format, headerName: b.headerName || undefined, headerValue: b.headerValue || undefined, name: b.name || "Load feed" };
       const rows = await readFeed(cfg);
@@ -89,6 +107,7 @@ export async function POST(request: Request) {
       await saveIntegration(who.me.carrierId, "load_feed", cfg, status);
       return Response.json({ ok: true, status });
     }
+    if (b.kind !== "samsara" && b.kind !== "motive") return Response.json({ error: "bad_request" }, { status: 400 });
     const data = await readEld(b.kind, b.apiKey);
     const ctx = await loadContext(who.me.carrierId);
     const applied = ctx ? await applyEld(ctx, b.kind, data) : { trucks: 0, drivers: 0, unmatched: [] };
@@ -96,15 +115,15 @@ export async function POST(request: Request) {
     await saveIntegration(who.me.carrierId, b.kind, { apiKey: b.apiKey }, status);
     return Response.json({ ok: true, status });
   } catch (e) {
-    const reason = e instanceof EldError || e instanceof FeedError || e instanceof BoardError ? e.message : "Couldn't connect.";
+    const reason = e instanceof EldError || e instanceof FeedError || e instanceof BoardError || e instanceof StatementError ? e.message : "Couldn't connect.";
     return Response.json({ ok: false, reason }, { status: 422 });
   }
 }
 
 export async function DELETE(request: Request) {
   const who = await caller(request);
-  if (!who || who.me.role === "driver") return Response.json({ error: "sign_in" }, { status: 401 });
-  const kind = z.union([z.enum(["samsara", "motive", "load_feed", "truckstop", "dat"]), z.string().regex(/^board:[a-z0-9_-]{1,40}$/)]).safeParse(new URL(request.url).searchParams.get("kind"));
+  if (!who || who.me.role === "driver" || who.me.role === "bookkeeper") return Response.json({ error: "sign_in" }, { status: 401 });
+  const kind = z.union([z.enum(["samsara", "motive", "load_feed", "fuel_feed", "toll_feed", "truckstop", "dat"]), z.string().regex(/^board:[a-z0-9_-]{1,40}$/)]).safeParse(new URL(request.url).searchParams.get("kind"));
   if (!kind.success) return Response.json({ error: "bad_request" }, { status: 400 });
   await removeIntegration(who.me.carrierId, kind.data as IntegrationKind);
   return Response.json({ ok: true });

@@ -15,7 +15,7 @@ interface Connection {
   postTrucks?: boolean;
 }
 
-const LABEL: Record<string, string> = { samsara: "Samsara ELD", motive: "Motive ELD", load_feed: "Load feed", truckstop: "Truckstop", dat: "DAT" };
+const LABEL: Record<string, string> = { samsara: "Samsara ELD", motive: "Motive ELD", load_feed: "Load feed", fuel_feed: "Fuel card statement", toll_feed: "Toll statement", truckstop: "Truckstop", dat: "DAT" };
 const label = (kind: string) => LABEL[kind] ?? "Load board";
 
 const CUSTOM_EXAMPLE = `{
@@ -43,6 +43,7 @@ export function ConnectionsCard() {
   const [eld, setEld] = useState<"samsara" | "motive">("samsara");
   const [apiKey, setApiKey] = useState("");
   const [feed, setFeed] = useState({ url: "", format: "json" as "json" | "csv", headerName: "", headerValue: "", name: "" });
+  const [stmt, setStmt] = useState({ kind: "fuel_feed" as "fuel_feed" | "toll_feed", url: "", headerName: "", headerValue: "", name: "" });
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -199,6 +200,29 @@ export function ConnectionsCard() {
             </Button>
           </div>
           <p className="text-[11px] text-ink-500">Any list of loads a broker, shipper or load board can publish. The fields are in DEPLOY.md. DAT and Truckstop need their own API agreement first.</p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-medium text-ink-700">Fuel card and toll statements</p>
+          <div className="grid gap-2 sm:grid-cols-[9rem_1fr]">
+            <select aria-label="Statement kind" className={input} value={stmt.kind} onChange={(e) => setStmt({ ...stmt, kind: e.target.value as "fuel_feed" | "toll_feed" })}>
+              <option value="fuel_feed">Fuel card</option>
+              <option value="toll_feed">Tolls</option>
+            </select>
+            <input aria-label="Statement address" className={input} placeholder="https://… (the CSV report's link)" value={stmt.url} onChange={(e) => setStmt({ ...stmt, url: e.target.value })} />
+            <input aria-label="Statement name" className={input} placeholder="WEX, Comdata, BestPass…" value={stmt.name} onChange={(e) => setStmt({ ...stmt, name: e.target.value })} />
+            <div className="grid grid-cols-2 gap-2">
+              <input aria-label="Statement header name" className={input} placeholder="Header (optional)" value={stmt.headerName} onChange={(e) => setStmt({ ...stmt, headerName: e.target.value })} />
+              <input aria-label="Statement header value" className={input} type="password" placeholder="Value" value={stmt.headerValue} onChange={(e) => setStmt({ ...stmt, headerValue: e.target.value })} />
+            </div>
+          </div>
+          <div>
+            <Button size="sm" disabled={!!busy || !stmt.url.trim()} onClick={() => void connect(stmt, "statement")}>
+              {busy === "statement" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plug className="h-3.5 w-3.5" />} Connect statement
+            </Button>
+          </div>
+          <p className="text-[11px] text-ink-500">
+            Most cards can publish a daily transactions report as CSV at a link (ask the card&apos;s account manager for a scheduled report). The AI reads it each morning and puts every line on its load. Or bring in a file on Money → Fuel &amp; tolls.
+          </p>
         </div>
         {msg && <p className={`text-xs ${msg.ok ? "text-[var(--accent-live)]" : "text-[var(--accent-danger)]"}`}>{msg.text}</p>}
       </CardContent>

@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: true });
   }
 
-  if (who.me.role === "driver") return Response.json({ error: "owner_only" }, { status: 403 });
+  if (who.me.role === "driver" || who.me.role === "bookkeeper") return Response.json({ error: "owner_only" }, { status: 403 });
   const ids = new Set(b.driverIds ?? []);
   const last10s = (b.phones ?? []).map((p) => p.replace(/\D/g, "").slice(-10)).filter((p) => p.length === 10);
   // Drivers typed in a moment ago reach the database a moment later: wait for them briefly.

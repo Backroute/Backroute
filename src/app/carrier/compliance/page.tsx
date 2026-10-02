@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatTile } from "@/components/ui/stat-tile";
 import { AddonGate } from "@/components/shared/addon-gate";
+import { PaperworkCard } from "@/components/owner/paperwork-card";
 import { useCarrierLoads, useCarrierTrucks, useDriverMap } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { PRIMARY_CARRIER_ID } from "@/lib/mock-data";
@@ -49,6 +50,8 @@ export default function CompliancePage() {
       <PageHeader title="Compliance" description="IFTA filing and insurance, kept current automatically" />
 
       <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
+        <PaperworkCard />
+
         <Card>
           <CardHeader>
             <div>

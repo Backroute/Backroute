@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { supabase } from "./client";
 
-export type Role = "owner" | "dispatcher" | "driver";
+export type Role = "owner" | "dispatcher" | "driver" | "bookkeeper";
 
 /** One carrier this person belongs to, and as whom. */
 export interface Membership {
@@ -69,7 +69,8 @@ export function pickMembership(list: Membership[]): Membership | undefined {
 export const useMemberships = create<{ list: Membership[] }>(() => ({ list: [] }));
 
 /** Where someone lands after signing in: drivers and owner-operators get the app, the office gets the dashboard. */
-export function homeFor(m: Membership): "/driver" | "/carrier" {
+export function homeFor(m: Membership): "/driver" | "/carrier" | "/carrier/earnings" {
+  if (m.role === "bookkeeper") return "/carrier/earnings";
   return m.role === "driver" || (m.ownerOperator && m.driverId) ? "/driver" : "/carrier";
 }
 

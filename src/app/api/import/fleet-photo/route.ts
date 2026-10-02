@@ -14,7 +14,7 @@ const TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 export async function POST(request: Request) {
   if (!dbConfigured()) return Response.json({ error: "not_set_up" }, { status: 503 });
   const who = await caller(request);
-  if (!who || who.me.role === "driver") return Response.json({ error: "sign_in" }, { status: 401 });
+  if (!who || who.me.role === "driver" || who.me.role === "bookkeeper") return Response.json({ error: "sign_in" }, { status: 401 });
   if (!aiConfigured()) return Response.json({ error: "ai_off" }, { status: 503 });
   const form = await request.formData().catch(() => null);
   const file = form?.get("photo");

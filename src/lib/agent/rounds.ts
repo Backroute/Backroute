@@ -10,6 +10,8 @@ import { offerCapacity } from "./capacity";
 import { trackHomeTime, weeklyCare } from "./care";
 import { runCheckins } from "./checkins";
 import { complianceReminders } from "./compliance";
+import { pullStatements } from "./costs";
+import { makeContractLoads } from "./contracts";
 import { marksFor, type CarrierContext } from "./db";
 import { forCarrier } from "./scope";
 import { applyEld, checkCalls, lateNotices, readEld } from "./eld";
@@ -77,6 +79,8 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   done.push(...(await offerCapacity(ctx, now)));
   done.push(...(await suggestRepositions(ctx, now)));
   done.push(...(await complianceReminders(ctx, now)));
+  done.push(...(await pullStatements(ctx, links, now)));
+  done.push(...(await makeContractLoads(ctx, now)));
   done.push(...(await trackHomeTime(ctx, now)));
   if (canText(ctx.carrier)) done.push(...(await trackingRounds(ctx, now)));
   if (canCall(ctx.carrier)) done.push(...(await appointmentRounds(ctx, now)));

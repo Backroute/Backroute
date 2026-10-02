@@ -63,6 +63,10 @@ import {
 } from "./dispatch-calls";
 import { clamp, formatDuration } from "./utils";
 import type {
+  Advance,
+  FuelTx,
+  PayRun,
+  TollTx,
   RateConPdfReading,
   ActivityEvent,
   Broker,
@@ -658,6 +662,8 @@ export type Aggressiveness = "conservative" | "balanced" | "aggressive";
 export type Autonomy = "ask" | "rules" | "full";
 
 export interface AgentSettings {
+  /** The date the carrier's insurance certificate (COI) runs out, if no certificate with a date is on file. */
+  insuranceExpires?: string;
   /** Real accounts: the lowest rate per loaded mile the AI will ask for or accept from a broker. */
   minRpm?: number;
   /** Real accounts: where brokers send payment questions, and the address that goes on invoices. */
@@ -817,7 +823,8 @@ const ESCALATION_TEMPLATES: EscalationTemplate[] = [
  * `driverId` is the driver this person is (drivers and owner-operators).
  */
 export interface CloudSession {
-  mode: "demo" | "office" | "driver";
+  /** "books": a bookkeeper's session (sees the money and the fleet, keeps the books, doesn't dispatch). */
+  mode: "demo" | "office" | "driver" | "books";
   carrierId?: string;
   driverId?: string | null;
   /** A carrier with nothing saved yet: starts from the fleet read at sign-up, and the AI sources its first offers. */
@@ -839,6 +846,11 @@ interface StoreState {
   dvirInspections: DvirInspection[];
   timeOffRequests: TimeOffRequest[];
   expenses: Expense[];
+  /** The back office: fuel card and toll statements, driver pay runs and advances (lib/back-office). */
+  fuelTx: FuelTx[];
+  tollTx: TollTx[];
+  payRuns: PayRun[];
+  advances: Advance[];
   /** The AI's phone calls to drivers: ringing, live, held for quiet hours, or done. */
   dispatchCalls: DispatchCall[];
   settings: AgentSettings;
@@ -2266,6 +2278,10 @@ export const useStore = create<StoreState>((set, get) => ({
         dvirInspections: [],
         timeOffRequests: [],
         expenses: [],
+        fuelTx: [],
+        tollTx: [],
+        payRuns: [],
+        advances: [],
       }));
       return made.map((m) => m.driver);
     },

@@ -2,7 +2,8 @@ import "server-only";
 import type { Item } from "../cloud/rows";
 import { roadMiles, roughCoords } from "../trip-geo";
 import { formatAtStop } from "../stop-time";
-import type { Driver, HosStatus, Load, Truck } from "../types";
+import type { Driver, HosStatus, Load, Truck, TruckFault } from "../types";
+import { faultAdvice, faultSeverity } from "../maintenance";
 import { canCall } from "../channels/out";
 import { needAppointment } from "./appointments";
 import { pushToOffice } from "../push";
@@ -20,6 +21,10 @@ import { addWhy } from "./why";
  *
  * Samsara: GET /fleet/vehicles/stats?types=gps and GET /fleet/hos/clocks, with a Bearer token.
  * Motive:  GET /v1/vehicle_locations and GET /v1/available_time, with an X-Api-Key header.
+ *
+ * Also the truck's own health, so maintenance runs on real miles: the odometer (Samsara obdOdometerMeters, Motive's
+ * odometer on the vehicle) and engine fault codes (Samsara faultCodes, Motive /v1/fault_codes). Those two are read
+ * when the account allows it and skipped quietly when it doesn't.
  */
 
 export type EldKind = "samsara" | "motive";
@@ -30,6 +35,14 @@ export interface EldVehicle {
   lon: number;
   at: string;
   description?: string;
+  odometerMiles?: number;
+}
+export interface EldFault {
+  unit: string;
+  code: string;
+  description: string;
+  lamp?: "red" | "amber" | "protect" | "mil" | null;
+  at: string;
 }
 export interface EldClock {
   driverName: string;
@@ -56,18 +69,28 @@ const samsaraStatus: Record<string, HosStatus> = { driving: "driving", onDuty: "
 const motiveStatus: Record<string, HosStatus> = { driving: "driving", on_duty: "on_duty", yard_move: "on_duty", off_duty: "off_duty", personal_conveyance: "off_duty", sleeper: "sleeper", sleeper_berth: "sleeper" };
 
 /** Reads every vehicle's position and every driver's clocks. Throws EldError when the key or the service fails. */
-export async function readEld(kind: EldKind, apiKey: string): Promise<{ vehicles: EldVehicle[]; clocks: EldClock[] }> {
+export async function readEld(kind: EldKind, apiKey: string): Promise<{ vehicles: EldVehicle[]; clocks: EldClock[]; faults: EldFault[] }> {
   const vehicles: EldVehicle[] = [];
   const clocks: EldClock[] = [];
+  const faults: EldFault[] = [];
   if (kind === "samsara") {
     const auth = { authorization: `Bearer ${apiKey}` };
     let after = "";
     for (let page = 0; page < 20; page++) {
-      const body = (await getJson(`${SAMSARA()}/fleet/vehicles/stats?types=gps${after ? `&after=${encodeURIComponent(after)}` : ""}`, auth)) as {
-        data?: { name?: string; gps?: { time?: string; latitude?: number; longitude?: number; reverseGeo?: { formattedLocation?: string } } }[];
+      const body = (await getJson(`${SAMSARA()}/fleet/vehicles/stats?types=gps,obdOdometerMeters${after ? `&after=${encodeURIComponent(after)}` : ""}`, auth)) as {
+        data?: { name?: string; gps?: { time?: string; latitude?: number; longitude?: number; reverseGeo?: { formattedLocation?: string } }; obdOdometerMeters?: { value?: number } }[];
         pagination?: { endCursor?: string; hasNextPage?: boolean };
       };
-      for (const v of body.data ?? []) if (v.name && v.gps?.latitude != null && v.gps.longitude != null) vehicles.push({ unit: v.name, lat: v.gps.latitude, lon: v.gps.longitude, at: v.gps.time ?? new Date().toISOString(), description: v.gps.reverseGeo?.formattedLocation });
+      for (const v of body.data ?? [])
+        if (v.name && v.gps?.latitude != null && v.gps.longitude != null)
+          vehicles.push({
+            unit: v.name,
+            lat: v.gps.latitude,
+            lon: v.gps.longitude,
+            at: v.gps.time ?? new Date().toISOString(),
+            description: v.gps.reverseGeo?.formattedLocation,
+            ...(v.obdOdometerMeters?.value ? { odometerMiles: Math.round(v.obdOdometerMeters.value / 1609.344) } : {}),
+          });
       if (!body.pagination?.hasNextPage || !body.pagination.endCursor) break;
       after = body.pagination.endCursor;
     }
@@ -89,16 +112,18 @@ export async function readEld(kind: EldKind, apiKey: string): Promise<{ vehicles
       if (!body.pagination?.hasNextPage || !body.pagination.endCursor) break;
       after = body.pagination.endCursor;
     }
+    faults.push(...(await samsaraFaults(auth).catch(() => [])));
   } else {
     const auth = { "x-api-key": apiKey };
     for (let page = 1; page <= 20; page++) {
       const body = (await getJson(`${MOTIVE()}/v1/vehicle_locations?per_page=100&page_no=${page}`, auth)) as {
-        vehicles?: { vehicle?: { number?: string; current_location?: { lat?: number; lon?: number; located_at?: string; description?: string } } }[];
+        vehicles?: { vehicle?: { number?: string; current_location?: { lat?: number; lon?: number; located_at?: string; description?: string; odometer?: number } } }[];
         pagination?: { per_page?: number; page_no?: number; total?: number };
       };
       for (const { vehicle: v } of body.vehicles ?? []) {
         const loc = v?.current_location;
-        if (v?.number && loc?.lat != null && loc.lon != null) vehicles.push({ unit: v.number, lat: loc.lat, lon: loc.lon, at: loc.located_at ?? new Date().toISOString(), description: loc.description });
+        if (v?.number && loc?.lat != null && loc.lon != null)
+          vehicles.push({ unit: v.number, lat: loc.lat, lon: loc.lon, at: loc.located_at ?? new Date().toISOString(), description: loc.description, ...(loc.odometer ? { odometerMiles: Math.round(loc.odometer) } : {}) });
       }
       const p = body.pagination;
       if (!p || (p.page_no ?? page) * (p.per_page ?? 100) >= (p.total ?? 0)) break;
@@ -120,8 +145,42 @@ export async function readEld(kind: EldKind, apiKey: string): Promise<{ vehicles
       const p = body.pagination;
       if (!p || (p.page_no ?? page) * (p.per_page ?? 100) >= (p.total ?? 0)) break;
     }
+    faults.push(...(await motiveFaults(auth).catch(() => [])));
   }
-  return { vehicles, clocks };
+  return { vehicles, clocks, faults };
+}
+
+/** Active engine codes per truck (J1939 SPN/FMI), with the lamp they lit. */
+async function samsaraFaults(auth: Record<string, string>): Promise<EldFault[]> {
+  const body = (await getJson(`${SAMSARA()}/fleet/vehicles/stats?types=faultCodes`, auth)) as {
+    data?: {
+      name?: string;
+      faultCodes?: {
+        time?: string;
+        j1939?: { diagnosticTroubleCodes?: { spnId?: number; fmiId?: number; spnDescription?: string; fmiDescription?: string }[]; checkEngineLights?: { stopIsOn?: boolean; warningIsOn?: boolean; protectIsOn?: boolean; emissionsIsOn?: boolean } };
+      };
+    }[];
+  };
+  const out: EldFault[] = [];
+  for (const v of body.data ?? []) {
+    const j = v.faultCodes?.j1939;
+    if (!v.name || !j) continue;
+    const lamps = j.checkEngineLights;
+    const lamp = lamps?.stopIsOn ? "red" : lamps?.protectIsOn ? "protect" : lamps?.warningIsOn ? "amber" : lamps?.emissionsIsOn ? "mil" : null;
+    for (const d of j.diagnosticTroubleCodes ?? [])
+      out.push({ unit: v.name, code: `SPN ${d.spnId ?? "?"} FMI ${d.fmiId ?? "?"}`, description: [d.spnDescription, d.fmiDescription].filter(Boolean).join(": ") || "Engine fault", lamp, at: v.faultCodes?.time ?? new Date().toISOString() });
+  }
+  return out;
+}
+
+async function motiveFaults(auth: Record<string, string>): Promise<EldFault[]> {
+  const body = (await getJson(`${MOTIVE()}/v1/fault_codes?per_page=100&status=open`, auth)) as {
+    fault_codes?: { fault_code?: { code?: string; code_label?: string; code_description?: string; status?: string; last_observed_at?: string; lamp?: string; vehicle?: { number?: string } } }[];
+  };
+  return (body.fault_codes ?? [])
+    .map((x) => x.fault_code)
+    .filter((f): f is NonNullable<typeof f> => !!f?.vehicle?.number && !!f.code && f.status !== "closed")
+    .map((f) => ({ unit: f.vehicle!.number!, code: f.code!, description: f.code_description || f.code_label || "Engine fault", lamp: /red|stop/i.test(f.lamp ?? "") ? "red" : /amber|warn/i.test(f.lamp ?? "") ? "amber" : null, at: f.last_observed_at ?? new Date().toISOString() }));
 }
 
 const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -139,7 +198,7 @@ export function cityState(description?: string): { city: string; state: string }
 }
 
 /** Puts what the ELD said on the trucks and drivers it matches. Returns the units and drivers it couldn't match. */
-export async function applyEld(ctx: CarrierContext, kind: EldKind, data: { vehicles: EldVehicle[]; clocks: EldClock[] }): Promise<{ trucks: number; drivers: number; unmatched: string[] }> {
+export async function applyEld(ctx: CarrierContext, kind: EldKind, data: { vehicles: EldVehicle[]; clocks: EldClock[]; faults?: EldFault[] }): Promise<{ trucks: number; drivers: number; unmatched: string[] }> {
   let trucks = 0;
   let drivers = 0;
   const unmatched: string[] = [];
@@ -150,7 +209,14 @@ export async function applyEld(ctx: CarrierContext, kind: EldKind, data: { vehic
       continue;
     }
     const place = cityState(v.description);
-    const next: Truck = { ...truck, position: { lat: v.lat, lon: v.lon, at: v.at, description: v.description, source: kind }, ...(place ? { currentCity: place.city, currentState: place.state } : {}) };
+    const next: Truck = {
+      ...truck,
+      position: { lat: v.lat, lon: v.lon, at: v.at, description: v.description, source: kind },
+      ...(place ? { currentCity: place.city, currentState: place.state } : {}),
+      // The odometer only goes up: a reading lower than what's known (a swapped ECU) is left alone.
+      ...(v.odometerMiles && v.odometerMiles >= (truck.odometer ?? 0) ? { odometer: v.odometerMiles, odometerAt: v.at } : {}),
+      ...(data.faults ? { faults: await faultsFor(ctx, truck, kind, data.faults.filter((f) => sameUnit(truck.unitNumber, f.unit))) } : {}),
+    };
     await save("trucks", ctx.carrier.id, next as unknown as Item);
     ctx.trucks = ctx.trucks.map((t) => (t.id === truck.id ? next : t));
     trucks++;
@@ -169,6 +235,23 @@ export async function applyEld(ctx: CarrierContext, kind: EldKind, data: { vehic
     drivers++;
   }
   return { trucks, drivers, unmatched };
+}
+
+/** The truck's open codes now: kept as first seen, new ones added; a new one that means stop reaches the owner at once. */
+async function faultsFor(ctx: CarrierContext, truck: Truck, kind: EldKind, reported: EldFault[]): Promise<TruckFault[]> {
+  const before = new Map((truck.faults ?? []).filter((f) => f.source === "manual").map((f) => [f.code, f]));
+  const out: TruckFault[] = [...before.values()];
+  for (const r of reported) {
+    if (out.some((f) => f.code === r.code)) continue;
+    const old = truck.faults?.find((f) => f.code === r.code);
+    const severity = faultSeverity(r);
+    out.push({ code: r.code, description: r.description, severity, at: old?.at ?? r.at, source: kind });
+    if (!old && severity === "critical" && (await claimMark(ctx.carrier.id, "faults", `${truck.id}:${r.code}`))) {
+      await addActivity(ctx.carrier.id, event({ type: "maintenance", message: `${truck.unitNumber}: ${r.description}`, detail: `${r.code} · ${faultAdvice("critical")}`, severity: "danger" }));
+      await pushToOffice(ctx.carrier.id, { title: `${truck.unitNumber} engine fault`, body: `${r.description}. ${faultAdvice("critical")}`, url: "/carrier/maintenance", tag: `fault-${truck.id}-${r.code}` }).catch(() => 0);
+    }
+  }
+  return out;
 }
 
 const HOUR = 3600_000;

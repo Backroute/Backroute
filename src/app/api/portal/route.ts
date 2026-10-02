@@ -21,7 +21,7 @@ const Body = z.discriminatedUnion("op", [
 export async function GET(request: Request) {
   if (!dbConfigured()) return Response.json({ error: "not_set_up" }, { status: 503 });
   const who = await caller(request);
-  if (!who || who.me.role === "driver") return Response.json({ error: "sign_in" }, { status: 401 });
+  if (!who || who.me.role === "driver" || who.me.role === "bookkeeper") return Response.json({ error: "sign_in" }, { status: 401 });
   const ctx = await loadContext(who.me.carrierId);
   if (!ctx) return Response.json({ error: "not_found" }, { status: 404 });
   // One job, for its card on Needs you.
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!dbConfigured()) return Response.json({ error: "not_set_up" }, { status: 503 });
   const who = await caller(request);
-  if (!who || who.me.role === "driver") return Response.json({ error: "sign_in" }, { status: 401 });
+  if (!who || who.me.role === "driver" || who.me.role === "bookkeeper") return Response.json({ error: "sign_in" }, { status: 401 });
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "bad_request" }, { status: 400 });
   const b = parsed.data;

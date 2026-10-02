@@ -9,7 +9,7 @@ import { caller } from "@/lib/agent/user";
 async function office(request: Request) {
   if (!dbConfigured()) return { error: Response.json({ error: "not_set_up" }, { status: 503 }) };
   const who = await caller(request);
-  if (!who || who.me.role === "driver") return { error: Response.json({ error: "sign_in" }, { status: 401 }) };
+  if (!who || who.me.role === "driver" || who.me.role === "bookkeeper") return { error: Response.json({ error: "sign_in" }, { status: 401 }) };
   return { carrierId: who.me.carrierId };
 }
 
