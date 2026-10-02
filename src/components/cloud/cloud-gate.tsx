@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/shared/logo";
 import { cloudEnabled, supabase } from "@/lib/cloud/client";
 import { claimInvites, homeFor, myMemberships, pickMembership, useMemberships } from "@/lib/cloud/account";
-import { connect, NotSetUpError, signOut, useSyncStatus } from "@/lib/cloud/sync";
+import { cachedView, connect, NotSetUpError, showCached, signOut, useSyncStatus } from "@/lib/cloud/sync";
 import { demoAllowed, inDemo } from "@/lib/cloud/demo";
 import { NotAvailable } from "./not-available";
 import { DemoBanner } from "./demo-banner";
@@ -43,10 +43,19 @@ function LiveGate({ area, children }: { area: Area; children: React.ReactNode })
 
   useEffect(() => {
     let cancelled = false;
+    // Shown from what this phone kept last time, while the latest loads: the app is usable at once (and offline).
+    let showingKept = false;
     (async () => {
       if (inDemo()) return setState("demo");
       const { data } = await supabase().auth.getSession();
       if (!data.session) return router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+      const userId = data.session.user.id;
+      const kept = area !== "signup" ? cachedView(userId) : null;
+      if (kept && (area === "carrier" ? kept.mode === "office" : kept.mode === "driver" || !!kept.driverId)) {
+        showCached(kept);
+        showingKept = true;
+        if (!cancelled) setState("ready");
+      }
       await claimInvites();
       const memberships = await myMemberships();
       useMemberships.setState({ list: memberships });
@@ -58,11 +67,14 @@ function LiveGate({ area, children }: { area: Area; children: React.ReactNode })
       if (area === "signup" && useStore.getState().session.mode === "demo") return router.replace(homeFor(m));
       if (area === "carrier" && m.role === "driver") return router.replace("/driver");
       if (area === "driver" && m.role !== "driver" && !m.driverId) return router.replace("/carrier");
-      if (area !== "signup") await connect(m);
+      if (area !== "signup") await connect(m, { userId });
       if (!cancelled) setState("ready");
     })().catch((e) => {
       if (!(e instanceof NotSetUpError)) console.error("[cloud] couldn't load the fleet", e);
-      if (!cancelled) setState(e instanceof NotSetUpError ? "not_set_up" : "error");
+      if (cancelled) return;
+      // No signal: keep showing what this phone has, and say it's not up to date.
+      if (showingKept && !(e instanceof NotSetUpError)) return useSyncStatus.setState({ state: "offline" });
+      setState(e instanceof NotSetUpError ? "not_set_up" : "error");
     });
     const { data: sub } = supabase().auth.onAuthStateChange((event) => {
       // A full page load, so the next person on this device doesn't inherit what's in memory.
@@ -117,6 +129,14 @@ function LiveGate({ area, children }: { area: Area; children: React.ReactNode })
 /** Only shows when saving is failing, so nobody thinks a change was saved when it wasn't. */
 function OfflineNotice() {
   const state = useSyncStatus((s) => s.state);
+  if (state === "cached")
+    return (
+      <div role="status" className="fixed inset-x-0 bottom-20 z-50 flex justify-center px-4 sm:bottom-6">
+        <p className="flex items-center gap-2 rounded-full bg-ink-950 px-4 py-2 text-xs text-white shadow-lg">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Showing what was saved on this phone. Updating…
+        </p>
+      </div>
+    );
   if (state !== "offline") return null;
   return (
     <div role="status" className="fixed inset-x-0 bottom-20 z-50 flex justify-center px-4 sm:bottom-6">

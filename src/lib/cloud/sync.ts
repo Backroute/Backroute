@@ -90,13 +90,17 @@ export function stable(v: unknown): string {
 
 // ─── Status, for the small "not saved" notice ────────────────────────────────
 
-export type SyncState = "saved" | "saving" | "offline";
+/** "cached": showing what this phone saved last time, while the latest loads. */
+export type SyncState = "saved" | "saving" | "offline" | "cached";
 export const useSyncStatus = create<{ state: SyncState; savedAt: number | null }>(() => ({ state: "saved", savedAt: null }));
 
 // ─── Connection ──────────────────────────────────────────────────────────────
 
 interface Connection {
   carrierId: string;
+  /** Who's signed in, for the view kept on this device, and when it was last kept. */
+  userId?: string;
+  viewAt?: number;
   mode: "office" | "driver";
   /** What the database holds for each item, as far as this browser knows: the object last saved or loaded. */
   last: Map<string, { ref: unknown; json: string }>;
@@ -183,7 +187,7 @@ export class NotSetUpError extends Error {}
  * Loads the carrier into the app and starts saving. `fresh` is a carrier just created at sign-up: it starts from
  * the fleet in the app and the first save writes all of it.
  */
-export async function connect(m: Membership, opts: { fresh?: boolean } = {}) {
+export async function connect(m: Membership, opts: { fresh?: boolean; userId?: string } = {}) {
   if (conn?.carrierId === m.carrierId) return;
   disconnect();
   const mode = m.role === "driver" ? "driver" : "office";
@@ -257,6 +261,98 @@ export async function connect(m: Membership, opts: { fresh?: boolean } = {}) {
   };
   c.channel = listen(c, specs);
   if (fresh) schedule(c, 0);
+  c.userId = opts.userId;
+  saveView(c, true);
+  if (useSyncStatus.getState().state === "cached") useSyncStatus.setState({ state: "saved", savedAt: Date.now() });
+}
+
+// ─── Opening fast: the last view, kept on this device ────────────────────────
+
+const VIEW_KEY = "backroute.view";
+const VIEW_MAX_AGE = 3 * 86400_000;
+const VIEW_MAX_CHARS = 2_500_000;
+
+interface View {
+  userId: string;
+  carrierId: string;
+  mode: "office" | "driver";
+  driverId: string | null;
+  at: number;
+  carrier: { name: string; mc: string; dot: string };
+  settings: Partial<State["settings"]>;
+  slices: Partial<Record<Slice, Item[]>>;
+}
+
+/**
+ * What this person last saw, kept in the browser so the app opens at once next time (and still shows the trip with
+ * no signal), then catches up from the database. Kept for three days, for the signed-in person only, and forgotten
+ * on sign-out.
+ */
+function saveView(c: Connection, force = false) {
+  if (!c.userId || conn !== c || typeof window === "undefined") return;
+  // At most every 15 seconds, and whenever the app goes to the background (flush runs then).
+  if (!force && c.viewAt && Date.now() - c.viewAt < 15_000 && document.visibilityState !== "hidden") return;
+  c.viewAt = Date.now();
+  try {
+    const s = useStore.getState();
+    const specs = SPECS.filter((x) => c.mode === "office" || driverSees(x));
+    const cap: Partial<Record<Slice, number>> = { loads: 300, driverMessages: 100, activity: 50, carrierMessages: 100, escalations: 100 };
+    const slices: View["slices"] = {};
+    for (const spec of specs) {
+      let items = (s[spec.slice] as unknown as Item[]).filter((i) => !spec.mine || spec.mine(i));
+      if (spec.slice === "loads") items = items.filter((l) => !(l as { imported?: boolean }).imported);
+      const n = cap[spec.slice];
+      if (n) items = spec.newestFirst ? items.slice(0, n) : items.slice(-n);
+      slices[spec.slice] = items;
+    }
+    const carrier = s.carriers.find((x) => x.id === PRIMARY_CARRIER_ID);
+    const view: View = { userId: c.userId, carrierId: c.carrierId, mode: c.mode, driverId: s.session.driverId ?? null, at: Date.now(), carrier: { name: carrier?.name ?? "", mc: carrier?.mc ?? "", dot: carrier?.dot ?? "" }, settings: s.settings, slices };
+    const json = JSON.stringify(view);
+    if (json.length <= VIEW_MAX_CHARS) window.localStorage.setItem(VIEW_KEY, json);
+    else window.localStorage.removeItem(VIEW_KEY);
+  } catch {
+    // Storage full or blocked (private browsing): the app just opens the usual way.
+  }
+}
+
+/** The view kept for this person, if it's recent. */
+export function cachedView(userId: string): View | null {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(VIEW_KEY) ?? "null") as View | null;
+    return v && v.userId === userId && Date.now() - v.at < VIEW_MAX_AGE ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Shows a kept view right away, read-only in effect until connect() has the latest (it replaces it all). */
+export function showCached(v: View) {
+  useStore.setState((s) => {
+    const next: Partial<State> = {
+      session: { mode: v.mode, carrierId: v.carrierId, driverId: v.driverId, fresh: false },
+      carriers: s.carriers.map((x) => (x.id === PRIMARY_CARRIER_ID ? { ...x, name: v.carrier.name || x.name, mc: v.carrier.mc || x.mc, dot: v.carrier.dot || x.dot } : x)),
+      settings: { ...s.settings, ...v.settings },
+    };
+    for (const spec of SPECS) {
+      const rows = v.slices[spec.slice];
+      if (!rows) {
+        if (v.mode === "driver" && !driverSees(spec)) (next as Record<string, unknown>)[spec.slice] = spec.mine ? (s[spec.slice] as unknown as Item[]).filter((i) => !spec.mine!(i)) : [];
+        continue;
+      }
+      const others = spec.mine ? (s[spec.slice] as unknown as Item[]).filter((i) => !spec.mine!(i)) : [];
+      (next as Record<string, unknown>)[spec.slice] = spec.newestFirst ? [...rows, ...others] : [...others, ...rows];
+    }
+    return next;
+  });
+  useSyncStatus.setState({ state: "cached" });
+}
+
+export function forgetViews() {
+  try {
+    window.localStorage.removeItem(VIEW_KEY);
+  } catch {
+    // Nothing kept.
+  }
 }
 
 export function disconnect() {
@@ -271,6 +367,7 @@ export function disconnect() {
 export async function signOut() {
   if (conn) await flush(conn);
   disconnect();
+  forgetViews();
   await supabase().auth.signOut();
   // eslint-disable-next-line @next/next/no-location-assign-relative-destination
   window.location.assign("/login");
@@ -399,6 +496,7 @@ async function flush(c: Connection) {
   c.failures = failed ? c.failures + 1 : 0;
   useSyncStatus.setState(failed ? { state: "offline" } : { state: "saved", savedAt: Date.now() });
   if (failed) schedule(c);
+  else saveView(c);
 }
 
 // ─── Hearing other screens ───────────────────────────────────────────────────
