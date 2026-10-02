@@ -303,6 +303,23 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - **Holidays, dock hours and drive time:** each offer and booking is checked against the days most docks close (New Year's, Memorial Day, July 4th, Labor Day, Thanksgiving, Christmas, and the observed days), days many close early, the hours drivers reported for that dock, and whether one driver (or a team) can legally drive it between pickup and delivery: 11 hours driving in a 14-hour day, the 30-minute break, 10 hours off, about an hour a day for the pre-trip and fuel, and, for a pickup soon, the hours the driver has left by the ELD. A stop in a Canadian province is checked against Canada's holidays (and Quebec's). A dock's hours from the carrier's own drivers can stop a booking; another carrier's driver's are a heads-up. A hard problem is shown on the load and keeps the AI from asking for it on its own; a new one found at booking goes to the owner.
   - **The weekly review:** Monday morning (owner's time), the week in a minute: loads, gross and net, per mile, empty miles, best broker (from two loads or more) and worst (a slow payer first), and one thing to change, like dropping a broker who pays in 40 days or a driver 3 weeks from home. On Home, by text, and on the owner's phone.
   - **History from old rate cons:** in Settings → Bring your history, besides a spreadsheet: upload up to 40 old rate cons (PDFs or photos) at a time (the app sends them in parts of 4 MB; a bigger file goes by email), or forward them from email to the history address (`inbound+KEY-hXXXXXXXXXX@...`, with a new random part each time it's opened, so a broker who knows the carrier's address can't guess it), which opens for a week from the app. Each is read for the broker (name, email, MC, payment terms), lane, rate and docks, and becomes finished history for pricing, never invoiced or texted. The same file twice is read once. Each import (spreadsheet, upload or email) is listed under Your imports with an Undo that takes out its loads and the brokers it added that nothing else uses (`src/lib/agent/import-batches.ts`).
+- **The back office:**
+  - **Paperwork reminders:** each truck's registration and annual DOT inspection, each driver's CDL and medical card, the insurance certificate, the IFTA return each quarter and the decals each December. The owner hears 30, 14 and 7 days ahead and once it runs out, each once (Needs you, and their phone). They're listed on Compliance. A truck with a lapsed inspection or registration or an engine code that means stop, or a driver whose CDL or medical card ran out, isn't booked by the AI.
+  - **Fuel & tolls** (Money): fuel card and toll statements as CSV (WEX, Comdata, EFS, BestPass and most others export one), uploaded or read once a day from the report's link (Settings → Integrations, with the header it needs). Each line goes on the load its truck was on that day; a unit number the app doesn't know is asked once: pick the truck and every line with that unit goes on its loads. The same line from an overlapping statement is saved once. Shows what each load really cost and diesel by state for the IFTA quarter.
+  - **Driver pay** (Money): each week's pay worked out from the loads (percentage, per mile or flat), less deductions, escrow and advances. An advance bigger than the week's pay is carried to the next week, never a pay below zero. Check, pay, mark paid, and download as CSV; at year end, the 1099-NEC list: what each contractor was paid (reimbursements left out) and who needs one ($2,000 or more from 2026).
+  - **Customers:** shippers who book the carrier directly, with their terms, and lanes they run every week. The AI makes those loads a week ahead on a truck that fits, once each.
+  - **Lanes** (Money): the carrier's rate per mile on each lane, month by month, against the market.
+  - **A bookkeeper:** an account that sees loads, money, fuel, pay and the fleet list, records advances and marks invoices paid, and nothing else: no booking, no messages to brokers or drivers, no AI chat, no settings.
+  - **Who did what:** every change to loads and settings, trucks and drivers added or removed, who can sign in, and pay, advances and payments is in Settings → Security, with who (owner, dispatcher, bookkeeper, driver or the AI) and when. Only the owner reads it.
+  - **Two-step sign-in:** the owner can add an authenticator app (Settings → Security). After that, an account's data stays out of reach until the 6-digit code is entered, in the database itself. The same page lists the devices signed in, with Sign out everywhere else.
+  - **From the ELD:** the odometer (for service due by miles) and engine codes, each with what it means and what to do. One that means stop reaches the owner at once.
+- **On the road (driver app):**
+  - **Directions** in the driver's own GPS app, for the truck's height, weight and hazmat in the truck apps (Sygic Truck, CoPilot Truck), or Google Maps, Apple Maps or Waze. Picked once in Profile.
+  - **Hours clock** at the top, counting down from the ELD's last reading, with a spoken heads-up at 60, 30 and 15 minutes left (Profile turns the voice off), and where on the way the hours run out, with truck parking near there.
+  - **Weather on the route:** National Weather Service warnings along the way to the next stop (`/api/weather`, US points only).
+  - **Lumper money:** the driver asks for the amount at the dock; the office gets it on their phone and in Needs you, sends the express code (Comdata, EFS) back, and the driver sees it in the app, never on the lock screen.
+  - **Paperwork photos** are cropped to the page, with the contrast lifted so they read like a scan, before they go.
+  - **Location only on duty:** the app stops sending where the phone is once the driver is off duty.
 - **Drivers can ask for what's near them:** truck parking, a truck stop, diesel, a CAT scale, a truck wash, a repair or tire shop, by text or on a call (needs the Places key from the breakdown step).
 - **Evening text:** at 6 PM Central the owner gets a text: what was delivered, what it made, how many trucks are rolling, and what needs them.
 - **The log:** every text, call and email in or out is listed in Settings, with what the AI did.
@@ -315,6 +332,7 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - Trucks, drivers and Needs you items merge the same way loads do, and an old copy can't reopen a closed Needs you item. (This also fixed loads: the app's upsert used to replace the whole load; now it merges.) (`20261006000000_merge_more.sql`)
   - Billing, push devices and the system's heartbeats are server-only; no one can mark their own account paid (`20261007000000_pilot_readiness.sql`). Rate-limit counters too (`20261008000000_rate_limits.sql`).
   - Consent records can't be changed or deleted, even by the server; a carrier's office reads its own drivers', a driver their own. Dock tips: each office reads its own drivers', the server all. How each number texts us is server-only. The weekly review is the office's (`20261009000000_natural_dispatch.sql`).
+  - The bookkeeper's limits, the audit log (written by the database, read by the owner only), the device list (each person their own), and two-step sign-in, checked on every table: with an authenticator app on, nothing is readable or writable until its code is entered. Marking an invoice paid goes through one function that changes nothing else on the load (`20261012000000_owner_tools.sql`).
   - Website logins and the answers the owner gives for them are encrypted by the server before they're stored, and no one who signs in can read the table, not even the owner. The website job queue is server-only too, and only the server can hand a job to the worker (`20261005000000_portal_worker.sql`).
 
 ## What it doesn't do yet
@@ -356,13 +374,14 @@ them in chat. `.env.example` lists every variable.
 ### 1. Supabase: accounts and the database
 
 1. Create a project at supabase.com (region near your drivers, e.g. US East).
-2. In **SQL Editor**, run the files in `supabase/migrations/` in order: `20260924000000_core.sql`, `20260925000000_channels.sql`, `20260926000000_dispatch.sql`, `20260927000000_support.sql`, `20260928000000_boards.sql`, `20260929000000_driver_edits.sql`, `20260930000000_outbound.sql`, `20261001000000_merge_edits.sql`, then `20261002000000_usage.sql`. With the CLI instead: `supabase link`, then `supabase db push`.
+2. In **SQL Editor**, run every file in `supabase/migrations/` in order, oldest first (the names start with the date), through `20261012000000_owner_tools.sql`. With the CLI instead: `supabase link`, then `supabase db push`.
 3. From **Project Settings → API**, set:
    - `NEXT_PUBLIC_SUPABASE_URL`: the Project URL.
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: the anon (or publishable) key.
    - `SUPABASE_SERVICE_ROLE_KEY`: the service_role (or secret) key. Only the server uses it, to act on texts, calls and email. It skips the access rules, so never put it in a `NEXT_PUBLIC_` variable.
 4. **Authentication → Sign In / Providers → Phone:** turn it on with your SMS provider (Twilio works). Supabase can also set test numbers with fixed codes for trying it out.
 5. **Authentication → URL Configuration:** set the Site URL to your web address.
+6. **Authentication → Multi-Factor:** turn on TOTP (authenticator app), so owners can add two-step sign-in in Settings → Security.
 
 ### 2. Anthropic: the AI
 
@@ -569,6 +588,14 @@ Without the template, a driver quiet for a day gets texts by SMS until they writ
 2. For spoken answers on WhatsApp: `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` (one multilingual voice covers the languages), and `PUBLIC_BASE_URL` so WhatsApp can fetch the audio. Spoken answers are deleted after two days by the daily job.
 
 Without Deepgram, a voice message gets a polite "type it, or call". The System tab shows both.
+
+### 21. Fuel card and toll statements (per carrier, optional)
+
+Nothing to set on Backroute's side. The owner uploads a CSV on Money → Fuel & tolls, or in Settings → Integrations gives the link where the card company publishes a scheduled CSV report (most do: WEX, Comdata, EFS, BestPass), and the header it needs to open, if any. The link is checked when saved and then read once a day by the dispatcher's rounds. The header value is stored server-side and never shown again.
+
+### 22. Weather on the route (optional)
+
+Uses the National Weather Service (`api.weather.gov`, free, no key). `WEATHER_ALERTS=off` turns it off everywhere; `WEATHER_API_BASE` points it somewhere else (only for testing).
 
 ### Security, in short
 
@@ -843,4 +870,5 @@ In **Settings → Billing & Team → Who can sign in**:
 
 - Tap **Let them sign in** next to each driver.
 - Add dispatchers by phone number.
+- Add a bookkeeper by phone number: they see the money and the fleet, record advances and mark invoices paid, and can't book or message anyone.
 - Send them the sign-in link on the card.

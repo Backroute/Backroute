@@ -2269,6 +2269,8 @@ export const useStore = create<StoreState>((set, get) => ({
         drivers: made.map((m) => m.driver),
         loads: ours(state.loads),
         escalations: ours(state.escalations),
+        // The sample customers (direct shippers) are the carrier's own; the shared sample brokers stay.
+        brokers: ours(state.brokers),
         activity: [],
         dispatchCalls: [],
         driverMessages: [],
