@@ -9,6 +9,7 @@ import { TimeAgo } from "@/components/shared/time-ago";
 import { AiTyping, LiveAiMark } from "@/components/shared/ai-typing";
 import { useAiTyping } from "@/lib/ai/client";
 import { QuickReplies } from "@/components/shared/quick-replies";
+import { DictateButton } from "@/components/shared/dictate";
 import { truckActiveLoads, useCarrierLoads, useCarrierTrucks } from "@/lib/selectors";
 
 export default function DriverMessagesPage() {
@@ -72,8 +73,9 @@ export default function DriverMessagesPage() {
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
           placeholder="Ask about your load, detention, or anything else…"
-          className="flex-1 rounded-full border border-line bg-ink-50/60 px-4 py-2.5 text-sm outline-none focus:border-ink-400"
+          className="min-w-0 flex-1 rounded-full border border-line bg-ink-50/60 px-4 py-2.5 text-sm outline-none focus:border-ink-400"
         />
+        <DictateButton lang={driver.prefs?.language ?? driver.prefs?.appLanguage ?? "en"} onText={(t) => setValue((v) => (v.trim() ? `${v.trim()} ${t}` : t))} />
         <button
           onClick={handleSend}
           aria-label="Send"

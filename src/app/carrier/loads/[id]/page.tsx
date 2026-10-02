@@ -21,6 +21,7 @@ import { RateConCard } from "@/components/shared/rate-con-card";
 import { RateConReader } from "@/components/shared/rate-con-reader";
 import { WhyCard } from "@/components/cloud/why-card";
 import { TeachAi } from "@/components/cloud/teach-ai";
+import { LoadTimeline } from "@/components/shared/load-timeline";
 import { LiveDot } from "@/components/shared/live-dot";
 import { StopsTimeline } from "@/components/shared/stops-timeline";
 import { TripStepper } from "@/components/shared/trip-stepper";
@@ -289,6 +290,7 @@ export default function LoadDetailPage() {
         </div>
 
         <div className="flex flex-col gap-6">
+          <LoadTimeline load={load} brokerName={broker?.company} driverName={driver?.name} />
           <PaymentCard load={load} />
           <Card>
             <CardHeader>

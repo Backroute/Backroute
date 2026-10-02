@@ -17,6 +17,7 @@ import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { IncidentCard } from "@/components/shared/incident-card";
 import { ConsentCard } from "@/components/cloud/driver-dispatch-card";
 import { QuickReplies } from "@/components/shared/quick-replies";
+import { useNextStopNotice } from "@/lib/next-stop";
 import { useMoving } from "@/lib/moving";
 import { OfflineBadge } from "@/components/shared/offline-badge";
 import { useNow } from "@/lib/hooks";
@@ -61,6 +62,8 @@ export default function DriverHomePage() {
 
   const truck = trucks.find((t) => t.id === driver.truckId);
   const { current: currentLoad, next: nextLoad } = truckActiveLoads(loads, truck);
+  // The driver's next stop on the lock screen, when they turned it on (Profile).
+  useNextStopNotice(currentLoad);
   // In a real account the office books loads with brokers; a company driver's app shows what's booked, not offers.
   const picksLoads = useStore((s) => s.session.mode !== "driver");
   const pendingOffers = loads.filter((l) => l.truckId === truck?.id && l.stage === "offered" && picksLoads);

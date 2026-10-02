@@ -11,6 +11,7 @@ import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { AiTyping, LiveAiMark } from "@/components/shared/ai-typing";
 import { useAiTyping } from "@/lib/ai/client";
+import { DictateButton } from "@/components/shared/dictate";
 
 /** The carrier's counterpart to the driver Messages tab — a fleet-level channel to the AI dispatcher
  *  that isn't tied to any one load, for "how's my week going" instead of "push this rate." */
@@ -83,8 +84,9 @@ export default function CarrierMessagesPage() {
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="Ask about net profit, escalations, fleet status…"
-            className="flex-1 rounded-full border border-line bg-ink-50/60 px-4 py-2.5 text-sm outline-none focus:border-ink-400"
+            className="min-w-0 flex-1 rounded-full border border-line bg-ink-50/60 px-4 py-2.5 text-sm outline-none focus:border-ink-400"
           />
+          <DictateButton onText={(t) => setValue((v) => (v.trim() ? `${v.trim()} ${t}` : t))} className="h-10 w-10" />
           <button
             onClick={handleSend}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ink-950 text-white disabled:bg-ink-300"

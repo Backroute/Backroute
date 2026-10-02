@@ -550,6 +550,8 @@ export interface Load {
     history?: { by: "us" | "them"; amount: number; at: string; via: "email" | "phone" }[];
     /** We walked away (too far under the owner's lowest after three counters), leaving the door open. */
     passedAt?: string;
+    /** The owner picked this load and asked for it (not the AI on its own): shown on the load's timeline. */
+    byOwner?: boolean;
   };
   /** The broker's email this load came from, so the book request answers it in the same thread. */
   offerEmail?: { subject: string; messageId?: string };

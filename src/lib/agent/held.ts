@@ -64,9 +64,10 @@ export async function release(id: string, now = Date.now()): Promise<boolean> {
   try {
     const ctx = await loadContext(claimed.carrier_id as string);
     if (!ctx) throw new Error("no carrier");
-    // Paused: it waits (the owner can still stop it); the rounds try again each minute until they resume.
+    // Paused: it waits (the owner can still stop it). Its time stays as it was, so it goes on the first round after
+    // they resume.
     if (ctx.settings.paused) {
-      await db.from("held_sends").update({ status: "held", send_at: new Date(now + 60_000).toISOString() }).eq("id", id);
+      await db.from("held_sends").update({ status: "held" }).eq("id", id);
       return false;
     }
     const { deliver } = await import("./outbox");

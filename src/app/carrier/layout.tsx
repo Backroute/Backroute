@@ -4,12 +4,15 @@ import { CloudGate } from "@/components/cloud/cloud-gate";
 import { CarrierSwitcher } from "@/components/cloud/carrier-switcher";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Settings, Truck, Users, Wallet } from "lucide-react";
+import { LayoutGrid, Monitor, Moon, Pause, Play, Settings, Sun, Truck, Users, Wallet } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { setTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { isAlert } from "@/lib/alerts";
 import { PortalShell, type NavItem } from "@/components/shared/portal-shell";
 import { TopBar } from "@/components/shared/top-bar";
 import { AiStatus } from "@/components/shared/ai-status";
+import { SampleTracker } from "@/components/cloud/sample-fleet";
 import { useNeedsYou } from "@/components/shared/needs-you";
 import { useAppBadge } from "@/lib/app-badge";
 import { CommandPalette, type CommandGroup } from "@/components/shared/command-palette";
@@ -89,7 +92,22 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
     n.href === "/carrier/loads" ? { ...n, badge: pendingOffers + activeNegotiations } : n.href === "/carrier" ? { ...n, badge: needsYou } : n,
   );
 
+  const router = useRouter();
+  const paused = useStore((s) => !!s.settings.paused);
+  const updateSettings = useStore((s) => s.actions.updateSettings);
+  const sendCarrierMessage = useStore((s) => s.actions.sendCarrierMessage);
   const commandGroups: CommandGroup[] = [
+    {
+      heading: "Do",
+      items: [
+        paused
+          ? { id: "resume", label: "Resume the AI", icon: Play, keywords: "start unpause continue", run: () => updateSettings({ paused: false, pausedAt: undefined }) }
+          : { id: "pause", label: "Pause the AI", sublabel: "emergency stop", icon: Pause, keywords: "stop halt freeze emergency", run: () => updateSettings({ paused: true, pausedAt: new Date().toISOString() }) },
+        { id: "theme-dark", label: "Dark mode", icon: Moon, keywords: "night theme appearance", run: () => setTheme("dark") },
+        { id: "theme-light", label: "Light mode", icon: Sun, keywords: "day theme appearance", run: () => setTheme("light") },
+        { id: "theme-auto", label: "Match my phone's light or dark", icon: Monitor, keywords: "auto system theme appearance", run: () => setTheme("system") },
+      ],
+    },
     { heading: "Go to", items: ALL_PAGES.map((n) => ({ id: n.href, label: n.label, icon: n.icon, href: n.href })) },
     {
       heading: "Loads",
@@ -125,6 +143,7 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
           settingsHref="/carrier/settings"
           exitHref="/"
           status={<AiStatus needsYou={needsYou} />}
+          searchHint="Search, or tell the AI…"
         />
       }
       footer={
@@ -141,7 +160,15 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
         </>
       }
     >
-      <CommandPalette groups={commandGroups} />
+      <CommandPalette
+        groups={commandGroups}
+        onAsk={(text) => {
+          // An order or question: it goes to the AI dispatcher's thread, where the answer (or what it did) shows up.
+          sendCarrierMessage(carrier.id, text);
+          router.push("/carrier/messages");
+        }}
+      />
+      <SampleTracker />
       <SectionTabs />
       {children}
       <NotificationToastHost events={alerts} hrefFor={(e) => (e.loadId ? `/carrier/loads/${e.loadId}` : undefined)} />

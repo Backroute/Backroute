@@ -25,6 +25,7 @@ import { NeedsYouList, useNeedsYou } from "@/components/shared/needs-you";
 import { PausedBanner } from "@/components/shared/ai-status";
 import { SinceLastVisit } from "@/components/shared/since-last-visit";
 import { FleetMap } from "@/components/shared/fleet-map";
+import { SampleChecklist, TrySampleFleet } from "@/components/cloud/sample-fleet";
 import { useRouter } from "next/navigation";
 import { RUN_TYPE_LABEL } from "@/lib/run-types";
 import { weekEarnings } from "@/lib/earnings";
@@ -117,6 +118,7 @@ export default function CarrierOverviewPage() {
 
       <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
         <PausedBanner />
+        <SampleChecklist />
         <SinceLastVisit needsYou={needsYouCount} />
         <div className="theme-ink rounded-3xl bg-ink-950 p-5 text-white sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -149,6 +151,7 @@ export default function CarrierOverviewPage() {
         </div>
 
         <SetupProgress />
+        <TrySampleFleet />
         <GoingOutCard />
 
         {incidents.length > 0 && (

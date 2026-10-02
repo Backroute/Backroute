@@ -1,5 +1,7 @@
 "use client";
 
+import { Help } from "@/components/ui/help";
+import type { HelpKey } from "@/lib/help";
 import { useState } from "react";
 import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { Switch } from "@/components/ui/switch";
@@ -32,7 +34,7 @@ export function BasicsCard() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Question n={1} q="What's the lowest you'll take per loaded mile?" hint="The AI never asks for or agrees to less. Anything lower comes to you.">
+      <Question n={1} help="minRpm" q="What's the lowest you'll take per loaded mile?" hint="The AI never asks for or agrees to less. Anything lower comes to you.">
         <label className="flex items-center gap-2 text-sm text-ink-800">
           $
           <input
@@ -54,7 +56,7 @@ export function BasicsCard() {
         </label>
       </Question>
 
-      <Question n={2} q="How far will you drive empty to a pickup?" hint="The AI won't take a load further away than this.">
+      <Question n={2} help="deadhead" q="How far will you drive empty to a pickup?" hint="The AI won't take a load further away than this.">
         <label className="flex items-center gap-2 text-sm text-ink-800">
           <input
             aria-label="Most empty miles to a pickup"
@@ -74,10 +76,12 @@ export function BasicsCard() {
         </label>
       </Question>
 
-      <Question n={3} q="How much can the AI do without asking?" hint="It always stays inside your numbers above.">
+      <Question n={3} help="autopilot" q="How much can the AI do without asking?" hint="It always stays inside your numbers above.">
         <AutopilotControl />
         <div className="mt-3">
-          <p className="text-xs font-medium text-ink-700">Time to stop the AI&apos;s emails to brokers before they go</p>
+          <p className="flex items-center gap-1 text-xs font-medium text-ink-700">
+            Time to stop the AI&apos;s emails to brokers before they go <Help topic="undo" />
+          </p>
           <div className="mt-1.5 flex flex-wrap gap-2" role="radiogroup" aria-label="Time to stop the AI's emails">
             {UNDO.map((u) => {
               const on = (settings.undoSeconds ?? 90) === u.s;
@@ -101,7 +105,7 @@ export function BasicsCard() {
         </div>
       </Question>
 
-      <Question n={4} q="When should each driver get home?" hint="The AI checks this before every load, and won't book one that makes a driver miss it.">
+      <Question n={4} help="homeTime" q="When should each driver get home?" hint="The AI checks this before every load, and won't book one that makes a driver miss it.">
         {drivers.length ? (
           <ul className="flex flex-col gap-2">
             {drivers.map((d) => (
@@ -128,7 +132,7 @@ export function BasicsCard() {
         )}
       </Question>
 
-      <Question n={5} q="How should we reach you?" hint="Only for what needs you. Routine work just happens.">
+      <Question n={5} help="alerts" q="How should we reach you?" hint="Only for what needs you. Routine work just happens.">
         <PhoneAlerts />
         <div className="mt-3 flex flex-col gap-3">
           <Row label="End-of-day text" detail="What got delivered, what it made, what needs you.">
@@ -149,11 +153,13 @@ export function BasicsCard() {
   );
 }
 
-function Question({ n, q, hint, children }: { n: number; q: string; hint: string; children: React.ReactNode }) {
+function Question({ n, q, hint, help, children }: { n: number; q: string; hint: string; help: HelpKey; children: React.ReactNode }) {
   return (
     <section className="rounded-2xl border border-line bg-white p-4 sm:p-5" aria-label={q}>
       <p className="text-xs font-semibold text-ink-500">{n} of 5</p>
-      <h3 className="mt-0.5 text-base font-semibold text-ink-950">{q}</h3>
+      <h3 className="mt-0.5 flex items-center gap-1 text-base font-semibold text-ink-950">
+        {q} <Help topic={help} />
+      </h3>
       <p className="mt-0.5 text-sm text-ink-600">{hint}</p>
       <div className="mt-3">{children}</div>
     </section>

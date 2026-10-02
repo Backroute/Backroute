@@ -20,6 +20,8 @@ import { DailyTextPreview } from "@/components/shared/daily-text";
 import { DispatchLineCard } from "@/components/shared/dispatch-line-card";
 import { OwnerLanguageCard } from "@/components/shared/owner-language-card";
 import { AppearanceCard } from "@/components/shared/appearance-card";
+import { Help } from "@/components/ui/help";
+import type { HelpKey } from "@/lib/help";
 import { AppAccessCard } from "@/components/cloud/app-access";
 import { DriverConsentsCard } from "@/components/cloud/driver-consents";
 import { ChannelsCard } from "@/components/cloud/channels-card";
@@ -205,14 +207,14 @@ function Settings() {
                       Only three kinds of alerts reach you: something that needs you, money moving, and safety. Everything else the AI does stays in its log.
                     </p>
                     {signedIn && <PhoneAlerts />}
-                    <ToggleRow label="Text me when something needs me" desc="Approvals, loads to pick, drivers' requests" checked={settings.notifySms} onChange={(v) => updateSettings({ notifySms: v })} />
-                    <ToggleRow label="Email me a copy of every alert" desc="Needs you, money and safety" checked={settings.notifyEmail} onChange={(v) => updateSettings({ notifyEmail: v })} />
-                    <ToggleRow label="End-of-day text at 6 PM" desc="Loads delivered, profit, and anything that needs you tomorrow" checked={settings.dailyText} onChange={(v) => updateSettings({ dailyText: v })} />
+                    <ToggleRow help="notifySms" label="Text me when something needs me" desc="Approvals, loads to pick, drivers' requests" checked={settings.notifySms} onChange={(v) => updateSettings({ notifySms: v })} />
+                    <ToggleRow help="notifyEmail" label="Email me a copy of every alert" desc="Needs you, money and safety" checked={settings.notifyEmail} onChange={(v) => updateSettings({ notifyEmail: v })} />
+                    <ToggleRow help="dailyText" label="End-of-day text at 6 PM" desc="Loads delivered, profit, and anything that needs you tomorrow" checked={settings.dailyText} onChange={(v) => updateSettings({ dailyText: v })} />
                     {settings.dailyText && <DailyTextPreview />}
                     {signedIn && (
                       <>
-                        <ToggleRow label="Your week, Monday morning" desc="What the trucks made, empty miles, best and worst broker, and one thing to change" checked={settings.weeklyReview !== false} onChange={(v) => updateSettings({ weeklyReview: v })} />
-                        <ToggleRow label="Drivers' morning text" desc="Each driver's stops, times, dock tips and weather before they roll (drivers can turn theirs off)" checked={settings.morningBriefs !== false} onChange={(v) => updateSettings({ morningBriefs: v })} />
+                        <ToggleRow help="weeklyReview" label="Your week, Monday morning" desc="What the trucks made, empty miles, best and worst broker, and one thing to change" checked={settings.weeklyReview !== false} onChange={(v) => updateSettings({ weeklyReview: v })} />
+                        <ToggleRow help="morningBriefs" label="Drivers' morning text" desc="Each driver's stops, times, dock tips and weather before they roll (drivers can turn theirs off)" checked={settings.morningBriefs !== false} onChange={(v) => updateSettings({ morningBriefs: v })} />
                       </>
                     )}
                   </CardContent>
@@ -520,11 +522,14 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ToggleRow({ label, desc, checked, onChange }: { label: string; desc: string; checked: boolean; onChange: (v: boolean) => void }) {
+function ToggleRow({ label, desc, checked, onChange, help }: { label: string; desc: string; checked: boolean; onChange: (v: boolean) => void; help?: HelpKey }) {
   return (
     <div className="flex items-center justify-between gap-4">
       <div>
-        <p className="text-sm font-medium text-ink-900">{label}</p>
+        <p className="flex items-center gap-1 text-sm font-medium text-ink-900">
+          {label}
+          {help && <Help topic={help} />}
+        </p>
         <p className="text-xs text-ink-500">{desc}</p>
       </div>
       <Switch checked={checked} onChange={onChange} label={label} />

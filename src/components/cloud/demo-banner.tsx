@@ -3,12 +3,29 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cloudEnabled } from "@/lib/cloud/client";
-import { exitDemo } from "@/lib/cloud/demo";
+import { useSyncExternalStore } from "react";
+import { exitDemo, inSample } from "@/lib/cloud/demo";
 import { cn } from "@/lib/utils";
 
 /** A thin strip on every demo screen: says it's sample data, and switches between the owner's and driver's side. */
 export function DemoBanner() {
   const pathname = usePathname();
+  const sample = useSyncExternalStore(
+    () => () => {},
+    inSample,
+    () => false,
+  );
+  if (sample)
+    return (
+      <div role="note" aria-label="Sample fleet" className="flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-info-soft px-4 py-1.5 text-xs text-ink-900">
+        <span>
+          <span className="font-semibold">Sample fleet</span> · practice here: made-up trucks and loads, nothing is real, saved or sent
+        </span>
+        <button type="button" onClick={() => exitDemo("/carrier")} className="rounded-full bg-ink-950 px-2.5 py-0.5 font-medium text-white">
+          Back to my fleet
+        </button>
+      </div>
+    );
   const views = [
     { href: "/carrier", label: "Owner dashboard" },
     { href: "/driver", label: "Driver app" },

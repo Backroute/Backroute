@@ -16,14 +16,40 @@ const KEY = "backroute-demo";
  */
 export const demoAllowed = process.env.NEXT_PUBLIC_DEMO !== "off";
 
+/**
+ * The sample fleet for practice: what the demo shows, opened by a signed-in owner from their own dashboard so they can
+ * try approving, picking loads and asking the AI before it's real. Allowed on the real site too (it lives only in that
+ * browser tab, with nothing saved or sent), unless NEXT_PUBLIC_SAMPLE=off.
+ */
+export const sampleAllowed = process.env.NEXT_PUBLIC_SAMPLE !== "off";
+const SAMPLE = "sample";
+
 export function inDemo(): boolean {
-  if (!demoAllowed) return false;
-  if (!cloudEnabled) return true;
+  if (!cloudEnabled) return demoAllowed;
   try {
-    return sessionStorage.getItem(KEY) === "1";
+    const v = sessionStorage.getItem(KEY);
+    return (v === "1" && demoAllowed) || (v === SAMPLE && sampleAllowed);
   } catch {
     return false;
   }
+}
+
+/** This tab is the sample fleet a signed-in owner opened to practice (not the public demo). */
+export function inSample(): boolean {
+  try {
+    return cloudEnabled && sampleAllowed && sessionStorage.getItem(KEY) === SAMPLE;
+  } catch {
+    return false;
+  }
+}
+
+/** Opens the sample fleet in this tab (a full page load, so it never shares memory with the real account). */
+export function startSample(to = "/carrier") {
+  try {
+    sessionStorage.setItem(KEY, SAMPLE);
+    sessionStorage.removeItem("backroute.sampleDone");
+  } catch {}
+  window.location.assign(to);
 }
 
 /** Full page loads on the way in and out, so demo data and a real account never share memory. */

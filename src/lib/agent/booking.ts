@@ -290,7 +290,7 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
     const floor = floorFor(load, ctx.settings);
     if (how.byOwner || (floor !== null && ask >= floor && ctx.settings.autonomy !== "ask")) {
       const at = new Date().toISOString();
-      const asking: Load = { ...load, stage: "negotiating", targetRate: ask, updatedAt: at, bookRequest: { ask, askedAt: at, status: "sent" } };
+      const asking: Load = { ...load, stage: "negotiating", targetRate: ask, updatedAt: at, bookRequest: { ask, askedAt: at, status: "sent", ...(how.byOwner ? { byOwner: true } : {}) } };
       await save("loads", ctx.carrier.id, asking as unknown as Item);
       await setAsideOthers(ctx, asking, at);
       const url = absoluteUrl(`/api/channels/voice/broker?carrier=${encodeURIComponent(ctx.carrier.id)}&load=${encodeURIComponent(load.id)}`);
@@ -302,7 +302,7 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
     // A broker who only works by phone: the AI calls them. With no phone either, support finds a way to reach them.
     const floor = floorFor(load, ctx.settings);
     const allowed = how.byOwner || (floor !== null && ask >= floor && ctx.settings.autonomy !== "ask");
-    const asking: Load = { ...load, stage: "negotiating", targetRate: ask, updatedAt: new Date().toISOString(), bookRequest: { ask, askedAt: new Date().toISOString(), status: "sent" } };
+    const asking: Load = { ...load, stage: "negotiating", targetRate: ask, updatedAt: new Date().toISOString(), bookRequest: { ask, askedAt: new Date().toISOString(), status: "sent", ...(how.byOwner ? { byOwner: true } : {}) } };
     if (allowed && broker?.phone) {
       await save("loads", ctx.carrier.id, asking as unknown as Item);
       ctx.loads = ctx.loads.map((l) => (l.id === load.id ? asking : l));
@@ -322,7 +322,7 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
     return "queued" as const;
   }
   const at = new Date().toISOString();
-  const updated: Load = { ...load, stage: "negotiating", targetRate: ask, updatedAt: at, bookRequest: { ask, askedAt: at, status: "drafted" } };
+  const updated: Load = { ...load, stage: "negotiating", targetRate: ask, updatedAt: at, bookRequest: { ask, askedAt: at, status: "drafted", ...(how.byOwner ? { byOwner: true } : {}) } };
   await save("loads", ctx.carrier.id, updated as unknown as Item);
   await setAsideOthers(ctx, updated, at);
 

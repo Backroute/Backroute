@@ -33,6 +33,7 @@ export function TopBar({
   onMenuClick,
   alertsOnly,
   status,
+  searchHint = "Search or jump to...",
 }: {
   dark?: boolean;
   notifications: ActivityEvent[];
@@ -45,6 +46,8 @@ export function TopBar({
   onMenuClick?: () => void;
   /** Shown left of the bell: the AI's status pill on the owner's dashboard. */
   status?: React.ReactNode;
+  /** What the search box says before it's opened. */
+  searchHint?: string;
 }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -92,7 +95,7 @@ export function TopBar({
           )}
         >
           <Search className="h-3.5 w-3.5 shrink-0" />
-          <span className="hidden flex-1 text-left sm:inline">Search or jump to...</span>
+          <span className="hidden flex-1 text-left sm:inline">{searchHint}</span>
           <kbd className={cn("hidden rounded border px-1.5 py-0.5 text-[10px] sm:inline", dark ? "border-white/15 text-white/40" : "border-line text-ink-400")}>
             &#8984;K
           </kbd>

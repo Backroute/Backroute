@@ -19,7 +19,7 @@ Keep them apart by running two Vercel projects from this same repository:
 |---|---|---|
 | Keys | None | All the keys below |
 | `NEXT_PUBLIC_DEMO` | Leave unset | `off` |
-| What people see | The sample fleet with the AI running, a yellow "Demo" bar, nothing saved or sent | Sign-in, real fleets, real texts, calls and email. No demo page, no demo links, no sample data anywhere |
+| What people see | The sample fleet with the AI running, a yellow "Demo" bar, nothing saved or sent | Sign-in, real fleets, real texts, calls and email. No demo page or demo links. A signed-in owner can open a practice sample fleet in their own tab (`NEXT_PUBLIC_SAMPLE=off` removes it) |
 
 - **Show the demo** by sharing the demo site. It can't text, call or email anyone, and it can't touch real accounts: it has no keys.
 - **Delete the demo** when you're done showing it by deleting the demo project in Vercel. The real site doesn't change.
@@ -29,6 +29,7 @@ With `NEXT_PUBLIC_DEMO=off`:
 
 - `/demo` says there's no demo, and the landing page and sign-in page have no demo links.
 - `/ops` is the support team's console (for people on the support list), not the sample-data Ops portal.
+- The sample fleet for practice stays (a signed-in owner opens it from Home; it lives only in that tab, nothing saved or sent). Set `NEXT_PUBLIC_SAMPLE=off` to remove it too.
 - A browser tab that was in the demo can't get back into it.
 
 It's built into the app, so redeploy after changing it.
@@ -282,6 +283,21 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - **Opens at once:** the last view is kept on the device for three days (forgotten on sign-out), shown right away and refreshed in the background; with no signal the app still shows it.
   - **Drivers:** one-tap answers to dispatch in their language, picked for where they are on the trip; this week's pay with what the current load adds and payday; hands-free switching on by itself once the phone moves at road speed (only if location is already allowed; a driver can turn it off); a framing hint and a blur, dark or glare check before a document photo goes; photos taken without signal kept on the phone and sent when it's back, with "N waiting to send".
   - **Look:** one set of status colors on every screen (green done, blue in progress, amber waiting on someone, red needs you), helper text dark enough to read in sunlight, larger tap targets in the driver app, visible keyboard focus, and no animation for people who turned motion off.
+- **Modern and quick to run:**
+  - **Dark mode** that follows the phone, or Light, Dark or Auto in the account menu, Settings and the driver's profile (kept on that device). It's applied before the page draws, so a dark phone never flashes white.
+  - **Needs you:** plain cards with a colored edge for how urgent each is (red decide now, amber waiting on you, grey for your information), most urgent first. On a phone, swipe right to do a card's one-tap action and left to set it aside for later. Several of the same paperwork (detention, layover and TONU claims, invoices, payment reminders, ETA updates, setup packets, short replies) can be sent together; offers, counters and anything with a new price never are.
+  - **Since you were last here:** after three hours or more away, Home opens with what the AI did meanwhile (booked, delivered, paid, calls) and what waits.
+  - **Fleet map** on Home: every truck as a dot by what it's doing (moving, at a stop, running late, empty), from the ELD when connected; tap one for its trip. Map tiles from OpenFreeMap (no key).
+  - **Money:** the last 8 weeks in bars (what came in, what it cost, what was kept), and the same per truck and per lane, from the carrier's own loads.
+  - **On a phone:** a tab bar for the owner like the driver's; the app icon shows how many things need the owner (installed app); long-press the icon for Needs you, Ask the AI, and the driver's next stop.
+  - **Command bar** (Ctrl+K or the search box): find a load, truck or driver; run "pause the AI" or "dark mode"; anything else, like "book Marcus home by Friday", goes to the AI dispatcher as an order or a question.
+  - **Pause everything:** the AI status pill at the top. Paused, the AI keeps reading email and answering drivers, but books nothing, sends nothing to brokers, and calls no broker or dock; what it would send waits in Needs you, and emails waiting for Undo wait too and go on the first round after Resume. The owner's own taps (send this, ask to book that) still go. Breakdown calls to repair shops still go.
+  - **Load timeline:** every load from the offer to the money: asked to book (by the AI or by you), booked, rate con, picked up, delivered, invoiced, paid, with when and who.
+  - **Loads:** search and filters (truck, broker, time) remembered on the device, ready-made views (unpaid over 30 days, running late, no rate con yet, delivered with no POD) and your own saved views.
+  - **Sample fleet:** a new owner can open a made-up fleet from Home to practice (answer Needs you, pick a load, ask the AI, open a timeline, pause and resume), with a checklist that ticks off. It lives only in that browser tab, nothing is saved or sent, and Back to my fleet returns to the real account. It's on the real site too (separate from the public demo); `NEXT_PUBLIC_SAMPLE=off` removes it.
+  - **Drivers:** quick replies learn their own words (short things they've sent twice come first); a microphone on the message box types what they say, in their language; and an optional next stop on the lock screen (a quiet notification that changes as the trip moves).
+  - **Help on settings:** a "?" beside each of the main settings with two plain lines and an example.
+  - Loading shows the page's outline instead of a spinner, alerts never stack more than two (the rest are in the bell), and cards and alerts move gently (none for people who turned motion off).
 - **Owners seeing why:**
   - **Why-lines:** every load the AI asks to book says why, on the load and on anything waiting for the owner's OK: what it pays a mile against their lowest and the market, empty miles to the pickup, what it does for the driver's home time, how the broker pays (their own invoices first), and what else the truck had. Each counter or acceptance adds a line with the broker's number and the AI's answer.
   - **Holidays, dock hours and drive time:** each offer and booking is checked against the days most docks close (New Year's, Memorial Day, July 4th, Labor Day, Thanksgiving, Christmas, and the observed days), days many close early, the hours drivers reported for that dock, and whether one driver (or a team) can legally drive it between pickup and delivery: 11 hours driving in a 14-hour day, the 30-minute break, 10 hours off, about an hour a day for the pre-trip and fuel, and, for a pickup soon, the hours the driver has left by the ELD. A stop in a Canadian province is checked against Canada's holidays (and Quebec's). A dock's hours from the carrier's own drivers can stop a booking; another carrier's driver's are a heads-up. A hard problem is shown on the load and keeps the AI from asking for it on its own; a new one found at booking goes to the owner.

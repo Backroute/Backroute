@@ -14,7 +14,9 @@ import { LiveDot } from "@/components/shared/live-dot";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
-import { useCarrierLoads, useBrokerMap, useTruckMap, useDriverMap } from "@/lib/selectors";
+import { useCarrierLoads, useBrokerMap, useTruckMap, useDriverMap, usePrimaryCarrier, useCarrierTrucks } from "@/lib/selectors";
+import { LoadFilterBar, filterLoads, useLoadFilters } from "@/components/shared/load-filters";
+import { useNow } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { cn, formatCurrency } from "@/lib/utils";
 import { downloadCsv } from "@/lib/csv-export";
@@ -62,11 +64,21 @@ export default function CarrierLoadsPage() {
   const [group, setGroup] = useState("active");
   const signedIn = useStore((s) => s.session.mode !== "demo");
 
+  const carrier = usePrimaryCarrier();
+  const fleetTrucks = useCarrierTrucks();
+  const filters = useLoadFilters(carrier.id);
+  const now = useNow();
   const activeGroup = GROUPS.find((g) => g.key === group)!;
   const filtered = useMemo(() => {
-    const list = activeGroup.stages === "all" ? loads : loads.filter((l) => activeGroup.stages.includes(l.stage));
+    // A ready-made view ("Unpaid over 30 days") looks across every load, whichever tab is open.
+    const inGroup = filters.filter.view || activeGroup.stages === "all" ? loads : loads.filter((l) => (activeGroup.stages as LoadStage[]).includes(l.stage));
+    const list = now === null ? inGroup : filterLoads(inGroup, filters.filter, brokers, trucks, now);
     return [...list].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  }, [loads, activeGroup]);
+  }, [loads, activeGroup, filters.filter, brokers, trucks, now]);
+  const usedBrokers = useMemo(() => {
+    const ids = new Set(loads.map((l) => l.brokerId));
+    return [...brokers.values()].filter((b) => ids.has(b.id)).sort((a, b) => a.company.localeCompare(b.company));
+  }, [loads, brokers]);
 
   const counts = Object.fromEntries(
     GROUPS.map((g) => [g.key, g.stages === "all" ? loads.length : loads.filter((l) => g.stages.includes(l.stage)).length]),
@@ -100,6 +112,7 @@ export default function CarrierLoadsPage() {
 
       <div className="px-4 py-6 sm:px-8">
         <Tabs tabs={GROUPS.map((g) => ({ key: g.key, label: g.label, count: counts[g.key] }))} active={group} onChange={setGroup} />
+        {group !== "offers" && <LoadFilterBar {...filters} brokers={usedBrokers} trucks={fleetTrucks} shown={filtered.length} total={loads.length} />}
 
         {group === "offers" ? (
           <div className="mt-5">

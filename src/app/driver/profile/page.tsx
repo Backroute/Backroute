@@ -5,6 +5,7 @@ import { CalendarClock, DollarSign, Home, Phone, Star, Users } from "lucide-reac
 import { CallSettingsCard, LanguageCard } from "@/components/shared/call-settings";
 import { BusinessCard } from "@/components/shared/owner-operator";
 import { AppearanceCard } from "@/components/shared/appearance-card";
+import { LockStopCard } from "@/components/shared/lock-stop-card";
 import { SignOutButton } from "@/components/cloud/app-access";
 import { ConsentCard, DriverDispatchCard } from "@/components/cloud/driver-dispatch-card";
 import { useDriverUi } from "@/lib/lang/use-driver-ui";
@@ -92,6 +93,8 @@ export default function DriverProfilePage() {
       <LanguageCard driver={driver} />
 
       <AppearanceCard />
+
+      <LockStopCard />
 
       <CallSettingsCard driver={driver} />
 
