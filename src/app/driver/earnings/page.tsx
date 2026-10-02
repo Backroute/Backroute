@@ -9,7 +9,8 @@ import { useStore } from "@/lib/store";
 import { OwnerMoney } from "@/components/shared/owner-operator";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 
-const INDUSTRY_EMPTY_PCT = 20;
+/** Empty miles at or under this show as good. */
+const EMPTY_GOOD_PCT = 20;
 
 export default function DriverEarningsPage() {
   const driver = usePrimaryDriver();
@@ -86,8 +87,8 @@ export default function DriverEarningsPage() {
             icon={Gauge}
             label="Empty miles"
             value={`${week.emptyPct.toFixed(0)}%`}
-            sub={`Industry average is ~${INDUSTRY_EMPTY_PCT}%. The AI books your next load near where you deliver.`}
-            good={week.emptyPct < INDUSTRY_EMPTY_PCT}
+            sub="The AI books your next load near where you deliver."
+            good={week.emptyPct < EMPTY_GOOD_PCT}
           />
           <Row icon={Clock} label="Dispatcher work done for you" value={`${week.hoursSaved} hrs`} sub="Broker calls, emails, rate cons, check calls and paperwork." />
         </ul>

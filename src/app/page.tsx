@@ -8,7 +8,7 @@ import { LiveTicker } from "@/components/landing/live-ticker";
 import { DashboardPreview } from "@/components/landing/dashboard-preview";
 
 const STATS = [
-  { v: "$961", l: "Saved per truck, every month" },
+  { v: "7", l: "Languages it calls and texts in" },
   { v: "24/7", l: "Negotiation coverage" },
   { v: "0", l: "Minutes on hold with brokers" },
 ];
@@ -141,25 +141,6 @@ export default function Home() {
                   <ChannelPill key={r.label} icon={r.icon} label={r.label} />
                 ))}
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Savings */}
-      <section className="bg-ink-50/60">
-        <div className="mx-auto max-w-5xl px-6 py-24 text-center sm:py-32">
-          <h2 className="mx-auto max-w-xl font-display text-4xl tracking-tighter text-ink-950 sm:text-5xl">
-            $1,000 less per truck, every month.
-          </h2>
-          <div className="mx-auto mt-14 flex w-fit items-end gap-10">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-ink-400">Human dispatcher</p>
-              <p className="mt-2 font-display text-6xl tracking-tighter text-ink-300 line-through decoration-2">$1,500</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-ink-400">Backroute</p>
-              <p className="mt-2 font-display text-6xl tracking-tighter text-ink-950">$539</p>
             </div>
           </div>
         </div>

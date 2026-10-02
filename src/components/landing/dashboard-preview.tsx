@@ -65,7 +65,7 @@ export function DashboardPreview() {
           <div className="mt-4 grid grid-cols-3 gap-2">
             <MiniStat label="Active loads" value={String(rows.length + 4)} />
             <MiniStat label="Net profit" value={formatCurrency(netProfit)} />
-            <MiniStat label="Saved vs. human" value="$961/mo" tone />
+            <MiniStat label="On the road" value={String(Math.max(1, carrier.trucks - 1))} />
           </div>
 
           <div className="mt-4 flex flex-col divide-y divide-line rounded-xl border border-line">

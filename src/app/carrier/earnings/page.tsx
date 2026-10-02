@@ -1,8 +1,6 @@
 "use client";
 
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { MoneyCharts, useChartColors } from "@/components/shared/money-charts";
-import { useStore } from "@/lib/store";
+import { MoneyCharts } from "@/components/shared/money-charts";
 import { Clock, Lightbulb, Sparkles, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -16,8 +14,6 @@ export default function EarningsPage() {
   const trucks = useCarrierTrucks();
   const brokers = useBrokerMap();
   const driverMap = useDriverMap();
-  const signedIn = useStore((s) => s.session.mode !== "demo");
-  const colors = useChartColors();
   const week = weekEarnings(loads);
   const perTruck = trucks
     .map((t) => ({ truck: t, driver: driverMap.get(t.driverId ?? ""), w: weekEarnings(loads.filter((l) => l.truckId === t.id)) }))
@@ -33,10 +29,6 @@ export default function EarningsPage() {
   const totalMiles = loads.reduce((s, l) => s + l.lane.miles, 0) + deadheadMiles;
   const emptyRate = totalMiles ? (deadheadMiles / totalMiles) * 100 : 0;
 
-  const costComparison = [
-    { name: "Industry avg", value: 1500 },
-    { name: "Backroute", value: 539 },
-  ];
 
   const priced = loads.filter((l) => l.netProfit !== null);
   const byLane = new Map<string, { total: number; count: number }>();
@@ -118,7 +110,7 @@ export default function EarningsPage() {
           </div>
           <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <WeekTile label="Revenue / mile, all miles" value={`$${week.rpmAll.toFixed(2)}`} />
-            <WeekTile label="Empty miles" value={`${week.emptyPct.toFixed(0)}%`} sub="Industry ~20%" />
+            <WeekTile label="Empty miles" value={`${week.emptyPct.toFixed(0)}%`} />
             <WeekTile label="Above posted rates" value={`+${formatCurrency(week.overPosted)}`} />
             <WeekTile label="Detention billed by AI" value={week.extras ? `+${formatCurrency(week.extras)}` : "$0"} />
           </div>
@@ -173,37 +165,10 @@ export default function EarningsPage() {
           <Card><CardContent><StatTile label="Net profit" value={formatCurrency(netProfitTotal)} sublabel="This cycle" /></CardContent></Card>
           <Card><CardContent><StatTile label="Avg rate / mile" value={`$${avgRpm.toFixed(2)}`} /></CardContent></Card>
           <Card><CardContent><StatTile label="Loads delivered" value={delivered.length} /></CardContent></Card>
-          <Card><CardContent><StatTile label="Empty-mile rate" value={`${emptyRate.toFixed(1)}%`} sublabel="Industry avg is ~20%" trend={{ direction: "down", value: "cut by load chaining", good: true }} /></CardContent></Card>
+          <Card><CardContent><StatTile label="Empty-mile rate" value={`${emptyRate.toFixed(1)}%`} sublabel="Of all miles driven" /></CardContent></Card>
         </div>
 
         <MoneyCharts loads={loads} trucks={trucks} drivers={driverMap} />
-
-        {/* The sample fleet's comparison with a human dispatcher's cost; a real account sees its own numbers above. */}
-        {!signedIn && (
-          <div className="max-w-xl">
-          <Card>
-            <CardHeader>
-              <CardTitle>Cost per truck / month</CardTitle>
-            </CardHeader>
-            <CardContent className="!pt-4">
-              <div className="h-72 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={costComparison} margin={{ left: -12, right: 12, top: 8 }}>
-                    <CartesianGrid stroke={colors.line} vertical={false} />
-                    <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: colors.muted }} />
-                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: colors.muted }} tickFormatter={(v) => `$${v}`} width={58} />
-                    <Tooltip formatter={(value) => formatCurrency(Number(value))} contentStyle={{ borderRadius: 12, border: `1px solid ${colors.line}`, fontSize: 12, background: colors.surface, color: colors.ink }} />
-                    <Bar dataKey="value" radius={[8, 8, 0, 0]} fill={colors.ink} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <p className="mt-3 text-xs text-ink-500">
-                About <span className="font-medium text-ink-900">{formatCurrency(1500 - 539)}</span> saved per truck, per month. {formatCurrency((1500 - 539) * trucks.length)} across your fleet.
-              </p>
-            </CardContent>
-          </Card>
-          </div>
-        )}
 
         <Card>
           <CardHeader>

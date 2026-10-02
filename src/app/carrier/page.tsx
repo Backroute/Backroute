@@ -72,7 +72,7 @@ export default function CarrierOverviewPage() {
     if (!withRpm.length) return 0;
     return withRpm.reduce((s, l) => s + (l.rpm ?? 0), 0) / withRpm.length;
   })();
-  const savingsMonth = carrier.avgSavingsPerTruck * trucks.length;
+  const deliveredCount = loads.filter((l) => l.stage === "delivered").length;
   const chainedCount = trucks.filter((t) => t.nextLoadId).length;
 
   const trucksWithOffers = new Set(offerGroups.map(([, group]) => group[0]?.truckId).filter(Boolean));
@@ -259,12 +259,7 @@ export default function CarrierOverviewPage() {
           </Card>
           <Card>
             <CardContent>
-              <StatTile
-                label="Saved vs. human dispatch"
-                value={formatCurrency(savingsMonth)}
-                sublabel="/mo across fleet"
-                trend={{ direction: "up", value: `${trucks.length} trucks`, good: true }}
-              />
+              <StatTile label="Delivered" value={deliveredCount} sublabel="This cycle" />
             </CardContent>
           </Card>
         </div>
