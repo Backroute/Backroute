@@ -5,6 +5,7 @@ import { CloudOff } from "lucide-react";
 import { useSyncStatus } from "@/lib/cloud/sync";
 import { refreshCount, useUploadQueue } from "@/lib/cloud/upload-queue";
 import { useStore } from "@/lib/store";
+import { registerServiceWorker } from "@/lib/service-worker";
 
 /**
  * "3 waiting to send": photos kept on the phone for lack of signal, and taps not saved yet. Shows only while
@@ -17,6 +18,8 @@ export function OfflineBadge() {
   const [online, setOnline] = useState(true);
   useEffect(() => {
     if (!real) return;
+    // Keeps a copy of the app on the phone, so it opens with no signal (built app only; lib/service-worker).
+    void registerServiceWorker();
     void refreshCount().catch(() => {});
     const on = () => setOnline(true);
     const off = () => setOnline(false);

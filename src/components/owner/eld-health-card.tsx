@@ -65,10 +65,10 @@ export function EldHealthCard() {
             return (
               <li key={t.id} className="rounded-2xl bg-ink-50 px-4 py-3 text-sm">
                 <p className="font-medium text-ink-950">
-                  {t.unitNumber} <span className="font-normal text-ink-500">· {formatNumber(t.odometer)} mi</span>
+                  {t.unitNumber} <span className="font-normal text-ink-500">· {t.odometer != null ? `${formatNumber(t.odometer)} mi` : "odometer not in yet"}</span>
                 </p>
                 <p className={`text-xs ${left < 0 ? "text-[var(--accent-danger)]" : "text-ink-500"}`}>
-                  {left < 0 ? `Service ${formatNumber(-left)} mi overdue` : `Service in ${formatNumber(left)} mi${eta !== null ? `, about ${eta} day${eta === 1 ? "" : "s"} at its pace` : ""}`}
+                  {!Number.isFinite(left) ? "Service due: add the odometer or connect the ELD" : left < 0 ? `Service ${formatNumber(-left)} mi overdue` : `Service in ${formatNumber(left)} mi${eta !== null ? `, about ${eta} day${eta === 1 ? "" : "s"} at its pace` : ""}`}
                 </p>
               </li>
             );

@@ -1,5 +1,6 @@
 "use client";
 
+import { registerServiceWorker } from "./service-worker";
 import { useEffect, useSyncExternalStore } from "react";
 import { formatAtStop } from "./stop-time";
 import type { Load } from "./types";
@@ -43,7 +44,7 @@ export function useLockStop(): boolean {
 
 async function registration() {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return null;
-  return (await navigator.serviceWorker.getRegistration()) ?? (await navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" }).catch(() => null));
+  return (await navigator.serviceWorker.getRegistration()) ?? (await registerServiceWorker());
 }
 
 async function clearNextStop() {

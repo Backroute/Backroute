@@ -74,7 +74,7 @@ export default function MaintenancePage() {
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="font-display text-xl text-ink-950">{truck.unitNumber}</p>
-                        <p className="text-xs text-ink-500">{driver?.name ?? "Unassigned"} · {formatNumber(truck.odometer)} mi</p>
+                        <p className="text-xs text-ink-500">{driver?.name ?? "Unassigned"} · {truck.odometer != null ? `${formatNumber(truck.odometer)} mi` : "odometer not in yet"}</p>
                       </div>
                       {truck.status === "maintenance" ? (
                         <Badge tone="neutral"><Wrench className="h-3 w-3" /> In shop</Badge>
@@ -86,16 +86,16 @@ export default function MaintenancePage() {
                     <div>
                       <div className="flex items-center justify-between text-xs text-ink-500">
                         <span>Next service</span>
-                        <span className="tabular">{remaining < 0 ? `${formatNumber(Math.abs(remaining))} mi overdue` : `${formatNumber(remaining)} mi left`}</span>
+                        <span className="tabular">{!Number.isFinite(remaining) ? "Add the odometer, or connect the ELD" : remaining < 0 ? `${formatNumber(Math.abs(remaining))} mi overdue` : `${formatNumber(remaining)} mi left`}</span>
                       </div>
-                      <Progress value={pct} className="mt-1.5" />
+                      <Progress value={Number.isFinite(pct) ? pct : 0} className="mt-1.5" />
                     </div>
 
                     <div className="flex items-center justify-between border-t border-line pt-3.5 text-xs">
                       <span className="text-ink-500">DOT inspection due</span>
                       <span className={inspStatus === "ok" ? "font-medium text-ink-950" : inspStatus === "due-soon" ? "font-medium text-[var(--accent-warn)]" : "font-medium text-[var(--accent-danger)]"}>
-                        {formatDate(truck.nextInspectionDue)}
-                        {new Date(truck.nextInspectionDue).getFullYear() !== new Date().getFullYear() ? `, ${new Date(truck.nextInspectionDue).getFullYear()}` : ""}
+                        {truck.nextInspectionDue ? formatDate(truck.nextInspectionDue) : "Not set"}
+                        {truck.nextInspectionDue && new Date(truck.nextInspectionDue).getFullYear() !== new Date().getFullYear() ? `, ${new Date(truck.nextInspectionDue).getFullYear()}` : ""}
                       </span>
                     </div>
 

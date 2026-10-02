@@ -42,7 +42,9 @@ export function formatCurrency(value: number, opts: { decimals?: number } = {}) 
   });
 }
 
-export function formatNumber(value: number, decimals = 0) {
+export function formatNumber(value: number | null | undefined, decimals = 0) {
+  // A number that isn't known yet (a truck with no odometer reading) reads as a dash, never "NaN" or a crash.
+  if (value == null || !Number.isFinite(value)) return "—";
   return value.toLocaleString("en-US", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,

@@ -270,7 +270,11 @@ export async function connect(m: Membership, opts: { fresh?: boolean; userId?: s
   }
 
   c.unsubscribe = useStore.subscribe(() => schedule(c));
-  const onHide = () => document.visibilityState === "hidden" && void flush(c);
+  const onHide = () => {
+    if (document.visibilityState !== "hidden") return;
+    saveOutbox(c);
+    void flush(c);
+  };
   document.addEventListener("visibilitychange", onHide);
   const unsubStore = c.unsubscribe;
   c.unsubscribe = () => {
@@ -280,8 +284,92 @@ export async function connect(m: Membership, opts: { fresh?: boolean; userId?: s
   c.channel = listen(c, specs);
   if (fresh) schedule(c, 0);
   c.userId = opts.userId;
+  // Taps made with no signal and not sent before the app was closed go now, on top of what the database has.
+  if (!fresh && replayOutbox(c, specs)) schedule(c, 0);
   saveView(c, true);
   if (useSyncStatus.getState().state === "cached") useSyncStatus.setState({ state: "saved", savedAt: Date.now() });
+}
+
+// ─── Nothing lost offline: what wasn't sent yet, kept on this device ─────────
+
+const OUTBOX_KEY = "backroute.outbox";
+const OUTBOX_MAX = 300;
+
+interface OutboxEntry {
+  spec: string;
+  id: string;
+  /** The copy the database last had, so only what this phone changed goes back (merged, never replacing). */
+  base?: string;
+  item: Item;
+}
+
+/**
+ * What this phone changed and couldn't send yet (no signal at a dock, a dead zone), kept in the browser alongside the
+ * last view. The in-memory retry sends it while the app is open; this copy is for when the phone closes the app
+ * first. Each tap keeps the time it happened (arrived, loaded, a message), not the time it finally went.
+ */
+function saveOutbox(c: Connection) {
+  if (!c.userId || conn !== c || typeof window === "undefined") return;
+  try {
+    const s = useStore.getState();
+    const entries: OutboxEntry[] = [];
+    for (const spec of SPECS) {
+      if (!writes(c.mode, spec) || entries.length >= OUTBOX_MAX) continue;
+      for (const item of s[spec.slice] as unknown as Item[]) {
+        if (spec.mine && !spec.mine(item)) continue;
+        const prev = c.last.get(itemKey(spec, item.id));
+        if (prev?.ref === item) continue;
+        if (prev && prev.json === stable(item)) continue;
+        entries.push({ spec: specKey(spec), id: item.id, base: prev?.json, item });
+        if (entries.length >= OUTBOX_MAX) break;
+      }
+    }
+    if (entries.length) window.localStorage.setItem(OUTBOX_KEY, JSON.stringify({ userId: c.userId, carrierId: c.carrierId, entries }));
+    else window.localStorage.removeItem(OUTBOX_KEY);
+  } catch {
+    // Storage full or blocked: the in-memory retry still sends it while the app stays open.
+  }
+}
+
+/** Puts unsent changes back on top of what was just loaded, field by field, so the next save sends only them. */
+function replayOutbox(c: Connection, specs: Spec[]): number {
+  let box: { userId: string; carrierId: string; entries: OutboxEntry[] } | null = null;
+  try {
+    box = JSON.parse(window.localStorage.getItem(OUTBOX_KEY) ?? "null");
+  } catch {
+    return 0;
+  }
+  if (!box || box.userId !== c.userId || box.carrierId !== c.carrierId || !Array.isArray(box.entries)) return 0;
+  const entries = box.entries;
+  let applied = 0;
+  useStore.setState((s) => {
+    const next: Record<string, Item[]> = {};
+    for (const e of entries) {
+      const spec = specs.find((x) => specKey(x) === e.spec);
+      if (!spec || !writes(c.mode, spec)) continue;
+      const list = next[spec.slice] ?? (s[spec.slice] as unknown as Item[]);
+      const at = list.findIndex((x) => x.id === e.id);
+      if (at < 0) {
+        // Gone from the database meanwhile (the office removed it): left gone. New on this phone: added.
+        if (e.base) continue;
+        next[spec.slice] = spec.newestFirst ? [e.item, ...list] : [...list, e.item];
+        applied++;
+        continue;
+      }
+      const fields = changedFields(e.base, e.item) ?? Object.keys(e.item);
+      if (!fields.length) continue;
+      const merged = { ...list[at] } as Record<string, unknown>;
+      for (const k of fields) {
+        const v = (e.item as Record<string, unknown>)[k];
+        if (v === undefined) delete merged[k];
+        else merged[k] = v;
+      }
+      next[spec.slice] = list.map((x, n) => (n === at ? (merged as Item) : x));
+      applied++;
+    }
+    return next as Partial<State>;
+  });
+  return applied;
 }
 
 // ─── Opening fast: the last view, kept on this device ────────────────────────
@@ -380,6 +468,7 @@ export function showCached(v: View) {
 export function forgetViews() {
   try {
     window.localStorage.removeItem(VIEW_KEY);
+    window.localStorage.removeItem(OUTBOX_KEY);
   } catch {
     // Nothing kept.
   }
@@ -525,6 +614,7 @@ async function flush(c: Connection) {
     c.flushing = false;
   }
   c.failures = failed ? c.failures + 1 : 0;
+  saveOutbox(c);
   useSyncStatus.setState(failed ? { state: "offline" } : { state: "saved", savedAt: Date.now() });
   if (failed) schedule(c);
   else saveView(c);

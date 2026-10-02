@@ -1,5 +1,66 @@
 // Backroute's service worker: shows push notifications (something needs the owner, a message for a driver), opens the
 // app on tap, and answers Yes / No from the notification's buttons without opening it (/api/agent/answer).
+//
+// In a built app (registered as /sw.js?offline=1) it also keeps a copy of the app on the phone, so the driver's screen
+// opens with no signal: pages come from the network when there is one (and the copy is refreshed), from the copy when
+// there isn't; the app's own files (hashed, never change) come from the copy. Nothing from /api is kept: the trip
+// itself comes from the last view the app saved, and anything typed offline waits in its outbox.
+const OFFLINE = new URL(self.location.href).searchParams.get("offline") === "1";
+const SHELL = "backroute-shell-v1";
+const PAGES = ["/driver", "/carrier"];
+
+self.addEventListener("install", (event) => {
+  self.skipWaiting();
+  if (OFFLINE) event.waitUntil(caches.open(SHELL).then((c) => Promise.all(PAGES.map((p) => c.add(p).catch(() => {})))));
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith("backroute-") && (k !== SHELL || !OFFLINE)).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
+  );
+});
+
+const isAsset = (path) => path.startsWith("/_next/static/") || path.startsWith("/icons/") || path.startsWith("/splash/") || path === "/manifest.webmanifest" || path === "/favicon.ico";
+
+self.addEventListener("fetch", (event) => {
+  if (!OFFLINE) return;
+  const req = event.request;
+  if (req.method !== "GET") return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+  if (isAsset(url.pathname)) {
+    event.respondWith(
+      caches.open(SHELL).then((c) =>
+        c.match(req).then(
+          (hit) =>
+            hit ||
+            fetch(req).then((res) => {
+              if (res.ok) c.put(req, res.clone());
+              return res;
+            }),
+        ),
+      ),
+    );
+    return;
+  }
+  if (req.mode === "navigate") {
+    const fallback = url.pathname.startsWith("/driver") ? "/driver" : "/carrier";
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res.ok && (url.pathname.startsWith("/driver") || url.pathname.startsWith("/carrier"))) {
+            const copy = res.clone();
+            caches.open(SHELL).then((c) => c.put(url.pathname, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.open(SHELL).then((c) => c.match(url.pathname).then((hit) => hit || c.match(fallback)).then((hit) => hit || Response.error()))),
+    );
+  }
+});
 self.addEventListener("push", (event) => {
   let data = {};
   try {

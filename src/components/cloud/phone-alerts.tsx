@@ -1,5 +1,6 @@
 "use client";
 
+import { registerServiceWorker } from "@/lib/service-worker";
 import { useEffect, useState } from "react";
 import { BellRing, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -56,9 +57,8 @@ export function PhoneAlerts({ words = OFFICE, lang }: { words?: AlertWords; lang
       return;
     }
     if (Notification.permission === "denied") return setState("blocked");
-    void navigator.serviceWorker
-      .register("/sw.js", { scope: "/", updateViaCache: "none" })
-      .then((reg) => reg.pushManager.getSubscription())
+    void registerServiceWorker()
+      .then((reg) => (reg ? reg.pushManager.getSubscription() : Promise.reject(new Error("no worker"))))
       .then((sub) => setState(sub ? "on" : "off"))
       .catch(() => setState("unsupported"));
   }, []);

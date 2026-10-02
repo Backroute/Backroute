@@ -51,6 +51,8 @@ export interface EldClock {
   shift: number;
   cycle: number;
   status: HosStatus;
+  /** Personal conveyance: driving the truck on their own time, off duty. */
+  personal?: boolean;
 }
 
 const SAMSARA = () => process.env.SAMSARA_API_BASE?.replace(/\/$/, "") ?? "https://api.samsara.com";
@@ -108,6 +110,7 @@ export async function readEld(kind: EldKind, apiKey: string): Promise<{ vehicles
             shift: (c.clocks?.shift?.shiftRemainingDurationMs ?? 0) / 3600_000,
             cycle: (c.clocks?.cycle?.cycleRemainingDurationMs ?? 0) / 3600_000,
             status: samsaraStatus[c.currentDutyStatus?.hosStatusType ?? ""] ?? "off_duty",
+            personal: c.currentDutyStatus?.hosStatusType === "personalConveyance",
           });
       if (!body.pagination?.hasNextPage || !body.pagination.endCursor) break;
       after = body.pagination.endCursor;
@@ -141,6 +144,7 @@ export async function readEld(kind: EldKind, apiKey: string): Promise<{ vehicles
             shift: (u.available_time?.shift ?? 0) / 3600,
             cycle: (u.available_time?.cycle ?? 0) / 3600,
             status: motiveStatus[u.duty_status ?? ""] ?? "off_duty",
+            personal: u.duty_status === "personal_conveyance",
           });
       const p = body.pagination;
       if (!p || (p.page_no ?? page) * (p.per_page ?? 100) >= (p.total ?? 0)) break;
@@ -203,12 +207,14 @@ export async function applyEld(ctx: CarrierContext, kind: EldKind, data: { vehic
   let drivers = 0;
   const unmatched: string[] = [];
   const at = new Date().toISOString();
+  const personalNow = new Set<string>();
   for (const c of data.clocks) {
     const driver = ctx.drivers.find((d) => sameName(d.name, c.driverName));
     if (!driver) {
       unmatched.push(`driver ${c.driverName}`);
       continue;
     }
+    if (c.personal) personalNow.add(driver.id);
     const round = (h: number) => Math.round(h * 10) / 10;
     const next: Driver = { ...driver, hos: { drive: round(c.drive), shift: round(c.shift), cycle: round(c.cycle), at, source: kind }, hoursRemaining: round(Math.min(c.drive, c.shift)), hosStatus: c.status };
     await save("drivers", ctx.carrier.id, next as unknown as Item);
@@ -222,13 +228,14 @@ export async function applyEld(ctx: CarrierContext, kind: EldKind, data: { vehic
       continue;
     }
     const place = cityState(v.description);
-    // Off duty (or in the sleeper), where the truck goes is the driver's own time: the last on-duty spot stays, and
-    // a personal-conveyance trip isn't followed. Odometer and engine codes still come in.
+    // Personal conveyance (the driver using the truck on their own time) isn't followed: the last spot stays. Parked
+    // off duty or in the sleeper, the truck's spot still comes in, since that's where the AI finds its next load.
+    // Odometer and engine codes always come in.
     const driver = ctx.drivers.find((d) => d.id === truck.driverId);
-    const offDuty = !!driver && (driver.hosStatus === "off_duty" || driver.hosStatus === "sleeper") && !!driver.hos && Date.now() - Date.parse(driver.hos.at) < 15 * 60_000;
+    const personal = !!driver && personalNow.has(driver.id);
     const next: Truck = {
       ...truck,
-      ...(offDuty && truck.position
+      ...(personal && truck.position
         ? {}
         : { position: { lat: v.lat, lon: v.lon, at: v.at, description: v.description, source: kind }, ...(place ? { currentCity: place.city, currentState: place.state } : {}) }),
       // The odometer only goes up: a reading lower than what's known (a swapped ECU) is left alone.
