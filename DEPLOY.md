@@ -314,7 +314,9 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - **Two-step sign-in:** the owner can add an authenticator app (Settings → Security). After that, an account's data stays out of reach until the 6-digit code is entered, in the database itself. The same page lists the devices signed in, with Sign out everywhere else.
   - **From the ELD:** the odometer (for service due by miles) and engine codes, each with what it means and what to do. One that means stop reaches the owner at once.
 - **On the road (driver app):**
-  - **Directions** in the driver's own GPS app, for the truck's height, weight and hazmat in the truck apps (Sygic Truck, CoPilot Truck), or Google Maps, Apple Maps or Waze. Picked once in Profile.
+  - **Directions, truck-safe only:** the big button opens the driver's truck GPS app (Sygic Truck or CoPilot Truck, picked once; "Get the app" if it isn't on the phone) at the dock itself. Google Maps, Apple Maps and Waze are left out on purpose: they route like a car, under low bridges and onto parkways. The dock's street address comes from the rate con (or the office types it on the load) and is looked up to its exact spot at street level (HERE, step 12); a city-only match is never used. Without an exact spot the driver copies the address and is told to check the pin; with no address at all the card says so and to ask dispatch, never "go to Memphis". The new-load text has the address too, and the AI tells drivers the same: truck GPS, the dock's address, no car apps.
+  - **The trip map** draws the road a truck this size takes (HERE truck routing), or, without it, a dashed straight line marked "Straight line · not directions". In a real account the truck's dot, miles left and arrival time come from its ELD position (fresh within 30 minutes); with none the card says "No GPS yet" instead of moving a dot on a timer. On the owner's fleet map a truck placed without GPS is faded and the legend says it's estimated.
+  - The fuel plan (where diesel is cheapest on the way) uses sample prices, so it shows only in the demo until a fuel card price feed is connected. The Lanes page compares against the market only when a rate service gives one (step 11); a load the owner typed in isn't treated as the market.
   - **Hours clock** at the top, counting down from the ELD's last reading, with a spoken heads-up at 60, 30 and 15 minutes left (Profile turns the voice off), and where on the way the hours run out, with truck parking near there.
   - **Weather on the route:** National Weather Service warnings along the way to the next stop (`/api/weather`, US points only).
   - **Lumper money:** the driver asks for the amount at the dock; the office gets it on their phone and in Needs you, sends the express code (Comdata, EFS) back, and the driver sees it in the app, never on the lock screen.
@@ -504,7 +506,7 @@ Check the request format in `src/lib/agent/rates.ts` against the provider's docu
 
 ### 12. HERE truck routing (optional)
 
-Create a HERE platform API key with Routing v8 and Geocoding, then set `HERE_API_KEY`.
+Create a HERE platform API key with Routing v8 and Geocoding, then set `HERE_API_KEY`. Besides road miles and ETAs, it finds each dock's exact spot from its street address (so the driver's truck GPS goes to the dock, not the city) and draws the truck's road on the driver's map, sized for the truck. Without it, drivers copy the dock address into their truck GPS and the map shows a straight line marked "not directions".
 
 ### 13. The voice server (for natural calls)
 
