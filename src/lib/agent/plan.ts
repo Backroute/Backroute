@@ -5,6 +5,7 @@ import type { Item } from "../cloud/rows";
 import type { Load, Truck } from "../types";
 import { save, type CarrierContext } from "./db";
 import { when } from "./templates";
+import { chainOf, slotsFor } from "./chain";
 
 /**
  * The plan a dispatcher keeps in their head for each truck, written down: what it's on, what's lined up next (or
@@ -17,14 +18,18 @@ const at = (iso: string | undefined, state: string, fallback: string) => (iso ? 
 export function planFor(ctx: Pick<CarrierContext, "loads" | "drivers">, truck: Truck, now: number): string[] {
   const lines: string[] = [];
   const current = ctx.loads.find((l) => l.id === truck.currentLoadId && ROLLING.has(l.stage));
-  const next = ctx.loads.find((l) => l.id === truck.nextLoadId && !["cancelled", "declined", "delivered"].includes(l.stage));
+  // What's lined up after it, in pickup order (lib/agent/chain): up to three loads ahead.
+  const lined = chainOf(ctx.loads, truck).filter((l) => l !== current && l.id !== truck.currentLoadId);
+  const next = lined[0];
   const chasing = ctx.loads.find((l) => l.truckId === truck.id && l.stage === "negotiating");
   const offered = ctx.loads.filter((l) => l.truckId === truck.id && l.stage === "offered").length;
   if (truck.status === "maintenance") lines.push("In the shop.");
   if (current) lines.push(`Now: ${current.referenceNumber} to ${current.lane.destination}, ${current.lane.destState}, delivering ${at(current.deliveryAt, current.lane.destState, current.deliveryWindow)}.`);
   else if (truck.status !== "maintenance")
     lines.push(truck.repositionTo && Date.parse(truck.repositionTo.at) > now - 86400_000 ? `Empty, heading to ${truck.repositionTo.city}, ${truck.repositionTo.state} where the freight is.` : `Empty in ${truck.currentCity}, ${truck.currentState}.`);
-  if (next) lines.push(`Next: ${next.referenceNumber}, ${next.lane.origin} → ${next.lane.destination}, ${next.stage === "negotiating" ? "waiting on the broker" : `picks up ${at(next.pickupAt, next.lane.originState, next.pickupWindow)}`}.`);
+  if (next) lines.push(`Next: ${next.referenceNumber}, ${next.lane.origin} → ${next.lane.destination}, picks up ${at(next.pickupAt, next.lane.originState, next.pickupWindow)}.`);
+  for (const then of lined.slice(1)) lines.push(`Then: ${then.referenceNumber}, ${then.lane.origin} → ${then.lane.destination}, picks up ${at(then.pickupAt, then.lane.originState, then.pickupWindow)}.`);
+  if (next && chasing) lines.push(`Also asking for ${chasing.lane.origin} → ${chasing.lane.destination} at $${(chasing.bookRequest?.ask ?? chasing.targetRate).toLocaleString()}, after that.`);
   else if (chasing) lines.push(`Next: asking ${chasing.lane.origin} → ${chasing.lane.destination} at $${(chasing.bookRequest?.ask ?? chasing.targetRate).toLocaleString()}, waiting on the broker.`);
   else if (truck.status !== "maintenance") {
     const from = current ? `${current.lane.destination}, ${current.lane.destState}` : `${truck.currentCity}, ${truck.currentState}`;
@@ -32,7 +37,7 @@ export function planFor(ctx: Pick<CarrierContext, "loads" | "drivers">, truck: T
   }
   const driver = ctx.drivers.find((d) => d.id === truck.driverId);
   if (driver?.homeBase) {
-    const lastLoad = next ?? current;
+    const lastLoad = lined[lined.length - 1] ?? current;
     const empty = lastLoad ? { city: lastLoad.lane.destination, state: lastLoad.lane.destState, when: Date.parse(lastLoad.deliveryAt ?? "") || now } : { city: truck.currentCity, state: truck.currentState, when: now };
     const home = homeTimeStatus(driver, empty.city, empty.state, new Date(Math.max(now, empty.when)));
     const first = driver.name.split(" ")[0];
@@ -50,6 +55,17 @@ export function planFor(ctx: Pick<CarrierContext, "loads" | "drivers">, truck: T
 
 /** Refreshes every truck's plan; saves only the ones that changed. */
 export async function refreshPlans(ctx: CarrierContext, now: number) {
+  // A truck's next load is the first one lined up behind the one it's on: when that one goes (delivered and taken
+  // over in the app, cancelled), the one after it moves up. A delivered load waiting for the driver's tap stays put.
+  for (const truck of ctx.trucks) {
+    const current = ctx.loads.find((l) => l.id === truck.currentLoadId);
+    if (!current || !ROLLING.has(current.stage)) continue;
+    const want = slotsFor(ctx.loads, truck).nextLoadId;
+    if (want === truck.nextLoadId) continue;
+    const fixed = { ...truck, nextLoadId: want };
+    await save("trucks", ctx.carrier.id, fixed as unknown as Item);
+    ctx.trucks = ctx.trucks.map((t) => (t.id === truck.id ? fixed : t));
+  }
   for (const truck of ctx.trucks) {
     const lines = planFor(ctx, truck, now);
     if (JSON.stringify(lines) === JSON.stringify(truck.plan?.lines)) continue;

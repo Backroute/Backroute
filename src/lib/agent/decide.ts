@@ -3,6 +3,7 @@ import type { Item } from "../cloud/rows";
 import type { Escalation } from "../types";
 import { save, type CarrierContext } from "./db";
 import { noticeApprovals } from "./learning";
+import { actOnDecision } from "./decisions";
 import { deliver } from "./outbox";
 
 /**
@@ -12,8 +13,11 @@ import { deliver } from "./outbox";
 export async function decideItem(ctx: CarrierContext, escalation: Escalation, send: boolean, body?: string): Promise<Escalation> {
   const now = new Date().toISOString();
   if (!escalation.draft) {
-    const done: Escalation = { ...escalation, status: "resolved", resolvedBy: "carrier", resolvedAt: now, resolutionNote: send ? "Done" : "Dismissed" };
+    let done: Escalation = { ...escalation, status: "resolved", resolvedBy: "carrier", resolvedAt: now, resolutionNote: send ? "Done" : "Dismissed", approved: send };
     await save("escalations", ctx.carrier.id, done as unknown as Item);
+    ctx.escalations = ctx.escalations.map((e) => (e.id === done.id ? done : e));
+    // A yes/no the AI acts on (move an empty truck): yes does it now.
+    if (done.decision) done = await actOnDecision(ctx, done);
     return done;
   }
   const text = body ?? escalation.draft.body;

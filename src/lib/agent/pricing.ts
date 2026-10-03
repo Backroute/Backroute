@@ -44,6 +44,7 @@ export function askFor(
   lane?: { count: number; avgRpm: number | null },
   market?: { rpm: number; high?: number } | null,
   broker?: BrokerHabits | null,
+  learned?: { factor: number; source: "broker" | "lane" | null } | null,
 ): number | null {
   const floor = floorFor(load, settings);
   const posted = load.listedRate > 0 ? load.listedRate : null;
@@ -62,11 +63,13 @@ export function askFor(
     const paid = round25(broker.avgRpm * load.lane.miles);
     ask = Math.max(ask ?? 0, Math.min(paid, posted ? round25(posted * 1.2) : paid));
   }
-  if (ask && broker) {
+  // How the last asks went (lib/agent/ask-learning) replaces the rough yes/no-count nudge when it knows this broker.
+  if (ask && broker && learned?.source !== "broker") {
     // Says yes to our first number every time: we've been asking too little. Always pushes back: leave room.
     if (broker.tookOurAsk >= 2 && broker.countered === 0) ask = round25(ask * 1.05);
     else if (broker.countered >= 2 && broker.tookOurAsk === 0) ask = round25(ask * 1.04);
   }
+  if (ask && learned && learned.factor !== 1) ask = round25(ask * learned.factor);
   if (market?.rpm) {
     const average = round25(market.rpm * load.lane.miles);
     const top = market.high ? round25(market.high * load.lane.miles) : round25(average * 1.1);

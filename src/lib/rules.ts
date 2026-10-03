@@ -6,6 +6,7 @@ export const OWNER_RULES: { rule: OwnerRule; label: string; detail: string; kind
   { rule: "detention_default", kind: "detention claims", label: "Claim detention at the usual rate", detail: "When the truck waited past the free time and the rate con doesn't give a detention rate." },
   { rule: "invoice_noted_pod", kind: "invoices with a noted POD", label: "Send invoices even when the POD has a note", detail: "A shortage or damage written on the POD. The note goes with the invoice either way." },
   { rule: "replies", kind: "email replies", label: "Let the AI send its own email replies", detail: "On Within my rules. It still never names a price that isn't already in the conversation." },
+  { rule: "reposition", kind: "moves of empty trucks to busier freight", label: "Move empty trucks to busier freight", detail: "When a truck sits empty half a day where nothing ships, the AI sends it toward the nearest place with freight, within half your empty-miles limit." },
   { rule: "portal_setup", kind: "carrier setups on broker websites", label: "Submit carrier setups on broker websites", detail: "MyCarrierPackets, RMIS, Highway and the like, filled from your details and papers. Off: you see each one before it's submitted." },
 ];
 

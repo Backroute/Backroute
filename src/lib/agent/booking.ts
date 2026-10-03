@@ -34,6 +34,9 @@ import { hardProblem, scheduleWarnings } from "./schedule";
 import { reeferLine } from "./reefer";
 import { translateForDriver } from "../ai/translate";
 import { cantRun } from "../expiry";
+import { chainOf, LINED_UP_MAX, reloadOutlook, reloadValue, slotsFor } from "./chain";
+import { bestAssignment } from "./match";
+import { learnedAsk } from "./ask-learning";
 
 /**
  * Booking by email, the way a small carrier's dispatcher does it: loads brokers send in are matched to a truck that
@@ -83,33 +86,79 @@ function emptyNow(ctx: Pick<CarrierContext, "trucks" | "loads">, truckId: string
   return !!truck && truck.status === "available" && !ctx.loads.some((l) => l.truckId === truck.id && ["booked", "rate_confirmed", "dispatched", "at_pickup", "in_transit", "at_delivery"].includes(l.stage));
 }
 
-/** The truck that can take a load soonest with the least empty driving, if any. */
-export function bestTruck(ctx: CarrierContext, o: { equipment: Load["equipmentType"]; originCity: string; originState: string; destinationState: string; pickupAt: number | null; miles: number }, skip?: Set<string>) {
+/**
+ * The truck that can take a load soonest with the least empty driving, if any. A truck with loads lined up (up to
+ * three, lib/agent/chain) takes one that picks up after the last of them delivers, from where that one ends.
+ */
+export function bestTruck(ctx: CarrierContext, o: LoadAsk, skip?: Set<string>) {
   let best: { truck: Truck; deadhead: number } | null = null;
   for (const truck of ctx.trucks) {
     if (skip?.has(truck.id)) continue;
-    if (!truck.driverId || truck.equipmentType !== o.equipment || truck.status === "maintenance" || truck.nextLoadId) continue;
-    // Can't legally run: an inspection or plates past due, a critical engine fault, a driver whose CDL or medical card
-    // ran out (lib/expiry). No load goes on it; the owner was reminded ahead of time.
-    if (cantRun(truck, ctx.drivers.find((d) => d.id === truck.driverId), Date.now())) continue;
-    // States the driver said they won't run into.
-    if (ctx.drivers.find((d) => d.id === truck.driverId)?.prefs?.avoidStates?.includes(o.destinationState)) continue;
-    const busy = ctx.loads.find((l) => l.id === truck.currentLoadId && !["delivered", "cancelled", "declined"].includes(l.stage));
-    let from = { city: truck.currentCity, state: truck.currentState };
-    if (busy) {
-      // A truck on a load can take one that picks up after it delivers, with a couple of hours to spare.
-      if (!busy.deliveryAt || !o.pickupAt || Date.parse(busy.deliveryAt) + 2 * HOUR > o.pickupAt) continue;
-      from = { city: busy.lane.destination, state: busy.lane.destState };
-    }
-    // A truck already chasing a load the AI asked for stays on that one.
-    if (ctx.loads.some((l) => l.truckId === truck.id && l.stage === "negotiating")) continue;
-    const deadhead = estimateMiles(from, { city: o.originCity, state: o.originState }) ?? 150;
-    if (deadhead > (ctx.settings.maxDeadhead ?? MAX_DEADHEAD)) continue;
-    // With an ELD connected: only a driver who has the hours to get there in time.
-    if (!busy && !canMakePickup(ctx.drivers.find((d) => d.id === truck.driverId), deadhead, o.miles, o.pickupAt, Date.now())) continue;
+    const deadhead = fitFor(ctx, truck, o);
+    if (deadhead === null) continue;
     if (!best || deadhead < best.deadhead) best = { truck, deadhead };
   }
   return best;
+}
+
+type LoadAsk = { equipment: Load["equipmentType"]; originCity: string; originState: string; destinationState: string; pickupAt: number | null; miles: number };
+const askOf = (l: Load): LoadAsk => ({ equipment: l.equipmentType, originCity: l.lane.origin, originState: l.lane.originState, destinationState: l.lane.destState, pickupAt: l.pickupAt ? Date.parse(l.pickupAt) : null, miles: l.lane.miles });
+
+/** Whether this truck can take the load, and the empty miles to it if so (null: it can't). */
+function fitFor(ctx: CarrierContext, truck: Truck, o: LoadAsk): number | null {
+  if (!truck.driverId || truck.equipmentType !== o.equipment || truck.status === "maintenance") return null;
+  // Can't legally run: an inspection or plates past due, a critical engine fault, a driver whose CDL or medical card
+  // ran out (lib/expiry). No load goes on it; the owner was reminded ahead of time.
+  if (cantRun(truck, ctx.drivers.find((d) => d.id === truck.driverId), Date.now())) return null;
+  // States the driver said they won't run into.
+  if (ctx.drivers.find((d) => d.id === truck.driverId)?.prefs?.avoidStates?.includes(o.destinationState)) return null;
+  const chain = chainOf(ctx.loads, truck);
+  if (chain.length >= LINED_UP_MAX) return null;
+  const last = chain[chain.length - 1];
+  let from = { city: truck.currentCity, state: truck.currentState };
+  if (last) {
+    // A truck with loads lined up can take one that picks up after the last delivers, with a couple of hours to spare.
+    if (!last.deliveryAt || !o.pickupAt || Date.parse(last.deliveryAt) + 2 * HOUR > o.pickupAt) return null;
+    from = { city: last.lane.destination, state: last.lane.destState };
+  }
+  // A truck already chasing a load the AI asked for stays on that one.
+  if (ctx.loads.some((l) => l.truckId === truck.id && l.stage === "negotiating")) return null;
+  const deadhead = estimateMiles(from, { city: o.originCity, state: o.originState }) ?? 150;
+  if (deadhead > (ctx.settings.maxDeadhead ?? MAX_DEADHEAD)) return null;
+  // With an ELD connected: only a driver who has the hours to get there in time.
+  if (!last && !canMakePickup(ctx.drivers.find((d) => d.id === truck.driverId), deadhead, o.miles, o.pickupAt, Date.now())) return null;
+  return deadhead;
+}
+
+/**
+ * What a load is worth on a given truck, the way pickForTruck weighs it: never one that makes the driver miss home
+ * time; for a driver who needs to head home (or the owner said so), closest to home wins; otherwise the profit after
+ * this truck's empty miles, less what reloading where it ends will likely cost. Null: not on this truck.
+ */
+function worthOn(ctx: CarrierContext, l: Load, truck: Truck, deadhead: number, now: Date): number | null {
+  const net = (l.netProfit ?? 0) + Math.round((l.deadheadMiles - deadhead) * 0.68);
+  const reload = reloadValue(reloadOutlook(ctx.loads, l.lane.destination, l.lane.destState, l.equipmentType, now.getTime()).outlook);
+  const driver = ctx.drivers.find((d) => d.id === truck.driverId);
+  if (!driver?.homeBase) return net + reload;
+  const at = new Date(Math.max(now.getTime(), Date.parse(l.deliveryAt ?? l.pickupAt ?? "") || 0));
+  const local = driver.runType === "local" || driver.runType === "intown";
+  const d = local && at.toDateString() !== now.toDateString() ? { ...driver, hoursRemaining: 11 } : driver;
+  const after = homeTimeStatus(d, l.lane.destination, l.lane.destState, at);
+  if (after.state === "late") return null;
+  const nowState = homeTimeStatus(driver, truck.currentCity, truck.currentState, now).state;
+  if (driver.homePriority || nowState === "head_home" || nowState === "late") return 1_000_000 - (after.hoursHome ?? 999) * 1000 + net / 1000;
+  return net + reload;
+}
+
+/**
+ * The whole fleet at once: of the loads the AI may ask for on its own, which truck asks for which, for the best total
+ * (lib/agent/match). A load moves to the truck that should take it; each truck asks for at most one.
+ */
+function matchFleet(ctx: CarrierContext, loads: Load[], now = new Date()): { load: Load; truck: Truck; deadhead: number }[] {
+  const trucks = ctx.trucks.filter((t) => t.driverId && t.status !== "maintenance");
+  const fits: (number | null)[][] = loads.map((l) => trucks.map((t) => fitFor(ctx, t, askOf(l))));
+  const value = loads.map((l, i) => trucks.map((t, j) => (fits[i][j] === null ? null : worthOn(ctx, l, t, fits[i][j]!, now))));
+  return bestAssignment(value).map(([i, j]) => ({ load: loads[i], truck: trucks[j], deadhead: fits[i][j]! }));
 }
 
 /**
@@ -144,7 +193,8 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
     const posted = o.rate ?? 0;
     const draft = { lane: { miles }, listedRate: posted } as Pick<Load, "lane" | "listedRate">;
     const market = await marketRate({ originCity: o.originCity, originState: o.originState, destinationCity: o.destinationCity, destinationState: o.destinationState, equipment });
-    const ask = askFor(draft as Load, ctx.settings, laneMemory(ctx.loads, ctx.brokers, { originState: o.originState, destState: o.destinationState }), market, brokerMemory(ctx.loads, broker.id));
+    const learned = learnedAsk(ctx.loads, { brokerId: broker.id, brokerName: broker.company, lane: { originState: o.originState, destState: o.destinationState } }, Date.now());
+    const ask = askFor(draft as Load, ctx.settings, laneMemory(ctx.loads, ctx.brokers, { originState: o.originState, destState: o.destinationState }), market, brokerMemory(ctx.loads, broker.id), learned);
     const base = makeLoad(
       {
         truckId: fit.truck.id,
@@ -202,36 +252,18 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
   const trusted = assessBroker(broker, ctx.settings.brokerOverrides).policy !== "block" || checkOnCall;
   if (ctx.settings.autonomy !== "ask" && added.length && !trusted) await untrustedBroker(ctx, broker, added[0].id);
   if (ctx.settings.autonomy !== "ask" && trusted) {
-    const byTruck = new Map<string, Load[]>();
-    for (const l of added) byTruck.set(l.truckId!, [...(byTruck.get(l.truckId!) ?? []), l]);
-    for (const group of byTruck.values()) {
-      const floor = (l: Load) => floorFor(l, ctx.settings);
-      const pick = pickForTruck(ctx, group.filter((l) => floor(l) !== null && l.targetRate >= floor(l)! && !hardProblem(l)));
-      if (pick) {
-        await requestBooking(ctx, pick, pick.targetRate, { byRules: true, callFirst: !!sender.feed && emptyNow(ctx, pick.truckId) });
-        asked.push(pick);
+    const floor = (l: Load) => floorFor(l, ctx.settings);
+    const fair = added.filter((l) => floor(l) !== null && l.targetRate >= floor(l)! && !hardProblem(l));
+    for (const { load, truck, deadhead } of matchFleet(ctx, fair)) {
+      let pick = ctx.loads.find((x) => x.id === load.id) ?? load;
+      if (pick.truckId !== truck.id) {
+        // The fleet's best pairing puts it on another truck than its nearest one.
+        pick = { ...pick, truckId: truck.id, offerGroupId: `offers-${truck.id}`, deadheadMiles: deadhead, updatedAt: new Date().toISOString() };
+        await save("loads", ctx.carrier.id, pick as unknown as Item);
+        ctx.loads = ctx.loads.map((x) => (x.id === pick.id ? pick : x));
       }
-    }
-    // The whole fleet at once: a load that lost out on its nearest truck goes to the next free truck that can take it.
-    const taken = new Set(asked.map((l) => l.truckId!));
-    const leftover = new Map<string, Load[]>();
-    for (const l of added) {
-      const now = ctx.loads.find((x) => x.id === l.id);
-      if (!now || now.stage !== "declined" || asked.includes(l)) continue;
-      const alt = bestTruck(ctx, { equipment: l.equipmentType, originCity: l.lane.origin, originState: l.lane.originState, destinationState: l.lane.destState, pickupAt: l.pickupAt ? Date.parse(l.pickupAt) : null, miles: l.lane.miles }, taken);
-      if (!alt) continue;
-      const moved: Load = { ...now, stage: "offered", truckId: alt.truck.id, offerGroupId: `offers-${alt.truck.id}`, deadheadMiles: alt.deadhead, updatedAt: new Date().toISOString() };
-      await save("loads", ctx.carrier.id, moved as unknown as Item);
-      ctx.loads = ctx.loads.map((x) => (x.id === moved.id ? moved : x));
-      leftover.set(alt.truck.id, [...(leftover.get(alt.truck.id) ?? []), moved]);
-    }
-    for (const group of leftover.values()) {
-      const floor = (l: Load) => floorFor(l, ctx.settings);
-      const pick = pickForTruck(ctx, group.filter((l) => floor(l) !== null && l.targetRate >= floor(l)! && !hardProblem(l)));
-      if (pick) {
-        await requestBooking(ctx, pick, pick.targetRate, { byRules: true });
-        asked.push(pick);
-      }
+      await requestBooking(ctx, pick, pick.targetRate, { byRules: true, callFirst: !!sender.feed && emptyNow(ctx, pick.truckId) });
+      asked.push(pick);
     }
   }
   return { added, asked };
@@ -242,11 +274,15 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
  * their home time is out; when the driver needs to head home (or the owner said to get them home first), the one
  * that ends closest to home; otherwise the one that makes the most.
  */
-export function pickForTruck(ctx: Pick<CarrierContext, "trucks" | "drivers">, loads: Load[], now = new Date()): Load | undefined {
+export function pickForTruck(ctx: Pick<CarrierContext, "trucks" | "drivers"> & { loads?: Load[] }, loads: Load[], now = new Date()): Load | undefined {
   if (!loads.length) return undefined;
+  const allLoads = ctx.loads;
   const truck = ctx.trucks.find((t) => t.id === loads[0].truckId);
   const driver = ctx.drivers.find((d) => d.id === truck?.driverId);
-  if (!truck || !driver?.homeBase) return [...loads].sort((a, b) => (b.netProfit ?? 0) - (a.netProfit ?? 0))[0];
+  if (!truck || !driver?.homeBase) {
+    const worth = (l: Load) => (l.netProfit ?? 0) + reloadValue(reloadOutlook(allLoads ?? loads, l.lane.destination, l.lane.destState, l.equipmentType, now.getTime()).outlook);
+    return [...loads].sort((a, b) => worth(b) - worth(a))[0];
+  }
   // Judged when the load is done (a load for Sunday is checked against next week's home day, not today's clock).
   const after = (l: Load) => {
     const at = new Date(Math.max(now.getTime(), Date.parse(l.deliveryAt ?? l.pickupAt ?? "") || 0));
@@ -258,7 +294,9 @@ export function pickForTruck(ctx: Pick<CarrierContext, "trucks" | "drivers">, lo
   const nowState = homeTimeStatus(driver, truck.currentCity, truck.currentState, now).state;
   if (driver.homePriority || nowState === "head_home" || nowState === "late")
     return ok.sort((a, b) => (after(a).hoursHome ?? 999) - (after(b).hoursHome ?? 999) || (b.netProfit ?? 0) - (a.netProfit ?? 0))[0];
-  return ok.sort((a, b) => (b.netProfit ?? 0) - (a.netProfit ?? 0))[0];
+  // Thinking a load ahead: the profit, less what it'll likely take to reload where it ends (lib/agent/chain).
+  const worth = (l: Load) => (l.netProfit ?? 0) + reloadValue(reloadOutlook(allLoads ?? loads, l.lane.destination, l.lane.destState, l.equipmentType, now.getTime()).outlook);
+  return ok.sort((a, b) => worth(b) - worth(a))[0];
 }
 
 /**
@@ -440,8 +478,9 @@ export async function bookIt(ctx: CarrierContext, load: Load, rate?: number): Pr
   ctx.loads = ctx.loads.map((l) => (l.id === load.id ? booked : l));
   let truckAfter: Truck | undefined;
   if (truck) {
-    truckAfter = free ? { ...truck, currentLoadId: load.id, status: "on_load" } : truck.nextLoadId ? truck : { ...truck, nextLoadId: load.id };
-    if (truckAfter !== truck) {
+    // The truck's current and next load from its lined-up chain (lib/agent/chain).
+    truckAfter = free ? { ...truck, currentLoadId: load.id, status: "on_load" } : { ...truck, ...slotsFor(ctx.loads, truck) };
+    if (truckAfter.currentLoadId !== truck.currentLoadId || truckAfter.nextLoadId !== truck.nextLoadId || truckAfter.status !== truck.status) {
       await save("trucks", ctx.carrier.id, truckAfter as unknown as Item);
       ctx.trucks = ctx.trucks.map((t) => (t.id === truck.id ? truckAfter! : t));
     }

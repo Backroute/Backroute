@@ -3,10 +3,10 @@ import { alertsAt } from "@/lib/weather";
 import { clientIp, overLimit, tooMany } from "@/lib/rate-limit";
 
 /**
- * Weather along a driver's route, from the National Weather Service: active warnings and advisories at points every
+ * Weather along a driver's route, from the National Weather Service (US) and Environment Canada: active warnings and advisories at points every
  * ~100 miles of the leg ahead. The app sends the points (no load or driver details); a few lookups per minute per phone.
  */
-const Points = z.array(z.tuple([z.number().min(15).max(72), z.number().min(-170).max(-60)])).min(1).max(6);
+const Points = z.array(z.tuple([z.number().min(15).max(72), z.number().min(-170).max(-50)])).min(1).max(6);
 
 export async function GET(request: Request) {
   if (await overLimit(`weather:${clientIp(request)}`, 60, 10)) return tooMany();

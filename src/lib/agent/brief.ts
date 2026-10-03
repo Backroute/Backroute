@@ -8,7 +8,9 @@ import { LANG_INFO } from "../lang/pack";
 import { formatAtStop, hourAtStop, zoneFor } from "../stop-time";
 import { placeCoords } from "../trip-geo";
 import type { Driver, Lang, Load, Truck } from "../types";
-import { alertsAt } from "../weather";
+import { alertsAlong, alertsAt } from "../weather";
+import { truckPath } from "./routing";
+import { DEFAULT_PROFILE } from "../nav-apps";
 import { claimMark, logChannel, saveDriverMessage, type CarrierContext } from "./db";
 import { uid } from "./dispatcher";
 import { facilitiesOf, tipsForLoad } from "./facility-notes";
@@ -84,6 +86,14 @@ export async function briefFacts(ctx: CarrierContext, driver: Driver, truck: Tru
   }
   const weather = new Set<string>();
   for (const [key, [lat, lon]] of points) for (const a of await alertsAt(lat, lon)) weather.add(`${a.event}${key === "now" ? " where you are" : ` near ${key.replace(",", ", ")}`}`);
+  // And along the way: every ~100 miles on the truck's road (truck routing) or the straight line between the stops.
+  for (const l of today) {
+    const a = placeCoords(l.lane.origin, l.lane.originState);
+    const b = placeCoords(l.lane.destination, l.lane.destState);
+    if (!a || !b) continue;
+    const road = await truckPath({ lat: a[0], lon: a[1] }, { lat: b[0], lon: b[1] }, truck.profile ?? DEFAULT_PROFILE).catch(() => null);
+    for (const w of await alertsAlong(road ?? [a, b])) if (![...weather].some((x) => x.startsWith(w.event))) weather.add(`${w.event} on the way to ${l.lane.destination}`);
+  }
   const reefer = today.map(reeferLine).find(Boolean) ?? undefined;
   const warnings = today.flatMap((l) => (l.scheduleWarnings ?? []).map((w) => w.text));
   return {

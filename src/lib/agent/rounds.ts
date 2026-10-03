@@ -20,6 +20,7 @@ import { integrationsFor, setStatus, type EldConfig, type FeedConfig } from "./i
 import { chasePayments } from "./money";
 import { expireOffers, sendDetentionClaims, sendInvoices, warnCoiExpiring } from "./paperwork";
 import { refreshPlans } from "./plan";
+import { actOnDecisions } from "./decisions";
 import { suggestRepositions } from "./reposition";
 import { trackingRounds } from "./tracking";
 import { portalReady, portalRounds } from "../portal/tasks";
@@ -77,6 +78,7 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   }
   done.push(...(await runBoards(ctx, links.filter((l) => isBoard(l.kind)), now, (row, status) => setStatus(id, row.kind, status))));
   done.push(...(await offerCapacity(ctx, now)));
+  done.push(...(await actOnDecisions(ctx)));
   done.push(...(await suggestRepositions(ctx, now)));
   done.push(...(await complianceReminders(ctx, now)));
   done.push(...(await pullStatements(ctx, links, now)));

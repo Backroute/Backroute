@@ -1,4 +1,5 @@
 import "server-only";
+import { slotsFor } from "./chain";
 import { aiConfigured } from "../ai/server";
 import { checkStopDocument } from "../ai/doc-check";
 import { twilioMedia } from "../channels/twilio";
@@ -83,7 +84,9 @@ export async function driverPhotos(ctx: CarrierContext, driver: Driver, media: {
     const at = new Date().toISOString();
     current = { ...current, stage: "delivered", progressPct: 100, ticksInStage: 0, tripChecklist: { ...current.tripChecklist, arrivedDeliveryAt: current.tripChecklist?.arrivedDeliveryAt ?? at, unloadedAt: current.tripChecklist?.unloadedAt ?? at } };
     if (truck && truck.currentLoadId === load.id) {
-      const next: Truck = { ...truck, currentLoadId: truck.nextLoadId ?? null, nextLoadId: null, status: truck.nextLoadId ? "on_load" : "available" };
+      // Whatever's lined up behind it moves up (lib/agent/chain).
+      const after = ctx.loads.map((l) => (l.id === current.id ? current : l));
+      const next: Truck = { ...truck, ...slotsFor(after, { ...truck, currentLoadId: null }) };
       await save("trucks", ctx.carrier.id, next as unknown as Item);
       ctx.trucks = ctx.trucks.map((t) => (t.id === next.id ? next : t));
     }

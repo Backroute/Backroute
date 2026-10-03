@@ -61,29 +61,42 @@ export async function suggestRepositions(ctx: CarrierContext, now: number): Prom
       .sort((a, b) => b.loads / (1 + b.miles / 100) - a.loads / (1 + a.miles / 100))[0];
     if (!best) continue;
     const driver = ctx.drivers.find((d) => d.id === truck.driverId);
-    const goes = ctx.settings.autonomy === "full" && best.miles <= limit / 2;
+    // Full autopilot, or the owner's rule to make these moves (lib/rules, offered after a few yeses).
+    const allowed = ctx.settings.autonomy === "full" || (ctx.settings.autonomy === "rules" && !!ctx.settings.ownerRules?.reposition);
+    const goes = allowed && best.miles <= limit / 2;
     // A move order can wait until the driver's up: it's asked again on a later round.
     if (goes && driver && restingNow(driver, truck, now)) continue;
     if (!(await claimMark(ctx.carrier.id, `truck:${truck.id}`, `reposition:${day}`))) continue;
     const hours = Math.round((now - since) / HOUR);
     const why = `Truck ${truck.unitNumber} has been empty in ${truck.currentCity}, ${truck.currentState} for ${hours} hours with no load that fits. ${best.city}, ${best.state} is ${best.miles} miles away and ${best.loads} of your loads came out of it in the last 3 weeks.`;
     if (goes && driver && canText(ctx.carrier) && !driver.prefs?.smsOptOut) {
-      const next: Truck = { ...truck, repositionTo: { city: best.city, state: best.state, at: new Date(now).toISOString() } };
-      await save("trucks", ctx.carrier.id, next as unknown as Item);
-      ctx.trucks = ctx.trucks.map((t) => (t.id === truck.id ? next : t));
-      const to = toE164(driver.phone);
-      if (to) {
-        const text = REPOSITION[driver.prefs?.language ?? "en"]({ city: `${best.city}, ${best.state}`, miles: best.miles });
-        const sid = await textTo(ctx.carrier, to, text);
-        await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: new Date(now).toISOString(), channel: "sms", ai: true });
-        await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: to, body: text, data: { kind: "reposition" } });
-      }
-      await addActivity(ctx.carrier.id, event({ type: "dispatched", message: `Truck ${truck.unitNumber} moving empty to ${best.city}, ${best.state}`, detail: why, severity: "info" }));
+      await moveTruck(ctx, truck, best, why, now);
       done.push(`Truck ${truck.unitNumber}: moving to ${best.city}`);
     } else {
-      await passToOwner(ctx, { reason: `${why} Send it there empty (about $${Math.round(best.miles * 0.75)} in fuel)? Tell ${driver?.name.split(" ")[0] ?? "the driver"}, or wait.`, label: "Decided", source: "app", to: "owner" });
+      // A yes/no: yes sends the driver (lib/agent/decisions).
+      const e = await passToOwner(ctx, { reason: `${why} Send it there empty (about $${Math.round(best.miles * 0.75)} in fuel)?`, label: "Send it there", source: "app", to: "owner" });
+      const asked = { ...e, decision: { kind: "reposition" as const, truckId: truck.id, city: best.city, state: best.state, miles: best.miles } };
+      await save("escalations", ctx.carrier.id, asked as unknown as Item);
+      ctx.escalations = ctx.escalations.map((x) => (x.id === asked.id ? asked : x));
       done.push(`Truck ${truck.unitNumber}: asked the owner about moving to ${best.city}`);
     }
   }
   return done;
+}
+
+/** Sends an empty truck toward busier freight: the driver hears where and why, and board searches start from there. */
+export async function moveTruck(ctx: CarrierContext, truck: Truck, to: { city: string; state: string; miles: number }, why: string, now: number): Promise<boolean> {
+  const driver = ctx.drivers.find((d) => d.id === truck.driverId);
+  const next: Truck = { ...truck, repositionTo: { city: to.city, state: to.state, at: new Date(now).toISOString() } };
+  await save("trucks", ctx.carrier.id, next as unknown as Item);
+  ctx.trucks = ctx.trucks.map((t) => (t.id === truck.id ? next : t));
+  const phone = driver && canText(ctx.carrier) && !driver.prefs?.smsOptOut ? toE164(driver.phone) : null;
+  if (driver && phone) {
+    const text = REPOSITION[driver.prefs?.language ?? "en"]({ city: `${to.city}, ${to.state}`, miles: to.miles });
+    const sid = await textTo(ctx.carrier, phone, text);
+    await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: new Date(now).toISOString(), channel: "sms", ai: true });
+    await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: phone, body: text, data: { kind: "reposition" } });
+  }
+  await addActivity(ctx.carrier.id, event({ type: "dispatched", message: `Truck ${truck.unitNumber} moving empty to ${to.city}, ${to.state}`, detail: why, severity: "info" }));
+  return !!phone;
 }

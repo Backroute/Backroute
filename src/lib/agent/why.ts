@@ -3,6 +3,8 @@ import { homeTimeStatus } from "../home";
 import type { Load } from "../types";
 import type { CarrierContext } from "./db";
 import { floorFor } from "./pricing";
+import { learnedAsk } from "./ask-learning";
+import { reloadOutlook } from "./chain";
 
 /**
  * Why the AI went for a load, in the owner's words: what it pays against their lowest and the market, the empty miles
@@ -47,6 +49,13 @@ export function whyBook(ctx: Pick<CarrierContext, "trucks" | "drivers" | "broker
     const pays = avg ?? days;
     lines.push(`${broker.company}${pays ? ` pays in about ${pays} days${avg ? " (your own invoices)" : ""}` : own.length === 0 ? " is new to you" : ""}${broker.authorityVerified ? ", authority checked" : ""}.`);
   }
+  // What the AI learned from its last asks (lib/agent/ask-learning), when it moved the number.
+  const learned = learnedAsk(ctx.loads, { brokerId: load.brokerId, brokerName: broker?.company, lane: load.lane }, now.getTime());
+  if (learned.why) lines.push(learned.why);
+  // Where it ends: a good place to find the next load, or one the truck will likely leave empty (lib/agent/chain).
+  const reload = reloadOutlook(ctx.loads, load.lane.destination, load.lane.destState, load.equipmentType, now.getTime());
+  if (reload.outlook === "weak") lines.push(`${load.lane.destination} is a hard place to reload: few loads have come out of there for this truck.`);
+  else if (reload.outlook === "strong" && ctx.loads.length >= 10) lines.push(`Ends in ${load.lane.destination}, a good place to reload (${reload.count} loads came out of there in 3 weeks).`);
   // What else this truck had.
   const others = load.offerGroupId ? ctx.loads.filter((l) => l.offerGroupId === load.offerGroupId && l.id !== load.id && ["offered", "declined"].includes(l.stage) && Date.parse(l.updatedAt) > now.getTime() - 86400_000) : [];
   if (others.length) {
@@ -54,7 +63,7 @@ export function whyBook(ctx: Pick<CarrierContext, "trucks" | "drivers" | "broker
     lines.push(`Best of ${others.length + 1} offers for this truck${best?.netProfit != null && load.netProfit != null ? `; the next best nets ${money(best.netProfit)} against ${money(load.netProfit)}` : ""}.`);
   }
   for (const w of load.scheduleWarnings ?? []) lines.push(w.text);
-  return lines.slice(0, 7);
+  return lines.slice(0, 9);
 }
 
 /** The why, stamped on the load. */

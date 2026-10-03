@@ -1,4 +1,5 @@
 import "server-only";
+import { chainOf, LINED_UP_MAX } from "../chain";
 import type { Truck } from "../../types";
 import { claimMark, type CarrierContext } from "../db";
 import { pullFeed } from "../feeds";
@@ -37,20 +38,22 @@ export function boardFor(row: IntegrationRow): Board | null {
 export function whereTrucksFree(ctx: Pick<CarrierContext, "trucks" | "loads" | "drivers">, now: number): { truck: Truck; q: BoardQuery }[] {
   const out: { truck: Truck; q: BoardQuery }[] = [];
   for (const truck of ctx.trucks) {
-    if (!truck.driverId || truck.status === "maintenance" || truck.nextLoadId) continue;
-    if (ctx.loads.some((l) => l.truckId === truck.id && (l.stage === "negotiating" || l.stage === "booked"))) continue;
+    if (!truck.driverId || truck.status === "maintenance") continue;
+    // Up to three loads lined up (lib/agent/chain); one the AI is already asking for comes first.
+    const chain = chainOf(ctx.loads, truck);
+    if (chain.length >= LINED_UP_MAX || ctx.loads.some((l) => l.truckId === truck.id && l.stage === "negotiating")) continue;
     const driver = ctx.drivers.find((d) => d.id === truck.driverId);
     const home = driver?.homeBase?.split(",").map((s) => s.trim());
-    const busy = ctx.loads.find((l) => l.id === truck.currentLoadId && ["dispatched", "at_pickup", "in_transit", "at_delivery"].includes(l.stage));
+    const last = chain[chain.length - 1];
     let q: BoardQuery;
     // A truck the AI sent toward busier freight in the last day searches from where it's headed.
     const to = truck.repositionTo && Date.parse(truck.repositionTo.at) > now - 24 * HOUR ? truck.repositionTo : null;
-    if (!busy) q = { originCity: to?.city ?? truck.currentCity, originState: to?.state ?? truck.currentState, radius: RADIUS, availableFrom: new Date(now).toISOString(), equipment: truck.equipmentType, towardState: home?.[1] };
+    if (!last) q = { originCity: to?.city ?? truck.currentCity, originState: to?.state ?? truck.currentState, radius: RADIUS, availableFrom: new Date(now).toISOString(), equipment: truck.equipmentType, towardState: home?.[1] };
     else {
-      // Loaded: line up the reload near the delivery, for after it's done (if it delivers within a day and a half).
-      const done = busy.deliveryAt ? Date.parse(busy.deliveryAt) + 2 * HOUR : null;
-      if (!done || done > now + 36 * HOUR) continue;
-      q = { originCity: busy.lane.destination, originState: busy.lane.destState, radius: RADIUS, availableFrom: new Date(Math.max(done, now)).toISOString(), equipment: truck.equipmentType, towardState: home?.[1] };
+      // Loads lined up: the reload near where the last one delivers, for after it's done (within three days).
+      const done = last.deliveryAt ? Date.parse(last.deliveryAt) + 2 * HOUR : null;
+      if (!done || done > now + 72 * HOUR) continue;
+      q = { originCity: last.lane.destination, originState: last.lane.destState, radius: RADIUS, availableFrom: new Date(Math.max(done, now)).toISOString(), equipment: truck.equipmentType, towardState: home?.[1] };
     }
     if (q.originCity && q.originState) out.push({ truck, q });
   }

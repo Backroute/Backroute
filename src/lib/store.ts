@@ -1467,7 +1467,7 @@ export const useStore = create<StoreState>((set, get) => ({
         }),
         escalations: state.escalations.map((e) =>
           e.id === id
-            ? { ...e, status: "resolved" as const, resolvedBy: actor, resolvedAt: new Date().toISOString(), resolutionNote: note || undefined }
+            ? { ...e, status: "resolved" as const, resolvedBy: actor, resolvedAt: new Date().toISOString(), resolutionNote: note || undefined, approved: approve }
             : e,
         ),
         activity: [

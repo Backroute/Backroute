@@ -742,6 +742,10 @@ export interface Escalation {
   draft?: DraftMessage;
   /** The AI noticed the owner keeps approving this kind of email unchanged, and offers to stop asking. */
   suggestRule?: OwnerRule;
+  /** A yes/no the AI acts on once the owner answers (lib/agent/decisions): yes does it, no leaves it. */
+  decision?: { kind: "reposition"; truckId: string; city: string; state: string; miles: number; doneAt?: string };
+  /** How the owner answered a yes/no: true for yes. */
+  approved?: boolean;
   /** Where this came from, when it arrived by a real channel. */
   source?: MessageChannel;
   /** The person on Backroute's support team who took it. */
@@ -780,7 +784,7 @@ export interface DraftMessage {
  * Judgment calls the owner can hand to the AI once they trust it with them. Off until the owner turns one on (in
  * Settings, or by saying yes when the AI notices they keep approving the same thing unchanged).
  */
-export type OwnerRule = "tonu_default" | "detention_default" | "invoice_noted_pod" | "replies" | "portal_setup";
+export type OwnerRule = "tonu_default" | "detention_default" | "invoice_noted_pod" | "replies" | "portal_setup" | "reposition";
 
 export type DraftPurpose = "reply" | "book_request" | "counter" | "accept" | "setup_packet" | "invoice" | "detention" | "layover" | "change" | "claim" | "factoring" | "payment_reminder" | "tonu" | "eta_update" | "capacity" | "pass" | "ack";
 
