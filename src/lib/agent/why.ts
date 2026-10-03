@@ -2,7 +2,8 @@ import "server-only";
 import { homeTimeStatus } from "../home";
 import type { Load } from "../types";
 import type { CarrierContext } from "./db";
-import { floorFor } from "./pricing";
+import { floorFor, learnedFor } from "./pricing";
+import { brokerMemory } from "./memory";
 import { learnedAsk } from "./ask-learning";
 import { reloadOutlook } from "./chain";
 
@@ -50,8 +51,8 @@ export function whyBook(ctx: Pick<CarrierContext, "trucks" | "drivers" | "broker
     lines.push(`${broker.company}${pays ? ` pays in about ${pays} days${avg ? " (your own invoices)" : ""}` : own.length === 0 ? " is new to you" : ""}${broker.authorityVerified ? ", authority checked" : ""}.`);
   }
   // What the AI learned from its last asks (lib/agent/ask-learning), when it moved the number.
-  const learned = learnedAsk(ctx.loads, { brokerId: load.brokerId, brokerName: broker?.company, lane: load.lane }, now.getTime());
-  if (learned.why) lines.push(learned.why);
+  const learned = learnedFor(learnedAsk(ctx.loads, { brokerId: load.brokerId, brokerName: broker?.company, lane: load.lane }, now.getTime()), load.brokerId ? brokerMemory(ctx.loads, load.brokerId) : null);
+  if (learned?.why) lines.push(learned.why);
   // Where it ends: a good place to find the next load, or one the truck will likely leave empty (lib/agent/chain).
   const reload = reloadOutlook(ctx.loads, load.lane.destination, load.lane.destState, load.equipmentType, now.getTime());
   if (reload.outlook === "weak") lines.push(`${load.lane.destination} is a hard place to reload: few loads have come out of there for this truck.`);

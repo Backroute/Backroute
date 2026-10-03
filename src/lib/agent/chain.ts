@@ -11,15 +11,32 @@ import type { Load, Truck } from "../types";
 export const LINED_UP_MAX = 3;
 const HOUR = 3600_000;
 const DAY = 24 * HOUR;
-const LINED = new Set<Load["stage"]>(["rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery"]);
+const ROLLING = new Set<Load["stage"]>(["rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery"]);
+/** Booked but not started: what can wait behind the load the truck is on. */
+const WAITING = new Set<Load["stage"]>(["rate_confirmed", "booked"]);
 const pickupTime = (l: Load) => Date.parse(l.pickupAt ?? "") || Number.MAX_SAFE_INTEGER;
 
-/** The truck's loads in order: the one it's on first, then the rest by pickup time. */
-export function chainOf(loads: Load[], truck: Pick<Truck, "id" | "currentLoadId">): Load[] {
-  const mine = loads.filter((l) => l.truckId === truck.id && LINED.has(l.stage));
-  const current = mine.find((l) => l.id === truck.currentLoadId);
-  const rest = mine.filter((l) => l !== current).sort((a, b) => pickupTime(a) - pickupTime(b));
-  return current ? [current, ...rest] : rest;
+/**
+ * The truck's loads in order: the one it's on (its current load), then its next one, then the rest of what's booked
+ * by pickup time. A booked load whose pickup is more than a day gone (never started, never cancelled) is left out, so
+ * a forgotten one can't hold up the truck.
+ */
+export function chainOf(loads: Load[], truck: Pick<Truck, "id" | "currentLoadId"> & { nextLoadId?: string | null }, now = Date.now()): Load[] {
+  const current = loads.find((l) => l.id === truck.currentLoadId && l.truckId === truck.id && ROLLING.has(l.stage));
+  const waiting = loads.filter((l) => l !== current && l.truckId === truck.id && WAITING.has(l.stage) && !(l.pickupAt && Date.parse(l.pickupAt) < now - DAY));
+  const next = waiting.find((l) => l.id === truck.nextLoadId);
+  const rest = waiting.filter((l) => l !== next).sort((a, b) => pickupTime(a) - pickupTime(b));
+  return [...(current ? [current] : []), ...(next ? [next] : []), ...rest];
+}
+
+/**
+ * When a lined-up load frees the truck: its delivery time, else its pickup plus the drive (about 45 mph with breaks)
+ * and two hours at the docks. Null with neither time (a load still waiting on its appointments).
+ */
+export function doneAt(l: Load): number | null {
+  if (l.deliveryAt) return Date.parse(l.deliveryAt);
+  if (l.pickupAt) return Date.parse(l.pickupAt) + ((l.lane.miles || 0) / 45 + 2) * HOUR;
+  return null;
 }
 
 /** Where the truck ends up after everything lined up, and when (null when the last load has no delivery time). */
@@ -27,14 +44,14 @@ export function freeAfter(loads: Load[], truck: Truck): { city: string; state: s
   const chain = chainOf(loads, truck);
   const last = chain[chain.length - 1];
   if (!last) return { city: truck.currentCity, state: truck.currentState, at: null, lined: 0 };
-  return { city: last.lane.destination, state: last.lane.destState, at: last.deliveryAt ? Date.parse(last.deliveryAt) + 2 * HOUR : null, lined: chain.length };
+  const done = doneAt(last);
+  return { city: last.lane.destination, state: last.lane.destState, at: done ? done + 2 * HOUR : null, lined: chain.length };
 }
 
 /** The truck's current and next load from its chain, after a load is booked, delivered or dropped. */
 export function slotsFor(loads: Load[], truck: Truck): Pick<Truck, "currentLoadId" | "nextLoadId" | "status"> {
   const chain = chainOf(loads, truck);
-  const rolling = chain.find((l) => l.id === truck.currentLoadId);
-  const current = rolling ?? chain[0] ?? null;
+  const current = chain[0] ?? null;
   const next = chain.find((l) => l !== current) ?? null;
   return {
     currentLoadId: current?.id ?? null,

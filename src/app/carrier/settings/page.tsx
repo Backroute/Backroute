@@ -31,6 +31,7 @@ import { PortalCard } from "@/components/cloud/portal-card";
 import { BillingCard } from "@/components/cloud/billing-card";
 import { PhoneAlerts } from "@/components/cloud/phone-alerts";
 import { ExportsCard } from "@/components/cloud/exports-card";
+import { QuickbooksCard } from "@/components/cloud/quickbooks-card";
 import { ConnectionsCard } from "@/components/cloud/connections-card";
 import { SecurityCard } from "@/components/cloud/security-card";
 import { AuditLogCard } from "@/components/cloud/audit-log-card";
@@ -155,6 +156,7 @@ function Settings() {
                   <DocumentsCard />
                   <ConnectionsCard />
                   <HistoryCard />
+                  <QuickbooksCard />
                   <ExportsCard />
                 </>
               )}

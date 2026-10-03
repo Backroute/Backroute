@@ -32,8 +32,10 @@ export function askOutcomes(loads: Load[], match: (l: Load) => boolean, now: num
     const opening = req.opening ?? req.ask;
     if (!opening) continue;
     const won = req.status === "accepted" || (BOOKED.has(l.stage) && !!l.bookedRate);
-    const lost = !won && (req.status === "declined" || l.stage === "declined" || (req.status === "sent" && at < now - 3 * DAY));
-    if (!won && !lost) continue; // Still going.
+    // Lost: the broker said no, we walked away over the price, or they never answered while we waited. A load we set
+    // aside ourselves (another one was booked for the truck) says nothing about our number.
+    const lost = !won && (req.status === "declined" || !!req.passedAt || (req.status === "sent" && l.stage === "negotiating" && at < now - 3 * DAY));
+    if (!won && !lost) continue; // Still going, or not about the price.
     out.push({ opening, final: won ? (l.bookedRate ?? req.brokerOffer ?? req.ask) : null, won, at });
   }
   return out.sort((a, b) => b.at - a.at).slice(0, 10);

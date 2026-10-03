@@ -1,5 +1,5 @@
 import "server-only";
-import { chainOf, LINED_UP_MAX } from "../chain";
+import { chainOf, doneAt, LINED_UP_MAX } from "../chain";
 import type { Truck } from "../../types";
 import { claimMark, type CarrierContext } from "../db";
 import { pullFeed } from "../feeds";
@@ -51,7 +51,8 @@ export function whereTrucksFree(ctx: Pick<CarrierContext, "trucks" | "loads" | "
     if (!last) q = { originCity: to?.city ?? truck.currentCity, originState: to?.state ?? truck.currentState, radius: RADIUS, availableFrom: new Date(now).toISOString(), equipment: truck.equipmentType, towardState: home?.[1] };
     else {
       // Loads lined up: the reload near where the last one delivers, for after it's done (within three days).
-      const done = last.deliveryAt ? Date.parse(last.deliveryAt) + 2 * HOUR : null;
+      const free = doneAt(last);
+      const done = free ? free + 2 * HOUR : null;
       if (!done || done > now + 72 * HOUR) continue;
       q = { originCity: last.lane.destination, originState: last.lane.destState, radius: RADIUS, availableFrom: new Date(Math.max(done, now)).toISOString(), equipment: truck.equipmentType, towardState: home?.[1] };
     }

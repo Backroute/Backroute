@@ -23,7 +23,7 @@ export async function makeContractLoads(ctx: CarrierContext, now: number): Promi
     const shipper = advanced.get(plan.shipper.id) ?? plan.shipper;
     const ref = `${shipper.company.split(/\s+/)[0].toUpperCase().slice(0, 6)}-${plan.date.replace(/-/g, "").slice(2)}-${plan.lane.id.slice(-4)}`;
     if (ctx.loads.some((l) => l.brokerId === shipper.id && l.referenceNumber === ref)) continue;
-    const fit = bestTruck(ctx, { equipment: plan.lane.equipmentType, originCity: plan.lane.origin, originState: plan.lane.originState, destinationState: plan.lane.destState, pickupAt: Date.parse(plan.pickupAt), miles: plan.lane.miles });
+    const fit = bestTruck(ctx, { equipment: plan.lane.equipmentType, originCity: plan.lane.origin, originState: plan.lane.originState, destinationState: plan.lane.destState, pickupAt: Date.parse(plan.pickupAt), miles: plan.lane.miles }, undefined, { planned: true });
     if (!fit) {
       if (await claimMark(ctx.carrier.id, "contracts", `${plan.lane.id}:${plan.date}`))
         await passToOwner(ctx, {

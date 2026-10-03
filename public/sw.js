@@ -12,7 +12,7 @@
 const OFFLINE = new URL(self.location.href).searchParams.get("offline") === "1";
 const SHELL = "backroute-shell-v1";
 const MAP = "backroute-map-v1";
-const MAP_MAX = 4000;
+const MAP_MAX = 2500;
 const MAP_HOSTS = ["tiles.openfreemap.org"];
 const isMapLib = (url) => url.hostname === "cdn.jsdelivr.net" && /^\/npm\/maplibre-gl@[\d.]+\/dist\//.test(url.pathname);
 const PAGES = ["/driver", "/carrier"];
@@ -146,7 +146,9 @@ async function keepTripMap(style, points) {
   const names = ["Noto Sans Regular", "Noto Sans Bold"];
   if (sheet.glyphs) for (const f of names) for (const r of ["0-255", "256-511"]) await mapThenNetwork(new Request(sheet.glyphs.replace("{fontstack}", encodeURIComponent(f)).replace("{range}", r))).catch(() => 0);
   const ends = [points[0], points[points.length - 1]];
-  const tiles = [...tilesAlong(points, [4, 5, 6, 7, 8, 9].filter((z) => z <= max)), ...tilesAlong(ends, [10, max].filter((z, i, a) => a.indexOf(z) === i))].slice(0, 1200);
+  // Whole-trip view down to regional (zoom 8) along the road, town level only at the two ends: a few hundred small
+  // pieces, a few megabytes, once per trip.
+  const tiles = [...tilesAlong(points, [4, 5, 6, 7, 8].filter((z) => z <= max)), ...tilesAlong(ends, [10, max].filter((z, i, a) => a.indexOf(z) === i))].slice(0, 400);
   for (let i = 0; i < tiles.length; i += 6) {
     await Promise.all(
       tiles.slice(i, i + 6).map((t) => {

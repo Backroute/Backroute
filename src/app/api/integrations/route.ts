@@ -9,6 +9,7 @@ import { datConfigured } from "@/lib/agent/boards/dat";
 import { truckstopConfigured } from "@/lib/agent/boards/truckstop";
 import { BoardError } from "@/lib/agent/boards/types";
 import { caller } from "@/lib/agent/user";
+import { quickbooksConfigured, type QuickbooksConfig } from "@/lib/agent/quickbooks";
 
 const Custom = z.object({
   name: z.string().trim().min(2).max(40),
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
   const rows = await integrationsFor(who.me.carrierId);
   return Response.json({
     // Whether Backroute's own side of each board is in place (its partner agreement and login).
-    available: { truckstop: truckstopConfigured(), dat: datConfigured() },
+    available: { truckstop: truckstopConfigured(), dat: datConfigured(), quickbooks: quickbooksConfigured() },
     connections: rows.map((r) => ({
       kind: r.kind,
       status: r.status,
@@ -58,6 +59,7 @@ export async function GET(request: Request) {
       ...(r.kind === "load_feed" || r.kind === "fuel_feed" || r.kind === "toll_feed" ? { name: (r.config as FeedConfig).name ?? null, host: new URL((r.config as FeedConfig).url).host } : {}),
       ...(r.kind.startsWith("board:") ? { name: (r.config as CustomBoardConfig).name } : {}),
       ...(r.kind === "truckstop" || r.kind === "dat" ? { postTrucks: !!(r.config as TruckstopConfig).postTrucks } : {}),
+      ...(r.kind === "quickbooks" ? { name: (r.config as QuickbooksConfig).companyName ?? null, lastSync: (r.config as QuickbooksConfig).lastSync ?? null } : {}),
     })),
   });
 }

@@ -32,6 +32,8 @@ function watchOnline() {
  */
 export function keepTripMap(style: string, path: [number, number][]) {
   if (process.env.NODE_ENV !== "production" || typeof navigator === "undefined" || !("serviceWorker" in navigator) || path.length < 2) return;
+  // The phone's data saver is on: nothing extra is downloaded.
+  if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
   const every = Math.max(1, Math.ceil(path.length / 300));
   const points = path.filter((_, i) => i % every === 0 || i === path.length - 1);
   tell({ type: "keep-trip-map", style, points });

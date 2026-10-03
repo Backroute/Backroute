@@ -38,6 +38,13 @@ export interface BrokerHabits {
  * they've paid before; a broker who always says yes to the first number is being asked too little; one who always
  * pushes back expects room). Null when there's nothing to go on (no floor and no posted rate): the owner names the price.
  */
+/** The learned adjustment that applies: none when it changes nothing, or when it's the lane's and this broker has a clear habit. */
+export function learnedFor<T extends { factor: number; source: "broker" | "lane" | null }>(learned: T | null | undefined, broker: BrokerHabits | null | undefined): T | null {
+  if (!learned || learned.factor === 1) return null;
+  const habit = !!broker && ((broker.tookOurAsk >= 2 && broker.countered === 0) || (broker.countered >= 2 && broker.tookOurAsk === 0));
+  return learned.source === "lane" && habit ? null : learned;
+}
+
 export function askFor(
   load: Pick<Load, "lane" | "listedRate">,
   settings: Pick<AgentSettings, "minRpm">,
@@ -63,13 +70,15 @@ export function askFor(
     const paid = round25(broker.avgRpm * load.lane.miles);
     ask = Math.max(ask ?? 0, Math.min(paid, posted ? round25(posted * 1.2) : paid));
   }
-  // How the last asks went (lib/agent/ask-learning) replaces the rough yes/no-count nudge when it knows this broker.
-  if (ask && broker && learned?.source !== "broker") {
+  // How the last asks went (lib/agent/ask-learning) moves the opening number; when that's from this broker it replaces
+  // the rough yes/no-count nudge, and the broker's own habit outranks what the lane did with anyone.
+  const learnedNow = learnedFor(learned, broker);
+  if (ask && broker && !learnedNow) {
     // Says yes to our first number every time: we've been asking too little. Always pushes back: leave room.
     if (broker.tookOurAsk >= 2 && broker.countered === 0) ask = round25(ask * 1.05);
     else if (broker.countered >= 2 && broker.tookOurAsk === 0) ask = round25(ask * 1.04);
   }
-  if (ask && learned && learned.factor !== 1) ask = round25(ask * learned.factor);
+  if (ask && learnedNow) ask = round25(ask * learnedNow.factor);
   if (market?.rpm) {
     const average = round25(market.rpm * load.lane.miles);
     const top = market.high ? round25(market.high * load.lane.miles) : round25(average * 1.1);

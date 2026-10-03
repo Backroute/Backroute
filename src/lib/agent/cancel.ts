@@ -1,5 +1,5 @@
 import "server-only";
-import { chainOf, slotsFor } from "./chain";
+import { chainOf } from "./chain";
 import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import { LOAD_CANCELLED } from "../channels/phrases";
@@ -41,11 +41,12 @@ export async function cancelLoad(ctx: CarrierContext, load: Load, reason: string
   // Off the truck: its next load (if any) moves up.
   const truck = ctx.trucks.find((t) => t.id === load.truckId);
   let freed: Truck | undefined;
-  if (truck && (truck.currentLoadId === load.id || truck.nextLoadId === load.id || chainOf(ctx.loads, truck).length > 0)) {
-    // Whatever's lined up behind it moves up (lib/agent/chain).
-    const slots = slotsFor(ctx.loads, { ...truck, currentLoadId: truck.currentLoadId === load.id ? null : truck.currentLoadId });
-    const next = slots.currentLoadId;
-    freed = { ...truck, ...slots };
+  if (truck && (truck.currentLoadId === load.id || truck.nextLoadId === load.id)) {
+    // Whatever's lined up behind it moves up (lib/agent/chain): the next load becomes current, the one after it next.
+    const behind = chainOf(ctx.loads, { ...truck, currentLoadId: null }).filter((l) => l.id !== truck.currentLoadId);
+    const next = truck.currentLoadId === load.id ? (behind[0]?.id ?? null) : truck.currentLoadId;
+    const after = behind.find((l) => l.id !== next)?.id ?? null;
+    freed = { ...truck, currentLoadId: next, nextLoadId: after, status: next ? "on_load" : "available" };
     await save("trucks", ctx.carrier.id, freed as unknown as Item);
     ctx.trucks = ctx.trucks.map((t) => (t.id === truck.id ? freed! : t));
     if (next) {

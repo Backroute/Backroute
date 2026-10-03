@@ -337,6 +337,22 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - Consent records can't be changed or deleted, even by the server; a carrier's office reads its own drivers', a driver their own. Dock tips: each office reads its own drivers', the server all. How each number texts us is server-only. The weekly review is the office's (`20261009000000_natural_dispatch.sql`).
   - The bookkeeper's limits, the audit log (written by the database, read by the owner only), the device list (each person their own), and two-step sign-in, checked on every table: with an authenticator app on, nothing is readable or writable until its code is entered. Marking an invoice paid goes through one function that changes nothing else on the load (`20261012000000_owner_tools.sql`).
   - Website logins and the answers the owner gives for them are encrypted by the server before they're stored, and no one who signs in can read the table, not even the owner. The website job queue is server-only too, and only the server can hand a job to the worker (`20261005000000_portal_worker.sql`).
+- **Dispatching like a senior dispatcher.**
+  - **Loads lined up.** The AI books up to three loads ahead per truck, each picking up after the one before delivers (with two hours between). Load boards are searched from where the last load ends. The truck's plan shows the current load, then "Next" and "Then".
+  - **The whole fleet at once.** When several offers come in, trucks and loads are paired for the best total, not each load's nearest truck in turn. Each pairing counts the empty miles to the pickup, home time, and how easy it is to reload where the load ends (from the carrier's own offers in the last three weeks).
+  - **Asks that learn.** The opening number follows how the last asks went: with this broker (three answered asks or more), else on this lane with anyone (four or more). It opens 5–7% higher when brokers keep taking the first number, and 3–8% lower when most asks are lost. The owner's lowest and the market's top still bound it, and the why line says so.
+  - **Rules from repeated answers.** Sending an empty truck to busier freight is a Yes/No for the owner. After three yeses in a row, the AI offers to make it a rule.
+- **Weather along the whole route**, not only at the stops: the truck's road (HERE) or the straight line is checked every ~100 miles, in the US (National Weather Service) and Canada (Environment Canada).
+- **Dock hours no driver has reported**: the place's posted hours on Google Places, as a heads-up only. They're often the office's hours, so they never stop a booking; drivers' word always wins.
+- **Truck parking, only when asked.** The driver taps **Reserve a spot** (spots near where their hours run out, with prices), or asks the AI by text, call or chat. The owner can ask in the app's chat, or book from the app. The AI never books a spot on its own; the tool refuses unless the person's own words asking for it are in their message. The driver gets the address, confirmation and gate code.
+- **Late trucks seen sooner.** ETAs use live traffic (HERE), weather warnings on the road ahead, and the driver's hours. Within 30 minutes either side of the appointment, the owner hears it's tight, with why. Past that, the broker is told, as before. A truck stopped 90 minutes or more away from its stops, with the driver on duty, gets an "everything OK?" text.
+- **Offline, finished.** The trip's map area is kept on the phone when the trip map opens (the road ahead, whole-trip to town level), so the map still draws with no signal. A Yes/No tapped on a notification with no signal is kept and sent once the phone is back online, with a note saying so.
+- **QuickBooks Online, kept in step.** The owner connects their company once (Settings → General). Every hour the AI puts in:
+  - each invoice sent to a broker, with the broker as the customer and one line per charge
+  - the payment when the broker pays
+  - fuel, tolls, and the lumpers and scales drivers paid that the owner approved
+
+  Each goes in once. The company's sign-in is stored encrypted (`20261013000000_quickbooks.sql`). The CSV downloads stay for anyone not on QuickBooks.
 
 ## What it doesn't do yet
 
@@ -366,8 +382,10 @@ The AI now does the day-to-day work of a dispatcher by email, text and phone. Wh
 - **The simulator's scores with the real AI haven't been measured yet.** It needs the app running with `ANTHROPIC_API_KEY` and `EVAL_SECRET`. The scripted runs check the money rules and the plumbing; only the AI-played runs say how human it sounds.
 - **The legal paperwork is drafted, not done.** `docs/legal/` has drafts of the carrier agreement (with the authority to act and sign for the carrier), terms, privacy policy, driver text consent and the call notice, plus the questions for your lawyer. The consent checkbox, the first text and the records are built with the draft wording; change it in `src/lib/consent-words.ts` (and bump `CONSENT_VERSION`) once your lawyer approves.
 - **WhatsApp needs Meta's approval** of the business and the template (step 19), and voice messages need Deepgram and ElevenLabs accounts (step 20). Punjabi voice messages are auto-detected and may not come through; those drivers are asked to type or call.
-- **Weather is US only** (the National Weather Service), and warnings are checked at the cities on today's loads and the truck's ELD position, not along the whole route.
-- **Holidays are the US ones**, and a dock's hours come only from what drivers told the AI. A dock no driver has reported is assumed open.
+- **Weather covers the US and Canada only.** Mexico isn't covered.
+- **Holidays are the US ones.** A dock's hours come from what drivers told the AI, else its posted hours on Google Places (a heads-up only). A dock with neither is assumed open.
+- **Parking needs a reservation partner** (step 23). The API Backroute expects is small and written down. Each network (Truck Parking Club, TA, Pilot) has its own partner terms. Without one, the AI finds lots nearby and the driver books in their truck stop app.
+- **QuickBooks Online needs Backroute's Intuit app approved** for production (step 24); until then it runs against Intuit's sandbox companies. It doesn't change an invoice already in QuickBooks when the load's charges change later (add the extra line there), and QuickBooks Desktop isn't supported.
 
 ## Setting it up
 
@@ -492,6 +510,8 @@ In Google Cloud:
 
 Without it, the AI still tells the owner and the broker about a breakdown, but a person has to find the shop.
 
+The same key gives the posted hours of a shipper or receiver no driver has reported on yet (a heads-up when the appointment falls outside them).
+
 ### 11. Market rates (optional)
 
 Set one of these:
@@ -598,7 +618,33 @@ Nothing to set on Backroute's side. The owner uploads a CSV on Money → Fuel & 
 
 ### 22. Weather on the route (optional)
 
-Uses the National Weather Service (`api.weather.gov`, free, no key). `WEATHER_ALERTS=off` turns it off everywhere; `WEATHER_API_BASE` points it somewhere else (only for testing).
+Uses the National Weather Service (`api.weather.gov`) in the US and Environment Canada (`api.weather.gc.ca`) north of the border; both free, no key. `WEATHER_ALERTS=off` turns it off everywhere; `WEATHER_API_BASE` and `WEATHER_CA_API_BASE` point them somewhere else (only for testing).
+
+### 23. Truck parking reservations (optional)
+
+Set `PARKING_API_BASE` and `PARKING_API_KEY` for a reservation network Backroute has a partner agreement with. Backroute calls three things (with `Authorization: Bearer <key>`), so a small adapter in front of any network's API works:
+
+- `GET /v1/spots?lat=&lon=&radius_mi=&arrive=` → `{ spots: [{ id, name, address, lat, lon, price }] }`
+- `POST /v1/reservations` with `{ spotId, arrive, driverName, driverPhone, unitNumber, company }` → `{ id, confirmation, checkIn? }`
+- `POST /v1/reservations/{id}/cancel`
+
+Spots are only ever booked when a driver or the owner asks. The price and place always come from the service, never from the phone.
+
+### 24. QuickBooks Online (optional)
+
+1. At developer.intuit.com, create an app with the **Accounting** scope.
+2. Add `PUBLIC_BASE_URL/api/integrations/quickbooks/callback` as its redirect address.
+3. Set `QBO_CLIENT_ID` and `QBO_CLIENT_SECRET`. For Intuit's sandbox companies, also set `QBO_ENV=sandbox`.
+4. `PORTAL_VAULT_KEY` must be set: each company's sign-in is stored encrypted with it.
+
+Intuit reviews the app before real companies can connect.
+
+In QuickBooks, Backroute finds or makes:
+
+- a "Freight" service item (on "Freight Income")
+- the expense accounts "Fuel", "Tolls and Scales" and "Lumper and Driver Expenses"
+
+Costs are recorded against the company's credit card account if it has one, else its bank account.
 
 ### Security, in short
 

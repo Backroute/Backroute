@@ -34,7 +34,7 @@ import { hardProblem, scheduleWarnings } from "./schedule";
 import { reeferLine } from "./reefer";
 import { translateForDriver } from "../ai/translate";
 import { cantRun } from "../expiry";
-import { chainOf, LINED_UP_MAX, reloadOutlook, reloadValue, slotsFor } from "./chain";
+import { chainOf, doneAt, LINED_UP_MAX, reloadOutlook, reloadValue } from "./chain";
 import { bestAssignment } from "./match";
 import { learnedAsk } from "./ask-learning";
 
@@ -90,11 +90,11 @@ function emptyNow(ctx: Pick<CarrierContext, "trucks" | "loads">, truckId: string
  * The truck that can take a load soonest with the least empty driving, if any. A truck with loads lined up (up to
  * three, lib/agent/chain) takes one that picks up after the last of them delivers, from where that one ends.
  */
-export function bestTruck(ctx: CarrierContext, o: LoadAsk, skip?: Set<string>) {
+export function bestTruck(ctx: CarrierContext, o: LoadAsk, skip?: Set<string>, opts: { planned?: boolean } = {}) {
   let best: { truck: Truck; deadhead: number } | null = null;
   for (const truck of ctx.trucks) {
     if (skip?.has(truck.id)) continue;
-    const deadhead = fitFor(ctx, truck, o);
+    const deadhead = fitFor(ctx, truck, o, opts);
     if (deadhead === null) continue;
     if (!best || deadhead < best.deadhead) best = { truck, deadhead };
   }
@@ -105,7 +105,7 @@ type LoadAsk = { equipment: Load["equipmentType"]; originCity: string; originSta
 const askOf = (l: Load): LoadAsk => ({ equipment: l.equipmentType, originCity: l.lane.origin, originState: l.lane.originState, destinationState: l.lane.destState, pickupAt: l.pickupAt ? Date.parse(l.pickupAt) : null, miles: l.lane.miles });
 
 /** Whether this truck can take the load, and the empty miles to it if so (null: it can't). */
-function fitFor(ctx: CarrierContext, truck: Truck, o: LoadAsk): number | null {
+function fitFor(ctx: CarrierContext, truck: Truck, o: LoadAsk, opts: { planned?: boolean } = {}): number | null {
   if (!truck.driverId || truck.equipmentType !== o.equipment || truck.status === "maintenance") return null;
   // Can't legally run: an inspection or plates past due, a critical engine fault, a driver whose CDL or medical card
   // ran out (lib/expiry). No load goes on it; the owner was reminded ahead of time.
@@ -113,12 +113,14 @@ function fitFor(ctx: CarrierContext, truck: Truck, o: LoadAsk): number | null {
   // States the driver said they won't run into.
   if (ctx.drivers.find((d) => d.id === truck.driverId)?.prefs?.avoidStates?.includes(o.destinationState)) return null;
   const chain = chainOf(ctx.loads, truck);
-  if (chain.length >= LINED_UP_MAX) return null;
+  // Contract freight the shipper already agreed (planned) isn't held to the three the AI books ahead on its own.
+  if (!opts.planned && chain.length >= LINED_UP_MAX) return null;
   const last = chain[chain.length - 1];
   let from = { city: truck.currentCity, state: truck.currentState };
   if (last) {
     // A truck with loads lined up can take one that picks up after the last delivers, with a couple of hours to spare.
-    if (!last.deliveryAt || !o.pickupAt || Date.parse(last.deliveryAt) + 2 * HOUR > o.pickupAt) return null;
+    const free = doneAt(last);
+    if (!free || !o.pickupAt || free + 2 * HOUR > o.pickupAt) return null;
     from = { city: last.lane.destination, state: last.lane.destState };
   }
   // A truck already chasing a load the AI asked for stays on that one.
@@ -478,8 +480,8 @@ export async function bookIt(ctx: CarrierContext, load: Load, rate?: number): Pr
   ctx.loads = ctx.loads.map((l) => (l.id === load.id ? booked : l));
   let truckAfter: Truck | undefined;
   if (truck) {
-    // The truck's current and next load from its lined-up chain (lib/agent/chain).
-    truckAfter = free ? { ...truck, currentLoadId: load.id, status: "on_load" } : { ...truck, ...slotsFor(ctx.loads, truck) };
+    // On a load: this one is next, unless one is already next (then it waits behind it in the lineup, lib/agent/chain).
+    truckAfter = free ? { ...truck, currentLoadId: load.id, status: "on_load" } : truck.nextLoadId ? truck : { ...truck, nextLoadId: load.id };
     if (truckAfter.currentLoadId !== truck.currentLoadId || truckAfter.nextLoadId !== truck.nextLoadId || truckAfter.status !== truck.status) {
       await save("trucks", ctx.carrier.id, truckAfter as unknown as Item);
       ctx.trucks = ctx.trucks.map((t) => (t.id === truck.id ? truckAfter! : t));

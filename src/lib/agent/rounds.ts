@@ -11,6 +11,7 @@ import { trackHomeTime, weeklyCare } from "./care";
 import { runCheckins } from "./checkins";
 import { complianceReminders } from "./compliance";
 import { pullStatements } from "./costs";
+import { quickbooksRound } from "./quickbooks";
 import { makeContractLoads } from "./contracts";
 import { marksFor, type CarrierContext } from "./db";
 import { forCarrier } from "./scope";
@@ -82,6 +83,7 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   done.push(...(await suggestRepositions(ctx, now)));
   done.push(...(await complianceReminders(ctx, now)));
   done.push(...(await pullStatements(ctx, links, now)));
+  done.push(...(await quickbooksRound(ctx, links, now).catch((e) => (console.error("[rounds] quickbooks failed", e), []))));
   done.push(...(await makeContractLoads(ctx, now)));
   done.push(...(await trackHomeTime(ctx, now)));
   if (canText(ctx.carrier)) done.push(...(await trackingRounds(ctx, now)));

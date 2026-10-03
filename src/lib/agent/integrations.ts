@@ -1,9 +1,10 @@
 import "server-only";
 import { admin } from "./db";
+import type { QuickbooksConfig } from "./quickbooks";
 
 /** A carrier's connections to outside services, kept server-side (see migration 20260927000000_support.sql). */
 
-export type IntegrationKind = "samsara" | "motive" | "load_feed" | "fuel_feed" | "toll_feed" | "truckstop" | "dat" | `board:${string}`;
+export type IntegrationKind = "samsara" | "motive" | "load_feed" | "fuel_feed" | "toll_feed" | "truckstop" | "dat" | "quickbooks" | `board:${string}`;
 
 export interface EldConfig {
   apiKey: string;
@@ -47,7 +48,7 @@ export interface CustomBoardConfig {
   listPath: string;
   fields: Record<string, string>;
 }
-export type AnyConfig = EldConfig | FeedConfig | StatementConfig | TruckstopConfig | DatConfig | CustomBoardConfig;
+export type AnyConfig = EldConfig | FeedConfig | StatementConfig | TruckstopConfig | DatConfig | CustomBoardConfig | QuickbooksConfig;
 
 export interface IntegrationRow {
   carrier_id: string;
