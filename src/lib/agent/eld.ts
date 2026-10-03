@@ -4,13 +4,15 @@ import { roadMiles, roughCoords } from "../trip-geo";
 import { formatAtStop } from "../stop-time";
 import type { Driver, HosStatus, Load, Truck, TruckFault } from "../types";
 import { faultAdvice, faultSeverity } from "../maintenance";
-import { canCall } from "../channels/out";
+import { canCall, textTo } from "../channels/out";
 import { needAppointment } from "./appointments";
 import { pushToOffice } from "../push";
-import { addActivity, claimMark, save, type CarrierContext } from "./db";
+import { addActivity, claimMark, logChannel, save, saveDriverMessage, type CarrierContext } from "./db";
 import { event } from "./dispatcher";
 import { sendOrQueue } from "./outbox";
 import { routedEta } from "./routing";
+import { etaWithReasons, stillSince, stoppedOddly } from "./late-risk";
+import { translateForDriver } from "../ai/translate";
 import * as mail from "./templates";
 import { addWhy } from "./why";
 
@@ -237,7 +239,11 @@ export async function applyEld(ctx: CarrierContext, kind: EldKind, data: { vehic
       ...truck,
       ...(personal && truck.position
         ? {}
-        : { position: { lat: v.lat, lon: v.lon, at: v.at, description: v.description, source: kind }, ...(place ? { currentCity: place.city, currentState: place.state } : {}) }),
+        : {
+            position: { lat: v.lat, lon: v.lon, at: v.at, description: v.description, source: kind },
+            stoppedSince: stillSince(truck.position, v, truck.stoppedSince),
+            ...(place ? { currentCity: place.city, currentState: place.state } : {}),
+          }),
       // The odometer only goes up: a reading lower than what's known (a swapped ECU) is left alone.
       ...(v.odometerMiles && v.odometerMiles >= (truck.odometer ?? 0) ? { odometer: v.odometerMiles, odometerAt: v.at } : {}),
       ...(data.faults ? { faults: await faultsFor(ctx, truck, kind, data.faults.filter((f) => sameUnit(truck.unitNumber, f.unit))) } : {}),
@@ -292,8 +298,25 @@ export async function lateNotices(ctx: CarrierContext, now: number): Promise<str
     const truck = ctx.trucks.find((t) => t.id === load.truckId);
     const driver = ctx.drivers.find((d) => d.id === truck?.driverId);
     const [city, state] = stop === "pickup" ? [load.lane.origin, load.lane.originState] : [load.lane.destination, load.lane.destState];
-    const eta = truck ? ((await routedEta(truck, driver, city, state, now)) ?? etaTo(truck, driver, city, state, now)) : null;
-    if (!eta || eta <= Date.parse(due) + 30 * 60_000) continue;
+    if (truck && (await stoppedCheck(ctx, load, truck, driver, now))) done.push(`${load.referenceNumber}: checked on the driver (truck stopped)`);
+    const seen = truck ? await etaWithReasons(truck, driver, city, state, now) : null;
+    const eta = seen?.at ?? (truck ? etaTo(truck, driver, city, state, now) : null);
+    const because = seen?.reasons.length ? ` (${seen.reasons.join("; ")})` : "";
+    if (!eta) continue;
+    // Close: the owner hears it's tight while there's still time to do something, before anyone is late.
+    if (eta > Date.parse(due) - 30 * 60_000 && eta <= Date.parse(due) + 30 * 60_000) {
+      if (seen?.reasons.length && (await claimMark(ctx.carrier.id, load.id, `late_risk_${stop}`))) {
+        const etaText = formatAtStop(new Date(eta).toISOString(), state);
+        const line = `Tight on time to the ${stop} in ${city}, ${state}: arriving about ${etaText}${because}. The AI is watching it and will tell the broker if it slips.`;
+        const marked = addWhy(load, line);
+        await save("loads", ctx.carrier.id, marked as unknown as Item);
+        ctx.loads = ctx.loads.map((l) => (l.id === load.id ? marked : l));
+        await pushToOffice(ctx.carrier.id, { title: `Truck ${truck!.unitNumber} tight on time`, body: `${load.referenceNumber}: ${line}`, url: `/carrier/loads/${load.id}`, tag: `late-${load.id}-${stop}` }).catch(() => 0);
+        done.push(`${load.referenceNumber}: tight on time to the ${stop}`);
+      }
+      continue;
+    }
+    if (eta <= Date.parse(due) + 30 * 60_000) continue;
     // The appointment will be missed: call the facility to move it, the way a dispatcher does before the truck is late.
     const phone = stop === "pickup" ? load.rateConReading?.shipperPhone : load.rateConReading?.receiverPhone;
     if (phone && canCall(ctx.carrier) && load.appointments?.[stop]?.purpose !== "move" && (await claimMark(ctx.carrier.id, load.id, `appt_move_${stop}`)))
@@ -312,7 +335,7 @@ export async function lateNotices(ctx: CarrierContext, now: number): Promise<str
     });
     done.push(`${load.referenceNumber}: late notice for ${stop} ${result}`);
     // The owner hears it the same moment, with the new time, before anyone has to ask them.
-    const line = `Running late to the ${stop} in ${city}, ${state}: new arrival about ${etaText}. ${result === "sent" ? "The AI told the broker." : "The note to the broker is waiting for your OK."}`;
+    const line = `Running late to the ${stop} in ${city}, ${state}: new arrival about ${etaText}${because}. ${result === "sent" ? "The AI told the broker." : "The note to the broker is waiting for your OK."}`;
     const marked = addWhy({ ...load, late: { stop, eta: new Date(eta).toISOString(), at: new Date(now).toISOString() } }, line);
     await save("loads", ctx.carrier.id, marked as unknown as Item);
     ctx.loads = ctx.loads.map((l) => (l.id === load.id ? marked : l));
@@ -320,6 +343,27 @@ export async function lateNotices(ctx: CarrierContext, now: number): Promise<str
     await pushToOffice(ctx.carrier.id, { title: `Truck ${truck!.unitNumber} running late`, body: `${load.referenceNumber}: ${line}`, url: `/carrier/loads/${load.id}`, tag: `late-${load.id}-${stop}` }).catch(() => 0);
   }
   return done;
+}
+
+/**
+ * A rolling truck sitting still somewhere it shouldn't (lib/agent/late-risk): the driver gets a short "everything
+ * OK?" text, once for each stop, and the owner sees it. A reply goes to the AI like any text.
+ */
+async function stoppedCheck(ctx: CarrierContext, load: Load, truck: Truck, driver: Driver | undefined, now: number): Promise<boolean> {
+  const odd = stoppedOddly(load, truck, driver, now);
+  if (!odd || !(await claimMark(ctx.carrier.id, load.id, `stopped:${truck.stoppedSince}`))) return false;
+  const where = truck.position?.description ?? `${truck.currentCity}, ${truck.currentState}`;
+  const hours = odd.minutes >= 120 ? `${Math.round(odd.minutes / 30) / 2} hours` : `${odd.minutes} minutes`;
+  if (driver?.phone && !driver.prefs?.smsOptOut) {
+    const text = await translateForDriver(`Checking in: the truck's been stopped about ${hours} near ${where}. Everything OK? Reply if you need anything (a shop, parking, more time at the dock).`, driver.prefs?.language ?? "en").catch(() => null);
+    if (text) {
+      const sid = await textTo(ctx.carrier, driver.phone, text);
+      await saveDriverMessage(ctx.carrier.id, { id: `dm-${now.toString(36)}${Math.random().toString(36).slice(2, 6)}`, driverId: driver.id, from: "ai", content: text, timestamp: new Date(now).toISOString(), channel: "sms", ai: true }, "/driver/messages");
+      await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: driver.phone, body: text, data: { kind: "stopped_check", loadId: load.id } });
+    }
+  }
+  await addActivity(ctx.carrier.id, event({ type: "check_call", loadId: load.id, message: `Truck ${truck.unitNumber} stopped ${hours} near ${where}`, detail: `${load.referenceNumber} · not at a stop, driver on duty. The AI texted ${driver?.name.split(" ")[0] ?? "the driver"} to check in.`, severity: "warning" }));
+  return true;
 }
 
 /** Whether a driver can legally get a truck to a pickup in time, from the ELD's clocks. True when there's no ELD data. */

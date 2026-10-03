@@ -21,6 +21,8 @@ const FRESH = 24 * 3600_000;
 export interface Route {
   miles: number;
   hours: number;
+  /** Live routes: the drive time with no traffic, so the traffic's share is `hours - freeHours`. */
+  freeHours?: number;
 }
 
 async function get(url: string): Promise<unknown> {
@@ -40,23 +42,28 @@ async function point(p: Place): Promise<Point | null> {
   return found;
 }
 
-/** Road miles and driving hours for a truck between two places, or null (not set up, or the service had no route). */
-export async function route(from: Place, to: Place): Promise<Route | null> {
+/**
+ * Road miles and driving hours for a truck between two places, or null (not set up, or the service had no route).
+ * `live` is for an ETA: traffic now, kept for 15 minutes; otherwise typical times, kept for a day.
+ */
+export async function route(from: Place, to: Place, opts: { live?: boolean } = {}): Promise<Route | null> {
   if (!routingConfigured()) return null;
   try {
     const [a, b] = await Promise.all([point(from), point(to)]);
     if (!a || !b) return null;
     // Positions are rounded to about a kilometer so a moving truck still hits the cache.
-    const key = `${a.lat.toFixed(2)},${a.lon.toFixed(2)}>${b.lat.toFixed(2)},${b.lon.toFixed(2)}`;
+    const key = `${opts.live ? "live:" : ""}${a.lat.toFixed(2)},${a.lon.toFixed(2)}>${b.lat.toFixed(2)},${b.lon.toFixed(2)}`;
     const hit = routes.get(key);
-    if (hit && Date.now() - hit.at < FRESH) return hit.route;
-    const body = (await get(`${ROUTER()}/v8/routes?transportMode=truck&origin=${a.lat},${a.lon}&destination=${b.lat},${b.lon}&return=summary&apiKey=${encodeURIComponent(process.env.HERE_API_KEY!)}`)) as {
-      routes?: { sections?: { summary?: { length?: number; duration?: number } }[] }[];
+    if (hit && Date.now() - hit.at < (opts.live ? 15 * 60_000 : FRESH)) return hit.route;
+    const when = opts.live ? `&departureTime=${encodeURIComponent(new Date().toISOString().replace(/\.\d{3}Z$/, "Z"))}` : "&departureTime=any";
+    const body = (await get(`${ROUTER()}/v8/routes?transportMode=truck&origin=${a.lat},${a.lon}&destination=${b.lat},${b.lon}&return=summary${when}&apiKey=${encodeURIComponent(process.env.HERE_API_KEY!)}`)) as {
+      routes?: { sections?: { summary?: { length?: number; duration?: number; baseDuration?: number } }[] }[];
     };
     const sections = body.routes?.[0]?.sections ?? [];
     const meters = sections.reduce((s, x) => s + (x.summary?.length ?? 0), 0);
     const seconds = sections.reduce((s, x) => s + (x.summary?.duration ?? 0), 0);
-    const r = meters > 0 ? { miles: Math.round(meters / 1609.34), hours: Math.round((seconds / 3600) * 10) / 10 } : null;
+    const base = sections.reduce((s, x) => s + (x.summary?.baseDuration ?? x.summary?.duration ?? 0), 0);
+    const r = meters > 0 ? { miles: Math.round(meters / 1609.34), hours: Math.round((seconds / 3600) * 10) / 10, ...(opts.live ? { freeHours: Math.round((base / 3600) * 10) / 10 } : {}) } : null;
     routes.set(key, { at: Date.now(), route: r });
     return r;
   } catch (e) {
@@ -69,7 +76,7 @@ export async function route(from: Place, to: Place): Promise<Route | null> {
 export async function routedEta(truck: Truck, driver: Driver | undefined, city: string, state: string, now: number): Promise<number | null> {
   const pos = truck.position;
   if (!pos || now - Date.parse(pos.at) > 30 * 60_000) return null;
-  const r = await route({ lat: pos.lat, lon: pos.lon }, { city, state });
+  const r = await route({ lat: pos.lat, lon: pos.lon }, { city, state }, { live: true });
   if (!r) return null;
   const clocksFresh = driver?.hos && now - Date.parse(driver.hos.at) < 2 * 3600_000;
   const left = clocksFresh ? Math.min(driver!.hos!.drive, driver!.hos!.shift) : Infinity;

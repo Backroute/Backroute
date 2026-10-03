@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import type { LatLng } from "@/lib/trip-geo";
 import { cloudEnabled } from "@/lib/cloud/client";
 import { authHeader } from "@/lib/ai/client";
+import { keepTripMap } from "@/lib/service-worker";
 import { DEFAULT_PROFILE } from "@/lib/nav-apps";
 import type { TruckProfile } from "@/lib/types";
 
@@ -187,6 +188,8 @@ export function TripMap({
       map.fitBounds(bounds, { padding, duration: 0 });
       state.current.path = path;
       drawProgress(state.current, latest.current.progress, latest.current.showTruck);
+      // The road ahead stays on the phone for when the signal drops.
+      keepTripMap(STYLE_URL, path);
     })();
     return () => {
       cancelled = true;

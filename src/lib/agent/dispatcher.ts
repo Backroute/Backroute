@@ -22,6 +22,7 @@ import { addActivity, save, type CarrierContext } from "./db";
 import { alertSupport } from "./support";
 import { addFacilityNote, cleanHours, facilitiesOf, tipsForLoad } from "./facility-notes";
 import { recordReefer } from "./reefer";
+import { askedForIt, bookForAi, cancelParking, spotsForAi } from "./parking";
 
 /**
  * The AI dispatcher on the server: one brain behind texts, calls and email. It reads the carrier's data, answers,
@@ -105,7 +106,7 @@ export type Talk = "sms" | "voice" | "chat";
 const sourceOf = (t: Talk): MessageChannel => (t === "chat" ? "app" : t);
 const BY: Record<Talk, string> = { sms: "by text", voice: "by phone", chat: "in the app" };
 
-function driverTools(ctx: CarrierContext, driver: Driver, channel: Talk, effects: Effects) {
+function driverTools(ctx: CarrierContext, driver: Driver, channel: Talk, effects: Effects, said = "") {
   const first = driver.name.split(" ")[0];
   const truck = ctx.trucks.find((t) => t.id === driver.truckId || t.secondDriverId === driver.id);
   const theirLoads = () => ctx.loads.filter((l) => l.truckId && l.truckId === truck?.id);
@@ -269,6 +270,43 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: Talk, effects
       },
     }),
     betaZodTool({
+      name: "find_parking_spots",
+      description: "Spots that can be reserved near where the driver will stop for the night (where their hours run out), with prices. Only when the driver asks about reserving or booking parking.",
+      inputSchema: z.object({}),
+      run: async () => {
+        if (!truck) return "The driver isn't on a truck.";
+        effects.done.push("Looked up parking to reserve");
+        return spotsForAi(ctx, truck);
+      },
+    }),
+    betaZodTool({
+      name: "reserve_parking",
+      description:
+        "Reserve a truck parking spot, paid by the company. ONLY when the driver has just asked you to book or reserve it (\"book me a spot\", \"yes, reserve that one\"). Never on your own, never because it would help. Quote the driver's own words that asked for it.",
+      inputSchema: z.object({
+        spot_id: z.string().optional().describe("The id from find_parking_spots; leave out to take the closest."),
+        driver_asked: z.string().describe("The driver's exact words in their last message that ask for the booking."),
+      }),
+      run: async ({ spot_id, driver_asked }) => {
+        if (!truck) return "The driver isn't on a truck.";
+        if (!askedForIt(driver_asked, said)) return "Not booked: the driver hasn't asked for a booking in their message. Ask them if they want one; book only after they say so.";
+        const r = await bookForAi(ctx, truck, spot_id, "driver", channel === "voice");
+        if (r.startsWith("Booked")) effects.done.push("Reserved parking (the driver asked)");
+        return r;
+      },
+    }),
+    betaZodTool({
+      name: "cancel_parking",
+      description: "Cancel the parking spot that was reserved for the driver's truck, when they ask.",
+      inputSchema: z.object({}),
+      run: async () => {
+        if (!truck) return "The driver isn't on a truck.";
+        const ok = await cancelParking(ctx, truck, "driver").catch(() => false);
+        if (ok) effects.done.push("Cancelled the parking reservation");
+        return ok ? "Cancelled." : "Nothing booked to cancel, or the parking service didn't answer.";
+      },
+    }),
+    betaZodTool({
       name: "tell_owner",
       description: "Pass a message to the owner that needs a person: a question you can't answer from the data, a request for a call back, pay or time off.",
       inputSchema: z.object({ message: z.string() }),
@@ -301,7 +339,7 @@ const CHANNEL_NOTES: Record<Talk, string> = {
 };
 
 const ACTING = `
-You can act with your tools. When the driver tells you they've arrived, are loaded, or reached delivery, update the load. When they report a problem, report it. When they need parking, fuel, a scale, a wash or a shop, find it nearby. When they tell you something about a dock the next driver should know (gate, check-in, parking, rules, hours), save it with note_facility. When they give you a reefer or pulp temperature, record it. When they need a person, tell the owner. Only say you did something after the tool says it's done.`;
+You can act with your tools. When the driver tells you they've arrived, are loaded, or reached delivery, update the load. When they report a problem, report it. When they need parking, fuel, a scale, a wash or a shop, find it nearby. Reserve a parking spot only when the driver asks you to book one; never offer to on your own and never book it unasked. When they tell you something about a dock the next driver should know (gate, check-in, parking, rules, hours), save it with note_facility. When they give you a reefer or pulp temperature, record it. When they need a person, tell the owner. Only say you did something after the tool says it's done.`;
 
 /**
  * For measuring the AI (api/eval): the tools it picks are recorded, with what it passed them, and nothing is done.
@@ -363,7 +401,7 @@ async function driverTurnOnce(ctx: CarrierContext, driver: Driver, channel: Talk
         { type: "text", text: `${CHANNEL_NOTES[channel]}${ACTING}` },
       ],
       messages,
-      tools: dry ? dryRun(driverTools(ctx, driver, channel, effects), dry) : driverTools(ctx, driver, channel, effects),
+      tools: dry ? dryRun(driverTools(ctx, driver, channel, effects, said), dry) : driverTools(ctx, driver, channel, effects, said),
       max_iterations: 5,
     });
     if (final.stop_reason === "refusal") return { reply: "", effects: { ...effects, failed: true } };
@@ -405,6 +443,47 @@ async function ownerTurnOnce(ctx: CarrierContext, channel: Talk, said: string, h
       },
     }),
   ];
+  // Parking for a truck, only when the owner asks for it.
+  tools.push(
+    betaZodTool({
+      name: "find_parking_spots",
+      description: "Spots that can be reserved for one of the owner's trucks, near where it will stop for the night. Only when the owner asks about reserving parking.",
+      inputSchema: z.object({ unit: z.string().describe("The truck's unit number.") }),
+      run: async ({ unit }) => {
+        const truck = ctx.trucks.find((t) => t.unitNumber.toLowerCase() === unit.toLowerCase().replace(/^(truck|unit)\s*/, ""));
+        if (!truck) return `No truck ${unit}. Units: ${ctx.trucks.map((t) => t.unitNumber).join(", ")}.`;
+        effects.done.push(`Looked up parking for ${truck.unitNumber}`);
+        return spotsForAi(ctx, truck);
+      },
+    }),
+    betaZodTool({
+      name: "reserve_parking",
+      description: "Reserve a parking spot for one of the owner's trucks. ONLY when the owner has just asked you to book it. Quote the owner's own words that asked. The driver gets the address by text.",
+      inputSchema: z.object({ unit: z.string(), spot_id: z.string().optional(), owner_asked: z.string().describe("The owner's exact words in their last message that ask for the booking.") }),
+      run: async ({ unit, spot_id, owner_asked }) => {
+        const truck = ctx.trucks.find((t) => t.unitNumber.toLowerCase() === unit.toLowerCase().replace(/^(truck|unit)\s*/, ""));
+        if (!truck) return `No truck ${unit}.`;
+        // A text or a call can't prove it's the owner well enough to spend their money; the app can.
+        if (channel !== "chat") return "Booking parking for the owner is done in the Backroute app (ask there), or the driver can ask by text. Say so.";
+        if (!askedForIt(owner_asked, said)) return "Not booked: the owner hasn't asked for a booking in their message. Ask first.";
+        const r = await bookForAi(ctx, truck, spot_id, "owner", true);
+        if (r.startsWith("Booked")) effects.done.push(`Reserved parking for ${truck.unitNumber} (the owner asked)`);
+        return r;
+      },
+    }),
+    betaZodTool({
+      name: "cancel_parking",
+      description: "Cancel the parking reserved for one of the owner's trucks, when they ask.",
+      inputSchema: z.object({ unit: z.string() }),
+      run: async ({ unit }) => {
+        const truck = ctx.trucks.find((t) => t.unitNumber.toLowerCase() === unit.toLowerCase().replace(/^(truck|unit)\s*/, ""));
+        if (!truck) return `No truck ${unit}.`;
+        const ok = await cancelParking(ctx, truck, "owner").catch(() => false);
+        if (ok) effects.done.push(`Cancelled parking for ${truck.unitNumber}`);
+        return ok ? "Cancelled." : "Nothing booked to cancel, or the parking service didn't answer.";
+      },
+    }),
+  );
   // Only from the signed-in app: a text or a call can't prove it's the owner well enough to send email for them.
   if (channel === "chat")
     tools.push(

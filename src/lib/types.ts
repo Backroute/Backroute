@@ -239,6 +239,36 @@ export interface DriverPrefs {
   notes?: { at: string; text: string; until?: string }[];
 }
 
+/** A reservable truck parking spot, from the parking service (lib/agent/parking). */
+export interface ParkingSpot {
+  id: string;
+  name: string;
+  address: string;
+  lat: number;
+  lon: number;
+  /** For the night, in dollars. */
+  price: number;
+  /** Miles from where the driver's hours run out (or from the truck, with no load). */
+  miles?: number;
+}
+
+/** A spot the AI reserved because the driver or the owner asked it to. */
+export interface ParkingReservation {
+  id: string;
+  place: string;
+  address: string;
+  lat: number;
+  lon: number;
+  price: number;
+  arriveAt: string;
+  confirmation: string;
+  /** How to get in, when the lot gave one (a gate code, which row). */
+  checkIn?: string;
+  askedBy: "driver" | "owner";
+  at: string;
+  status: "booked" | "cancelled";
+}
+
 export interface Truck {
   id: string;
   unitNumber: string;
@@ -260,6 +290,10 @@ export interface Truck {
   repositionTo?: { city: string; state: string; at: string };
   /** Real accounts: a breakdown the AI is working on (shops found near the truck, and which one it's calling). */
   roadside?: Roadside;
+  /** Real accounts: since when the ELD has had the truck in the same spot (cleared once it moves). */
+  stoppedSince?: string;
+  /** Real accounts: a truck parking spot the AI reserved, only ever because the driver or the owner asked. */
+  parking?: ParkingReservation;
   currentLoadId: string | null;
   nextLoadId: string | null;
   /** A load this truck just delivered that the driver hasn't dismissed yet — keeps the "load complete"

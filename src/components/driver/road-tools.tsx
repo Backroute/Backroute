@@ -12,6 +12,7 @@ import { DEFAULT_PROFILE, heightWords, NAV_APPS, navApp, profileWords } from "@/
 import { dockOf, dockSearchText, useDockSpot, type DockTarget } from "@/lib/dock-spot";
 import { clockWords, hosNow, samplePoints, whereHoursEnd } from "@/lib/hos-clock";
 import { requestLumper } from "@/lib/lumper";
+import { ParkingReserve } from "./parking-reserve";
 import { updateTruck } from "@/lib/back-office";
 import { haptic } from "@/lib/feedback";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -38,6 +39,7 @@ export function RoadTools({ load, truck, driver }: { load: Load; truck: Truck; d
   const to = cityCoords(stop.city, stop.state);
   const from: LatLng | undefined = pickup ? pickupLegStart(load, truck.currentCity, truck.currentState) : cityCoords(load.lane.origin, load.lane.originState);
   const [sheet, setSheet] = useState<"directions" | "lumper" | null>(null);
+  const live = useStore((st) => st.session.mode !== "demo");
   const dock = dockOf(load, pickup ? "pickup" : "delivery");
   const { spot, looking } = useDockSpot(dock.address);
   if (s.card === "booking") return null;
@@ -79,7 +81,7 @@ export function RoadTools({ load, truck, driver }: { load: Load; truck: Truck; d
         </p>
       )}
 
-      {hos && end && <HoursAndParking driver={driver} hos={hos} end={end} now={now!} />}
+      {hos && end && <HoursAndParking driver={driver} truck={truck} live={live} hos={hos} end={end} now={now!} />}
 
       {from && to && <RouteWeather from={from} to={to} progress={s.legP} light={!load.weight || load.weight < LIGHT_LBS || s.card === "pickup"} loadKey={`${load.id}:${s.card}`} />}
 
@@ -213,7 +215,7 @@ const RESERVE = [
   { name: "Love's", url: "https://www.loves.com" },
 ];
 
-function HoursAndParking({ hos, end, now }: { driver: Driver; hos: ReturnType<typeof hosNow>; end: ReturnType<typeof whereHoursEnd>; now: number }) {
+function HoursAndParking({ driver, truck, live, hos, end, now }: { driver: Driver; truck: Truck; live: boolean; hos: ReturnType<typeof hosNow>; end: ReturnType<typeof whereHoursEnd>; now: number }) {
   const left = Math.min(hos.drive, hos.shift);
   const stopAt = new Date(now + left * 3600_000);
   const hour = stopAt.getHours();
@@ -230,6 +232,7 @@ function HoursAndParking({ hos, end, now }: { driver: Driver; hos: ReturnType<ty
         {hos.cycle !== null ? ` · cycle ${clockWords(hos.cycle)}` : ""}
         {hos.fromEld ? "" : " · from the app, no ELD"}
       </p>
+      {live && (truck.parking?.status === "booked" || !end.reachesStop) && <ParkingReserve truck={truck} driver={driver} />}
       {!end.reachesStop && (
         <>
           {late && (

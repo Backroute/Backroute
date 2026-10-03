@@ -9,5 +9,30 @@ export const SW_URL = process.env.NODE_ENV === "production" ? "/sw.js?offline=1"
 
 export function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return Promise.resolve(null);
+  watchOnline();
   return navigator.serviceWorker.register(SW_URL, { scope: "/", updateViaCache: "none" }).catch(() => null);
+}
+
+function tell(message: Record<string, unknown>) {
+  navigator.serviceWorker?.ready.then((r) => r.active?.postMessage(message)).catch(() => {});
+}
+
+let watching = false;
+/** Back online (or opened online): Yes / No answers tapped on a notification with no signal go now. */
+function watchOnline() {
+  if (watching || typeof window === "undefined") return;
+  watching = true;
+  window.addEventListener("online", () => tell({ type: "online" }));
+  if (navigator.onLine) tell({ type: "online" });
+}
+
+/**
+ * Saves the trip's map area on the phone (public/sw.js), so the map still draws on the road with no signal. Points are
+ * [lat, lon] along the road; thinned to a few hundred. Only in a built app, where the offline copy runs.
+ */
+export function keepTripMap(style: string, path: [number, number][]) {
+  if (process.env.NODE_ENV !== "production" || typeof navigator === "undefined" || !("serviceWorker" in navigator) || path.length < 2) return;
+  const every = Math.max(1, Math.ceil(path.length / 300));
+  const points = path.filter((_, i) => i % every === 0 || i === path.length - 1);
+  tell({ type: "keep-trip-map", style, points });
 }

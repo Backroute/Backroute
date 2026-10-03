@@ -2,11 +2,13 @@ import "server-only";
 import { holidayOn } from "../holidays";
 import { zoneFor } from "../stop-time";
 import type { Driver, Load, ScheduleWarning, Truck } from "../types";
+import { postedHours } from "./dock-hours";
 import { facilitiesOf, formatHours, hoursAt, type FacilityHours } from "./facility-notes";
 
 /**
  * Whether a load's times can actually be run, checked the way a dispatcher does before saying yes: a stop on a
- * holiday most docks close for, a dock that's closed at that hour or on that day (from what drivers reported), and a
+ * holiday most docks close for, a dock that's closed at that hour or on that day (from what drivers reported, else
+ * its posted hours), and a
  * delivery window too short for one driver's legal hours. A hard problem keeps the AI from booking it on its own; a
  * soft one is mentioned to the owner and the driver.
  */
@@ -113,6 +115,12 @@ export async function scheduleWarnings(load: Load, truck?: Pick<Truck, "secondDr
     const closed = known ? closedAt(known.hours, when) : null;
     // Only the carrier's own drivers' word can stop a booking; another carrier's driver's is a heads-up.
     if (f && known && closed) out.push({ hard: known.own, text: `${f.name} ${closed}, ${known.own ? "your drivers say" : "another carrier's driver says"} (${formatHours(known.hours)}), but the ${s.stop.toLowerCase()} is set for ${when.weekday} ${when.time}.` });
+    // No driver has said: the place's posted hours, as a heads-up only (they're often the office's, not the dock's).
+    if (f && !known) {
+      const posted = await postedHours(f, s.stop === "Pickup" ? load.rateConReading?.shipperAddress : load.rateConReading?.receiverAddress);
+      const shut = posted && Object.keys(posted).length ? closedAt(posted, when) : null;
+      if (posted && shut) out.push({ hard: false, text: `${f.name} ${shut} by its posted hours (${formatHours(posted)}), but the ${s.stop.toLowerCase()} is set for ${when.weekday} ${when.time}. Worth confirming the dock's hours with the broker.` });
+    }
   }
   // Enough time to drive it legally between the pickup and the delivery.
   if (load.pickupAt && load.deliveryAt && load.lane.miles) {
