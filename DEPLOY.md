@@ -888,7 +888,36 @@ The code was run against local stand-ins that behave like the real services:
     - A reroute is agreed by a revised rate con at the new total.
   - **Factoring:** the packet has the schedule, the invoice, the rate con and the POD. It covers the line haul, the layover and the agreed extra stop.
   - **Cargo claim:** it's acknowledged in writing with what the claimant must send. The driver's account goes in the file, and the claim file waits for the owner's OK before going to the insurer.
-- **Access rules:**
+- **Dispatching like a senior dispatcher** (58 unit checks, 34 end-to-end checks in `ux4-e2e`, and the whole suite again: 779 checks, 34 suites):
+  - **Loads lined up:**
+    - A truck's lineup is its current load, its next one, then what's booked by pickup time. A booked load more than a day past its pickup doesn't hold the truck.
+    - Contract freight isn't held to the three-load limit, and a load with no delivery time is estimated from its pickup.
+  - **Fleet-wide matching:** the pairing with the best total wins over each load's nearest truck. A truck that can't take a load is never paired with it.
+  - **Asks that learn:**
+    - Opening 5–7% higher after the broker took our first number 4 or 5 times, and 3–8% lower after most asks were lost.
+    - A load we set aside ourselves isn't a lost ask.
+    - A broker's own habit outranks the lane's.
+  - **Posted dock hours:**
+    - A Saturday delivery at a weekday-only dock is a heads-up, never a hard stop.
+    - A different business found by the same search isn't taken as the dock.
+  - **Parking, only on request:**
+    - A dispatch round never books a spot.
+    - The driver's spots come from where their hours run out, and a spot the service didn't offer can't be booked.
+    - A second booking the same night is refused, and the bookkeeper can't book.
+    - The owner booking for a truck texts the driver the address and confirmation.
+    - The AI's tool refuses unless the person's own words asking for it are in their message.
+  - **Late trucks, early:**
+    - Traffic into Houston turns a 5-hour run into 7, and the owner hears why before the appointment.
+    - A truck stopped 2 hours off its stops, with the driver on duty, gets one "everything OK?" text. A driver in the sleeper doesn't.
+  - **QuickBooks Online:**
+    - A forged return from Intuit is refused, and only the owner can connect. The sign-in is stored encrypted, never shown.
+    - Invoices go in with one line per charge, payments are applied to their invoice, and fuel, tolls and an approved lumper each go to their own account. An unapproved cost stays out.
+    - Up to 60 entries go in a run, and nothing goes in twice. An invoice number already in the books is linked, not duplicated.
+    - Disconnecting tells Intuit to forget the sign-in.
+  - **Offline:**
+    - A Yes tapped with no signal is kept on the phone and goes through once it's back online, then isn't sent again. This was tested on the built app.
+    - The trip's map area is saved and served with no signal: Dallas to Waco is 119 pieces, from the whole-trip view to town level. This was tested on the worker itself, because the test browser's service workers can't reach the internet.
+- **Access rules:** 125 checks.
   - A stale copy saving one field of a load changes only that field.
   - What carriers cost to run is server-only.
   - The website password vault and job queue can't be read or written by anyone who signs in, not even the owner, and only the server can take a job like the worker.
