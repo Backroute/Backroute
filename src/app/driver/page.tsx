@@ -301,6 +301,7 @@ export default function DriverHomePage() {
             <Switch checked={autoPick} onChange={toggleAutoPick} label="Pick my next load for me" />
           </div>
           <NextLoadOffers
+            bleed
             offerGroups={offerGroups}
             brokers={brokers}
             onSelect={(groupId, loadId) => selectLoadOffer(groupId, loadId, "driver")}

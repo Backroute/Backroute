@@ -41,13 +41,18 @@ A lane on screen is `<Lane from to />` (`components/ui/lane.tsx`): an arrow icon
 
 ## Load cards
 
-`components/shared/load-offer-card.tsx`, the same card for owners and drivers: broker and the fit ring on top; the
-trip as a line from a dot to a ring with the cities big and, under each, the real date ("Pickup · Mon, Oct 5
-(tomorrow) · 9 am–5 pm", from `lib/load-dates.ts`); three facts in fixed places (drive time, empty miles, reload) so a
-row of cards reads across like a boarding pass; then the money. The load's rate is the big number, because that's what
-the load pays and a smaller number reads as a worse load; under it every cost (fuel, tolls, empty miles, the 2% fee) and
-what's left ("You keep" for the owner). One reason; one blue button. "Best fit" sits on the card's top edge so the cards
-in a row line up.
+`components/shared/load-offer-card.tsx`, the same card for owners and drivers, in a row you swipe or step through with
+the arrows (`components/shared/offer-rail.tsx`: never moves on its own, the next card peeks in, "1 of 3" says how many).
+
+- The best load is first and the opposite colour of the page (`.theme-invert`: dark on a light page, light on a dark
+  one), with a blue "Best fit" tag on its top edge.
+- Top: broker, equipment and weight; the fit score as a number in a ring, nothing else.
+- The trip: a dot, a line and a ring, the cities big, and under each the stop's date and the dock's hours in the dock's
+  own time zone ("Pickup · Mon, Oct 5 (tomorrow)" / "9 am–5 pm CDT"), from `lib/load-dates.ts`.
+- Three facts in fixed places: the miles they'll drive (empty to pickup plus loaded), the drive time, and the reload.
+- The money: the load's rate is the big number, because it's what the load pays and a smaller figure reads as a worse
+  load; under it every cost (fuel, tolls, empty miles, the 2% fee) and what's left ("You keep" for the owner).
+- One reason, one blue button.
 
 ## Notifications
 

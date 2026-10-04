@@ -1,6 +1,7 @@
 "use client";
 
 import { LoadOfferCard } from "./load-offer-card";
+import { OfferRail } from "./offer-rail";
 import { TruckDriverChip } from "./truck-driver-chip";
 import type { OfferAskDraft } from "@/lib/engine";
 import { useStore } from "@/lib/store";
@@ -15,6 +16,7 @@ export function NextLoadOffers({
   onSelect,
   onAsk,
   onAskResolve,
+  bleed,
 }: {
   offerGroups: [string, Load[]][];
   brokers: Map<string, Broker>;
@@ -24,6 +26,8 @@ export function NextLoadOffers({
   onSelect: (groupId: string, loadId: string) => void;
   onAsk: (loadId: string, text: string) => { draft: OfferAskDraft; pendingReply: string; resolved: boolean };
   onAskResolve: (loadId: string, draft: OfferAskDraft) => string;
+  /** The driver's phone: let the row of cards run to the screen edges. */
+  bleed?: boolean;
 }) {
   // A real account's offers are loads brokers emailed; there's no load board behind them, and questions go by email.
   const real = useStore((s) => s.session.mode !== "demo");
@@ -51,15 +55,7 @@ export function NextLoadOffers({
           const driver = drivers && truck?.driverId ? drivers.get(truck.driverId) : undefined;
           return (
             <div key={groupId}>
-              {trucks && (
-                <TruckDriverChip
-                  truck={truck}
-                  driver={driver}
-                  trailing={<span className="ml-auto shrink-0 text-xs text-ink-400">{loads.length} option{loads.length === 1 ? "" : "s"}</span>}
-                  className="mb-4"
-                />
-              )}
-              <div className="grid gap-x-4 gap-y-6 pt-3 md:grid-cols-2 xl:grid-cols-3">
+              <OfferRail bleed={bleed} header={trucks ? <TruckDriverChip truck={truck} driver={driver} /> : undefined}>
                 {loads.map((load) => (
                   <LoadOfferCard
                     key={load.id}
@@ -71,7 +67,7 @@ export function NextLoadOffers({
                     onAskResolve={real ? undefined : (draft) => onAskResolve(load.id, draft)}
                   />
                 ))}
-              </div>
+              </OfferRail>
             </div>
           );
         })}

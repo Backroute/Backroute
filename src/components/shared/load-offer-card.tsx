@@ -24,8 +24,8 @@ const RELOAD = { strong: "Easy", fair: "Fair", weak: "Slow" } as const;
 /** Rough wheels-turning time at a truck's average, for a sense of the run (not a plan: breaks aren't in it). */
 function driveTime(miles: number) {
   const h = miles / 50;
-  if (h < 1) return `about ${Math.max(5, Math.round((h * 60) / 5) * 5)} min`;
-  return `about ${Math.round(h)} h`;
+  if (h < 1) return `${Math.max(5, Math.round((h * 60) / 5) * 5)} min`;
+  return `${Math.round(h)} h`;
 }
 
 /**
@@ -106,9 +106,11 @@ export function LoadOfferCard({
     { label: "Backroute fee (2%)", amount: load.commission },
   ].filter((c) => c.amount > 0);
 
+  // Everything the truck drives for this load: empty to the pickup, then loaded to the delivery.
+  const totalMiles = load.lane.miles + Math.max(0, load.deadheadMiles);
   const facts = [
-    { label: "Drive", value: driveTime(load.lane.miles) },
-    { label: "Empty miles", value: load.deadheadMiles > 0 ? `${load.deadheadMiles} mi` : "None" },
+    { label: "You drive", value: `${totalMiles.toLocaleString()} mi` },
+    { label: "Drive time", value: driveTime(totalMiles) },
     load.reloadMarket && !load.lane.moveKind
       ? { label: "Reload", value: RELOAD[load.reloadMarket] }
       : { label: "Weight", value: load.weight ? `${Math.round(load.weight / 1000)}k lb` : "—" },
@@ -117,12 +119,13 @@ export function LoadOfferCard({
   return (
     <article
       className={cn(
-        "group relative flex h-full flex-col rounded-[28px] border bg-white p-6 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_16px_40px_-24px_rgb(0_0_0/0.22)] transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgb(0_0_0/0.04),0_28px_56px_-28px_rgb(0_0_0/0.3)]",
-        load.recommended ? "border-ink-950 ring-1 ring-ink-950" : "border-line",
+        "group relative flex h-full w-full flex-col rounded-[28px] border bg-white p-6 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_16px_40px_-24px_rgb(0_0_0/0.22)] transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgb(0_0_0/0.04),0_28px_56px_-28px_rgb(0_0_0/0.3)]",
+        // The best one is the opposite colour of the page, so it's the first thing the eye lands on.
+        load.recommended ? "theme-invert border-transparent shadow-[0_2px_4px_rgb(0_0_0/0.08),0_24px_48px_-20px_rgb(0_0_0/0.45)]" : "border-line",
       )}
     >
       {load.recommended && (
-        <span className="absolute -top-3 left-6 rounded-full bg-ink-950 px-3 py-1 text-xs font-semibold text-white">Best fit</span>
+        <span className="absolute -top-3 left-6 rounded-full bg-[var(--action)] px-3 py-1 text-xs font-semibold text-[var(--action-ink)] shadow-sm">Best fit</span>
       )}
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0 pt-1">
@@ -158,7 +161,7 @@ export function LoadOfferCard({
             <span className="w-0.5 bg-ink-200" />
           </span>
           <p className="py-3 text-sm font-medium tabular text-ink-500">
-            {load.lane.miles.toLocaleString()} mi
+            {load.lane.miles.toLocaleString()} mi loaded
           </p>
         </li>
         <li className="contents">
@@ -313,19 +316,15 @@ export function LoadOfferCard({
   );
 }
 
-/** "Pickup · Sun, Oct 4 (today) · 9 am–6 pm": the date stands out; the load's own words if it has no date. */
+/** "Pickup · Sun, Oct 4 (today)", and the dock's hours in its own zone under it; the load's own words if it has no date. */
 function StopDate({ stop, when, raw }: { stop: string; when: StopWhen | null | undefined; raw: string }) {
   return (
-    <p className="mt-0.5 text-[15px] leading-snug text-ink-500">
-      {stop} ·{" "}
-      <span className="font-semibold text-ink-950">{when?.date ?? raw.charAt(0).toUpperCase() + raw.slice(1)}</span>
-      {when?.relative && ` (${when.relative.toLowerCase()})`}
-      {when?.time && (
-        <>
-          {" · "}
-          <span className="whitespace-nowrap tabular">{when.time}</span>
-        </>
-      )}
-    </p>
+    <div className="mt-0.5 text-[15px] leading-snug text-ink-500">
+      <p>
+        {stop} · <span className="font-semibold text-ink-950">{when?.date ?? raw.charAt(0).toUpperCase() + raw.slice(1)}</span>
+        {when?.relative && ` (${when.relative.toLowerCase()})`}
+      </p>
+      {when?.time && <p className="tabular">{when.time}</p>}
+    </div>
   );
 }

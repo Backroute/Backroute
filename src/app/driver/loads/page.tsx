@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { LoadOfferCard } from "@/components/shared/load-offer-card";
+import { OfferRail } from "@/components/shared/offer-rail";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -23,7 +24,8 @@ export default function DriverLoadsPage() {
   const truck = trucks.find((t) => t.id === driver.truckId);
   // In a real account the office books loads with brokers; a company driver's app shows what's booked, not offers.
   const picksLoads = useStore((s) => s.session.mode !== "driver");
-  const pendingOffers = loads.filter((l) => l.truckId === truck?.id && l.stage === "offered" && picksLoads).sort((a, b) => b.score - a.score);
+  const pendingOffers = loads.filter((l) => l.truckId === truck?.id && l.stage === "offered" && picksLoads)
+    .sort((a, b) => Number(!!b.recommended) - Number(!!a.recommended) || b.score - a.score);
   const myLoads = [...loads.filter((l) => l.truckId === truck?.id && l.stage !== "offered")].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
   );
@@ -32,9 +34,15 @@ export default function DriverLoadsPage() {
     <div className="flex flex-col gap-5 px-5">
       {pendingOffers.length > 0 && (
         <div>
-          <h2 className="mb-1 text-[17px] font-semibold tracking-tight text-ink-950">Choose your next load</h2>
-          <p className="mb-3 text-xs text-ink-500">{pendingOffers.length} options from every connected board.</p>
-          <div className="flex flex-col gap-3">
+          <OfferRail
+            bleed
+            header={
+              <>
+                <h2 className="text-[17px] font-semibold tracking-tight text-ink-950">Choose your next load</h2>
+                <p className="text-xs text-ink-500">Best fit first. Swipe for the others.</p>
+              </>
+            }
+          >
             {pendingOffers.map((offer) => (
               <LoadOfferCard
                 key={offer.id}
@@ -46,7 +54,7 @@ export default function DriverLoadsPage() {
                 onAskResolve={(draft) => resolveOfferDetail(offer.id, draft)}
               />
             ))}
-          </div>
+          </OfferRail>
         </div>
       )}
 

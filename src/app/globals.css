@@ -166,6 +166,54 @@
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
 }
 
+/*
+ * The opposite of the page, for the one thing to look at first among equals (the best load in a row of choices): a
+ * dark card on a light page, a light card on a dark one. Everything inside follows, since it's the same token names.
+ */
+.theme-invert {
+  --color-white: #1c1c1e;
+  --ink-0: #1c1c1e;
+  --ink-50: #161618;
+  --ink-100: #2c2c2e;
+  --ink-150: #3a3a3c;
+  --ink-200: #48484a;
+  --ink-300: #545458;
+  --ink-400: #8e8e93;
+  --ink-500: #a1a1a6;
+  --ink-600: #c7c7cc;
+  --ink-700: #d1d1d6;
+  --ink-800: #e5e5ea;
+  --ink-900: #f2f2f7;
+  --ink-950: #ffffff;
+  --line: #3a3a3c;
+  --line-strong: #48484a;
+  --action: #0a84ff;
+  --action-strong: #409cff;
+  color: var(--ink-950);
+  color-scheme: dark;
+}
+:root[data-theme="dark"] .theme-invert {
+  --color-white: #ffffff;
+  --ink-0: #ffffff;
+  --ink-50: #fafafc;
+  --ink-100: #f2f2f7;
+  --ink-150: #e5e5ea;
+  --ink-200: #d1d1d6;
+  --ink-300: #c7c7cc;
+  --ink-400: #76767b;
+  --ink-500: #6e6e73;
+  --ink-600: #545458;
+  --ink-700: #3a3a3c;
+  --ink-800: #2c2c2e;
+  --ink-900: #242426;
+  --ink-950: #1d1d1f;
+  --line: #e5e5ea;
+  --line-strong: #d2d2d7;
+  --action: #0071e3;
+  --action-strong: #0062c4;
+  color-scheme: light;
+}
+
 /* Driving mode is up: pop-ups, prompts and undo bars wait until the driver is parked. */
 [data-driving] .hide-when-driving {
   display: none !important;
