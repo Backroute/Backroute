@@ -57,7 +57,7 @@ export function DriverTripCard(props: DriverTripCardProps) {
 
 /** Who a step is waiting on, in the carrier's words. */
 export function waitingOn(s: TripState, driverName?: string): string {
-  return `${s.next.owner === "ai" ? "AI" : driverName?.split(" ")[0] ?? "Driver"}: ${s.next.title}`;
+  return `${s.next.owner === "ai" ? "Backroute" : driverName?.split(" ")[0] ?? "Driver"}: ${s.next.title}`;
 }
 
 // ---------- Booking ----------
@@ -83,7 +83,7 @@ function BookingCard({ load, brokerName, viewer = "driver", onCall, onCounter }:
         </MapHeader>
       )}
       <CardHeading kicker="Booking" reference={load.referenceNumber} title={`${load.lane.origin} → ${load.lane.destination}`} sub={`Pickup ${load.pickupWindow} · ${load.lane.miles} mi`} />
-      <CompletionBar value={s.done} caption="AI is handling this" />
+      <CompletionBar value={s.done} caption="Backroute is on it" />
 
       <ol className="mt-5">
         <Step state="done" title="Found and scored" detail={`${load.score} match · ${formatCurrency(rate)} · est. net ${formatCurrency(load.netProfit ?? 0)}`} />
@@ -107,7 +107,7 @@ function BookingCard({ load, brokerName, viewer = "driver", onCall, onCounter }:
       </ol>
 
       <p className="mt-4 rounded-2xl bg-white/5 px-4 py-3 text-sm text-white/70">
-        {viewer === "driver" ? "Nothing for you to do. The AI books it and sends you to pickup." : "Nothing for you to do. The AI books it and dispatches the driver."}
+        {viewer === "driver" ? "Nothing to do. Backroute books it and sends you to pickup." : "Nothing to do. Backroute books it and dispatches the driver."}
       </p>
       {viewer === "driver" && <CardFooter load={load} rate={rate} onCall={onCall} />}
     </CardShell>
@@ -231,7 +231,7 @@ function DeliveryCard({ load, brokerName, upNext, viewer = "driver", driverName,
             state={lumper?.status === "verified" ? "done" : "todo"}
             title="Lumper receipt"
             optional
-            detail={lumper ? undefined : "Only if a lumper was paid. The AI files it for reimbursement."}
+            detail={lumper ? undefined : "Only if a lumper was paid. Backroute files it for reimbursement."}
             last
           >
             {(!readOnly || lumper) && <DocumentSlot doc={lumper} label="Photo of receipt" readOnly={readOnly} onFile={(f) => onUpload(load.id, "lumper_receipt", f)} />}
@@ -254,7 +254,7 @@ function DeliveryCard({ load, brokerName, upNext, viewer = "driver", driverName,
         ) : upNext === "choose" ? (
           <>Next-load options ready{readOnly ? "" : ", pick one below"} <ArrowDown className="h-3.5 w-3.5" /></>
         ) : (
-          <><Loader2 className="h-3.5 w-3.5 animate-spin" /> AI is lining up the next load</>
+          <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Lining up the next load</>
         )}
       </p>
       {!readOnly && <CardFooter load={load} rate={rate} onCall={onCall} />}
@@ -300,9 +300,9 @@ export function DockTimer({ load, brokerName, compact }: { load: Load; brokerNam
   return (
     <p
       className={cn(
-        "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium tabular",
-        tone === "warn" && "bg-amber-400/15 text-amber-200",
-        tone === "good" && "bg-emerald-400/15 text-emerald-200",
+        "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium tabular",
+        tone === "warn" && "bg-white/10 text-[var(--accent-warn)]",
+        tone === "good" && "bg-white/10 text-white",
         tone === "calm" && "bg-white/10 text-white/70",
       )}
     >
@@ -375,7 +375,7 @@ export function DriverTripCompleteCard({
           </div>
           <p className="pb-1 text-right text-xs text-white/50">Est. net<br />{formatCurrency(rate)} · {load.lane.miles} mi</p>
         </div>
-        <p className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-emerald-300">
+        <p className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/60">
           <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> POD checked</span>
           <span className="flex items-center gap-1">
             <Check className="h-3.5 w-3.5" /> Invoice packet sent to {payment.method === "factoring" ? "factoring" : brokerName ?? "the broker"}
@@ -384,22 +384,22 @@ export function DriverTripCompleteCard({
           {detention > 0 && <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> {formatCurrency(detention)} detention billed by AI</span>}
         </p>
 
-        <div className={cn("mt-4 flex items-center justify-between gap-3 rounded-2xl px-4 py-3", postTripDone ? "bg-white/5" : "bg-amber-400/15")}>
+        <div className={cn("mt-4 flex items-center justify-between gap-3 rounded-2xl px-4 py-3", postTripDone ? "bg-white/5" : "bg-white/10")}>
           <div className="flex items-center gap-2.5">
-            <ClipboardCheck className={cn("h-4 w-4", postTripDone ? "text-emerald-300" : "text-amber-200")} />
+            <ClipboardCheck className={cn("h-4 w-4", postTripDone ? "text-[var(--accent-live)]" : "text-[var(--accent-warn)]")} />
             <div>
               <p className="text-sm font-medium">Post-trip inspection</p>
-              <p className="text-[11px] text-white/55">{postTripDone ? "Logged for today" : "Required at the end of your driving day"}</p>
+              <p className="text-xs text-white/55">{postTripDone ? "Logged for today" : "Required at the end of your driving day"}</p>
             </div>
           </div>
-          {postTripDone ? <Check className="h-4 w-4 text-emerald-300" /> : <InspectionLink kind="post_trip">Start</InspectionLink>}
+          {postTripDone ? <Check className="h-4 w-4 text-[var(--accent-live)]" /> : <InspectionLink kind="post_trip">Start</InspectionLink>}
         </div>
 
         <div className="mt-3 rounded-2xl bg-white/5 p-4">
           {nextLoad ? (
             <>
-              <p className="text-[11px] font-medium uppercase tracking-wider text-white/50">
-                {nextIsBooking ? "Up next · AI is locking the rate" : "Up next · Pickup"}
+              <p className="text-xs font-medium uppercase tracking-wider text-white/50">
+                {nextIsBooking ? "Up next · locking the rate" : "Up next · Pickup"}
               </p>
               <p className="mt-0.5 text-xl font-semibold">{nextLoad.lane.origin}, {nextLoad.lane.originState}</p>
               <p className="mt-1 flex items-center gap-1.5 text-xs text-white/70">
@@ -444,7 +444,7 @@ export function CardShell({ children, className }: { children: React.ReactNode; 
 }
 
 export function LiveDot() {
-  return <span className="h-2 w-2 animate-pulse-dot rounded-full bg-[var(--accent-live)]" />;
+  return <span className="h-2 w-2 rounded-full bg-white" />;
 }
 
 export function AutoPickRow({ on, onChange, className }: { on: boolean; onChange: (on: boolean) => void; className?: string }) {
@@ -452,7 +452,7 @@ export function AutoPickRow({ on, onChange, className }: { on: boolean; onChange
     <div className={cn("flex items-center justify-between gap-3", className)}>
       <div>
         <p className="text-sm font-medium">Auto-pick the next load</p>
-        <p className="text-[11px] text-white/55">{on ? "AI books the best-scoring load for you." : "Off: you choose from the AI's top 3."}</p>
+        <p className="text-xs text-white/55">{on ? "Books the best fit for you." : "Off: you pick from the top 3."}</p>
       </div>
       <Switch checked={on} onChange={onChange} label="Auto-pick the next load" dark />
     </div>
@@ -463,7 +463,7 @@ export function InspectionLink({ kind, children }: { kind: "pre_trip" | "post_tr
   return (
     <Link
       href={`/driver/inspection?kind=${kind}`}
-      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400/20 px-3.5 py-2 text-xs font-semibold text-amber-200"
+      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-3.5 py-2 text-xs font-semibold text-ink-950"
     >
       {children} <ChevronRight className="h-3.5 w-3.5" />
     </Link>
@@ -511,7 +511,7 @@ function CardHeading({ kicker, reference, title, sub, aside }: { kicker: string;
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50">
+        <p className="text-xs font-semibold uppercase tracking-wider text-white/50">
           {kicker} · {reference}
         </p>
         {aside && <p className="shrink-0 text-sm font-semibold tabular">{aside}</p>}
@@ -532,7 +532,7 @@ export function CompletionBar({ value, caption, className }: { value: number; ca
       <div className="h-1.5 overflow-hidden rounded-full bg-white/15" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={caption ?? "Progress"}>
         <div className="h-full rounded-full bg-white transition-[width] duration-700 ease-out" style={{ width: `${pct}%` }} />
       </div>
-      {caption && <p className="mt-1.5 text-[11px] text-white/50">{caption}</p>}
+      {caption && <p className="mt-1.5 text-xs text-white/50">{caption}</p>}
     </div>
   );
 }
@@ -569,7 +569,7 @@ function Step({
       <div className="min-w-0 flex-1">
         <p className={cn("text-sm font-medium", state === "todo" && "text-white/45")}>
           {title}
-          {optional && <span className="ml-1.5 text-[11px] font-normal text-white/40">Optional</span>}
+          {optional && <span className="ml-1.5 text-xs font-normal text-white/40">Optional</span>}
           <span className="sr-only">{state === "done" ? ", done" : state === "current" ? ", in progress" : ", not started"}</span>
         </p>
         {detail && <div className="mt-0.5 text-xs text-white/55">{detail}</div>}
@@ -614,9 +614,9 @@ export function DocumentSlot({ doc, label, readOnly, onFile }: { doc?: LoadDocum
 
   if (doubt)
     return (
-      <div className="flex flex-col gap-2 rounded-2xl bg-amber-400/15 p-3" role="alert">
+      <div className="flex flex-col gap-2 rounded-2xl bg-white/10 p-3" role="alert">
         {picker}
-        <p className="text-xs leading-snug text-amber-100">{PHOTO_PROBLEM[doubt.why]}</p>
+        <p className="text-xs leading-snug text-white/85">{PHOTO_PROBLEM[doubt.why]}</p>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => input.current?.click()} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-semibold text-ink-950">
             <Camera className="h-3.5 w-3.5" /> Retake
@@ -648,7 +648,7 @@ export function DocumentSlot({ doc, label, readOnly, onFile }: { doc?: LoadDocum
         >
           <Camera className="h-4 w-4" /> {label}
         </button>
-        <p className="text-[11px] text-white/60">Lay it flat in good light, all four corners in the picture.</p>
+        <p className="text-xs text-white/60">Lay it flat in good light, all four corners in the picture.</p>
       </div>
     );
   }
@@ -666,13 +666,13 @@ export function DocumentSlot({ doc, label, readOnly, onFile }: { doc?: LoadDocum
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-medium">{doc.name}</p>
         {doc.status === "pending" ? (
-          <p className="mt-0.5 flex items-center gap-1 text-[11px] text-white/60">
+          <p className="mt-0.5 flex items-center gap-1 text-xs text-white/60">
             <Loader2 className="h-3 w-3 animate-spin" /> AI is reading it…
           </p>
         ) : doc.status === "failed" ? (
-          <p className="mt-0.5 text-[11px] leading-snug text-amber-300">{doc.aiNote ?? "Didn't upload."} Tap Retake.</p>
+          <p className="mt-0.5 text-xs leading-snug text-[var(--accent-warn)]">{doc.aiNote ?? "Didn't upload."} Tap Retake.</p>
         ) : (
-          <p className={`mt-0.5 text-[11px] leading-snug ${doc.flagged ? "text-amber-300" : "text-emerald-300"}`}>AI checked: {doc.aiNote ?? "looks good"}</p>
+          <p className={`mt-0.5 text-xs leading-snug ${doc.flagged ? "text-[var(--accent-warn)]" : "text-white/55"}`}>Checked: {doc.aiNote ?? "looks good"}</p>
         )}
       </div>
       {!readOnly && (
@@ -719,16 +719,16 @@ function CardFooter({ load, rate, onCall }: { load: Load; rate: number; onCall: 
         <p className="flex items-center gap-1 text-sm font-semibold tabular">
           {formatCurrency(rate)} <ChevronRight className="h-3.5 w-3.5 text-white/40 transition-transform group-hover:translate-x-0.5" />
         </p>
-        <p className="truncate text-[11px] text-white/50">Est. net {formatCurrency(load.netProfit ?? 0)} · {load.lane.miles} mi · Load page</p>
+        <p className="truncate text-xs text-white/50">Est. net {formatCurrency(load.netProfit ?? 0)} · {load.lane.miles} mi · Load page</p>
       </Link>
       <div className="flex shrink-0 items-center gap-2">
-        <button onClick={onCall} aria-label="Call AI Dispatcher" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/15">
+        <button onClick={onCall} aria-label="Call dispatch" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/15">
           <Phone className="h-4 w-4" />
         </button>
-        <Link href="/driver/messages" aria-label="Message AI Dispatcher" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/15">
+        <Link href="/driver/messages" aria-label="Message dispatch" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/15">
           <MessageCircle className="h-4 w-4" />
         </Link>
-        <Link href="/driver/incident" aria-label="Report an issue or emergency" className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--accent-danger)]/20 text-red-200 hover:bg-[var(--accent-danger)]/30">
+        <Link href="/driver/incident" aria-label="Report an issue or emergency" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-[var(--accent-danger)] hover:bg-white/15">
           <LifeBuoy className="h-4 w-4" />
         </Link>
       </div>

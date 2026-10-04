@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useDragControls, type PanInfo } from "framer-m
 import { X } from "lucide-react";
 import { useEscapeKey } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
+import { Portal } from "./portal";
 
 const useWide = () =>
   useSyncExternalStore(
@@ -58,6 +59,7 @@ export function Sheet({
   };
 
   return (
+    <Portal>
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
@@ -107,5 +109,6 @@ export function Sheet({
         </div>
       )}
     </AnimatePresence>
+    </Portal>
   );
 }

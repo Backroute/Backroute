@@ -7,12 +7,12 @@ import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/feedback";
 
 /**
- * How much something needs the owner, shown the same way everywhere: a thin colored edge on a plain card. Red needs a
- * decision now, amber is waiting on them, grey is for their information, green is done.
+ * How much something needs the owner, shown the same way everywhere: a small dot on a plain card. Red needs a
+ * decision now, orange is waiting on them, grey is for their information, green is done.
  */
 export type AttentionTone = "urgent" | "waiting" | "info" | "done";
 
-const EDGE: Record<AttentionTone, string> = {
+const DOT: Record<AttentionTone, string> = {
   urgent: "bg-[var(--accent-danger)]",
   waiting: "bg-[var(--accent-warn)]",
   info: "bg-ink-300",
@@ -28,8 +28,8 @@ const TONE_LABEL: Record<AttentionTone, string> = {
 
 export function AttentionCard({ tone, className, children, ...props }: { tone: AttentionTone } & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("relative h-full overflow-hidden rounded-2xl border border-line bg-white p-4 pl-5 shadow-[0_1px_2px_rgb(0_0_0/0.04)]", className)} {...props}>
-      <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1", EDGE[tone])} />
+    <div className={cn("relative h-full overflow-hidden rounded-2xl border border-line bg-white p-4 pl-6", className)} {...props}>
+      <span aria-hidden className={cn("absolute left-2.5 top-[1.4rem] h-1.5 w-1.5 rounded-full", DOT[tone])} />
       <span className="sr-only">{TONE_LABEL[tone]}. </span>
       {children}
     </div>

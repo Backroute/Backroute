@@ -6,7 +6,7 @@ import { Bell, LogOut, Menu, Search, Settings } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useCompactTitle } from "@/lib/large-title";
-import { useEscapeKey, useNow } from "@/lib/hooks";
+import { useEscapeKey } from "@/lib/hooks";
 import { openCommandPalette } from "./command-palette";
 import { GroupedAlertFeed } from "./activity-feed";
 import { OPEN_BELL_EVENT } from "./notification-toast";
@@ -68,9 +68,7 @@ export function TopBar({
     return () => window.removeEventListener(OPEN_BELL_EVENT, open);
   }, []);
 
-  const now = useNow();
   const compactTitle = useCompactTitle();
-  const recentCount = now === null ? 0 : notifications.filter((n) => now - new Date(n.timestamp).getTime() < 120_000).length;
 
   return (
     <div
@@ -105,7 +103,7 @@ export function TopBar({
         >
           <Search className="h-3.5 w-3.5 shrink-0" />
           <span className="hidden flex-1 text-left sm:inline">{searchHint}</span>
-          <kbd className={cn("hidden rounded border px-1.5 py-0.5 text-[10px] sm:inline", dark ? "border-white/15 text-white/40" : "border-line text-ink-400")}>
+          <kbd className={cn("hidden rounded border px-1.5 py-0.5 text-xs sm:inline", dark ? "border-white/15 text-white/40" : "border-line text-ink-400")}>
             &#8984;K
           </kbd>
         </button>
@@ -138,16 +136,13 @@ export function TopBar({
             )}
           >
             <Bell className="h-4 w-4" />
-            {recentCount > 0 && (
-              <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[var(--accent-live)]" />
-            )}
           </button>
           {notifOpen && (
             <div className="absolute right-0 z-40 mt-2 w-80 overflow-hidden rounded-2xl border border-line bg-white shadow-xl">
               <div className="border-b border-line px-4 py-3">
                 <p className="text-sm font-semibold text-ink-950">{alertsOnly ? "Alerts" : "Notifications"}</p>
                 {alertsOnly && (
-                  <p className="mt-0.5 text-[11px] text-ink-500">
+                  <p className="mt-0.5 text-xs text-ink-500">
                     {(["needs_you", "money", "safety"] as const).map((k) => `${notifications.filter((n) => alertKind(n) === k).length} ${ALERT_LABEL[k].toLowerCase()}`).join(" · ")}. Everything else is in the AI log.
                   </p>
                 )}
@@ -170,7 +165,7 @@ export function TopBar({
                 <p className="truncate text-xs text-ink-400">{accountSubtitle}</p>
               </div>
               <div className="border-b border-line px-3 py-2.5">
-                <p className="mb-1.5 px-1 text-[11px] font-medium text-ink-500">Appearance</p>
+                <p className="mb-1.5 px-1 text-xs font-medium text-ink-500">Appearance</p>
                 <ThemePicker compact />
               </div>
               <div className="flex flex-col p-1.5">

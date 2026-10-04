@@ -4,7 +4,6 @@ import { Mail, MessageSquare, Phone, Radar } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { LiveDot } from "@/components/shared/live-dot";
 import { CallTranscript } from "@/components/shared/call-transcript";
 import { useStore } from "@/lib/store";
 import { useCarrierLoads, useBrokerMap } from "@/lib/selectors";
@@ -30,7 +29,7 @@ export default function AgentsPage() {
 
   return (
     <div>
-      <PageHeader title="Agents" description={`${metrics.activeCalls + metrics.activeSmsThreads + metrics.activeEmailThreads} conversations active`} right={<LiveDot />} />
+      <PageHeader title="Agents" description={`${metrics.activeCalls + metrics.activeSmsThreads + metrics.activeEmailThreads} conversations active`} />
 
       <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">

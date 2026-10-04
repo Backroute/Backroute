@@ -152,14 +152,14 @@ export function LoadTimeline({ load, brokerName, driverName, className }: { load
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                   <p className={cn("text-sm font-medium", done ? "text-ink-950" : isNow ? "text-ink-800" : "text-ink-400")}>
                     {s.title}
-                    {isNow && <span className="ml-2 text-[11px] font-normal text-ink-500">next</span>}
+                    {isNow && <span className="ml-2 text-xs font-normal text-ink-500">next</span>}
                   </p>
-                  {s.at && live && <p className="text-[11px] tabular text-ink-500">{s.zone ? formatAtStop(s.at, s.zone) : when(s.at)}</p>}
+                  {s.at && live && <p className="text-xs tabular text-ink-500">{s.zone ? formatAtStop(s.at, s.zone) : when(s.at)}</p>}
                 </div>
                 {(s.whoLabel || s.detail) && (
                   <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-ink-600">
                     {Icon && s.whoLabel && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-ink-100 px-1.5 py-0.5 text-[11px] font-medium text-ink-700">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-ink-100 px-1.5 py-0.5 text-xs font-medium text-ink-700">
                         <Icon className="h-3 w-3" /> {s.whoLabel}
                       </span>
                     )}

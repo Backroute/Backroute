@@ -48,12 +48,6 @@ export function computeLoadScore(opts: {
   return Math.round(clamp(score, 1, 99));
 }
 
-export function scoreTone(score: number): "success" | "warning" | "danger" {
-  if (score >= 78) return "success";
-  if (score >= 55) return "warning";
-  return "danger";
-}
-
 /** The one-line reason a dispatcher would give for liking a load — surfaces the dominant factor behind the score. */
 export function loadHighlight(opts: {
   rpm: number;

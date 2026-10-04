@@ -227,7 +227,7 @@ function AddLoadPanel({ onDone }: { onDone: () => void }) {
         <Button className="mt-4 w-full" onClick={submit}>
           <Plus className="h-4 w-4" /> Add the load
         </Button>
-        <p className="mt-2 text-center text-[11px] text-ink-400">It goes to the driver&apos;s app right away, and they get a text about it when texting is on. Fuel and profit are estimates.</p>
+        <p className="mt-2 text-center text-xs text-ink-400">It goes to the driver&apos;s app right away, and they get a text about it when texting is on. Fuel and profit are estimates.</p>
       </div>
     </Sheet>
   );

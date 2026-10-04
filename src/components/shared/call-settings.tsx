@@ -92,7 +92,7 @@ export function LanguageCard({ driver }: { driver: Driver }) {
       </p>
       {picker(t.talkLang, driver.prefs?.language ?? "en", (l) => setDriverPrefs(driver.id, { language: l }))}
       {picker(t.appLang, appLangOf(driver), (l) => setDriverPrefs(driver.id, { appLanguage: l }))}
-      <p className="mt-2 text-[11px] text-ink-500">{t.languageNote}</p>
+      <p className="mt-2 text-xs text-ink-500">{t.languageNote}</p>
     </section>
   );
 }
@@ -125,7 +125,7 @@ export function CallSettingsCard({ driver }: { driver: Driver }) {
           </button>
         ))}
       </div>
-      <p className="mt-1.5 text-[11px] text-ink-500">
+      <p className="mt-1.5 text-xs text-ink-500">
         {(prefs.reach ?? "app") === "phone" ? t.reachPhone(driver.phone, DISPATCH_LINE) : t.reachApp} <span className="text-ink-400">{t.demoBoth}</span>
       </p>
 
@@ -133,7 +133,7 @@ export function CallSettingsCard({ driver }: { driver: Driver }) {
       <div className="mt-1.5">
         <DutyStatusPicker driver={driver} />
       </div>
-      <p className={cn("mt-1.5 text-[11px]", quiet ? "text-ink-500" : "text-[var(--accent-live)]")}>
+      <p className={cn("mt-1.5 text-xs", quiet ? "text-ink-500" : "text-[var(--accent-live)]")}>
         {quiet ? t.heldNote(quiet) : t.ringThrough} <span className="text-ink-400">{t.eldNote}</span>
       </p>
 

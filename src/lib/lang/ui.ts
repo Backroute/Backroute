@@ -104,8 +104,8 @@ export interface UiText {
 const en: UiText = {
   tabs: { home: "Home", loads: "Loads", earnings: "Earnings", messages: "Messages", profile: "Profile" },
   hi: (n) => `Hi ${n}`,
-  nothingNeeds: "Nothing needs you. AI Dispatcher has it handled.",
-  thingsForYou: (n) => `${n} thing${n === 1 ? "" : "s"} for you. AI handles the rest.`,
+  nothingNeeds: "Nothing needs you right now.",
+  thingsForYou: (n) => `${n} thing${n === 1 ? "" : "s"} for you.`,
   delivered: "Load delivered. Nice work.",
   payWeek: "Pay this week",
   home: "Home",

@@ -150,7 +150,7 @@ export default function MaintenancePage() {
                             <Button size="sm" variant="outline" onClick={() => setSchedulingTruckId(truck.id)}>
                               <Wrench className="h-3.5 w-3.5" /> {real ? "Record a shop appointment" : "Schedule at a shop"}
                             </Button>
-                            {real && <p className="text-[11px] text-ink-500">Book the slot with the shop yourself; recording it here keeps the AI from booking this truck until it&apos;s done.</p>}
+                            {real && <p className="text-xs text-ink-500">Book the slot with the shop yourself; recording it here keeps the AI from booking this truck until it&apos;s done.</p>}
                           </div>
                         )}
                       </>

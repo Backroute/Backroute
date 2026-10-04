@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, MessageSquareText, Phone, PhoneOff, RotateCcw, UserRound, Volume2 } from "lucide-react";
 import { cn, formatDuration } from "@/lib/utils";
+import { Portal } from "@/components/ui/portal";
 import { useNow } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { DISPATCH_LINE, matchSpoken, OWNER_NAME } from "@/lib/dispatch-calls";
@@ -36,17 +37,20 @@ export function IncomingCallHost({ driverId }: { driverId: string }) {
     return () => clearTimeout(t);
   }, [ended]);
 
-  if (active?.status === "ringing") return <Ringing call={active} />;
-  if (active?.status === "live") return <LiveCall key={active.id} call={active} />;
+  if (active?.status === "ringing") return <Portal><Ringing call={active} /></Portal>;
+  if (active?.status === "live") return <Portal><LiveCall key={active.id} call={active} /></Portal>;
   if (ended) {
+    // Below the top bar (and below driving mode's "I'm parked"), never on top of a button.
     return (
-      <div role="status" className="theme-ink fixed inset-x-0 top-4 z-[80] mx-auto flex w-[min(92vw,24rem)] items-center gap-3 rounded-2xl bg-ink-950 px-4 py-3 text-white shadow-lg">
-        <MessageSquareText className="h-5 w-5 shrink-0 text-emerald-300" />
+      <Portal>
+      <div role="status" className="theme-ink fixed inset-x-0 top-[calc(env(safe-area-inset-top)+4.75rem)] z-[80] mx-auto flex w-[min(92vw,24rem)] items-center gap-3 rounded-2xl bg-ink-950 px-4 py-3 text-white shadow-lg">
+        <MessageSquareText className="h-5 w-5 shrink-0 text-white/70" />
         <div className="min-w-0">
           <p className="text-sm font-semibold">{t.callEnded}</p>
           <p className="truncate text-xs text-white/60">{ended.missed ? `${t.textedInstead}. ` : ""}{t.copyInMessages}</p>
         </div>
       </div>
+      </Portal>
     );
   }
   return null;
@@ -57,9 +61,9 @@ function Ringing({ call }: { call: DispatchCall }) {
   const { t } = useDriverUi();
   useRingtone();
   return (
-    <div role="alertdialog" aria-modal="true" aria-label="Incoming call from AI Dispatch" className="theme-ink fixed inset-0 z-[80] flex flex-col items-center bg-ink-950 px-6 pb-12 pt-24 text-white">
+    <div role="alertdialog" aria-modal="true" aria-label="Incoming call from AI Dispatch" className="theme-ink fixed inset-0 z-[80] flex flex-col items-center bg-ink-950 px-6 pb-[max(3rem,env(safe-area-inset-bottom))] pt-[max(6rem,calc(env(safe-area-inset-top)+4rem))] text-white">
       <span className="relative flex h-24 w-24 items-center justify-center">
-        <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/25" />
+        <span className="absolute inset-0 animate-ping rounded-full bg-white/20" />
         <span className="relative flex h-24 w-24 items-center justify-center rounded-full bg-white text-2xl font-semibold text-ink-950">AI</span>
       </span>
       <p className="mt-6 text-3xl font-semibold tracking-tight">{call.channel === "phone" ? "Titan Dispatch" : t.aiDispatch}</p>
@@ -167,7 +171,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
   const bookedSomething = call.effects.some((e) => e.type === "book" || e.type === "reserve_parking");
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Call with AI Dispatch" className="theme-ink fixed inset-0 z-[80] flex flex-col bg-ink-950 px-5 pb-6 pt-8 text-white">
+    <div role="dialog" aria-modal="true" aria-label="Call with AI Dispatch" className="theme-ink fixed inset-0 z-[80] flex flex-col bg-ink-950 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] text-white">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-lg font-semibold">{call.ownerTookOver ? `${OWNER_NAME} · Titan Freight` : t.aiDispatch}</p>
@@ -180,7 +184,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
             type="button"
             onClick={() => (listening ? recognizer.current?.stop() : listen())}
             aria-pressed={listening}
-            className={cn("flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold", listening ? "bg-emerald-400 text-ink-950" : "bg-white/10 text-white/80")}
+            className={cn("flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold", listening ? "bg-[var(--action)] text-[var(--action-ink)]" : "bg-white/10 text-white/80")}
           >
             {listening ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
             {listening ? t.listening : t.tapToTalk}
@@ -197,7 +201,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
               l.speaker === "driver" ? "self-end rounded-2xl bg-white/10 px-3.5 py-2 text-sm text-white/80" : i === lines.length - 1 ? "text-xl font-medium" : "text-sm text-white/45",
             )}
           >
-            {l.speaker === "owner" && <span className="mb-0.5 block text-[11px] font-semibold uppercase tracking-wider text-emerald-300">{OWNER_NAME}</span>}
+            {l.speaker === "owner" && <span className="mb-0.5 block text-xs font-semibold uppercase tracking-wider text-white/55">{OWNER_NAME}</span>}
             {readable(l.text, l.tr)}
             {i === lines.length - 1 && l.speaker !== "driver" && readable(l.text, l.tr) !== l.text && (
               <span lang={call.lang} className="mt-1.5 flex items-start gap-1.5 text-sm font-normal text-white/40">
@@ -206,7 +210,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
             )}
           </p>
         ))}
-        {hint && <p className="text-xs text-amber-200">{hint}</p>}
+        {hint && <p className="text-xs text-white/70">{hint}</p>}
         {voiceMissing && <p className="text-xs text-white/40">{t.noVoice(voice.native)}</p>}
       </div>
 
@@ -238,7 +242,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
         <button
           type="button"
           onClick={() => (call.ownerTookOver ? replyDispatchCall(call.id, "again", t.sayAgain) : replyDispatchCall(call.id, "again"))}
-          className="flex flex-col items-center gap-1 text-[11px] text-white/60"
+          className="flex flex-col items-center gap-1 text-xs text-white/60"
         >
           <span className="rounded-full bg-white/10 p-3">
             <RotateCcw className="h-5 w-5" />
@@ -251,7 +255,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
         {call.ownerTookOver ? (
           <span />
         ) : (
-          <button type="button" onClick={() => replyDispatchCall(call.id, "person")} className="flex flex-col items-center gap-1 text-[11px] text-white/60">
+          <button type="button" onClick={() => replyDispatchCall(call.id, "person")} className="flex flex-col items-center gap-1 text-xs text-white/60">
             <span className="rounded-full bg-white/10 p-3">
               <UserRound className="h-5 w-5" />
             </span>

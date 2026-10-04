@@ -7,7 +7,6 @@ import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
 import { Badge } from "@/components/ui/badge";
-import { LiveDot } from "@/components/shared/live-dot";
 import { ActivityFeed } from "@/components/shared/activity-feed";
 import { useStore } from "@/lib/store";
 import { formatCompact, formatCurrency, formatNumber } from "@/lib/utils";
@@ -31,7 +30,7 @@ export default function OpsOverviewPage() {
 
   return (
     <div>
-      <PageHeader title="Overview" description={`${carriers.length} carriers · ${formatNumber(totalTrucks)} trucks tracked`} right={<LiveDot />} />
+      <PageHeader title="Overview" description={`${carriers.length} carriers · ${formatNumber(totalTrucks)} trucks tracked`} />
 
       <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -78,7 +77,7 @@ export default function OpsOverviewPage() {
           </Card>
 
           <div className="flex flex-col gap-6">
-            <Card className={escalations.length ? "border-[var(--accent-warn)]/40" : undefined}>
+            <Card className={escalations.length ? "border-line" : undefined}>
               <CardHeader>
                 <CardTitle>Escalations</CardTitle>
                 <Badge tone={escalations.length ? "warning" : "success"}>{escalations.length} open</Badge>
@@ -90,7 +89,7 @@ export default function OpsOverviewPage() {
               </CardContent>
             </Card>
 
-            <Card className={activeIncidents.length ? "border-[var(--accent-danger)]/40" : undefined}>
+            <Card className={activeIncidents.length ? "border-line" : undefined}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <LifeBuoy className="h-4 w-4" /> Active incidents

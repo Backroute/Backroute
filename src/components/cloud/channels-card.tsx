@@ -116,7 +116,7 @@ export function ChannelsCard() {
                     <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-400" />
                     <span className="min-w-0 flex-1 text-ink-700">
                       <span className="font-medium text-ink-900">{m.direction === "in" ? who(m.counterparty) : `AI → ${who(m.counterparty)}`}</span>{" "}
-                      {held && <span className="mr-1 rounded bg-ink-100 px-1 py-0.5 text-[10px] font-medium text-ink-600">not sent: practice</span>}
+                      {held && <span className="mr-1 rounded bg-ink-100 px-1 py-0.5 text-xs font-medium text-ink-600">not sent: practice</span>}
                       <span className="text-ink-500">{m.data?.subject ? `${m.data.subject}: ` : ""}{(m.body ?? "").slice(0, 140)}</span>
                     </span>
                     <span className="shrink-0 text-ink-400">
@@ -189,7 +189,7 @@ function Undelivered({ items }: { items: NonNullable<Status["outbound"]> }) {
       <ul className="mt-1.5 flex flex-col gap-1.5">
         {items.slice(0, 10).map((m, n) => (
           <li key={n} className="flex items-start gap-2 text-xs">
-            <span className={cn("shrink-0 rounded px-1 py-0.5 text-[10px] font-medium", m.status === "retry" ? "bg-ink-100 text-ink-600" : "bg-danger-soft text-red-700")}>
+            <span className={cn("shrink-0 rounded px-1 py-0.5 text-xs font-medium", m.status === "retry" ? "bg-ink-100 text-ink-600" : "bg-ink-100 text-[var(--accent-danger)]")}>
               {m.status === "retry" ? "sending again" : "not sent"}
             </span>
             <span className="min-w-0 flex-1 truncate text-ink-600">

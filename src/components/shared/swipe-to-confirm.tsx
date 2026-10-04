@@ -83,7 +83,7 @@ export function SwipeToConfirm({
   return (
     <div ref={track} className="relative h-[60px] select-none overflow-hidden rounded-full bg-white">
       <div
-        className={cn("absolute inset-y-0 left-0 rounded-full bg-emerald-100", !dragging && "transition-[width] duration-300")}
+        className={cn("absolute inset-y-0 left-0 rounded-full bg-ink-150", !dragging && "transition-[width] duration-300")}
         style={{ width: x + KNOB + PAD * 2 }}
       />
       <span

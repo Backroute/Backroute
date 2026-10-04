@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import type { Driver } from "@/lib/types";
 
 /**
- * The hours clock, always on screen: drive time left (and the shift's, when it's the one that runs out first),
+ * The hours clock, on screen while on duty: drive time left (and the shift's, when it's the one that runs out first),
  * amber under an hour, red under 30 minutes. While driving, a voice says it at an hour, 30 and 15 minutes left, once
  * each, so eyes stay on the road.
  */
@@ -18,7 +18,8 @@ export function HosClock({ driver }: { driver: Driver }) {
   const now = useNow();
   const h = now !== null ? hosNow(driver, now) : null;
   useHosVoice(driver, h);
-  if (!h) return null;
+  // Off duty, the clock isn't running: nothing to watch, so nothing on screen.
+  if (!h || driver.hosStatus === "off_duty") return null;
   const m = minutesLeft(h);
   const shiftFirst = h.shift < h.drive;
   return (

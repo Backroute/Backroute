@@ -9,9 +9,9 @@ import type { ActivityEvent } from "@/lib/types";
 import { TYPE_ICON, SEVERITY_TONE } from "./activity-feed";
 import { chime } from "@/lib/feedback";
 
-// Two at most, so they never cover the page; the rest wait in the bell.
-const MAX_VISIBLE = 2;
-const DISMISS_MS = 6000;
+// One at a time, so it never covers the page; the rest wait in the bell.
+const MAX_VISIBLE = 1;
+const DISMISS_MS = 5000;
 
 const OPEN_BELL = "backroute:open-bell";
 /** Opens the bell's list (top bar), e.g. from "3 more" under the pop-ups. */
@@ -106,19 +106,20 @@ export function NotificationToastHost({ events, hrefFor }: { events: ActivityEve
 
   if (toasts.length === 0 && overflow === 0) return null;
 
+  // Phones: a banner under the top bar, like iPhone notifications. Computers: bottom right. Never in driving mode.
   return (
     <div
       aria-live="polite"
       onMouseEnter={hold}
       onMouseLeave={resume}
-      className="pointer-events-none fixed bottom-[5.5rem] right-4 z-[60] flex flex-col items-end gap-2 lg:bottom-6 lg:right-6"
+      className="hide-when-driving pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+4.25rem)] z-[60] flex flex-col items-center gap-2 px-4 lg:inset-x-auto lg:bottom-6 lg:right-6 lg:top-auto lg:items-end lg:px-0"
     >
       <AnimatePresence initial={false}>
       {toasts.map((t) => {
         const Icon = TYPE_ICON[t.type];
         const href = hrefFor?.(t);
         const inner = (
-          <div className="pointer-events-auto flex w-[19rem] max-w-[calc(100vw-2rem)] items-start gap-3 rounded-2xl border border-line bg-white p-3.5 shadow-xl">
+          <div className="pointer-events-auto flex w-[22rem] max-w-[calc(100vw-2rem)] items-start gap-3 rounded-2xl border border-line bg-white p-3.5 shadow-xl">
             <span className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full", SEVERITY_TONE[t.severity])}>
               <Icon className="h-3.5 w-3.5" strokeWidth={2} />
             </span>
@@ -143,9 +144,9 @@ export function NotificationToastHost({ events, hrefFor }: { events: ActivityEve
           <motion.div
             key={t.id}
             layout
-            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            initial={{ opacity: 0, y: -12, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 24, transition: { duration: 0.15 } }}
+            exit={{ opacity: 0, y: -12, transition: { duration: 0.15 } }}
             transition={{ type: "spring", stiffness: 420, damping: 34 }}
           >
             {href ? (

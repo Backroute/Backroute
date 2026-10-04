@@ -1,40 +1,49 @@
 @import "tailwindcss";
 
+/*
+ * Apple's palette: cool greys, near-black text, one blue for the thing to tap. Colour means something or it isn't
+ * used: red is wrong right now, orange is waiting on you, green is done or paid, and each shows as a small dot or
+ * word, never a coloured block.
+ */
 :root {
   --background: #ffffff;
-  --foreground: #0a0a0a;
+  --foreground: #1d1d1f;
 
   --ink-0: #ffffff;
-  --ink-50: #fafafa;
-  --ink-100: #f2f2f0;
-  --ink-150: #e9e9e6;
-  --ink-200: #dfdfdb;
-  --ink-300: #c6c6c0;
+  --ink-50: #fafafc;
+  --ink-100: #f5f5f7;
+  --ink-150: #ececf0;
+  --ink-200: #e3e3e8;
+  --ink-300: #d2d2d7;
   /* Helper text stays readable: 400 and 500 both pass 4.5:1 on white. */
-  --ink-400: #73736b;
-  --ink-500: #63635c;
-  --ink-600: #55554f;
-  --ink-700: #38382f;
-  --ink-800: #232320;
-  --ink-900: #131311;
-  --ink-950: #0a0a08;
+  --ink-400: #76767b;
+  --ink-500: #6e6e73;
+  --ink-600: #545458;
+  --ink-700: #3a3a3c;
+  --ink-800: #2c2c2e;
+  --ink-900: #242426;
+  --ink-950: #1d1d1f;
 
-  --line: #e4e4e0;
-  --line-strong: #d3d3cc;
+  --line: #e5e5ea;
+  --line-strong: #d2d2d7;
 
-  --accent-live: #0f8a4b;
-  --accent-warn: #b3760b;
-  --accent-danger: #b23a2f;
-  --accent-info: #2b4c8c;
+  /* Apple's system colours in their higher-contrast form, so small text stays readable outdoors. */
+  --accent-live: #248a3d;
+  --accent-warn: #c93400;
+  --accent-danger: #d70015;
+  --accent-info: #0066cc;
+  /* Status never fills a block: a panel about a problem is grey like any other, and the word or dot carries it. */
+  --accent-live-soft: var(--ink-100);
+  --accent-warn-soft: var(--ink-100);
+  --accent-danger-soft: var(--ink-100);
+  --accent-info-soft: var(--ink-100);
 
-  /* The three states, the same on every screen: done (green), waiting on someone (amber), needs you (red). */
-  --accent-live-soft: #e8f5ee;
-  --accent-warn-soft: #fdf3e1;
-  --accent-danger-soft: #fbeceb;
-  --accent-info-soft: #eaf0fa;
+  /* The one colour for "tap here": the main button on a screen, a switch that's on, keyboard focus. */
+  --action: #0071e3;
+  --action-strong: #0062c4;
+  --action-ink: #ffffff;
 
-  /* Where you are and what you picked (the active tab, a selected choice, a switch that's on, keyboard focus): the
-     same ink as everything else, so the app stays black and white. Green, amber and red only ever mean a status. */
+  /* Where you are and what you picked (the active tab, a selected choice): the same ink as the text. */
   --brand: var(--ink-950);
   --brand-strong: var(--ink-800);
   --brand-soft: var(--ink-100);
@@ -47,39 +56,41 @@
  * person picked one (lib/theme.ts sets data-theme before the first paint).
  */
 :root[data-theme="dark"] {
-  color-scheme: dark;
-  --background: #0d0d0c;
-  --foreground: #f4f4ef;
-  --color-white: #171716;
+  --background: #000000;
+  --foreground: #f5f5f7;
+  --color-white: #1c1c1e;
 
-  --ink-0: #171716;
-  --ink-50: #121211;
-  --ink-100: #1f1f1d;
-  --ink-150: #262624;
-  --ink-200: #2e2e2b;
-  --ink-300: #42423d;
-  --ink-400: #94948b;
-  --ink-500: #a6a69d;
-  --ink-600: #bcbcb3;
-  --ink-700: #d2d2ca;
-  --ink-800: #e4e4de;
-  --ink-900: #efefea;
-  --ink-950: #f7f7f2;
+  --ink-0: #1c1c1e;
+  --ink-50: #161618;
+  --ink-100: #242426;
+  --ink-150: #2c2c2e;
+  --ink-200: #38383a;
+  --ink-300: #48484a;
+  --ink-400: #8e8e93;
+  --ink-500: #98989d;
+  --ink-600: #aeaeb2;
+  --ink-700: #c7c7cc;
+  --ink-800: #e5e5ea;
+  --ink-900: #f2f2f7;
+  --ink-950: #f5f5f7;
 
-  --line: #2a2a27;
-  --line-strong: #3b3b37;
+  --line: #2c2c2e;
+  --line-strong: #3a3a3c;
 
-  --accent-live: #45d08b;
-  --accent-warn: #e9ad45;
-  --accent-danger: #f27d71;
-  --accent-info: #8eaef0;
+  --accent-live: #30d158;
+  --accent-warn: #ff9f0a;
+  --accent-danger: #ff453a;
+  --accent-info: #409cff;
+  --accent-live-soft: var(--ink-100);
+  --accent-warn-soft: var(--ink-100);
+  --accent-danger-soft: var(--ink-100);
+  --accent-info-soft: var(--ink-100);
 
-  --accent-live-soft: #12271c;
-  --accent-warn-soft: #2a2110;
-  --accent-danger-soft: #2e1715;
-  --accent-info-soft: #151e30;
+  --action: #0a84ff;
+  --action-strong: #409cff;
 
   --surface-shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset;
+  color-scheme: dark;
 }
 
 /*
@@ -90,34 +101,56 @@
 .theme-ink {
   --color-white: #ffffff;
   --ink-0: #ffffff;
-  --ink-50: #fafafa;
-  --ink-100: #f2f2f0;
-  --ink-150: #e9e9e6;
-  --ink-200: #dfdfdb;
-  --ink-300: #c6c6c0;
-  --ink-400: #73736b;
-  --ink-500: #63635c;
-  --ink-600: #55554f;
-  --ink-700: #38382f;
-  --ink-800: #232320;
-  --ink-900: #131311;
-  --ink-950: #0a0a08;
-  --line: #e4e4e0;
-  --line-strong: #d3d3cc;
-  --accent-live: #0f8a4b;
-  --accent-warn: #b3760b;
-  --accent-danger: #b23a2f;
-  --accent-info: #2b4c8c;
-  --accent-live-soft: #e8f5ee;
-  --accent-warn-soft: #fdf3e1;
-  --accent-danger-soft: #fbeceb;
-  --accent-info-soft: #eaf0fa;
+  --ink-50: #fafafc;
+  --ink-100: #f5f5f7;
+  --ink-150: #ececf0;
+  --ink-200: #e3e3e8;
+  --ink-300: #d2d2d7;
+  /* Helper text stays readable: 400 and 500 both pass 4.5:1 on white. */
+  --ink-400: #76767b;
+  --ink-500: #6e6e73;
+  --ink-600: #545458;
+  --ink-700: #3a3a3c;
+  --ink-800: #2c2c2e;
+  --ink-900: #242426;
+  --ink-950: #1d1d1f;
+
+  --line: #e5e5ea;
+  --line-strong: #d2d2d7;
+
+  /* Apple's system colours in their higher-contrast form, so small text stays readable outdoors. */
+  --accent-live: #248a3d;
+  --accent-warn: #c93400;
+  --accent-danger: #d70015;
+  --accent-info: #0066cc;
+  /* Status never fills a block: a panel about a problem is grey like any other, and the word or dot carries it. */
+  --accent-live-soft: var(--ink-100);
+  --accent-warn-soft: var(--ink-100);
+  --accent-danger-soft: var(--ink-100);
+  --accent-info-soft: var(--ink-100);
+
+  /* The one colour for "tap here": the main button on a screen, a switch that's on, keyboard focus. */
+  --action: #0071e3;
+  --action-strong: #0062c4;
+  --action-ink: #ffffff;
+  /* On a dark panel the status colours are the bright ones, as in iOS dark mode. */
+  --accent-live: #30d158;
+  --accent-warn: #ff9f0a;
+  --accent-danger: #ff453a;
+  --accent-info: #409cff;
+  --action: #0a84ff;
+  --action-strong: #409cff;
   color-scheme: dark;
 }
 :root[data-theme="dark"] .theme-ink {
-  --ink-950: #1c1c1a;
-  --ink-900: #242422;
+  --ink-950: #1c1c1e;
+  --ink-900: #2c2c2e;
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+/* Driving mode is up: pop-ups, prompts and undo bars wait until the driver is parked. */
+[data-driving] .hide-when-driving {
+  display: none !important;
 }
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
@@ -156,6 +189,9 @@
   --color-danger-soft: var(--accent-danger-soft);
   --color-info-soft: var(--accent-info-soft);
 
+  --color-action: var(--action);
+  --color-action-strong: var(--action-strong);
+  --color-action-ink: var(--action-ink);
   --color-brand: var(--brand);
   --color-brand-strong: var(--brand-strong);
   --color-brand-soft: var(--brand-soft);
@@ -188,8 +224,8 @@ body {
 
 .font-display {
   font-family: var(--font-display), Arial, Helvetica, sans-serif;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 500;
+  letter-spacing: -0.03em;
 }
 
 .tabular {
@@ -197,28 +233,29 @@ body {
 }
 
 /*
- * One type scale for the whole app. Big money and counts are the loudest thing on a screen, then page titles, then
- * card titles; small uppercase labels name what a number is. Numbers always line up (tabular figures).
+ * One type scale for the whole app, after Apple's own: big money and counts are the loudest thing on a screen, set
+ * large and medium-weight rather than heavy; then page titles, then card titles; small labels name what a number is.
+ * Nothing smaller than 12px anywhere. Numbers always line up (tabular figures).
  */
 @utility t-hero {
-  font-size: clamp(2rem, 1.6rem + 1.6vw, 2.75rem);
+  font-size: clamp(2.125rem, 1.7rem + 1.6vw, 2.875rem);
   line-height: 1;
-  font-weight: 650;
-  letter-spacing: -0.035em;
+  font-weight: 500;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
 }
 @utility t-stat {
   font-size: 1.75rem;
   line-height: 1.1;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
 }
 @utility t-page {
-  font-size: 1.625rem;
-  line-height: 1.15;
-  font-weight: 650;
-  letter-spacing: -0.03em;
+  font-size: 1.875rem;
+  line-height: 1.12;
+  font-weight: 600;
+  letter-spacing: -0.028em;
 }
 @utility t-section {
   font-size: 0.9375rem;
@@ -227,29 +264,17 @@ body {
   letter-spacing: -0.012em;
 }
 @utility t-label {
-  font-size: 11px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
   line-height: 1.3;
-  font-weight: 550;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.05em;
 }
 
 ::selection {
   background: var(--ink-950);
   color: var(--color-white);
-}
-
-/* subtle grain / noise overlay used on dark hero panels */
-.grain-overlay {
-  position: relative;
-}
-.grain-overlay::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.045;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 @keyframes pulse-dot {
@@ -359,7 +384,7 @@ body {
 
 /* Keyboard and switch users always see where they are. */
 :where(a, button, input, select, textarea, [role="switch"], [role="radio"], [tabindex]):focus-visible {
-  outline: 2px solid var(--brand);
+  outline: 2px solid var(--action);
   outline-offset: 2px;
 }
 

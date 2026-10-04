@@ -112,7 +112,7 @@ export default function DriverLoadDetailPage() {
       <ViewTransition name={`load-${load.id}`} share="morph" default="none">
       <div className="theme-ink rounded-3xl bg-ink-950 p-5 text-white">
         <div className="flex items-center justify-between">
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-medium text-white/70">
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/70">
             <span className="relative flex h-1.5 w-1.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--accent-live)] opacity-75" />
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--accent-live)]" />
@@ -127,7 +127,7 @@ export default function DriverLoadDetailPage() {
           <span className="mx-1 text-white/40">→</span>
           {load.lane.destination}, {load.lane.destState}
         </p>
-        <p className="mt-0.5 text-[11px] text-white/40">{load.referenceNumber} · {load.equipmentType} · {load.lane.miles} mi</p>
+        <p className="mt-0.5 text-xs text-white/40">{load.referenceNumber} · {load.equipmentType} · {load.lane.miles} mi</p>
         {load.stage === "cancelled" && load.cancellationReason && (
           <p className="mt-2 text-xs text-white/60">{load.cancellationReason}</p>
         )}
@@ -208,7 +208,7 @@ export default function DriverLoadDetailPage() {
             <div key={e.id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3.5 py-3">
               <div>
                 <p className="text-xs font-medium text-ink-900">{EXPENSE_CATEGORIES.find((c) => c.key === e.category)?.label}</p>
-                {e.note && <p className="text-[11px] text-ink-400">{e.note}</p>}
+                {e.note && <p className="text-xs text-ink-400">{e.note}</p>}
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold tabular text-ink-950">{formatCurrency(e.amount)}</span>
@@ -275,8 +275,8 @@ export default function DriverLoadDetailPage() {
                 </span>
                 <div>
                   <p className="text-xs font-medium text-ink-900">{doc.name}</p>
-                  <p className="text-[11px] text-ink-400">{doc.uploadedBy === "driver" ? "Uploaded by you · " : ""}{formatDateTime(doc.generatedAt)}</p>
-                  {doc.aiNote && <p className="mt-0.5 text-[11px] text-[var(--accent-live)]">AI checked: {doc.aiNote}</p>}
+                  <p className="text-xs text-ink-400">{doc.uploadedBy === "driver" ? "Uploaded by you · " : ""}{formatDateTime(doc.generatedAt)}</p>
+                  {doc.aiNote && <p className="mt-0.5 text-xs text-ink-500">Checked: {doc.aiNote}</p>}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -303,7 +303,7 @@ export default function DriverLoadDetailPage() {
                 </span>
                 <div>
                   <p className="text-xs font-medium text-ink-700">{pendingDocLabel(pendingType)}</p>
-                  <p className="text-[11px] text-ink-400">
+                  <p className="text-xs text-ink-400">
                     {isCurrent ? "Upload it from your trip card on Home." : "Captured once this load reaches that stage."}
                   </p>
                 </div>

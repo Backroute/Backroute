@@ -44,7 +44,7 @@ export function CallTranscript({
               <Headphones className="h-3.5 w-3.5" /> Replay
             </button>
           )}
-          <span className="text-[11px] tabular text-ink-500">{formatDuration(call.durationSec)}</span>
+          <span className="text-xs tabular text-ink-500">{formatDuration(call.durationSec)}</span>
         </span>
       </div>
       {replaying && brokerName && <BrokerCallModal recorded={call} brokerName={brokerName} onClose={() => setReplaying(false)} />}
@@ -67,7 +67,7 @@ export function CallTranscript({
                   line.speaker === "ai" ? "bg-ink-950 text-white rounded-br-sm" : "bg-white border border-line text-ink-800 rounded-bl-sm",
                 )}
               >
-                <span className={cn("mr-1.5 text-[10px] font-semibold uppercase tracking-wide", line.speaker === "ai" ? "text-white/60" : "text-ink-400")}>
+                <span className={cn("mr-1.5 text-xs font-semibold uppercase tracking-wide", line.speaker === "ai" ? "text-white/60" : "text-ink-400")}>
                   {SPEAKER_LABEL[line.speaker]}
                 </span>
                 {line.text}

@@ -21,6 +21,12 @@ export function isAlert(e: ActivityEvent): boolean {
   return alertKind(e) !== null;
 }
 
+/** The few that are worth a pop-up: safety, a decision that can't wait, a load lost. The rest go quietly to the bell. */
+export function isUrgent(e: ActivityEvent): boolean {
+  const kind = alertKind(e);
+  return kind === "safety" || e.type === "load_cancelled" || (e.type === "escalation" && kind === "needs_you");
+}
+
 /** Alerts of one kind close together, shown as one line ("3 loads delivered") that opens to the list. */
 interface AlertGroup {
   id: string;

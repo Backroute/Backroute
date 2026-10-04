@@ -781,7 +781,7 @@ export function generateWorld(seed = 20260916): World {
       id: rng.id("esc"),
       loadId: loads.find((l) => l.stage === "negotiating")?.id ?? loads[3].id,
       carrierId: PRIMARY_CARRIER_ID,
-      reason: "Broker requesting rate 9% below carrier floor. Needs a judgment call on accept or walk.",
+      reason: "The broker offered 9% under your floor. Take it or walk?",
       createdAt: iso(-18),
       status: "open",
       complexity: "critical",

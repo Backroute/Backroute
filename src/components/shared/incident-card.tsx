@@ -36,11 +36,11 @@ export function IncidentCard({ incident, viewer, label, onApprove }: {
     <section className="theme-ink animate-rise-in overflow-hidden rounded-3xl bg-ink-950 p-5 text-white" aria-label={`${TITLE[incident.type]}, handled by the AI`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <span className={cn("flex h-9 w-9 items-center justify-center rounded-full", resolved ? "bg-emerald-400/20 text-emerald-200" : "bg-[var(--accent-danger)]/20 text-red-200")}>
+          <span className={cn("flex h-9 w-9 items-center justify-center rounded-full", resolved ? "bg-white/10 text-[var(--accent-live)]" : "bg-white/10 text-[var(--accent-danger)]")}>
             <Icon className="h-4 w-4" />
           </span>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50">
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/50">
               {TITLE[incident.type]}{label ? ` · ${label}` : ""}
             </p>
             <p className="text-base font-semibold">
@@ -48,7 +48,7 @@ export function IncidentCard({ incident, viewer, label, onApprove }: {
             </p>
           </div>
         </div>
-        <span className="shrink-0 text-[11px] text-white/40">{now ? timeAgo(incident.createdAt, now) : ""}</span>
+        <span className="shrink-0 text-xs text-white/40">{now ? timeAgo(incident.createdAt, now) : ""}</span>
       </div>
 
       <CompletionBar value={done / incident.steps.length} caption={`${done} of ${incident.steps.length} done${incident.humanNotified ? " · safety specialist on the line" : ""}`} />
@@ -62,20 +62,20 @@ export function IncidentCard({ incident, viewer, label, onApprove }: {
                 className={cn(
                   "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full",
                   step.status === "done" ? "bg-white text-ink-950" : isCurrent ? "border-2 border-white" : "border border-white/25",
-                  isCurrent && step.owner === "human" && "border-amber-300",
+                  isCurrent && step.owner === "human" && "border-line",
                 )}
               >
                 {step.status === "done" ? (
                   <Check className="h-3 w-3" strokeWidth={3} />
                 ) : isCurrent ? (
-                  <span className={cn("h-1.5 w-1.5 animate-pulse-dot rounded-full", step.owner === "human" ? "bg-amber-300" : "bg-white")} />
+                  <span className={cn("h-1.5 w-1.5 animate-pulse-dot rounded-full", step.owner === "human" ? "bg-[var(--accent-warn)]" : "bg-white")} />
                 ) : null}
               </span>
               <div className="min-w-0 flex-1">
                 <p className={cn("flex items-center gap-1.5 text-sm font-medium", step.status === "pending" && !isCurrent && "text-white/45")}>
                   {step.label}
                   {step.owner === "human" && (
-                    <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-200">
+                    <span className="inline-flex items-center gap-0.5 rounded-full bg-white/10 px-1.5 py-0.5 text-xs font-semibold text-[var(--accent-warn)]">
                       <UserRound className="h-2.5 w-2.5" /> Human
                     </span>
                   )}

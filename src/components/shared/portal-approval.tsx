@@ -61,7 +61,7 @@ export function PortalApproval({ escalation }: { escalation: Escalation }) {
 
   return (
     <div className="mt-3 flex flex-col gap-2 rounded-xl bg-white p-3">
-      <p className="flex items-center gap-1.5 text-[11px] text-ink-500">
+      <p className="flex items-center gap-1.5 text-xs text-ink-500">
         <Globe className="h-3.5 w-3.5" /> {task.site}
         {task.loadRef ? ` · ${task.loadRef}` : ""}
       </p>
@@ -113,7 +113,7 @@ export function PortalApproval({ escalation }: { escalation: Escalation }) {
               <X className="h-3.5 w-3.5" /> Stop
             </Button>
           </div>
-          {task.secretAnswer && <p className="text-[11px] text-ink-500">Encrypted, and used only on these websites. Support can&apos;t see it.</p>}
+          {task.secretAnswer && <p className="text-xs text-ink-500">Encrypted, and used only on these websites. Support can&apos;t see it.</p>}
         </form>
       )}
       {error && <span className="text-xs text-[var(--accent-danger)]">{error}</span>}

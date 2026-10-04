@@ -5,7 +5,6 @@ import { Pause } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { LoadScoreBadge } from "@/components/shared/load-score";
-import { LiveDot } from "@/components/shared/live-dot";
 import { Badge } from "@/components/ui/badge";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { LOAD_STAGE_ORDER, LOAD_STAGE_LABEL } from "@/lib/types";
@@ -34,7 +33,6 @@ export default function OpsLoadsPage() {
                 <Pause className="h-3 w-3" /> {pausedCount} paused
               </Badge>
             )}
-            <LiveDot />
           </div>
         }
       />
@@ -44,7 +42,7 @@ export default function OpsLoadsPage() {
           {LOAD_STAGE_ORDER.map((stage) => (
             <div key={stage} className="rounded-xl border border-line bg-white p-3 text-center">
               <p className="font-display text-xl tabular text-ink-950">{counts[stage]}</p>
-              <p className="mt-0.5 text-[10px] leading-tight text-ink-500">{LOAD_STAGE_LABEL[stage]}</p>
+              <p className="mt-0.5 text-xs leading-tight text-ink-500">{LOAD_STAGE_LABEL[stage]}</p>
             </div>
           ))}
         </div>
@@ -77,7 +75,7 @@ export default function OpsLoadsPage() {
         <div className="hidden overflow-x-auto rounded-2xl border border-line bg-white lg:block">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-line bg-ink-50/60 text-left text-[11px] uppercase tracking-wider text-ink-400">
+              <tr className="border-b border-line bg-ink-50/60 text-left text-xs uppercase tracking-wider text-ink-400">
                 <th className="px-5 py-3 font-medium">Lane</th>
                 <th className="px-5 py-3 font-medium">Carrier</th>
                 <th className="px-5 py-3 font-medium">Broker</th>

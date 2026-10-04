@@ -140,7 +140,7 @@ export function ConnectionsCard() {
               {busy === "eld" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plug className="h-3.5 w-3.5" />} Connect
             </Button>
           </div>
-          <p className="text-[11px] text-ink-500">Trucks are matched by unit number and drivers by name, so keep them the same as in the ELD. Read-only access is enough.</p>
+          <p className="text-xs text-ink-500">Trucks are matched by unit number and drivers by name, so keep them the same as in the ELD. Read-only access is enough.</p>
         </div>
 
         <div className="flex flex-col gap-2">
@@ -156,7 +156,7 @@ export function ConnectionsCard() {
                 {busy === "truckstop" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plug className="h-3.5 w-3.5" />} Connect
               </Button>
             </div>
-            {!available.truckstop && <p className="text-[11px] text-ink-500">Backroute&apos;s Truckstop agreement isn&apos;t in place yet: you can save your ID now, and searching starts when it is.</p>}
+            {!available.truckstop && <p className="text-xs text-ink-500">Backroute&apos;s Truckstop agreement isn&apos;t in place yet: you can save your ID now, and searching starts when it is.</p>}
           </div>
           <div className="grid gap-2 rounded-xl border border-line p-3">
             <p className="text-sm font-medium text-ink-900">DAT</p>
@@ -169,12 +169,12 @@ export function ConnectionsCard() {
                 {busy === "dat" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plug className="h-3.5 w-3.5" />} Connect
               </Button>
             </div>
-            {!available.dat && <p className="text-[11px] text-ink-500">Backroute&apos;s DAT agreement isn&apos;t in place yet: you can save your DAT login now, and searching starts when it is.</p>}
+            {!available.dat && <p className="text-xs text-ink-500">Backroute&apos;s DAT agreement isn&apos;t in place yet: you can save your DAT login now, and searching starts when it is.</p>}
           </div>
           <details className="rounded-xl border border-line p-3">
             <summary className="cursor-pointer text-sm font-medium text-ink-900">Another load board (123Loadboard and others)</summary>
-            <p className="mt-2 text-[11px] text-ink-500">Any board with an API, described in JSON: where to search, and where each field is. Backroute support fills this in from the board&apos;s API documents.</p>
-            <textarea aria-label="Load board setup" className={`${input} mt-2 h-40 w-full font-mono text-[11px]`} placeholder={CUSTOM_EXAMPLE} value={custom} onChange={(e) => setCustom(e.target.value)} />
+            <p className="mt-2 text-xs text-ink-500">Any board with an API, described in JSON: where to search, and where each field is. Backroute support fills this in from the board&apos;s API documents.</p>
+            <textarea aria-label="Load board setup" className={`${input} mt-2 h-40 w-full font-mono text-xs`} placeholder={CUSTOM_EXAMPLE} value={custom} onChange={(e) => setCustom(e.target.value)} />
             <Button size="sm" className="mt-2" disabled={!!busy || !custom.trim()} onClick={addCustom}>
               {busy === "custom" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plug className="h-3.5 w-3.5" />} Add board
             </Button>
@@ -199,7 +199,7 @@ export function ConnectionsCard() {
               {busy === "feed" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plug className="h-3.5 w-3.5" />} Add feed
             </Button>
           </div>
-          <p className="text-[11px] text-ink-500">Any list of loads a broker, shipper or load board can publish. The fields are in DEPLOY.md. DAT and Truckstop need their own API agreement first.</p>
+          <p className="text-xs text-ink-500">Any list of loads a broker, shipper or load board can publish. The fields are in DEPLOY.md. DAT and Truckstop need their own API agreement first.</p>
         </div>
         <div className="flex flex-col gap-2">
           <p className="text-xs font-medium text-ink-700">Fuel card and toll statements</p>
@@ -220,11 +220,11 @@ export function ConnectionsCard() {
               {busy === "statement" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plug className="h-3.5 w-3.5" />} Connect statement
             </Button>
           </div>
-          <p className="text-[11px] text-ink-500">
+          <p className="text-xs text-ink-500">
             Most cards can publish a daily transactions report as CSV at a link (ask the card&apos;s account manager for a scheduled report). The AI reads it each morning and puts every line on its load. Or bring in a file on Money → Fuel &amp; tolls.
           </p>
         </div>
-        {msg && <p className={`text-xs ${msg.ok ? "text-[var(--accent-live)]" : "text-[var(--accent-danger)]"}`}>{msg.text}</p>}
+        {msg && <p className={`text-xs ${msg.ok ? "text-ink-950" : "text-[var(--accent-danger)]"}`}>{msg.text}</p>}
       </CardContent>
     </Card>
   );

@@ -49,7 +49,7 @@ export function DailyTextPreview() {
   if (!text) return null;
   return (
     <div className="rounded-2xl bg-ink-50 p-4">
-      <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400">
+      <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-ink-400">
         <MessageSquare className="h-3.5 w-3.5" /> Text to {phone} at 6 PM
       </p>
       <p className="mt-2 max-w-md rounded-2xl rounded-bl-sm bg-white px-3.5 py-2.5 text-sm leading-relaxed text-ink-800 shadow-sm">{text}</p>

@@ -113,7 +113,7 @@ export function DriverDispatchCard() {
       <div className="mt-3 flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-ink-800">{t.textsToo}</p>
-          <p className="text-[11px] text-ink-500">{t.textsTooNote}</p>
+          <p className="text-xs text-ink-500">{t.textsTooNote}</p>
         </div>
         <Switch checked={prefs.textsToo !== false} onChange={(on) => setDriverPrefs(driver.id, { textsToo: on })} label={t.textsToo} />
       </div>
@@ -135,29 +135,29 @@ export function DriverDispatchCard() {
       <div className="mt-4 flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-ink-800">{t.autoDrive}</p>
-          <p className="text-[11px] text-ink-500">{t.autoDriveNote}</p>
+          <p className="text-xs text-ink-500">{t.autoDriveNote}</p>
         </div>
         <Switch checked={prefs.handsFreeAuto !== false} onChange={(on) => setDriverPrefs(driver.id, { handsFreeAuto: on })} label={t.autoDrive} />
       </div>
-      <p className="mt-2 text-[11px] text-ink-500">{t.locationNote}</p>
+      <p className="mt-2 text-xs text-ink-500">{t.locationNote}</p>
       <div className="mt-3 flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-ink-800">{t.hosVoice}</p>
-          <p className="text-[11px] text-ink-500">{t.hosVoiceNote}</p>
+          <p className="text-xs text-ink-500">{t.hosVoiceNote}</p>
         </div>
         <Switch checked={prefs.hosVoice !== false} onChange={(on) => setDriverPrefs(driver.id, { hosVoice: on })} label={t.hosVoice} />
       </div>
       <div className="mt-3 flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-ink-800">{t.morning}</p>
-          <p className="text-[11px] text-ink-500">{t.morningNote}</p>
+          <p className="text-xs text-ink-500">{t.morningNote}</p>
         </div>
         <Switch checked={prefs.morningBrief !== false} onChange={(on) => setDriverPrefs(driver.id, { morningBrief: on })} label={t.morning} />
       </div>
       <div className="mt-3 flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-ink-800">{t.voice}</p>
-          <p className="text-[11px] text-ink-500">{t.voiceNote}</p>
+          <p className="text-xs text-ink-500">{t.voiceNote}</p>
         </div>
         <Switch checked={prefs.voiceReplies !== false} onChange={(on) => setDriverPrefs(driver.id, { voiceReplies: on })} label={t.voice} />
       </div>

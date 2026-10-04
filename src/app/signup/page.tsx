@@ -188,7 +188,7 @@ function Signup() {
                     </li>
                     {fmcsa.city && <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[var(--accent-live)]" /> {fmcsa.city}, {fmcsa.state}</li>}
                   </ul>
-                  <p className="mt-3 text-[11px] text-ink-400">From FMCSA, just now.{real ? "" : " The trucks and drivers below are still the demo fleet."}</p>
+                  <p className="mt-3 text-xs text-ink-400">From FMCSA, just now.{real ? "" : " The trucks and drivers below are still the demo fleet."}</p>
                   {!fmcsa.allowedToOperate && (
                     <p className="mt-3 rounded-xl bg-danger-soft px-3 py-2 text-xs text-[var(--accent-danger)]">
                       FMCSA shows this authority isn&apos;t active. Brokers won&apos;t book you and Backroute can&apos;t dispatch until it is.
@@ -206,7 +206,7 @@ function Signup() {
                         <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[var(--accent-live)]" /> Insurance on file: $1M liability, $100K cargo</li>
                         <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[var(--accent-live)]" /> {carrier.city}, {carrier.state}</li>
                       </ul>
-                      <p className="mt-3 text-[11px] text-ink-400">Demo: FMCSA isn&apos;t connected (no web key), so every MC number shows the demo fleet.</p>
+                      <p className="mt-3 text-xs text-ink-400">Demo: FMCSA isn&apos;t connected (no web key), so every MC number shows the demo fleet.</p>
                     </>
                   )}
                   <p className="mt-4 text-sm font-medium text-ink-950">Who drives?</p>

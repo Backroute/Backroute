@@ -289,7 +289,7 @@ export const ESCALATION_TEMPLATES: EscalationTemplate[] = [
     recommendedLabel: "Approve, confirm accessorial with broker",
   },
   {
-    reason: "Broker requesting rate 8% below carrier floor. Needs a judgment call on accept or walk.",
+    reason: "The broker offered 8% under your floor. Take it or walk?",
     complexity: "critical",
   },
   {

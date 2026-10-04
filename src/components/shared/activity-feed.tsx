@@ -81,7 +81,7 @@ export function ActivityFeed({ events, className, dense }: { events: ActivityEve
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2">
                 <p className="truncate text-[13px] font-medium text-ink-900">{event.message}</p>
-                <TimeAgo iso={event.timestamp} className="shrink-0 text-[11px] tabular text-ink-400" />
+                <TimeAgo iso={event.timestamp} className="shrink-0 text-xs tabular text-ink-400" />
               </div>
               {event.detail && <p className="mt-0.5 truncate text-xs text-ink-500">{event.detail}</p>}
             </div>
@@ -111,7 +111,7 @@ export function GroupedAlertFeed({ events, limit = 8 }: { events: ActivityEvent[
             <div className="min-w-0 flex-1 text-left">
               <div className="flex items-baseline justify-between gap-2">
                 <p className="truncate text-[13px] font-medium text-ink-900">{g.title}</p>
-                <TimeAgo iso={g.lead.timestamp} className="shrink-0 text-[11px] tabular text-ink-400" />
+                <TimeAgo iso={g.lead.timestamp} className="shrink-0 text-xs tabular text-ink-400" />
               </div>
               <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-ink-500">
                 {many ? (

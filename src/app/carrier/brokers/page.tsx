@@ -33,7 +33,7 @@ export default function BrokersPage() {
       <PageHeader title="Brokers" description="How each broker pays and treats carriers, and how the AI deals with them." />
       <div className="flex flex-col gap-5 px-4 py-6 sm:px-8">
         <div className="grid grid-cols-3 gap-3">
-          <Summary label="Book normally" value={counts.normal} tone="text-[var(--accent-live)]" />
+          <Summary label="Book normally" value={counts.normal} tone="text-ink-950" />
           <Summary label="Ask more to cover slow pay" value={counts.surcharge} tone="text-[var(--accent-warn)]" />
           <Summary label="AI won't book" value={counts.block} tone="text-[var(--accent-danger)]" />
         </div>
@@ -108,10 +108,10 @@ function Summary({ label, value, tone }: { label: string; value: number; tone: s
 function Metric({ label, value, sub, bad }: { label: string; value: string; sub?: string; bad?: boolean }) {
   return (
     <div className="rounded-xl bg-ink-50 px-3 py-2">
-      <dt className="text-[10px] uppercase tracking-wide text-ink-400">{label}</dt>
+      <dt className="text-xs uppercase tracking-wide text-ink-400">{label}</dt>
       <dd className={cn("mt-0.5 text-sm font-semibold tabular", bad ? "text-[var(--accent-danger)]" : "text-ink-950")}>
         {value}
-        {sub && <span className="ml-1 text-[10px] font-normal text-ink-400">{sub}</span>}
+        {sub && <span className="ml-1 text-xs font-normal text-ink-400">{sub}</span>}
       </dd>
     </div>
   );

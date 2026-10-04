@@ -101,7 +101,7 @@ export default function OpsLoadDetailPage() {
 
       <div className="grid gap-6 px-4 py-6 sm:px-8 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
-          <Card className="border-[var(--accent-warn)]/40">
+          <Card className="border-line">
             <CardHeader>
               <div>
                 <CardTitle className="flex items-center gap-2"><ShieldAlert className="h-4 w-4 text-[var(--accent-warn)]" /> Ops controls</CardTitle>
@@ -306,7 +306,7 @@ function Row({ label, value, strong, tone }: { label: string; value: string; str
         className={
           "tabular text-sm " +
           (strong ? "font-semibold " : "font-medium ") +
-          (tone === "success" ? "text-[var(--accent-live)]" : tone === "danger" ? "text-[var(--accent-danger)]" : "text-ink-950")
+          (tone === "success" ? "text-ink-950" : tone === "danger" ? "text-[var(--accent-danger)]" : "text-ink-950")
         }
       >
         {value}

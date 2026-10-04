@@ -17,7 +17,7 @@ export function TripStops({ truck, loads, hrefFor }: { truck: Truck; loads: Load
   return (
     <section className="rounded-3xl border border-line p-5" aria-label="Your trip">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Your trip</h2>
+        <h2 className="text-xs font-medium uppercase tracking-wider text-ink-400">Your trip</h2>
         <span className="text-xs text-ink-500">
           {new Set(stops.map((s) => s.load.id)).size} loads · stop {nextAt + 1} of {stops.length}
         </span>
@@ -34,7 +34,7 @@ export function TripStops({ truck, loads, hrefFor }: { truck: Truck; loads: Load
           return (
             <li key={`${stop.loadId}-${stop.kind}`}>
               <Link href={hrefFor(load.id)} className={`flex min-h-12 items-center gap-3 border-b border-line py-2 last:border-0 ${done ? "text-ink-400" : "text-ink-900"}`} aria-current={here ? "step" : undefined}>
-                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${here ? "bg-ink-950 text-white" : done ? "bg-ink-100 text-ink-500" : "border border-line text-ink-600"}`}>
+                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${here ? "bg-ink-950 text-white" : done ? "bg-ink-100 text-ink-500" : "border border-line text-ink-600"}`}>
                   {done ? <Check className="h-3.5 w-3.5" aria-label="Done" /> : i + 1}
                 </span>
                 <span className="min-w-0 flex-1">

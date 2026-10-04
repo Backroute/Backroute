@@ -1,6 +1,5 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
 import { LoadOfferCard } from "./load-offer-card";
 import { TruckDriverChip } from "./truck-driver-chip";
 import type { OfferAskDraft } from "@/lib/engine";
@@ -33,24 +32,20 @@ export function NextLoadOffers({
 
   return (
     <div>
-      <div className="mb-2.5 flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-ink-950" />
-        <p className="text-sm font-semibold text-ink-950">Choose your next load</p>
-      </div>
+      <h2 className="mb-1 text-[17px] font-semibold tracking-tight text-ink-950">Choose your next load</h2>
       {real ? (
         <p className="mb-3 text-xs text-ink-500">
-          {totalCount} load{totalCount === 1 ? "" : "s"} brokers emailed you fit{totalCount === 1 ? "s" : ""} a truck. Pick one and the AI emails the broker to book it
-          at the price shown, never under your lowest rate. The booking is confirmed when their rate con comes back and matches.
+          {totalCount} load{totalCount === 1 ? "" : "s"} brokers emailed you fit{totalCount === 1 ? "s" : ""} a truck. Pick one and Backroute emails the broker to book it
+          at the price shown, never under your lowest rate. It&apos;s booked when their rate con comes back and matches.
         </p>
       ) : (
         <p className="mb-3 text-xs text-ink-500">
-          AI checked every connected board and scored {totalCount} option{totalCount === 1 ? "" : "s"} for you. Its pick weighs pay per hour, how far each
-          load leaves the driver from home, and whether there&apos;s freight to reload after.
+          {totalCount} option{totalCount === 1 ? "" : "s"} from every connected board. Best fit weighs pay per hour, home time and the next reload.
         </p>
       )}
       <div className="flex flex-col gap-6">
         {offerGroups.map(([groupId, groupLoads]) => {
-          // The AI pick leads: it can beat a higher score once home time and the next reload are counted.
+          // The best fit leads: it can beat a higher score once home time and the next reload are counted.
           const loads = [...groupLoads].sort((a, b) => Number(!!b.recommended) - Number(!!a.recommended) || b.score - a.score);
           const truck = trucks && loads[0].truckId ? trucks.get(loads[0].truckId) : undefined;
           const driver = drivers && truck?.driverId ? drivers.get(truck.driverId) : undefined;
@@ -60,7 +55,7 @@ export function NextLoadOffers({
                 <TruckDriverChip
                   truck={truck}
                   driver={driver}
-                  trailing={<span className="ml-auto shrink-0 text-[11px] text-ink-400">{loads.length} option{loads.length === 1 ? "" : "s"}</span>}
+                  trailing={<span className="ml-auto shrink-0 text-xs text-ink-400">{loads.length} option{loads.length === 1 ? "" : "s"}</span>}
                   className="mb-2.5"
                 />
               )}
@@ -72,6 +67,7 @@ export function NextLoadOffers({
                     broker={brokers.get(load.brokerId)}
                     truck={truck}
                     driver={driver}
+                    viewer={trucks ? "owner" : "driver"}
                     onSelect={() => onSelect(groupId, load.id)}
                     onAsk={real ? undefined : (text) => onAsk(load.id, text)}
                     onAskResolve={real ? undefined : (draft) => onAskResolve(load.id, draft)}

@@ -108,7 +108,7 @@ export function DriverCallsBoard({ limit = 6 }: { limit?: number }) {
                         {call.status === "live" && call.ownerTookOver ? "You're on" : st.label}
                       </Badge>
                     </span>
-                    <span className="flex items-center gap-1 text-[11px] text-ink-400">
+                    <span className="flex items-center gap-1 text-xs text-ink-400">
                       <TimeAgo iso={call.endedAt ?? call.answeredAt ?? call.createdAt} />
                       {call.lines.length > 0 && (expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
                     </span>
@@ -137,7 +137,7 @@ export function DriverCallsBoard({ limit = 6 }: { limit?: number }) {
                       </ul>
                     )}
                     {call.lang !== readLang && call.lines.length > 0 && (
-                      <button type="button" onClick={() => setOriginalFor(showOriginal ? null : call.id)} className="mt-2 text-[11px] font-medium text-ink-500 underline underline-offset-2">
+                      <button type="button" onClick={() => setOriginalFor(showOriginal ? null : call.id)} className="mt-2 text-xs font-medium text-ink-500 underline underline-offset-2">
                         {showOriginal ? `Show in ${LANG_INFO[readLang].english}` : `Show what was said (${LANG_INFO[call.lang].native})`}
                       </button>
                     )}
@@ -175,7 +175,7 @@ function OwnerControls({ call, driverFirst }: { call: DispatchCall; driverFirst:
         <button type="button" onClick={() => takeOverDispatchCall(call.id)} className="flex items-center gap-1.5 rounded-full bg-ink-950 px-3.5 py-1.5 text-xs font-semibold text-white">
           <UserRound className="h-3.5 w-3.5" /> Take over the call
         </button>
-        <span className="text-[11px] text-ink-500">You&apos;re listening. {driverFirst} can&apos;t hear you until you take over.</span>
+        <span className="text-xs text-ink-500">You&apos;re listening. {driverFirst} can&apos;t hear you until you take over.</span>
       </div>
     );
   }
@@ -188,7 +188,7 @@ function OwnerControls({ call, driverFirst }: { call: DispatchCall; driverFirst:
             key={q}
             type="button"
             onClick={() => ownerSayOnCall(call.id, "", q)}
-            className="rounded-full border border-line bg-white px-3 py-1 text-[11px] font-medium text-ink-700 hover:border-ink-300"
+            className="rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-ink-700 hover:border-ink-300"
           >
             {pack(readLang).quick[q]}
           </button>
@@ -210,7 +210,7 @@ function OwnerControls({ call, driverFirst }: { call: DispatchCall; driverFirst:
           <PhoneOff className="h-3.5 w-3.5" /> End call
         </button>
       </div>
-      <p className="text-[11px] text-ink-500">
+      <p className="text-xs text-ink-500">
         {driverFirst} hears you as {OWNER_NAME}
         {call.lang !== readLang ? `, in ${LANG_INFO[call.lang].english}: the quick phrases above are translated for you. Typed words go as typed in the demo; on a real line the AI translates as you talk.` : ". The AI keeps notes and logs the call. Demo: you type here; on a real line you'd talk."}
       </p>

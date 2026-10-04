@@ -17,9 +17,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Backroute: Autonomous freight dispatch",
+  title: "Backroute",
   description:
-    "Backroute sources, negotiates, books, tracks, documents, and chains every load, end to end, so your trucks never run empty.",
+    "The dispatcher for owner-operators and small fleets. Backroute finds the load, calls the broker, books at your rate and gets you paid.",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

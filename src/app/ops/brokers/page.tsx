@@ -43,7 +43,7 @@ export default function BrokersPage() {
                 <span className="text-ink-500">Avg response <span className="font-semibold tabular text-ink-950">{b.avgResponseMins}m</span></span>
                 <span className="text-ink-500">Booked <span className="font-semibold tabular text-ink-950">{b.loadsBooked}</span></span>
                 <span className="text-ink-500">On-time <span className="font-semibold tabular text-ink-950">{b.onTimePct}%</span></span>
-                <span className={cn("ml-auto font-semibold tabular", b.avgRateVariancePct >= 0 ? "text-[var(--accent-live)]" : "text-[var(--accent-danger)]")}>
+                <span className={cn("ml-auto font-semibold tabular", b.avgRateVariancePct >= 0 ? "text-ink-950" : "text-[var(--accent-danger)]")}>
                   {b.avgRateVariancePct >= 0 ? "+" : ""}{b.avgRateVariancePct}% vs market
                 </span>
               </div>
@@ -54,7 +54,7 @@ export default function BrokersPage() {
         <div className="hidden overflow-x-auto rounded-2xl border border-line bg-white lg:block">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-line bg-ink-50/60 text-left text-[11px] uppercase tracking-wider text-ink-400">
+              <tr className="border-b border-line bg-ink-50/60 text-left text-xs uppercase tracking-wider text-ink-400">
                 <th className="px-5 py-3 font-medium">Broker</th>
                 <th className="px-5 py-3 font-medium">Tier</th>
                 <th className="px-5 py-3 font-medium">Reliability</th>
@@ -83,7 +83,7 @@ export default function BrokersPage() {
                   <td className="px-5 py-3.5 text-right tabular text-ink-600">{b.loadsBooked}</td>
                   <td className="px-5 py-3.5 text-right tabular text-ink-600">{b.onTimePct}%</td>
                   <td className="px-5 py-3.5 text-right tabular">
-                    <span className={b.avgRateVariancePct >= 0 ? "text-[var(--accent-live)]" : "text-[var(--accent-danger)]"}>
+                    <span className={b.avgRateVariancePct >= 0 ? "text-ink-950" : "text-[var(--accent-danger)]"}>
                       {b.avgRateVariancePct >= 0 ? "+" : ""}{b.avgRateVariancePct}%
                     </span>
                   </td>
@@ -103,7 +103,7 @@ function TierSelect({ tier, onChange }: { tier: Broker["tier"]; onChange: (tier:
       value={tier}
       onChange={(e) => onChange(e.target.value as Broker["tier"])}
       className={cn(
-        "cursor-pointer appearance-none rounded-full border-0 px-2.5 py-1 text-[11px] font-medium tracking-tight outline-none",
+        "cursor-pointer appearance-none rounded-full border-0 px-2.5 py-1 text-xs font-medium tracking-tight outline-none",
         TIER_TONE[tier],
       )}
     >

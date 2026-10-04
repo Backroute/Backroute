@@ -73,7 +73,7 @@ function markerElement(kind: "start" | "end" | "truck"): HTMLElement {
   const el = document.createElement("div");
   el.innerHTML =
     kind === "truck"
-      ? '<span class="relative flex h-[22px] w-[22px] items-center justify-center"><span class="absolute inset-0 animate-ping rounded-full bg-emerald-400/40"></span><span class="relative h-3.5 w-3.5 rounded-full border-[3px] border-white bg-[var(--accent-live)] shadow"></span></span>'
+      ? '<span class="relative flex h-[22px] w-[22px] items-center justify-center"><span class="absolute inset-0 animate-ping rounded-full bg-[#0a84ff]/35"></span><span class="relative h-3.5 w-3.5 rounded-full border-[3px] border-white bg-[#0a84ff] shadow"></span></span>'
       : `<span class="block h-3.5 w-3.5 border-[3px] border-white bg-ink-950 ${kind === "start" ? "rounded-full" : ""}"></span>`;
   return el;
 }
@@ -204,7 +204,7 @@ export function TripMap({
     <div className={cn("absolute inset-0 z-0", className)} style={{ background: "#141414" }}>
       <div ref={el} aria-hidden className="h-full w-full" />
       {straight && !compact && (
-        <span className="pointer-events-none absolute top-14 right-3 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white/80">Straight line · not directions</span>
+        <span className="pointer-events-none absolute top-14 right-3 rounded-full bg-black/60 px-2 py-0.5 text-xs font-medium text-white/80">Straight line · not directions</span>
       )}
     </div>
   );

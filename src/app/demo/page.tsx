@@ -67,7 +67,7 @@ export default function DemoPage() {
           ))}
         </ul>
 
-        <p className="rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-950">
+        <p className="rounded-2xl bg-ink-100 px-4 py-3 text-sm text-ink-700">
           Tip: switch between the owner and driver side from the yellow bar at the top. It&apos;s the same fleet, so a call the AI makes to a
           driver shows up on the owner&apos;s dashboard too.
         </p>

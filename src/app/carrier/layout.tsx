@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { setTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { slideTypes } from "@/lib/nav-direction";
-import { isAlert } from "@/lib/alerts";
+import { isAlert, isUrgent } from "@/lib/alerts";
 import { PortalShell, type NavItem } from "@/components/shared/portal-shell";
 import { TopBar } from "@/components/shared/top-bar";
 import { AiStatus } from "@/components/shared/ai-status";
@@ -27,7 +27,7 @@ import { InstallPrompt } from "@/components/shared/install-prompt";
 
 /** Five sections instead of eleven pages; each section's pages sit on tabs inside it. */
 const SECTIONS: { nav: NavItem; tabs: { href: string; label: string }[] }[] = [
-  { nav: { href: "/carrier", label: "Home", icon: LayoutGrid }, tabs: [{ href: "/carrier", label: "Today" }, { href: "/carrier/messages", label: "Ask the AI" }] },
+  { nav: { href: "/carrier", label: "Home", icon: LayoutGrid }, tabs: [{ href: "/carrier", label: "Today" }, { href: "/carrier/messages", label: "Messages" }] },
   { nav: { href: "/carrier/loads", label: "Loads", icon: Truck }, tabs: [{ href: "/carrier/loads", label: "All loads" }, { href: "/carrier/negotiations", label: "Negotiating" }, { href: "/carrier/customers", label: "Customers" }] },
   {
     nav: { href: "/carrier/fleet", label: "Fleet", icon: Users },
@@ -96,9 +96,6 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
   const activity = useStore((s) => s.activity).filter((e) => e.carrierId === carrier.id);
   // Only three kinds of things interrupt the owner: needs you, money, safety.
   const alerts = activity.filter(isAlert);
-  const pendingOffers = loads.filter((l) => l.stage === "offered").length;
-  // Matches exactly what the Negotiations page itself lists, so the badge never disagrees with the page it labels.
-  const activeNegotiations = loads.filter((l) => l.stage === "negotiating" || l.stage === "rate_confirmed").length;
   const needsYou = useNeedsYou().count;
   const router = useRouter();
   // The number on the app's icon (home screen, dock): what's waiting for the owner.
@@ -109,9 +106,8 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (books && !BOOKS_PAGES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) router.replace("/carrier/earnings");
   }, [books, pathname, router]);
-  const navWithBadge = NAV.filter((n) => !books || BOOKS_NAV.has(n.href)).map((n) =>
-    n.href === "/carrier/loads" ? { ...n, badge: pendingOffers + activeNegotiations } : n.href === "/carrier" ? { ...n, badge: needsYou } : n,
-  );
+  // One number in the whole app: what needs the owner, on Home. Loads, the bell and the status pill don't repeat it.
+  const navWithBadge = NAV.filter((n) => !books || BOOKS_NAV.has(n.href)).map((n) => (n.href === "/carrier" ? { ...n, badge: needsYou } : n));
 
   const paused = useStore((s) => !!s.settings.paused);
   const updateSettings = useStore((s) => s.actions.updateSettings);
@@ -151,7 +147,7 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
     <PortalShell
       variant="light"
       bottomTabs
-      portalLabel="Carrier Dashboard"
+      portalLabel="Owner"
       navItems={navWithBadge}
       switchTo={{ href: "/", label: "Back to home" }}
       topBar={
@@ -163,7 +159,7 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
           settingsHref="/carrier/settings"
           exitHref="/"
           status={<AiStatus needsYou={needsYou} />}
-          searchHint="Search, or tell the AI…"
+          searchHint="Search or ask…"
         />
       }
       footer={
@@ -173,7 +169,7 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
           <Avatar name={carrier.name} size="sm" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-semibold text-ink-950">{carrier.name}</p>
-            <p className="truncate text-[11px] text-ink-400">{carrier.mc}</p>
+            <p className="truncate text-xs text-ink-400">{carrier.mc}</p>
           </div>
           <Badge tone="dark">{carrier.plan}</Badge>
         </div>
@@ -192,7 +188,7 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
       <SampleTracker />
       <SectionTabs />
       {children}
-      <NotificationToastHost events={alerts} hrefFor={(e) => (e.loadId ? `/carrier/loads/${e.loadId}` : undefined)} />
+      <NotificationToastHost events={alerts.filter(isUrgent)} hrefFor={(e) => (e.loadId ? `/carrier/loads/${e.loadId}` : undefined)} />
     </PortalShell>
   );
 }

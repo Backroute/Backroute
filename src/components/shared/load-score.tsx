@@ -1,18 +1,9 @@
 import { cn } from "@/lib/utils";
-import { scoreTone } from "@/lib/scoring";
 
-const TONE_CLASSES = {
-  success: "bg-live-soft text-[var(--accent-live)]",
-  warning: "bg-warn-soft text-[var(--accent-warn)]",
-  danger: "bg-danger-soft text-[var(--accent-danger)]",
-};
-
-const RING_COLOR = {
-  success: "var(--accent-live)",
-  warning: "var(--accent-warn)",
-  danger: "var(--accent-danger)",
-};
-
+/**
+ * How well a load fits, 0–100. Plain black, like every other number: a low score isn't an alarm, so it gets no colour.
+ * The ring's fill shows the size of it at a glance.
+ */
 export function LoadScoreBadge({
   score,
   size = "md",
@@ -20,35 +11,28 @@ export function LoadScoreBadge({
   className,
 }: {
   score: number;
-  /** "xl" is the decision-prominent ring gauge — use it wherever a carrier/driver is choosing between loads. */
+  /** "xl" is the ring, for wherever someone is choosing between loads. */
   size?: "sm" | "md" | "lg" | "xl";
   invert?: boolean;
   className?: string;
 }) {
-  const tone = scoreTone(score);
-
   if (size === "xl") {
-    // A round-capped SVG ring (Apple Watch activity-ring construction) reads as far more premium than a
-    // conic-gradient at this size, and it's the score decisions actually get made on — carriers and drivers
-    // pick between load offers by scanning these, so it's sized to be unmissable rather than merely legible.
-    const dim = 96;
-    const strokeWidth = 7;
+    const dim = 76;
+    const strokeWidth = 5;
     const radius = (dim - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
     const progress = Math.max(0.03, Math.min(1, score / 100));
     const dashOffset = circumference * (1 - progress);
-    const ringColor = invert ? "#fff" : RING_COLOR[tone];
-    const trackColor = invert ? "rgba(255,255,255,0.15)" : "rgba(10,10,10,0.08)";
     return (
-      <div className={cn("relative shrink-0", className)} style={{ width: dim, height: dim }}>
-        <svg width={dim} height={dim} viewBox={`0 0 ${dim} ${dim}`} className="-rotate-90">
-          <circle cx={dim / 2} cy={dim / 2} r={radius} fill="none" stroke={trackColor} strokeWidth={strokeWidth} />
+      <div className={cn("relative shrink-0", className)} style={{ width: dim, height: dim }} aria-label={`Fit ${score} out of 100`}>
+        <svg width={dim} height={dim} viewBox={`0 0 ${dim} ${dim}`} className="-rotate-90" aria-hidden>
+          <circle cx={dim / 2} cy={dim / 2} r={radius} fill="none" stroke={invert ? "rgb(255 255 255 / 0.16)" : "var(--ink-150)"} strokeWidth={strokeWidth} />
           <circle
             cx={dim / 2}
             cy={dim / 2}
             r={radius}
             fill="none"
-            stroke={ringColor}
+            stroke={invert ? "#fff" : "var(--ink-950)"}
             strokeWidth={strokeWidth}
             strokeLinecap="round"
             strokeDasharray={circumference}
@@ -56,10 +40,9 @@ export function LoadScoreBadge({
             style={{ transition: "stroke-dashoffset 700ms cubic-bezier(0.4, 0, 0.2, 1)" }}
           />
         </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={cn("font-display text-[34px] font-bold leading-none tabular", invert ? "text-white" : "text-ink-950")}>{score}</span>
-          <span className={cn("mt-1 text-[9px] font-semibold uppercase tracking-wider", invert ? "text-white/50" : "text-ink-400")}>Match score</span>
-        </div>
+        <span className={cn("absolute inset-0 flex items-center justify-center text-[26px] font-medium leading-none tracking-tight tabular", invert ? "text-white" : "text-ink-950")}>
+          {score}
+        </span>
       </div>
     );
   }
@@ -67,14 +50,14 @@ export function LoadScoreBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-baseline gap-0.5 rounded-full font-semibold tabular",
-        invert ? "bg-white/15 text-white" : TONE_CLASSES[tone],
-        size === "lg" ? "px-3 py-1.5 text-lg" : size === "sm" ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-sm",
+        "inline-flex items-baseline rounded-full font-medium tabular",
+        invert ? "bg-white/15 text-white" : "bg-ink-100 text-ink-950",
+        size === "lg" ? "px-3 py-1 text-lg" : size === "sm" ? "px-2 py-0.5 text-xs" : "px-2.5 py-0.5 text-sm",
         className,
       )}
+      title="Fit, out of 100"
     >
       {score}
-      <span className={cn("font-normal opacity-60", size === "lg" ? "text-xs" : "text-[10px]")}>/100</span>
     </span>
   );
 }

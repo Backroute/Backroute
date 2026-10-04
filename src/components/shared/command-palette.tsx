@@ -111,7 +111,7 @@ export function CommandPalette({ groups, onAsk }: { groups: CommandGroup[]; onAs
     const idx = flatItems.indexOf(item);
     return (
       <div className="mb-1">
-        <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-400">Ask the AI dispatcher</p>
+        <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-ink-400">Ask the AI dispatcher</p>
         <button
           onMouseEnter={() => setActiveIndex(idx)}
           onClick={() => select(item)}
@@ -158,7 +158,7 @@ export function CommandPalette({ groups, onAsk }: { groups: CommandGroup[]; onAs
             placeholder={onAsk ? "Search, or tell the AI what to do…" : "Search or jump to..."}
             className="flex-1 bg-transparent text-sm text-ink-950 outline-none placeholder:text-ink-400"
           />
-          <kbd className="rounded border border-line px-1.5 py-0.5 text-[10px] text-ink-400">esc</kbd>
+          <kbd className="rounded border border-line px-1.5 py-0.5 text-xs text-ink-400">esc</kbd>
         </div>
 
         <div className="max-h-[22rem] overflow-y-auto p-2">
@@ -171,7 +171,7 @@ export function CommandPalette({ groups, onAsk }: { groups: CommandGroup[]; onAs
           {flatItems.length === 0 && <p className="px-3 py-6 text-center text-sm text-ink-400">No results.</p>}
           {filteredGroups.map((g) => (
             <div key={g.heading} className="mb-1">
-              <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-400">{g.heading}</p>
+              <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-ink-400">{g.heading}</p>
               {g.items.map((item) => {
                 const flatIdx = flatItems.indexOf(item);
                 const Icon = item.icon;

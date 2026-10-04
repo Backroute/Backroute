@@ -29,7 +29,7 @@ export function DraftApproval({ escalation }: { escalation: Escalation }) {
 
   return (
     <div className="mt-3 rounded-xl border border-line bg-ink-50 p-3">
-      <p className="flex items-center gap-1.5 text-[11px] text-ink-500">
+      <p className="flex items-center gap-1.5 text-xs text-ink-500">
         <Mail className="h-3.5 w-3.5" /> To {draft.toName ? `${draft.toName} <${draft.to}>` : draft.to} · {draft.subject}
       </p>
       <label className="sr-only" htmlFor={`draft-${escalation.id}`}>
@@ -64,7 +64,7 @@ function Attachments({ files }: { files: { fileId: string; name: string }[] }) {
           key={f.fileId}
           type="button"
           onClick={() => void openFile(f.fileId)}
-          className="inline-flex items-center gap-1 rounded-full border border-line bg-white px-2.5 py-1 text-[11px] font-medium text-ink-700 hover:border-ink-300"
+          className="inline-flex items-center gap-1 rounded-full border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink-700 hover:border-ink-300"
         >
           <Paperclip className="h-3 w-3" /> {f.name}
         </button>
@@ -77,5 +77,5 @@ const SOURCE_LABEL = { sms: "By text", voice: "On a call", email: "By email", ap
 
 export function SourceTag({ source }: { source: Escalation["source"] }) {
   if (!source || source === "app") return null;
-  return <span className="mb-1.5 inline-block rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-500">{SOURCE_LABEL[source]}</span>;
+  return <span className="mb-1.5 inline-block rounded-full bg-ink-100 px-2 py-0.5 text-xs font-medium uppercase tracking-wider text-ink-500">{SOURCE_LABEL[source]}</span>;
 }

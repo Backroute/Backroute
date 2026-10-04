@@ -68,7 +68,7 @@ export function TripStepper({ stage, invert }: { stage: LoadStage; invert?: bool
             </div>
             <span
               className={cn(
-                "mt-1.5 text-center text-[9px] font-medium leading-tight",
+                "mt-1.5 text-center text-xs font-medium leading-tight",
                 done || isActive ? (invert ? "text-white" : "text-ink-950") : invert ? "text-white/40" : "text-ink-400",
               )}
             >

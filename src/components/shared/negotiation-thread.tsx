@@ -14,7 +14,7 @@ export function NegotiationThread({ messages }: { messages: NegotiationMessage[]
         return (
           <div key={m.id} className={cn("flex", isAi ? "justify-end" : "justify-start")}>
             <div className={cn("max-w-[80%] rounded-2xl px-4 py-3", isAi ? "bg-ink-950 text-white rounded-br-sm" : "bg-ink-100 text-ink-900 rounded-bl-sm")}>
-              <div className={cn("mb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-wider", isAi ? "text-white/60" : "text-ink-500")}>
+              <div className={cn("mb-1 flex items-center gap-1.5 text-xs uppercase tracking-wider", isAi ? "text-white/60" : "text-ink-500")}>
                 <ChannelIcon channel={m.channel} className="h-3 w-3" />
                 <span>{isAi ? "Backroute AI" : m.from}</span>
                 <span>·</span>

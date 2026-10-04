@@ -1,17 +1,15 @@
 import { cn } from "@/lib/utils";
 
-export function LiveDot({ label = "Live", className, tone = "live" }: { label?: string; className?: string; tone?: "live" | "muted" }) {
+/**
+ * A short status note with a quiet dot, e.g. what Backroute is doing on a load. With no note there's nothing to say,
+ * so nothing shows: pages don't announce that they're "live".
+ */
+export function LiveDot({ label, className }: { label?: string; className?: string }) {
+  if (!label) return null;
   return (
-    <span className={cn("inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider", className)}>
-      <span className="relative flex h-2 w-2">
-        <span
-          className={cn(
-            "absolute inline-flex h-full w-full rounded-full animate-pulse-dot",
-            tone === "live" ? "bg-[var(--accent-live)]" : "bg-ink-400",
-          )}
-        />
-      </span>
-      <span className={tone === "live" ? "text-[var(--accent-live)]" : "text-ink-500"}>{label}</span>
+    <span className={cn("inline-flex items-center gap-1.5 text-xs font-medium text-ink-600", className)}>
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ink-950" />
+      {label}
     </span>
   );
 }

@@ -11,7 +11,7 @@ export function Switch({ checked, onChange, label, dark }: { checked: boolean; o
       onClick={() => onChange(!checked)}
       className={cn(
         "relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200",
-        dark ? (checked ? "bg-[var(--accent-live)]" : "bg-white/20") : checked ? "bg-brand" : "bg-ink-200",
+        dark ? (checked ? "bg-[var(--action)]" : "bg-white/20") : checked ? "bg-[var(--action)]" : "bg-ink-200",
       )}
     >
       <span

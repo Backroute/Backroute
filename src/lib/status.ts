@@ -1,17 +1,20 @@
 import type { LoadStage } from "./types";
 
 /**
- * One way to show where anything stands, on every screen: done (green), moving (blue: the AI or the truck is on it),
- * waiting on someone (amber: a broker, a driver, an appointment), needs you (red), and set aside (gray).
+ * One way to show where anything stands, on every screen: a grey pill with a small dot. The dot carries the meaning:
+ * green done, black moving (Backroute or the truck is on it), orange waiting, red needs you, light grey set aside.
+ * The pill itself is never coloured, so a screen full of statuses stays calm.
  */
-type StatusKind = "done" | "moving" | "waiting" | "needs_you" | "off";
+export type StatusKind = "done" | "moving" | "waiting" | "needs_you" | "off";
 
-export const STATUS_CLASS: Record<StatusKind, string> = {
-  done: "bg-live-soft text-[var(--accent-live)]",
-  moving: "bg-info-soft text-[var(--accent-info)]",
-  waiting: "bg-warn-soft text-[var(--accent-warn)]",
-  needs_you: "bg-danger-soft text-[var(--accent-danger)]",
-  off: "bg-ink-100 text-ink-600",
+export const STATUS_PILL = "bg-ink-100 text-ink-800";
+
+export const STATUS_DOT: Record<StatusKind, string> = {
+  done: "bg-[var(--accent-live)]",
+  moving: "bg-ink-950",
+  waiting: "bg-[var(--accent-warn)]",
+  needs_you: "bg-[var(--accent-danger)]",
+  off: "bg-ink-300",
 };
 
 export const STAGE_STATUS: Record<LoadStage, StatusKind> = {

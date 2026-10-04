@@ -84,7 +84,7 @@ export function InstallPrompt() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 40, opacity: 0 }}
           transition={{ type: "spring", stiffness: 420, damping: 36 }}
-          className="fixed inset-x-3 bottom-[5.5rem] z-[65] mx-auto max-w-sm rounded-3xl border border-line bg-white p-4 shadow-2xl"
+          className="hide-when-driving fixed inset-x-3 bottom-[5.5rem] z-[65] mx-auto max-w-sm rounded-3xl border border-line bg-white p-4 shadow-2xl"
         >
           <div className="flex items-start gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}

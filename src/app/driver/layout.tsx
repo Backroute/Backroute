@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils";
 import { slideTypes } from "@/lib/nav-direction";
 import { useCompactTitle } from "@/lib/large-title";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
-import { LiveTripPill } from "@/components/shared/live-trip-pill";
 import { HosClock } from "@/components/driver/hos-clock";
 import { Logo } from "@/components/shared/logo";
 import { Avatar } from "@/components/ui/avatar";
@@ -18,7 +17,7 @@ import { NotificationToastHost } from "@/components/shared/notification-toast";
 import { IncomingCallHost } from "@/components/shared/dispatch-call-screen";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, truckActiveLoads } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
-import { isAlert } from "@/lib/alerts";
+import { isAlert, isUrgent } from "@/lib/alerts";
 import { useDriverUi } from "@/lib/lang/use-driver-ui";
 import { InstallPrompt } from "@/components/shared/install-prompt";
 
@@ -81,8 +80,6 @@ function DriverShell({ children }: { children: React.ReactNode }) {
           </span>
         </div>
         <PullToRefresh />
-        {/* On a trip, away from Home (whose map already shows it): the trip stays in view at the top. */}
-        {current && pathname !== "/driver" && <LiveTripPill load={current} href="/driver" />}
 
         <div className="flex-1 pb-20">{children}</div>
 
@@ -96,7 +93,7 @@ function DriverShell({ children }: { children: React.ReactNode }) {
                 href={tab.href}
                 transitionTypes={slideTypes(TAB_ORDER, currentTab, tab.href)}
                 className={cn(
-                  "flex flex-1 flex-col items-center gap-1 rounded-2xl py-2 text-[10px] font-medium transition-colors",
+                  "flex flex-1 flex-col items-center gap-1 rounded-2xl py-2 text-xs font-medium transition-colors",
                   active ? "bg-ink-950 text-white" : "text-ink-400 hover:text-ink-700",
                 )}
               >
@@ -109,7 +106,7 @@ function DriverShell({ children }: { children: React.ReactNode }) {
       </div>
       <InstallPrompt />
       <IncomingCallHost driverId={driver.id} />
-      <NotificationToastHost events={driverActivity} hrefFor={(e) => (e.loadId ? `/driver/loads/${e.loadId}` : undefined)} />
+      <NotificationToastHost events={driverActivity.filter(isUrgent)} hrefFor={(e) => (e.loadId ? `/driver/loads/${e.loadId}` : undefined)} />
     </div>
   );
 }

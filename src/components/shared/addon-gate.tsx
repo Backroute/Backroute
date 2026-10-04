@@ -21,7 +21,7 @@ export function AddonGate({ addonId, children }: { addonId: string; children: Re
       <Button size="sm" className="mt-4" onClick={() => toggleAddon(addonId)}>
         Turn on, free
       </Button>
-      {addon?.commissionNote && <p className="mx-auto mt-2 max-w-sm text-[11px] text-ink-400">{addon.commissionNote}</p>}
+      {addon?.commissionNote && <p className="mx-auto mt-2 max-w-sm text-xs text-ink-400">{addon.commissionNote}</p>}
     </div>
   );
 }

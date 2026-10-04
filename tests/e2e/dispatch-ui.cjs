@@ -62,7 +62,7 @@ async function signIn(browser, sub, phone, width = 1280) {
   await p.evaluate(() => window.next.router.push("/carrier"));
   await p.getByText("Choose your next load").waitFor({ timeout: 30000 });
   const board = await p.locator("#next-load").innerText();
-  check("offers say where they came from and what the AI will ask", /brokers emailed you/.test(board) && /AI will ask \(posted \$2,000\)/i.test(board) && /Email from TQL/.test(board), board.slice(0, 300));
+  check("offers say where they came from and what the AI will ask", /brokers emailed you/.test(board) && /Backroute asks \$[0-9,]+ \(posted \$2,000\)/i.test(board) && /Email from TQL/.test(board), board.slice(0, 300));
   check("no demo load-board wording or fake broker Q&A", !/connected board/.test(board) && (await p.getByRole("button", { name: "Ask a question" }).count()) === 0);
   await p.screenshot({ path: `${S}/.out/ui-offers.png` });
   const pm0 = pm().length;

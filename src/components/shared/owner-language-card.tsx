@@ -33,7 +33,7 @@ export function OwnerLanguageCard() {
       <CardContent className="!pt-3 flex flex-col gap-4">
         <div>
           <p className="text-xs font-medium text-ink-800">Texts and calls to you</p>
-          <p className="text-[11px] text-ink-500">Your end-of-day text, and your own calls with the AI about the fleet or a load.</p>
+          <p className="text-xs text-ink-500">Your end-of-day text, and your own calls with the AI about the fleet or a load.</p>
           <div className="mt-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Texts and calls to you">
             {LANGS.map((l) => (
               <button key={l.code} type="button" role="radio" aria-checked={lang === l.code} lang={l.code} onClick={() => updateSettings({ ownerLanguage: l.code })} className={pill(lang === l.code)}>
@@ -44,7 +44,7 @@ export function OwnerLanguageCard() {
         </div>
         <div>
           <p className="text-xs font-medium text-ink-800">Driver calls on this dashboard</p>
-          <p className="text-[11px] text-ink-500">Every call can be read here translated, with what was actually said a tap away.</p>
+          <p className="text-xs text-ink-500">Every call can be read here translated, with what was actually said a tap away.</p>
           <div className="mt-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Driver calls on this dashboard">
             <button type="button" role="radio" aria-checked={transcriptsIn === "dashboard"} onClick={() => updateSettings({ transcriptsIn: "dashboard" })} className={pill(transcriptsIn === "dashboard")}>
               In English, like the dashboard
@@ -64,7 +64,7 @@ export function OwnerLanguageCard() {
         <p className="text-xs text-ink-500">
           Your drivers talk in: {talk.map((c) => LANG_INFO[c].english).join(", ")}. Drivers pick their calls-and-texts language and their app language separately in the app, or you can set how each one talks on the Fleet page.
         </p>
-        <p className="text-[11px] text-ink-400">Demo: the AI&apos;s scripted calls, texts and the driver app&apos;s main screens are translated.</p>
+        <p className="text-xs text-ink-400">Demo: the AI&apos;s scripted calls, texts and the driver app&apos;s main screens are translated.</p>
       </CardContent>
     </Card>
   );

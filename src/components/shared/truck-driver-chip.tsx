@@ -34,7 +34,7 @@ export function TruckDriverChip({
           {truck?.unitNumber ?? "Unassigned truck"}
           {driver && ` · ${driver.name}`}
         </p>
-        <p className="truncate text-[11px] text-ink-500">
+        <p className="truncate text-xs text-ink-500">
           {truck ? `${truck.equipmentType} · ${truck.currentCity}, ${truck.currentState}` : "No driver assigned"}
         </p>
       </div>

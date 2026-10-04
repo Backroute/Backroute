@@ -275,7 +275,7 @@ function RouteWeather({ from, to, progress, light, loadKey }: { from: LatLng; to
   if (!alerts?.length) return null;
   const windy = alerts.some((a) => /wind/i.test(a.event));
   return (
-    <div className="rounded-2xl border border-[var(--accent-warn)]/40 bg-warn-soft p-3.5 text-sm" role="status">
+    <div className="rounded-2xl border border-line bg-warn-soft p-3.5 text-sm" role="status">
       <p className="flex items-center gap-2 font-medium text-ink-950">
         <CloudLightning className="h-4 w-4 text-[var(--accent-warn)]" /> Weather on your route
       </p>

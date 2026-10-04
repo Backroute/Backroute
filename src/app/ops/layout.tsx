@@ -86,15 +86,15 @@ function OpsShell({ children }: { children: React.ReactNode }) {
       }
       footer={
         <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-1.5 rounded-xl bg-white/5 px-3 py-2 text-[11px] text-white/40">
+          <div className="flex items-center gap-1.5 rounded-xl bg-white/5 px-3 py-2 text-xs text-white/40">
             <Lock className="h-3 w-3" />
             Internal only, not part of the customer product
           </div>
           <div className="flex items-center gap-2.5 rounded-xl border border-white/15 px-3 py-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-[11px] font-bold text-ink-950">HD</div>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-xs font-bold text-ink-950">HD</div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-semibold text-white">Harvey Dhillon</p>
-              <p className="truncate text-[11px] text-white/40">Founder & CEO</p>
+              <p className="truncate text-xs text-white/40">Founder & CEO</p>
             </div>
             <Badge tone="dark" className="!bg-white/10 !text-white">Admin</Badge>
           </div>

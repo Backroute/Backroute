@@ -7,25 +7,23 @@ import { AUTONOMY_LABEL, useStore } from "@/lib/store";
 import { useEscapeKey } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
-type State = "paused" | "practice" | "waiting" | "running";
+type State = "paused" | "practice" | "running";
 
 const DOT: Record<State, string> = {
   paused: "bg-[var(--accent-danger)]",
   practice: "bg-ink-400",
-  waiting: "bg-[var(--accent-warn)]",
-  running: "bg-[var(--accent-live)]",
+  running: "bg-ink-950",
 };
 
 const SHORT: Record<State, string> = {
-  paused: "AI paused",
+  paused: "Paused",
   practice: "Practice",
-  waiting: "Waiting on you",
-  running: "AI running",
+  running: "Running",
 };
 
 /**
- * Always in the top bar: is the AI working, waiting on the owner, or stopped. A tap opens what that means and the
- * one big switch: pause everything (an emergency stop) or resume.
+ * Always in the top bar: is Backroute working or stopped. A tap opens what that means and the one big switch: pause
+ * everything (an emergency stop) or resume. What's waiting on the owner is counted once, on Home, not here too.
  */
 export function AiStatus({ needsYou }: { needsYou: number }) {
   const paused = useStore((s) => !!s.settings.paused);
@@ -43,7 +41,7 @@ export function AiStatus({ needsYou }: { needsYou: number }) {
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
 
-  const state: State = paused ? "paused" : practice ? "practice" : needsYou > 0 ? "waiting" : "running";
+  const state: State = paused ? "paused" : practice ? "practice" : "running";
   const since = pausedAt ? new Date(pausedAt).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }) : null;
 
   return (
@@ -52,18 +50,16 @@ export function AiStatus({ needsYou }: { needsYou: number }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        aria-label={`${SHORT[state]}${state === "waiting" ? `: ${needsYou}` : ""}. AI status and pause`}
+        aria-label={`${SHORT[state]}. AI status and pause`}
         className={cn(
           "flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-          paused ? "border-[var(--accent-danger)]/50 bg-danger-soft text-[var(--accent-danger)]" : "border-line text-ink-700 hover:border-ink-300",
+          paused ? "border-line bg-ink-100 text-[var(--accent-danger)]" : "border-line text-ink-600 hover:border-ink-300",
         )}
       >
         <span className="relative flex h-2 w-2">
-          {state === "running" && <span className="absolute inset-0 animate-ping rounded-full bg-[var(--accent-live)] opacity-50" />}
           <span className={cn("relative h-2 w-2 rounded-full", DOT[state])} />
         </span>
         <span className="hidden sm:inline">{SHORT[state]}</span>
-        {state === "waiting" && <span className="tabular">{needsYou}</span>}
       </button>
       {open && (
         <div role="dialog" aria-label="AI status" className="absolute right-0 z-40 mt-2 w-80 rounded-2xl border border-line bg-white p-4 shadow-xl">
@@ -86,7 +82,7 @@ export function AiStatus({ needsYou }: { needsYou: number }) {
               </Button>
             )}
           </div>
-          {!paused && <p className="mt-2 text-[11px] text-ink-500">For an emergency, or when you want to take over for a while. Nothing is lost; resume any time.</p>}
+          {!paused && <p className="mt-2 text-xs text-ink-500">For an emergency, or when you want to take over for a while. Nothing is lost; resume any time.</p>}
         </div>
       )}
     </div>
@@ -100,7 +96,7 @@ export function PausedBanner() {
   const updateSettings = useStore((s) => s.actions.updateSettings);
   if (!paused) return null;
   return (
-    <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--accent-danger)]/40 bg-danger-soft px-4 py-3">
+    <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-danger-soft px-4 py-3">
       <p className="flex items-center gap-2 text-sm font-medium text-ink-900">
         <Pause className="h-4 w-4 text-[var(--accent-danger)]" />
         The AI is paused{pausedAt ? ` since ${new Date(pausedAt).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })}` : ""}. It books and sends nothing until you resume.

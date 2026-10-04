@@ -50,7 +50,7 @@ export function RateConReader({ load, broker }: { load: Load; broker: Broker | u
   const minor = reading?.mismatches.filter((m) => !m.serious) ?? [];
 
   return (
-    <Card className={serious.length || (reading && !reading.isRateCon) ? "border-[var(--accent-warn)]/50" : undefined}>
+    <Card className={serious.length || (reading && !reading.isRateCon) ? "border-line" : undefined}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileSearch className="h-4 w-4 text-ink-400" /> Check the broker&apos;s rate con
@@ -95,7 +95,7 @@ export function RateConReader({ load, broker }: { load: Load; broker: Broker | u
             {[...serious, ...minor].length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="text-[11px] uppercase tracking-wider text-ink-400">
+                  <thead className="text-xs uppercase tracking-wider text-ink-400">
                     <tr>
                       <th className="py-1.5 pr-3 font-medium">Item</th>
                       <th className="py-1.5 pr-3 font-medium">Agreed</th>
@@ -143,7 +143,7 @@ export function RateConReader({ load, broker }: { load: Load; broker: Broker | u
               </ul>
             )}
 
-            <p className="flex items-center gap-1.5 text-[11px] text-ink-400">
+            <p className="flex items-center gap-1.5 text-xs text-ink-400">
               <LiveAiMark label="Read by AI" /> {reading.fileName} · {formatDateTime(reading.readAt)} · Check anything important on the PDF yourself before signing.
             </p>
           </>

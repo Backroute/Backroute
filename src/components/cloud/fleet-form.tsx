@@ -84,7 +84,7 @@ export function FleetForm({ solo, submitLabel, onSubmit, busy }: { solo: boolean
         </div>
       )}
       {rows.map((row, i) => (
-        <fieldset key={i} className={unsure.has(i) ? "rounded-2xl border border-[var(--accent-warn)] p-3" : "rounded-2xl border border-line p-3"}>
+        <fieldset key={i} className={unsure.has(i) ? "rounded-2xl border border-line p-3" : "rounded-2xl border border-line p-3"}>
           <legend className="px-1 text-xs font-medium text-ink-500">{solo ? "You and your truck" : `Truck ${i + 1}`}</legend>
           <div className="grid grid-cols-2 gap-2">
             <input className={input} placeholder={solo ? "Your name" : "Driver's name"} aria-label="Driver's name" value={row.driverName} onChange={(e) => set(i, { driverName: e.target.value })} />

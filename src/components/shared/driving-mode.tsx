@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Clock, Mic, MicOff, Navigation, Package, Phone, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Portal } from "@/components/ui/portal";
 import { useEscapeKey, useNow } from "@/lib/hooks";
 import { tripState } from "@/lib/trip-state";
 import { makeRecognizer, say, type Recognizer } from "@/lib/speech";
@@ -57,6 +58,13 @@ export function DrivingMode({
   const [canListen] = useState(() => makeRecognizer() !== null);
   useEscapeKey(onClose);
   useEffect(() => () => recognizer.current?.stop(), []);
+  // While it's open, pop-ups and prompts stay out of the way (globals.css hides them under [data-driving]).
+  useEffect(() => {
+    document.documentElement.dataset.driving = "1";
+    return () => {
+      delete document.documentElement.dataset.driving;
+    };
+  }, []);
 
   const place = s.card === "pickup" ? `${load.lane.origin}, ${load.lane.originState}` : `${load.lane.destination}, ${load.lane.destState}`;
 
@@ -119,9 +127,10 @@ export function DrivingMode({
 
   const big = "flex flex-col items-center justify-center gap-2 rounded-3xl py-6 text-lg font-semibold active:scale-[0.98] transition-transform";
   return (
-    <div role="dialog" aria-modal="true" aria-label="Driving mode" className="theme-ink fixed inset-0 z-[70] flex flex-col bg-ink-950 p-5 text-white">
+    <Portal>
+    <div role="dialog" aria-modal="true" aria-label="Driving mode" className="theme-ink fixed inset-0 z-[70] flex flex-col bg-ink-950 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] text-white">
       <div className="flex items-center justify-between">
-        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-300">
+        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/55">
           <Navigation className="h-4 w-4" /> {t.drivingMode}
         </p>
         <button type="button" onClick={onClose} className="flex items-center gap-1.5 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold">
@@ -153,7 +162,7 @@ export function DrivingMode({
           type="button"
           onClick={canListen ? listen : () => run("next")}
           aria-pressed={listening}
-          className={cn(big, listening ? "bg-emerald-400 text-ink-950" : "bg-emerald-400/20 text-emerald-200")}
+          className={cn(big, listening ? "bg-[var(--action)] text-[var(--action-ink)]" : "bg-white/10")}
         >
           {listening ? <MicOff className="h-7 w-7" /> : <Mic className="h-7 w-7" />}
           {canListen ? (listening ? `${t.listening}…` : t.speak) : t.whatsNext}
@@ -163,5 +172,6 @@ export function DrivingMode({
         {t.driveFooter}
       </p>
     </div>
+    </Portal>
   );
 }

@@ -6,11 +6,12 @@ type Variant = "primary" | "secondary" | "ghost" | "outline" | "danger";
 type Size = "sm" | "md" | "lg";
 
 const variantClasses: Record<Variant, string> = {
-  primary: "bg-ink-950 text-white hover:bg-ink-800 disabled:bg-ink-300",
-  secondary: "bg-white text-ink-950 border border-ink-950 hover:bg-ink-50",
+  // The one blue on a screen: the thing to tap. Everything else is grey or a plain link.
+  primary: "bg-[var(--action)] text-[var(--action-ink)] hover:bg-[var(--action-strong)] disabled:bg-ink-300",
+  secondary: "bg-ink-100 text-ink-950 hover:bg-ink-150",
   outline: "bg-transparent text-ink-700 border border-line-strong hover:border-ink-950 hover:text-ink-950",
   ghost: "bg-transparent text-ink-600 hover:bg-ink-100 hover:text-ink-950",
-  danger: "bg-white text-[var(--accent-danger)] border border-[var(--accent-danger)] hover:bg-danger-soft",
+  danger: "bg-ink-100 text-[var(--accent-danger)] hover:bg-ink-150",
 };
 
 const sizeClasses: Record<Size, string> = {
@@ -37,7 +38,7 @@ type ButtonProps = ButtonAsButton | ButtonAsLink;
 
 export function Button({ variant = "primary", size = "md", className, children, ...props }: ButtonProps) {
   const classes = cn(
-    "inline-flex items-center justify-center rounded-full font-medium tracking-tight transition-colors duration-150 disabled:cursor-not-allowed whitespace-nowrap",
+    "inline-flex items-center justify-center rounded-full font-semibold tracking-tight transition-colors duration-150 disabled:cursor-not-allowed whitespace-nowrap",
     variantClasses[variant],
     sizeClasses[size],
     className,

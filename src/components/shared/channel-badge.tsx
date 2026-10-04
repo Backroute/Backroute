@@ -17,7 +17,7 @@ export function ChannelBadge({ channel, className }: { channel: Channel; classNa
   const meta = CHANNEL_META[channel];
   const Icon = meta.icon;
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full bg-ink-100 px-2 py-0.5 text-[11px] font-medium text-ink-700", className)}>
+    <span className={cn("inline-flex items-center gap-1 rounded-full bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-700", className)}>
       <Icon className="h-3 w-3" strokeWidth={2} />
       {meta.label}
     </span>

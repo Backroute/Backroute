@@ -1,4 +1,4 @@
-// The demo, after the store split: every main screen opens with no errors, and the simulation keeps moving.
+// The demo: every main screen opens with no errors, the simulation keeps moving, and nothing covers a button.
 const path = require("path");
 const S = path.join(__dirname, "..");
 const ROOT = path.join(__dirname, "../..");
@@ -33,6 +33,38 @@ const ARGS = [`--proxy-server=${process.env.HTTPS_PROXY}`, "--proxy-bypass-list=
   await box.press("Enter");
   await p.waitForTimeout(4000);
   check("the demo AI answers the driver's message", (await p.locator("body").innerText()).split("Where is my next load?").length > 1);
+  // Nothing covers a button: on a phone, every button in driving mode is the thing a tap at its centre lands on.
+  const ph = await b.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  ph.on("pageerror", (e) => errors.push(e.message));
+  await ph.goto(BASE + "/driver", { waitUntil: "domcontentloaded" });
+  await ph.getByRole("button", { name: /driving mode/i }).first().click({ timeout: 60000 });
+  await ph.waitForTimeout(1500);
+  // Every button and line of text, at its centre and both ends: what's there must be driving mode itself.
+  const covered = await ph.evaluate(() => {
+    const dialog = document.querySelector('[role="dialog"][aria-label="Driving mode"]');
+    return [...dialog.querySelectorAll("button, p")]
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        return [r.left + 4, r.left + r.width / 2, r.right - 4].some((x) => {
+          const hit = document.elementFromPoint(x, r.top + r.height / 2);
+          // Next's own dev-mode badge (bottom corner) isn't part of the app and isn't there in production.
+          if (hit?.tagName === "NEXTJS-PORTAL") return false;
+          return !hit || !dialog.contains(hit);
+        });
+      })
+      .map((el) => el.textContent.trim().slice(0, 40));
+  });
+  check("driving mode: nothing on it is covered (buttons, the stop, the footer)", covered.length === 0, covered.join(" | "));
+  const parked = await ph.getByRole("button", { name: /parked/i }).boundingBox();
+  check("…and I'm parked sits on screen, below the top edge", !!parked && parked.y >= 0 && parked.y + parked.height <= 844, JSON.stringify(parked));
+  await ph.getByRole("button", { name: /parked/i }).click();
+  await ph.waitForTimeout(800);
+  check("…and tapping it closes driving mode", (await ph.getByRole("dialog", { name: "Driving mode" }).count()) === 0);
+  // The website on a phone: nothing wider than the screen.
+  await ph.goto(BASE + "/", { waitUntil: "domcontentloaded" });
+  await ph.waitForTimeout(2500);
+  check("the website fits a phone (no sideways scroll)", await ph.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+  check("…and leads with the new headline", /Your next load\s+is already booked\./.test(await ph.locator("h1").innerText()));
   check("no page errors", errors.length === 0, errors.join(" | "));
   await b.close();
   console.log(`${ok} passed, ${bad} failed`);

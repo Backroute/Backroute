@@ -41,7 +41,7 @@ export function RateConCard({ load }: { load: Load }) {
               : "Matches what was agreed. Signed";
 
   return (
-    <Card className={review.status === "needs_you" ? "border-[var(--accent-warn)]/50" : undefined}>
+    <Card className={review.status === "needs_you" ? "border-line" : undefined}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           {review.status === "checking" || review.status === "fixing" ? (
@@ -62,7 +62,7 @@ export function RateConCard({ load }: { load: Load }) {
         {review.issues.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="text-[11px] uppercase tracking-wider text-ink-400">
+              <thead className="text-xs uppercase tracking-wider text-ink-400">
                 <tr>
                   <th className="py-1.5 pr-3 font-medium">Item</th>
                   <th className="py-1.5 pr-3 font-medium">Agreed</th>
@@ -108,7 +108,7 @@ export function RateConCard({ load }: { load: Load }) {
                 </Button>
               </>
             )}
-            <span className="text-[11px] text-ink-500">Nothing is dispatched yet, so walking away costs nothing.</span>
+            <span className="text-xs text-ink-500">Nothing is dispatched yet, so walking away costs nothing.</span>
           </div>
         )}
       </CardContent>

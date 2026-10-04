@@ -17,40 +17,41 @@ export function DemoBanner() {
   );
   if (sample)
     return (
-      <div role="note" aria-label="Sample fleet" className="flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-info-soft px-4 py-1.5 text-xs text-ink-900">
+      <div role="note" aria-label="Sample fleet" className="flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-line bg-ink-50 px-4 py-1.5 text-xs text-ink-600">
         <span>
-          <span className="font-semibold">Sample fleet</span> · practice here: made-up trucks and loads, nothing is real, saved or sent
+          <span className="font-semibold text-ink-950">Sample fleet.</span> Made-up trucks and loads. Nothing is saved or sent.
         </span>
-        <button type="button" onClick={() => exitDemo("/carrier")} className="rounded-full bg-ink-950 px-2.5 py-0.5 font-medium text-white">
+        <button type="button" onClick={() => exitDemo("/carrier")} className="font-medium text-[var(--action)] hover:underline">
           Back to my fleet
         </button>
       </div>
     );
   const views = [
-    { href: "/carrier", label: "Owner dashboard" },
-    { href: "/driver", label: "Driver app" },
+    { href: "/carrier", label: "Owner" },
+    { href: "/driver", label: "Driver" },
   ];
   return (
-    <div role="note" aria-label="Demo" className="flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-amber-100 px-4 py-1.5 text-xs text-amber-950 dark:bg-amber-950/70 dark:text-amber-100">
+    <div role="note" aria-label="Demo" className="flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-line bg-ink-50 px-4 py-1.5 text-xs text-ink-600">
       <span>
-        <span className="font-semibold">Demo</span> · sample fleet, nothing is saved or sent
+        <span className="font-semibold text-ink-950">Demo.</span> A sample fleet. Nothing is saved or sent.
       </span>
-      <span className="flex items-center gap-1">
+      <span className="flex items-center rounded-full bg-ink-150 p-0.5">
         {views.map((v) => (
           <Link
             key={v.href}
             href={v.href}
-            className={cn("rounded-full px-2 py-0.5 font-medium", pathname.startsWith(v.href) ? "bg-amber-950 text-amber-50 dark:bg-amber-100 dark:text-amber-950" : "underline")}
+            aria-current={pathname.startsWith(v.href) ? "page" : undefined}
+            className={cn("rounded-full px-2.5 py-0.5 font-medium", pathname.startsWith(v.href) ? "bg-white text-ink-950 shadow-sm" : "text-ink-600 hover:text-ink-950")}
           >
             {v.label}
           </Link>
         ))}
-        {cloudEnabled && (
-          <button type="button" onClick={() => exitDemo()} className="ml-1 rounded-full px-2 py-0.5 font-medium underline">
-            Exit demo
-          </button>
-        )}
       </span>
+      {cloudEnabled && (
+        <button type="button" onClick={() => exitDemo()} className="font-medium text-[var(--action)] hover:underline">
+          Exit demo
+        </button>
+      )}
     </div>
   );
 }

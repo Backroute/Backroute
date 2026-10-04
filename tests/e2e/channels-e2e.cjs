@@ -35,7 +35,7 @@ const waitFor = async (fn, ms = 20000) => { const end = Date.now() + ms; while (
   const claudeReq = read("claude").find((x) => x.body.tools?.some((t) => t.name === "update_load_status"));
   check("brain got the driver's instructions, tools and fallback", !!claudeReq && claudeReq.beta?.includes("server-side-fallback") && claudeReq.body.system[1].text.includes("texting"));
   check("thread saved (in + out, by text)", db(`select string_agg(data->>'from' || ':' || (data->>'channel'), ',' order by created_at) from driver_messages where carrier_id = '${cid}' and data->>'content' not like 'New load%'`) === "driver:sms,ai:sms");
-  check("activity logged for the owner", db(`select count(*) from activity where carrier_id = '${cid}' and data->>'message' like 'Marcus: in transit%'`) === "1");
+  check("activity logged for the owner", db(`select count(*) from activity where carrier_id = '${cid}' and data->>'message' like 'Marcus: on the road%'`) === "1");
   const before = read("twilio").length;
   r = await twilio("/api/channels/sms", { From: marcus, To: "+14695550199", Body: "I'm loaded and rolling", MessageSid: "SM1" });
   await sleep(3000);

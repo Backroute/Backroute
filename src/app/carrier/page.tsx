@@ -1,20 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowUpRight, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatTile } from "@/components/ui/stat-tile";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { LiveDot } from "@/components/shared/live-dot";
 import { ActivityFeed } from "@/components/shared/activity-feed";
 import { TripCompactCard, TripDetails, TripSheet } from "@/components/shared/trip-compact";
 import type { DriverTripCardProps } from "@/components/shared/driver-trip-card";
 import { Switch } from "@/components/ui/switch";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { IncidentCard } from "@/components/shared/incident-card";
-import { AutopilotControl } from "@/components/shared/autopilot-control";
 import { DailyTextPreview } from "@/components/shared/daily-text";
 import { WeeklyReviewCard } from "@/components/cloud/weekly-review-card";
 import { GoingOutCard } from "@/components/cloud/going-out";
@@ -30,18 +27,17 @@ import { useRouter } from "next/navigation";
 import { RUN_TYPE_LABEL } from "@/lib/run-types";
 import { weekEarnings } from "@/lib/earnings";
 import { useNow } from "@/lib/hooks";
-import { useStore } from "@/lib/store";
-import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks, useCarrierDrivers, useDriverMap, useBrokerMap, useTruckMap, truckActiveLoads } from "@/lib/selectors";
+import { useStore, AUTONOMY_LABEL } from "@/lib/store";
+import { usePrimaryCarrier, useCarrierLoads, useCarrierTrucks, useDriverMap, useBrokerMap, useTruckMap, truckActiveLoads } from "@/lib/selectors";
 import { isTransitStage } from "@/lib/load-status";
 import { PRE_TRIP_STAGES } from "@/lib/trip-state";
 import type { Driver, Load, Truck } from "@/lib/types";
-import { formatCurrency, formatNumber } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 
 export default function CarrierOverviewPage() {
   const carrier = usePrimaryCarrier();
   const loads = useCarrierLoads();
   const trucks = useCarrierTrucks();
-  const drivers = useCarrierDrivers();
   const driverMap = useDriverMap();
   const brokers = useBrokerMap();
   const truckMap = useTruckMap();
@@ -63,16 +59,8 @@ export default function CarrierOverviewPage() {
   const liveCalls = loads.filter((l) => l.liveCall).length;
   const weekProfit = weekEarnings(loads).net;
   const dailyText = useStore((s) => s.settings.dailyText);
+  const autonomy = useStore((s) => s.settings.autonomy);
 
-  const activeLoads = loads.filter((l) => l.stage !== "delivered");
-  const netProfitMonth = loads.reduce((sum, l) => sum + (l.netProfit ?? 0), 0);
-  const milesMonth = loads.reduce((sum, l) => sum + l.lane.miles, 0);
-  const avgRpm = (() => {
-    const withRpm = loads.filter((l) => l.rpm);
-    if (!withRpm.length) return 0;
-    return withRpm.reduce((s, l) => s + (l.rpm ?? 0), 0) / withRpm.length;
-  })();
-  const deliveredCount = loads.filter((l) => l.stage === "delivered").length;
   const chainedCount = trucks.filter((t) => t.nextLoadId).length;
 
   const trucksWithOffers = new Set(offerGroups.map(([, group]) => group[0]?.truckId).filter(Boolean));
@@ -108,54 +96,41 @@ export default function CarrierOverviewPage() {
   const available = fleet.filter((f) => !f.current).length;
 
 
+  const hour = now === null ? null : new Date(now).getHours();
+  const greeting = hour === null ? "Today" : hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const summary = [
+    needsYouCount === 0 ? "Nothing needs you" : `${needsYouCount} need${needsYouCount === 1 ? "s" : ""} you`,
+    `${formatCurrency(weekProfit)} profit this week`,
+  ].join(" · ");
+
   return (
     <div>
       <PageHeader
-        title="Today"
-        description={`${carrier.name} · ${trucks.length} trucks · ${carrier.plan} plan`}
-        right={<LiveDot />}
+        title={greeting}
+        description={summary}
+        right={
+          <Link href="/carrier/settings" className="rounded-full bg-ink-100 px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-150">
+            Autopilot: {AUTONOMY_LABEL[autonomy]}
+          </Link>
+        }
       />
 
       <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
         <PausedBanner />
         <SampleChecklist />
         <SinceLastVisit needsYou={needsYouCount} />
-        <div className="theme-ink rounded-3xl bg-ink-950 p-5 text-white sm:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <p className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-white/50">
-              <Sparkles className="h-3.5 w-3.5" /> AI Dispatcher
-            </p>
-            <div className="text-right">
-              <p className="text-3xl font-semibold tabular tracking-tight">{formatCurrency(weekProfit)}</p>
-              <p className="text-[11px] text-white/50">profit this week</p>
-            </div>
-          </div>
-          <p className="mt-2 text-xl font-semibold leading-snug sm:text-2xl">
-            {needsYouCount === 0
-              ? "Nothing needs you. Every load is handled."
-              : `${needsYouCount} thing${needsYouCount === 1 ? " needs" : "s need"} you. AI is handling everything else.`}
-          </p>
-          <p className="mt-1 text-sm text-white/60">
-            {chainedCount} of {trucks.length} trucks already {chainedCount === 1 ? "has" : "have"} the next load lined up.
-            {liveCalls > 0 && ` AI is on ${liveCalls === 1 ? "a broker call" : `${liveCalls} broker calls`} right now.`}
-          </p>
-          <div className="mt-5">
-            <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-white/50">Autopilot</p>
-            <AutopilotControl dark />
-          </div>
-          <div className="mt-5 grid grid-cols-3 gap-2">
-            <BannerTile label="On the road" value={onRoad} />
-            <BannerTile label="AI booking" value={booking} />
-            <BannerTile label="Available" value={available} />
-          </div>
-        </div>
+        <p className="text-sm text-ink-500">
+          <span className="font-medium text-ink-950">{onRoad}</span> on the road · <span className="font-medium text-ink-950">{booking}</span> booking ·{" "}
+          <span className="font-medium text-ink-950">{available}</span> available · {chainedCount} of {trucks.length} {trucks.length === 1 ? "has" : "have"} the next load lined up
+          {liveCalls > 0 && ` · on ${liveCalls === 1 ? "a broker call" : `${liveCalls} broker calls`} now`}
+        </p>
 
         <SetupProgress />
         <TrySampleFleet />
         <GoingOutCard />
 
         {incidents.length > 0 && (
-          <section aria-label="Incidents the AI is handling" className="grid gap-3 md:grid-cols-2">
+          <section aria-label="Problems being handled" className="grid gap-3 md:grid-cols-2">
             {incidents.map((incident) => {
               const truck = truckMap.get(incident.truckId);
               const driver = driverMap.get(incident.driverId);
@@ -198,7 +173,7 @@ export default function CarrierOverviewPage() {
           <div className="mb-3 flex items-end justify-between gap-3">
             <div>
               <h2 id="live-loads-title" className="text-sm font-semibold text-ink-950">Live loads</h2>
-              <p className="mt-0.5 text-xs text-ink-500">Tap a load for the full trip, the AI&apos;s log and the paperwork.</p>
+              <p className="mt-0.5 text-xs text-ink-500">Tap one for the trip, the log and the paperwork.</p>
             </div>
             <Button href="/carrier/fleet" variant="ghost" size="sm">
               View fleet <ArrowUpRight className="h-3.5 w-3.5" />
@@ -211,12 +186,12 @@ export default function CarrierOverviewPage() {
                 return (
                   <div key={truck.id} className="flex flex-col justify-between gap-3 rounded-3xl border border-line bg-white p-4">
                     <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-400">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">
                         {truck.unitNumber} · {driver?.name ?? "Unassigned"}{driver ? ` · ${RUN_TYPE_LABEL[driver.runType]}` : ""}
                       </p>
                       <p className="mt-0.5 text-lg font-semibold text-ink-950">Available in {truck.currentCity}, {truck.currentState}</p>
                       <p className="mt-1 text-xs text-ink-500">
-                        {hasOffers ? "AI's top options are waiting for your pick." : "AI is sourcing the next load."}
+                        {hasOffers ? "3 loads ready for your pick." : "Looking for the next load."}
                       </p>
                     </div>
                     <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
@@ -241,70 +216,22 @@ export default function CarrierOverviewPage() {
 
         <DriverCallsBoard />
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Card>
-            <CardContent>
-              <StatTile label="Active loads" value={activeLoads.length} sublabel={`${loads.length} total this cycle`} />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent>
-              <StatTile label="Net profit" value={formatCurrency(netProfitMonth)} sublabel="This cycle · includes projected loads" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent>
-              <StatTile label="Avg rate / mile" value={`$${avgRpm.toFixed(2)}`} sublabel={`${formatNumber(milesMonth)} miles run`} />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent>
-              <StatTile label="Delivered" value={deliveredCount} sublabel="This cycle" />
-            </CardContent>
-          </Card>
-        </div>
-
         {dailyText && <DailyTextPreview />}
 
         <MoneyCard />
         <WeeklyReviewCard />
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="min-w-0 lg:col-span-2">
-            <CardHeader>
-              <CardTitle>AI log</CardTitle>
-              <Button href="/carrier/negotiations" variant="ghost" size="sm">
-                All negotiations <ArrowUpRight className="h-3.5 w-3.5" />
-              </Button>
-            </CardHeader>
-            <CardContent className="!pt-2">
-              <ActivityFeed events={activity.slice(0, 8)} />
-            </CardContent>
-          </Card>
-
-          <Card className="min-w-0">
-            <CardHeader>
-              <CardTitle>Driver roster</CardTitle>
-              {drivers.length > 5 && (
-                <Button href="/carrier/fleet" variant="ghost" size="sm">
-                  View all {drivers.length} <ArrowUpRight className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent className="!pt-3">
-              <div className="flex flex-col divide-y divide-line">
-                {drivers.slice(0, 5).map((d) => (
-                  <div key={d.id} className="flex items-center justify-between gap-2 py-2.5 first:pt-0 last:pb-0">
-                    <p className="text-sm text-ink-800">{d.name}</p>
-                    <Badge tone={d.hosStatus === "driving" ? "success" : d.hosStatus === "off_duty" ? "neutral" : "info"}>
-                      {d.hosStatus.replace("_", " ")}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle>What Backroute did</CardTitle>
+            <Button href="/carrier/negotiations" variant="ghost" size="sm">
+              All negotiations <ArrowUpRight className="h-3.5 w-3.5" />
+            </Button>
+          </CardHeader>
+          <CardContent className="!pt-2">
+            <ActivityFeed events={activity.slice(0, 8)} />
+          </CardContent>
+        </Card>
       </div>
 
       {openTrip?.current && (
@@ -317,15 +244,6 @@ export default function CarrierOverviewPage() {
           />
         </TripSheet>
       )}
-    </div>
-  );
-}
-
-function BannerTile({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-2xl bg-white/5 px-3 py-2.5">
-      <p className="font-display text-xl tabular">{value}</p>
-      <p className="text-[11px] text-white/50">{label}</p>
     </div>
   );
 }

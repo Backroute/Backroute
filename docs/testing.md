@@ -269,6 +269,10 @@ The code was run against local stand-ins that behave like the real services:
   - **QuickBooks:** detention added after the invoice went in updates it ($1,000 + $150), and a cancelled load's invoice is voided once. What went in is remembered per QuickBooks company, so connecting a different company puts everything in there too.
   - Feeds and boards read partials from a full/partial flag, feet or "8 pallets" in the notes. Per-day dock hours and the reason in the broker's late email are unit-checked too.
   - The built app still opens and sends saved answers with no signal (6 checks), and the offline worker passes its 8.
+- **The redesign** (Apple's colours, fewer alerts, simpler screens, a new website; the whole suite again: 809 checks, 34 suites, none failing):
+  - Driving mode, calls and sheets open above everything. `demo-smoke` taps the centre and both ends of every button and line in driving mode on a phone and fails if anything else is there. It caught the old bug ("Delivery" and the footer were under the app's own bars) when the fix was taken out.
+  - "I'm parked" sits fully on screen and closes driving mode; the website doesn't scroll sideways on a phone and leads with the new headline.
+  - The production build still works offline (6 checks), and dark mode was checked by eye on the owner's Home and the driver's loads.
 - **Access rules:** 125 checks.
   - A stale copy saving one field of a load changes only that field.
   - What carriers cost to run is server-only.

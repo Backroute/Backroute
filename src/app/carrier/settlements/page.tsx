@@ -290,7 +290,7 @@ function DriverPayList({ loads, drivers, trucks }: { loads: Load[]; drivers: Map
             </div>
             <div className="text-right">
               <p className="text-sm font-semibold tabular text-ink-950">{formatCurrency(pay)}</p>
-              <p className="text-[11px] text-ink-400">{payLabel(driver)}</p>
+              <p className="text-xs text-ink-400">{payLabel(driver)}</p>
             </div>
           </div>
         ))}

@@ -40,7 +40,7 @@ export function CarrierSwitcher() {
         </label>
       )}
       {owner && (
-        <a href="/signup?another=1" className="flex items-center gap-1.5 px-1 text-[11px] font-medium text-ink-500 hover:text-ink-950">
+        <a href="/signup?another=1" className="flex items-center gap-1.5 px-1 text-xs font-medium text-ink-500 hover:text-ink-950">
           <Plus className="h-3 w-3" /> Add another company
         </a>
       )}

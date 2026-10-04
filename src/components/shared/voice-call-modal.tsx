@@ -9,6 +9,7 @@ import { classifyInstruction } from "@/lib/engine";
 import { LANG_INFO, pack } from "@/lib/lang";
 import { say as speak, stopSpeaking } from "@/lib/speech";
 import type { CallTranscriptLine, IncidentType } from "@/lib/types";
+import { Portal } from "@/components/ui/portal";
 
 type CheckinSpec = { kind: "checkin"; driverId: string; driverFirstName: string };
 type FleetSpec = { kind: "fleet"; carrierId: string };
@@ -235,8 +236,9 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
           : [];
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Voice call with AI Dispatcher" className="theme-ink fixed inset-0 z-50 flex flex-col bg-ink-950 text-white">
-      <div className="flex flex-col items-center gap-2 px-6 pb-4 pt-10">
+    <Portal>
+    <div role="dialog" aria-modal="true" aria-label="Voice call with AI Dispatcher" className="theme-ink fixed inset-0 z-50 flex flex-col bg-ink-950 pb-[env(safe-area-inset-bottom)] text-white">
+      <div className="flex flex-col items-center gap-2 px-6 pb-4 pt-[max(2.5rem,env(safe-area-inset-top))]">
         <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-white/10">
           {phase === "connecting" && (
             <>
@@ -302,7 +304,7 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
                       key={q}
                       onClick={() => say(ownerQuick?.[i] ?? q, q)}
                       disabled={pending}
-                      className="rounded-full border border-white/15 px-3 py-1.5 text-[11px] font-medium text-white/80 hover:bg-white/10 disabled:opacity-40"
+                      className="rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 disabled:opacity-40"
                     >
                       {ownerQuick?.[i] ?? q}
                     </button>
@@ -310,7 +312,7 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
                 </div>
               )}
               {englishAnswers && (
-                <p className="text-[11px] text-white/40">Fleet answers are in English in the demo. The live AI answers in your language.</p>
+                <p className="text-xs text-white/40">Fleet answers are in English in the demo. The live AI answers in your language.</p>
               )}
               <div className="flex items-center gap-2">
                 <input
@@ -370,5 +372,6 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
         </div>
       )}
     </div>
+    </Portal>
   );
 }

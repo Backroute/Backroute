@@ -8,7 +8,6 @@ import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { LiveDot } from "@/components/shared/live-dot";
 import { ChannelBadge } from "@/components/shared/channel-badge";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { BrokerTrustBadge } from "@/components/shared/broker-trust-badge";
@@ -55,7 +54,7 @@ export default function NegotiationsPage() {
 
   return (
     <div>
-      <PageHeader title="Negotiations" description={`${active.length} active`} right={<LiveDot />} />
+      <PageHeader title="Negotiations" description={`${active.length} active`} />
 
       <div className="px-4 py-6 sm:px-8">
         <div className="grid grid-cols-3 gap-4">
@@ -114,7 +113,7 @@ export default function NegotiationsPage() {
 
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1">
-                      <div className="flex items-center justify-between text-[11px] text-ink-500">
+                      <div className="flex items-center justify-between text-xs text-ink-500">
                         <span>Their offer {brokerLastOffer ? formatCurrency(brokerLastOffer) : "—"}</span>
                         <span>Our ask {formatCurrency(aiLastOffer)}</span>
                       </div>
@@ -141,7 +140,7 @@ export default function NegotiationsPage() {
                         </div>
                         <button
                           onClick={() => setDecliningLoadId(decliningLoadId === load.id ? null : load.id)}
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-ink-400 hover:border-[var(--accent-danger)]/40 hover:text-[var(--accent-danger)]"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-ink-400 hover:border-line hover:text-[var(--accent-danger)]"
                           aria-label="Walk away from this negotiation"
                         >
                           <Ban className="h-3.5 w-3.5" />
@@ -161,7 +160,7 @@ export default function NegotiationsPage() {
                     </>
                   )}
                   {lastMsg && (
-                    <p className="text-[11px] text-ink-400">
+                    <p className="text-xs text-ink-400">
                       Last activity <TimeAgo iso={lastMsg.timestamp} />
                     </p>
                   )}
@@ -186,7 +185,7 @@ function DeclineForm({ onCancel, onConfirm }: { onCancel: () => void; onConfirm:
   const [reason, setReason] = useState(DECLINE_REASONS[0]);
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl border border-[var(--accent-danger)]/30 bg-danger-soft/50 p-3.5">
+    <div className="flex flex-col gap-2.5 rounded-xl border border-line bg-danger-soft/50 p-3.5">
       <label className="flex flex-col gap-1 text-xs text-ink-500">
         Reason for walking away
         <select value={reason} onChange={(e) => setReason(e.target.value)} className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm text-ink-900">

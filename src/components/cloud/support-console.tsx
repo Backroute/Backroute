@@ -82,7 +82,7 @@ export function SupportConsole() {
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-3">
             <Logo />
-            <span className="rounded-full bg-ink-950 px-2.5 py-0.5 text-[11px] font-semibold text-white">Support</span>
+            <span className="rounded-full bg-ink-950 px-2.5 py-0.5 text-xs font-semibold text-white">Support</span>
           </div>
           <div className="flex items-center gap-3 text-sm text-ink-600">
             {q?.me.name}
@@ -297,7 +297,7 @@ function QueueCard({ item, onDone }: { item: QueueItem; onDone: () => Promise<vo
   };
 
   return (
-    <article className={cn("rounded-2xl border bg-white p-4", e.complexity === "critical" ? "border-[var(--accent-danger)]/50" : "border-line")}>
+    <article className={cn("rounded-2xl border bg-white p-4", e.complexity === "critical" ? "border-line" : "border-line")}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           {e.complexity === "critical" && (
@@ -308,7 +308,7 @@ function QueueCard({ item, onDone }: { item: QueueItem; onDone: () => Promise<vo
           <span className="text-sm font-semibold text-ink-950">{item.carrier.name}</span>
           <Badge tone="neutral">{PLAYBOOK[kind].label}</Badge>
           {late && <Badge tone="danger">Late: over {SLA_MINUTES(e)} minutes</Badge>}
-          {e.source && e.source !== "app" && <span className="text-[11px] uppercase tracking-wider text-ink-400">by {e.source === "sms" ? "text" : e.source === "voice" ? "call" : "email"}</span>}
+          {e.source && e.source !== "app" && <span className="text-xs uppercase tracking-wider text-ink-400">by {e.source === "sms" ? "text" : e.source === "voice" ? "call" : "email"}</span>}
         </div>
         <span className="text-xs text-ink-500">
           <TimeAgo iso={e.createdAt} />
@@ -417,7 +417,7 @@ function QueueCard({ item, onDone }: { item: QueueItem; onDone: () => Promise<vo
 
       {e.draft && (
         <div className="mt-3 rounded-xl border border-line p-3">
-          <p className="flex items-center gap-1.5 text-[11px] text-ink-500">
+          <p className="flex items-center gap-1.5 text-xs text-ink-500">
             <Mail className="h-3.5 w-3.5" /> The AI&apos;s draft to {e.draft.toName ?? e.draft.to} · {e.draft.subject}
             {e.draft.attachments?.length ? ` · ${e.draft.attachments.map((a) => a.name).join(", ")}` : ""}
           </p>
@@ -487,7 +487,7 @@ function SystemHealth() {
     return () => clearInterval(id);
   }, [load]);
   if (!checks) return <p className="text-sm text-ink-500">Checking…</p>;
-  const dot: Record<HealthCheck["level"], string> = { ok: "bg-[var(--accent-live)]", warn: "bg-[var(--accent-warn)]", down: "bg-red-600", off: "bg-ink-300" };
+  const dot: Record<HealthCheck["level"], string> = { ok: "bg-[var(--accent-live)]", warn: "bg-[var(--accent-warn)]", down: "bg-[var(--accent-danger)]", off: "bg-ink-300" };
   const word: Record<HealthCheck["level"], string> = { ok: "Working", warn: "Look at it", down: "Down", off: "Not set up" };
   const down = checks.filter((c) => c.level === "down").length;
   return (

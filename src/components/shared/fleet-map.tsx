@@ -55,7 +55,7 @@ function dotElement(dot: FleetDot, spot: TruckSpot, onSelect: (truckId: string) 
   el.className = "group flex flex-col items-center";
   // A real truck with no ELD reading is placed along its trip or at its city: faded, so it isn't read as GPS.
   if (estimated) el.style.opacity = "0.5";
-  el.innerHTML = `<span class="rounded-full bg-[var(--color-white)] px-1.5 py-0.5 text-[10px] font-semibold text-ink-950 shadow ring-1 ring-black/5">${dot.truck.unitNumber.replace(/[<>&]/g, "")}</span><span class="mt-1 block h-3.5 w-3.5 rounded-full border-2 border-[var(--color-white)] shadow" style="background:${SPOT_COLOR[spot]}"></span>`;
+  el.innerHTML = `<span class="rounded-full bg-[var(--color-white)] px-1.5 py-0.5 text-xs font-semibold text-ink-950 shadow ring-1 ring-black/5">${dot.truck.unitNumber.replace(/[<>&]/g, "")}</span><span class="mt-1 block h-3.5 w-3.5 rounded-full border-2 border-[var(--color-white)] shadow" style="background:${SPOT_COLOR[spot]}"></span>`;
   el.addEventListener("click", (e) => {
     e.stopPropagation();
     onSelect(dot.truck.id);

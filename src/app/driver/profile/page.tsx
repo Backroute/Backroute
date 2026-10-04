@@ -178,7 +178,7 @@ export default function DriverProfilePage() {
               <div key={r.id} className="flex items-center justify-between gap-2 rounded-xl bg-ink-50 px-3.5 py-2.5">
                 <div className="min-w-0">
                   <p className="truncate text-xs font-medium text-ink-900">{formatDate(r.startDate)} – {formatDate(r.endDate)}</p>
-                  <p className="truncate text-[11px] text-ink-400">{r.reason}</p>
+                  <p className="truncate text-xs text-ink-400">{r.reason}</p>
                 </div>
                 <Badge tone={TIME_OFF_TONE[r.status]}>{r.status}</Badge>
               </div>
@@ -255,7 +255,7 @@ export default function DriverProfilePage() {
                 <div key={l.id} className="flex items-center justify-between gap-2 py-2.5 first:pt-0 last:pb-0">
                   <div className="min-w-0">
                     <p className="truncate text-sm text-ink-800">{l.lane.origin} → {l.lane.destination}</p>
-                    <p className="text-[11px] text-ink-400">{formatDate(l.updatedAt)}</p>
+                    <p className="text-xs text-ink-400">{formatDate(l.updatedAt)}</p>
                   </div>
                   <p className="shrink-0 text-sm font-semibold tabular text-ink-950">{formatCurrency(computeDriverPay(l, driver, isTeam))}</p>
                 </div>
@@ -288,7 +288,7 @@ export default function DriverProfilePage() {
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[11px] text-ink-400">{label}</p>
+      <p className="text-xs text-ink-400">{label}</p>
       <p className="font-medium text-ink-950">{value}</p>
     </div>
   );

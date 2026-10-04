@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Phone, Send } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
-import { LiveDot } from "@/components/shared/live-dot";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { VoiceCallModal } from "@/components/shared/voice-call-modal";
 import { usePrimaryCarrier } from "@/lib/selectors";
@@ -41,7 +40,6 @@ export default function CarrierMessagesPage() {
         description="Ask your AI dispatcher about your fleet, not tied to one load"
         right={
           <>
-            <LiveDot />
             <button
               onClick={() => setCalling(true)}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink-100 text-ink-700 hover:bg-ink-150"
@@ -67,7 +65,7 @@ export default function CarrierMessagesPage() {
                 )}
               >
                 <p className="leading-relaxed">{m.content}</p>
-                <p className={cn("mt-1 flex items-center gap-1.5 text-[10px]", m.from === "carrier" ? "text-white/50" : "text-ink-400")}>
+                <p className={cn("mt-1 flex items-center gap-1.5 text-xs", m.from === "carrier" ? "text-white/50" : "text-ink-400")}>
                   <TimeAgo iso={m.timestamp} />
                   {m.ai && <LiveAiMark label="Live AI" />}
                 </p>

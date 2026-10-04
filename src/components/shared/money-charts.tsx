@@ -206,7 +206,7 @@ function TrendList({
                 </div>
                 <div className="w-20 shrink-0 text-right">
                   <p className="text-sm font-semibold tabular text-ink-950">{formatCurrency(it.total)}</p>
-                  <p className={`text-[11px] tabular ${down ? "text-[var(--accent-danger)]" : "text-ink-500"}`}>{down ? "down this week" : "8 weeks"}</p>
+                  <p className={`text-xs tabular ${down ? "text-[var(--accent-danger)]" : "text-ink-500"}`}>{down ? "down this week" : "8 weeks"}</p>
                 </div>
               </li>
             );

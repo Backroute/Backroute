@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { LoadOfferCard } from "@/components/shared/load-offer-card";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap } from "@/lib/selectors";
@@ -32,20 +31,15 @@ export default function DriverLoadsPage() {
     <div className="flex flex-col gap-5 px-5">
       {pendingOffers.length > 0 && (
         <div>
-          <div className="mb-2.5 flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-ink-950" />
-            <p className="text-sm font-semibold text-ink-950">Choose your next load</p>
-          </div>
-          <p className="mb-3 text-xs text-ink-500">
-            AI checked every connected board and scored {pendingOffers.length} options for you.
-          </p>
+          <h2 className="mb-1 text-[17px] font-semibold tracking-tight text-ink-950">Choose your next load</h2>
+          <p className="mb-3 text-xs text-ink-500">{pendingOffers.length} options from every connected board.</p>
           <div className="flex flex-col gap-3">
             {pendingOffers.map((offer) => (
               <LoadOfferCard
                 key={offer.id}
                 load={offer}
                 broker={brokers.get(offer.brokerId)}
-                compact
+                viewer="driver"
                 onSelect={() => offer.offerGroupId && selectLoadOffer(offer.offerGroupId, offer.id, "driver")}
                 onAsk={(text) => requestOfferDetail(offer.id, text)}
                 onAskResolve={(draft) => resolveOfferDetail(offer.id, draft)}

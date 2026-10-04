@@ -95,7 +95,7 @@ export default function EarningsPage() {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <section className="theme-ink col-span-2 flex flex-col justify-between rounded-3xl bg-ink-950 p-5 text-white sm:p-6 lg:row-span-2" aria-labelledby="week-title">
             <div>
-              <p id="week-title" className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-white/50">
+              <p id="week-title" className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-white/50">
                 <Sparkles className="h-3.5 w-3.5" /> This week
               </p>
               <p className="mt-3 text-5xl font-semibold tabular tracking-tight">{formatCurrency(week.net)}</p>
@@ -104,7 +104,7 @@ export default function EarningsPage() {
               </p>
             </div>
             {week.overMarket > 0 && (
-              <p className="mt-6 flex w-fit items-center gap-1.5 rounded-2xl bg-emerald-400/15 px-3.5 py-2 text-sm font-medium text-emerald-200">
+              <p className="mt-6 flex w-fit items-center gap-1.5 rounded-2xl bg-white/10 px-3.5 py-2 text-sm font-medium text-white/85">
                 <TrendingUp className="h-4 w-4" /> AI earned you {formatCurrency(week.overMarket)} more than market
               </p>
             )}
@@ -133,7 +133,7 @@ export default function EarningsPage() {
                     <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-ink-100">
                       <div className="h-full rounded-full bg-brand" style={{ width: `${Math.max(2, (Math.max(0, w.net) / top) * 100)}%` }} />
                     </div>
-                    <p className="mt-1 text-[11px] tabular text-ink-500">
+                    <p className="mt-1 text-xs tabular text-ink-500">
                       {w.loads.length} load{w.loads.length === 1 ? "" : "s"} · {formatCurrency(w.gross)} revenue · {w.rpmAll ? `$${w.rpmAll.toFixed(2)}/mi` : "—"} ·{" "}
                       <span className={w.emptyPct > 20 ? "text-[var(--accent-danger)]" : undefined}>{w.loads.length ? `${w.emptyPct.toFixed(0)}% empty` : "no miles"}</span>
                     </p>
@@ -150,7 +150,7 @@ export default function EarningsPage() {
           )}
           {priced.length > 0 && bestEquip && <BentoTile label="Most profitable equipment" value={formatCurrency(bestEquip.avg)} sub={`${bestEquip.key} · avg net`} />}
           <section className="flex flex-col justify-between rounded-3xl bg-brand-soft p-4">
-            <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-brand">
+            <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-brand">
               <Lightbulb className="h-3.5 w-3.5" /> Rate floor
             </p>
             <p className="mt-2 text-sm font-medium text-ink-950">{priced.length ? rateFloorNote : "Not enough delivered loads yet to say."}</p>

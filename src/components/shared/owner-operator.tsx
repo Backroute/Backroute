@@ -39,7 +39,7 @@ export function OwnerNeedsYou({ driver, truck }: { driver: Driver; truck: Truck 
   if (!mine.length) return null;
 
   return (
-    <section aria-labelledby="owner-needs-you" className="rounded-3xl border border-[var(--accent-warn)]/40 bg-warn-soft/60 p-4">
+    <section aria-labelledby="owner-needs-you" className="rounded-3xl border border-line bg-warn-soft/60 p-4">
       <h2 id="owner-needs-you" className="text-sm font-semibold text-ink-950">
         {t.needsYou} · {mine.length}
       </h2>
@@ -163,7 +163,7 @@ export function OwnerMoney({ truck }: { truck: Truck | undefined }) {
   return (
     <div lang="en" className="flex flex-col gap-5">
       <section className="theme-ink rounded-3xl bg-ink-950 p-5 text-white">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Your profit this week</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-white/50">Your profit this week</p>
         <p className="mt-1 text-4xl font-semibold tabular tracking-tight">{formatCurrency(week.net)}</p>
         <p className="mt-1 text-xs text-white/55">
           {formatCurrency(week.gross)} in, on {week.loads.length} load{week.loads.length === 1 ? "" : "s"}
@@ -174,7 +174,7 @@ export function OwnerMoney({ truck }: { truck: Truck | undefined }) {
           <Cost label="Empty miles" value={costs.empty} />
           <Cost label="Backroute fee" value={costs.fee} />
         </ul>
-        <p className="mt-3 text-[11px] text-white/40">Before your truck payment, insurance and maintenance, which the AI doesn&apos;t see yet.</p>
+        <p className="mt-3 text-xs text-white/40">Before your truck payment, insurance and maintenance, which the AI doesn&apos;t see yet.</p>
       </section>
 
       <section>

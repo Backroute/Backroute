@@ -246,7 +246,7 @@ function Settings() {
                   <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
                     <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-950 text-[10px] font-bold text-white">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-950 text-xs font-bold text-white">
                           {initials(settings.tmsProvider)}
                         </span>
                         <div>
@@ -277,7 +277,7 @@ function Settings() {
                         return (
                           <div key={item.id} className="flex flex-wrap items-center justify-between gap-4 px-4 py-3">
                             <div className="flex items-center gap-3">
-                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-[10px] font-bold text-ink-700">
+                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-xs font-bold text-ink-700">
                                 {initials(item.name)}
                               </span>
                               <div>
@@ -344,7 +344,7 @@ function Settings() {
                           <div className="max-w-md">
                             <p className="text-sm font-medium text-ink-900">{addon.name}</p>
                             <p className="text-xs text-ink-500">{addon.tagline}</p>
-                            {addon.commissionNote && <p className="mt-1 text-[11px] text-ink-400">{addon.commissionNote}</p>}
+                            {addon.commissionNote && <p className="mt-1 text-xs text-ink-400">{addon.commissionNote}</p>}
                           </div>
                           <Switch checked={enabled} onChange={() => toggleAddon(addon.id)} label={addon.name} />
                         </div>
@@ -527,7 +527,7 @@ function initials(name: string): string {
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[11px] uppercase tracking-wider text-ink-400">{label}</p>
+      <p className="text-xs uppercase tracking-wider text-ink-400">{label}</p>
       <p className="mt-1 text-sm font-medium text-ink-950">{value}</p>
     </div>
   );

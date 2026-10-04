@@ -28,7 +28,7 @@ export function Tabs({
           {typeof tab.count === "number" && (
             <span
               className={cn(
-                "rounded-full px-1.5 text-[11px] tabular",
+                "rounded-full px-1.5 text-xs tabular",
                 active === tab.key ? "bg-white/20 text-white" : "bg-ink-150 text-ink-600",
               )}
             >

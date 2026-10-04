@@ -47,7 +47,7 @@ export default function LanesPage() {
                       {lane.market !== null && lane.vsMarket !== null ? (
                         <>
                           , market ${lane.market.toFixed(2)}/mi ·{" "}
-                          <span className={lane.vsMarket >= 0 ? "text-[var(--accent-live)]" : "text-[var(--accent-danger)]"}>
+                          <span className={lane.vsMarket >= 0 ? "text-ink-950" : "text-[var(--accent-danger)]"}>
                             {lane.vsMarket >= 0 ? "+" : ""}
                             {Math.round(lane.vsMarket * 100)}% {lane.vsMarket >= 0 ? "over" : "under"} market
                           </span>
@@ -108,7 +108,7 @@ export default function LanesPage() {
                         <span className="flex shrink-0 items-center gap-2 text-sm font-semibold tabular">
                           {l.trend !== 0 && (l.trend > 0 ? <TrendingUp className="h-4 w-4 text-[var(--accent-live)]" aria-label="Going up" /> : <TrendingDown className="h-4 w-4 text-[var(--accent-danger)]" aria-label="Going down" />)}
                           {l.vsMarket !== null && (
-                            <span className={l.vsMarket >= 0 ? "text-[var(--accent-live)]" : "text-[var(--accent-danger)]"}>
+                            <span className={l.vsMarket >= 0 ? "text-ink-950" : "text-[var(--accent-danger)]"}>
                               {l.vsMarket >= 0 ? "+" : ""}
                               {Math.round(l.vsMarket * 100)}%
                             </span>

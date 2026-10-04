@@ -108,7 +108,7 @@ function DvirInspection() {
             onClick={() => toggle(label)}
             className={cn(
               "flex items-center justify-between rounded-2xl border p-3.5 text-left transition-colors",
-              items[label] === "defect" ? "border-[var(--accent-danger)]/40 bg-danger-soft" : "border-line",
+              items[label] === "defect" ? "border-line bg-danger-soft" : "border-line",
             )}
           >
             <span className="text-sm font-medium text-ink-900">{label}</span>
@@ -140,7 +140,7 @@ function DvirInspection() {
                 <ClipboardCheck className="h-3.5 w-3.5 text-ink-400" />
                 <div>
                   <p className="text-xs font-medium text-ink-900">{d.kind === "pre_trip" ? "Pre-trip" : "Post-trip"}</p>
-                  <p className="text-[11px] text-ink-400">{formatDate(d.createdAt)}</p>
+                  <p className="text-xs text-ink-400">{formatDate(d.createdAt)}</p>
                 </div>
               </div>
               <Badge tone={d.overallStatus === "pass" ? "success" : "danger"}>{d.overallStatus === "pass" ? "Pass" : "Defect"}</Badge>

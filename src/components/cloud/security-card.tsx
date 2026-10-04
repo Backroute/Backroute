@@ -170,7 +170,7 @@ export function SecurityCard() {
                 {devices && !devices.length && <li className="px-4 py-3 text-sm text-ink-500">Just this one.</li>}
               </ul>
             </section>
-            {msg && <p className={`text-sm ${msg.ok ? "text-[var(--accent-live)]" : "text-[var(--accent-danger)]"}`}>{msg.text}</p>}
+            {msg && <p className={`text-sm ${msg.ok ? "text-ink-950" : "text-[var(--accent-danger)]"}`}>{msg.text}</p>}
           </>
         )}
       </CardContent>

@@ -10,8 +10,6 @@ import { OwnerMoney } from "@/components/shared/owner-operator";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { LargeTitle } from "@/components/ui/large-title";
 
-/** Empty miles at or under this show as good. */
-const EMPTY_GOOD_PCT = 20;
 
 export default function DriverEarningsPage() {
   const driver = usePrimaryDriver();
@@ -42,14 +40,14 @@ export default function DriverEarningsPage() {
         <OwnerMoney truck={truck} />
       ) : (
         <section className="theme-ink rounded-3xl bg-ink-950 p-5 text-white">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Your pay this week</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-white/50">Your pay this week</p>
           <p className="mt-1 text-4xl font-semibold tabular tracking-tight">{formatCurrency(pay)}</p>
           <p className="mt-1 text-xs text-white/55">
             {payLabel(driver)}
             {team ? " · split with your team partner" : ""}
           </p>
           {week.overMarket > 0 && (
-            <p className="mt-3 flex items-center gap-1.5 rounded-2xl bg-emerald-400/15 px-3 py-2 text-xs font-medium text-emerald-200">
+            <p className="mt-3 flex items-center gap-1.5 rounded-2xl bg-white/10 px-3 py-2 text-xs font-medium text-white/85">
               <TrendingUp className="h-3.5 w-3.5 shrink-0" /> AI booked your loads {formatCurrency(week.overMarket)} above market rate
             </p>
           )}
@@ -64,7 +62,7 @@ export default function DriverEarningsPage() {
                     title={formatCurrency(d.pay)}
                   />
                 </div>
-                <span className={cn("text-[10px]", i === today ? "font-semibold text-white" : "text-white/45")}>{d.day}</span>
+                <span className={cn("text-xs", i === today ? "font-semibold text-white" : "text-white/45")}>{d.day}</span>
               </div>
             ))}
           </div>
@@ -79,17 +77,16 @@ export default function DriverEarningsPage() {
 
       <section className="rounded-3xl border border-line p-5">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold text-ink-950">
-          <Sparkles className="h-4 w-4" /> Where the AI made you money
+          <Sparkles className="h-4 w-4" /> Where Backroute made you money
         </h2>
         <ul className="mt-3 flex flex-col divide-y divide-line">
-          <Row icon={TrendingUp} label="Negotiated above posted rates" value={`+${formatCurrency(week.overPosted)}`} good />
-          <Row icon={Timer} label="Detention billed for you" value={week.extras ? `+${formatCurrency(week.extras)}` : "None this week"} good={week.extras > 0} />
+          <Row icon={TrendingUp} label="Negotiated above posted rates" value={`+${formatCurrency(week.overPosted)}`} />
+          <Row icon={Timer} label="Detention billed for you" value={week.extras ? `+${formatCurrency(week.extras)}` : "None this week"} />
           <Row
             icon={Gauge}
             label="Empty miles"
             value={`${week.emptyPct.toFixed(0)}%`}
-            sub="The AI books your next load near where you deliver."
-            good={week.emptyPct < EMPTY_GOOD_PCT}
+            sub="Your next load is booked near where you deliver."
           />
         </ul>
       </section>
@@ -129,12 +126,12 @@ function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-2xl border border-line p-3.5 text-center">
       <p className="font-display text-xl tabular text-ink-950">{value}</p>
-      <p className="mt-0.5 text-[10px] leading-tight text-ink-500">{label}</p>
+      <p className="mt-0.5 text-xs leading-tight text-ink-500">{label}</p>
     </div>
   );
 }
 
-function Row({ icon: Icon, label, value, sub, good }: { icon: typeof Clock; label: string; value: string; sub?: string; good?: boolean }) {
+function Row({ icon: Icon, label, value, sub }: { icon: typeof Clock; label: string; value: string; sub?: string }) {
   return (
     <li className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
       <Icon className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" />
@@ -142,7 +139,7 @@ function Row({ icon: Icon, label, value, sub, good }: { icon: typeof Clock; labe
         <p className="text-sm text-ink-800">{label}</p>
         {sub && <p className="mt-0.5 text-xs text-ink-500">{sub}</p>}
       </div>
-      <span className={cn("shrink-0 text-sm font-semibold tabular", good ? "text-[var(--accent-live)]" : "text-ink-950")}>{value}</span>
+      <span className="shrink-0 text-sm font-semibold tabular text-ink-950">{value}</span>
     </li>
   );
 }

@@ -71,7 +71,7 @@ export default function ReportIncidentPage() {
         <Phone className="h-4 w-4" /> Call AI Dispatcher instead
       </button>
 
-      <div className="flex items-center gap-3 text-[11px] font-medium uppercase tracking-wider text-ink-300">
+      <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-wider text-ink-300">
         <span className="h-px flex-1 bg-line" /> or type it in <span className="h-px flex-1 bg-line" />
       </div>
 

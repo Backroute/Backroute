@@ -89,7 +89,7 @@ export default function EscalationsPage() {
           ) : (
             <div className="flex flex-col gap-3">
               {open.map((e) => (
-                <Card key={e.id} className="border-[var(--accent-warn)]/40">
+                <Card key={e.id} className="border-line">
                   <CardContent className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-start gap-3">
                       <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warn-soft text-[var(--accent-warn)]">

@@ -28,18 +28,18 @@ export const LOAD_STAGE_ORDER: LoadStage[] = [
 ];
 
 export const LOAD_STAGE_LABEL: Record<LoadStage, string> = {
-  sourced: "Sourced",
-  scoring: "Scoring",
-  offered: "Awaiting Choice",
+  sourced: "Found",
+  scoring: "Checking",
+  offered: "Pick one",
   negotiating: "Negotiating",
-  rate_confirmed: "Rate Confirmed",
+  rate_confirmed: "Rate agreed",
   booked: "Booked",
   dispatched: "Dispatched",
-  at_pickup: "At Pickup",
-  in_transit: "In Transit",
-  at_delivery: "At Delivery",
+  at_pickup: "At pickup",
+  in_transit: "On the road",
+  at_delivery: "At delivery",
   delivered: "Delivered",
-  declined: "Declined",
+  declined: "Passed",
   cancelled: "Cancelled",
 };
 

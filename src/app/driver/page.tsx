@@ -61,7 +61,6 @@ export default function DriverHomePage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [driving, setDriving] = useState(false);
   const [sentNote, setSentNote] = useState<string | null>(null);
-  const payDay = useStore((s) => s.settings.payDay) ?? "Friday";
   const reportIncident = useStore((s) => s.actions.reportIncident);
 
   const truck = trucks.find((t) => t.id === driver.truckId);
@@ -123,8 +122,6 @@ export default function DriverHomePage() {
   const homeTime = useHomeTime(driver, truck, currentLoad);
   const ownerWeek = useOwnerProfit(truck);
   const weekPay = weekEarnings(loads.filter((l) => l.truckId === truck?.id)).loads.reduce((s, l) => s + computeDriverPay(l, driver, !!truck?.secondDriverId), 0);
-  // What the load they're on adds, when it's not counted in the week yet.
-  const loadPay = currentLoad && !weekEarnings([currentLoad]).loads.length ? computeDriverPay({ ...currentLoad, bookedRate: currentLoad.bookedRate ?? currentLoad.targetRate }, driver, !!truck?.secondDriverId) : 0;
   // Hands-free by itself when the truck starts moving (and back when it stops), unless the driver closed it.
   const moving = useMoving(!!currentLoad && !completedLoad);
   const [closedWhileMoving, setClosedWhileMoving] = useState(false);
@@ -167,7 +164,7 @@ export default function DriverHomePage() {
             <button
               type="button"
               onClick={() => setDriving(true)}
-              className="flex min-h-11 items-center gap-1.5 rounded-full bg-ink-950 px-4 py-2 text-sm font-semibold text-white"
+              className="flex min-h-11 items-center gap-1.5 rounded-full bg-[var(--action)] px-4 py-2 text-sm font-semibold text-[var(--action-ink)]"
             >
               <Navigation className="h-3.5 w-3.5" /> {t.drivingMode}
             </button>
@@ -181,22 +178,18 @@ export default function DriverHomePage() {
               ? t.nothingNeeds
               : t.thingsForYou(todoCount)}
         </p>
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <Link href="/driver/earnings" className="rounded-2xl border border-line px-4 py-3">
-            {/* An owner-operator keeps what the truck makes, so the number that matters is profit, not driver pay. */}
-            <p className="font-display text-2xl tabular text-ink-950">{formatCurrency(solo ? ownerWeek.net : weekPay)}</p>
-            <p className="text-xs text-ink-500">{solo ? t.profitWeek : t.payWeek}</p>
-            {!solo && (
-              <p className="mt-1 text-xs text-ink-700">
-                {currentLoad && loadPay > 0 ? `+${formatCurrency(loadPay)} this load · ` : ""}Paid {payDay}
-              </p>
-            )}
-          </Link>
-          <div className="rounded-2xl border border-line px-4 py-3">
-            <p className="font-display text-2xl text-ink-950">{homeWhen}</p>
-            <p className="text-xs text-ink-500">{driver.runType === "local" || driver.runType === "intown" ? t.hoursLeft(driver.hoursRemaining.toFixed(1)) : t.home}</p>
-          </div>
-        </div>
+        {/* Pay and home in one quiet line: the trip below is what this screen is for. */}
+        <Link href="/driver/earnings" className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-ink-50 px-4 py-3 text-sm">
+          {/* An owner-operator keeps what the truck makes, so the number that matters is profit, not driver pay. */}
+          <span className="min-w-0 truncate">
+            <span className="font-semibold tabular text-ink-950">{formatCurrency(solo ? ownerWeek.net : weekPay)}</span>{" "}
+            <span className="text-ink-500">{solo ? t.profitWeek : t.payWeek}</span>
+          </span>
+          <span className="shrink-0 text-ink-500">
+            {driver.runType === "local" || driver.runType === "intown" ? t.hoursLeft(driver.hoursRemaining.toFixed(1)) : t.home}{" "}
+            <span className="font-medium text-ink-950">{homeWhen}</span>
+          </span>
+        </Link>
       </div>
 
       {solo && <OwnerNeedsYou driver={driver} truck={truck} />}
@@ -233,7 +226,7 @@ export default function DriverHomePage() {
               No active load. Pick your next one below <ArrowDown className="h-4 w-4" />
             </p>
           ) : (
-            <p className="text-sm text-ink-500">No active load. The AI is sourcing your next one now.</p>
+            <p className="text-sm text-ink-500">No load right now. Backroute is finding your next one.</p>
           )}
           <button onClick={callDispatch} className="flex items-center gap-1.5 rounded-full border border-line px-4 py-2 text-xs font-medium text-ink-700">
             <Phone className="h-3.5 w-3.5" /> {t.callDispatch}
@@ -259,7 +252,7 @@ export default function DriverHomePage() {
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-info-soft text-[var(--accent-info)]">
                 <Link2 className="h-3.5 w-3.5" />
               </span>
-              <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Up next</span>
+              <span className="text-xs font-medium uppercase tracking-wider text-ink-400">Up next</span>
             </div>
             <LoadScoreBadge score={nextLoad.score} size="sm" />
           </div>
@@ -268,7 +261,7 @@ export default function DriverHomePage() {
           </p>
           <p className="mt-0.5 text-xs text-ink-500">
             {nextLoad.stage === "negotiating" || nextLoad.stage === "scoring" || nextLoad.stage === "sourced"
-              ? "AI is negotiating the rate now"
+              ? "Negotiating the rate now"
               : "Rate locked. It becomes your current load the moment you deliver."}
           </p>
           <div className="mt-2.5 flex items-center gap-4 text-xs">
@@ -301,10 +294,10 @@ export default function DriverHomePage() {
         <div id="next-load" className="scroll-mt-4">
           <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3">
             <div>
-              <p className="text-sm font-medium text-ink-950">Let the AI pick for me</p>
-              <p className="text-xs text-ink-500">Books the best-scoring option now and every time after.</p>
+              <p className="text-sm font-medium text-ink-950">Pick for me</p>
+              <p className="text-xs text-ink-500">Books the best fit now and every time after.</p>
             </div>
-            <Switch checked={autoPick} onChange={toggleAutoPick} label="Let the AI pick my next load" />
+            <Switch checked={autoPick} onChange={toggleAutoPick} label="Pick my next load for me" />
           </div>
           <NextLoadOffers
             offerGroups={offerGroups}

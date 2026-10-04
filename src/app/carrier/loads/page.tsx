@@ -10,7 +10,6 @@ import { Tabs } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadStagePill } from "@/components/shared/load-stage";
-import { LiveDot } from "@/components/shared/live-dot";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
@@ -50,7 +49,7 @@ const GROUPS: { key: string; label: string; stages: LoadStage[] | "all" }[] = [
   { key: "offers", label: "Offers", stages: ["offered"] },
   { key: "negotiating", label: "Negotiating", stages: ["negotiating"] },
   { key: "booked", label: "Booked", stages: ["rate_confirmed", "booked"] },
-  { key: "transit", label: "In Transit", stages: ["dispatched", "at_pickup", "in_transit", "at_delivery"] },
+  { key: "transit", label: "On the road", stages: ["dispatched", "at_pickup", "in_transit", "at_delivery"] },
   { key: "delivered", label: "Delivered", stages: ["delivered"] },
   { key: "all", label: "All", stages: "all" },
 ];
@@ -107,7 +106,6 @@ export default function CarrierLoadsPage() {
             <Button size="sm" variant="secondary" onClick={() => exportLoads(filtered, brokers, trucks)}>
               <Download className="h-3.5 w-3.5" /> Export CSV
             </Button>
-            <LiveDot />
           </div>
         }
       />
@@ -161,12 +159,12 @@ export default function CarrierLoadsPage() {
                     <div className="mt-3 flex items-center gap-4 border-t border-line pt-3 text-xs">
                       <span className="text-ink-500">
                         Rate <span className="font-semibold tabular text-ink-950">
-                          {load.bookedRate ? formatCurrency(load.bookedRate) : `Target ${formatCurrency(load.targetRate)}`}
+                          {formatCurrency(load.bookedRate ?? load.targetRate)}
                         </span>
                       </span>
                       <span className="text-ink-500">
                         Net profit{" "}
-                        <span className={cn("font-semibold tabular", load.netProfit ? (load.netProfit > 0 ? "text-[var(--accent-live)]" : "text-[var(--accent-danger)]") : "text-ink-300")}>
+                        <span className={cn("font-semibold tabular", load.netProfit ? (load.netProfit > 0 ? "text-ink-950" : "text-[var(--accent-danger)]") : "text-ink-300")}>
                           {load.netProfit ? formatCurrency(load.netProfit) : "—"}
                         </span>
                       </span>
@@ -182,14 +180,14 @@ export default function CarrierLoadsPage() {
             <div className="mt-5 hidden overflow-x-auto rounded-2xl border border-line bg-white lg:block">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-line bg-ink-50/60 text-left text-[11px] uppercase tracking-wider text-ink-400">
+                <tr className="border-b border-line bg-ink-50/60 text-left text-xs text-ink-500">
                   <th className="px-5 py-3 font-medium">Lane</th>
                   <th className="px-5 py-3 font-medium">Broker</th>
-                  <th className="px-5 py-3 font-medium">Score</th>
+                  <th className="px-5 py-3 font-medium">Fit</th>
                   <th className="px-5 py-3 font-medium">Stage</th>
                   <th className="px-5 py-3 font-medium">Truck</th>
                   <th className="px-5 py-3 font-medium text-right">Rate</th>
-                  <th className="px-5 py-3 font-medium text-right">Net profit</th>
+                  <th className="px-5 py-3 font-medium text-right">You keep</th>
                   <th className="px-5 py-3 font-medium text-right">Updated</th>
                 </tr>
               </thead>
@@ -213,10 +211,10 @@ export default function CarrierLoadsPage() {
                       <td className="px-5 py-3.5"><LoadStagePill stage={load.stage} /></td>
                       <td className="px-5 py-3.5 text-ink-600">{truck?.unitNumber ?? "—"}</td>
                       <td className="px-5 py-3.5 text-right tabular text-ink-950">
-                        {load.bookedRate ? formatCurrency(load.bookedRate) : <span className="text-ink-400">Target {formatCurrency(load.targetRate)}</span>}
+                        {load.bookedRate ? formatCurrency(load.bookedRate) : <span className="text-ink-400">{formatCurrency(load.targetRate)}</span>}
                       </td>
                       <td className="px-5 py-3.5 text-right tabular">
-                        {load.netProfit ? <span className={load.netProfit > 0 ? "text-[var(--accent-live)]" : "text-[var(--accent-danger)]"}>{formatCurrency(load.netProfit)}</span> : <span className="text-ink-300">—</span>}
+                        {load.netProfit ? <span className={load.netProfit > 0 ? "text-ink-950" : "text-[var(--accent-danger)]"}>{formatCurrency(load.netProfit)}</span> : <span className="text-ink-300">—</span>}
                       </td>
                       <td className="px-5 py-3.5 text-right text-xs text-ink-400"><TimeAgo iso={load.updatedAt} /></td>
                     </tr>

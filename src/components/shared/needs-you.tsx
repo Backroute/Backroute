@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, ArrowDown, CalendarClock, Check, ChevronDown, LifeBuoy, Loader2, Phone, Send, Sparkles, UserRound, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, CalendarClock, Check, ChevronDown, LifeBuoy, Loader2, Phone, Send, UserRound, X } from "lucide-react";
 import { AttentionCard, SwipeAction, type AttentionTone } from "@/components/ui/attention";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import { queueWithUndo, undo, usePending } from "@/lib/undo-queue";
 import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierLoads, useCarrierEscalations, useDriverMap, useTruckMap } from "@/lib/selectors";
 import type { DraftPurpose, Escalation, Load } from "@/lib/types";
-import { formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { celebrate, haptic } from "@/lib/feedback";
 import { LumperAsk } from "@/components/owner/lumper-ask";
 
@@ -263,7 +263,7 @@ export function NeedsYouList() {
             {(truck || driver) && <TruckDriverChip truck={truck} driver={driver} className="mb-2" />}
             {e.complexity === "critical" && e.status !== "with_support" && (
               <Badge tone="danger" className="mb-1.5">
-                Needs a human judgment call
+                Your call
               </Badge>
             )}
             <SourceTag source={e.source} />
@@ -331,7 +331,7 @@ export function NeedsYouList() {
             ) : (
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <Button size="sm" variant="outline" onClick={() => routeEscalationToSupport(e.id)}>
-                  <LifeBuoy className="h-3.5 w-3.5" /> Get human support
+                  <LifeBuoy className="h-3.5 w-3.5" /> Ask a person
                 </Button>
                 {e.loadId && (
                   <Link href={`/carrier/loads/${e.loadId}`} className="text-xs font-medium text-ink-500 hover:underline">
@@ -354,7 +354,7 @@ export function NeedsYouList() {
           Needs you
         </h2>
         {count > 0 && <Badge tone="warning">{count}</Badge>}
-        <span className="ml-auto hidden text-[11px] text-ink-400 [@media(pointer:coarse)]:inline">Swipe right to do it, left for later</span>
+        <span className="ml-auto hidden text-xs text-ink-400 [@media(pointer:coarse)]:inline">Swipe right to do it, left for later</span>
       </div>
       <BatchBar batches={batches} />
       <div className="grid gap-3 md:grid-cols-2">
@@ -366,19 +366,19 @@ export function NeedsYouList() {
               <motion.div key={groupId} layout {...enter}>
                 <AttentionCard tone="waiting">
                   {(truck || driver) && <TruckDriverChip truck={truck} driver={driver} className="mb-2" />}
-                  <p className="text-sm font-medium text-ink-900">Pick the next load</p>
+                  <p className="text-sm font-semibold text-ink-950">Pick {driver ? `${driver.name.split(" ")[0]}'s` : "the"} next load</p>
                   <p className="mt-0.5 text-xs text-ink-600">
                     {signedIn
-                      ? `${group.length} load${group.length === 1 ? "" : "s"} from broker emails fit${group.length === 1 ? "s" : ""}. Pick one and the AI asks the broker to book it.`
-                      : `AI found the top ${group.length}. Your pick, then AI books it.`}
+                      ? `${group.length} load${group.length === 1 ? "" : "s"} from broker emails fit${group.length === 1 ? "s" : ""}. Pick one and Backroute asks the broker to book it.`
+                      : `${group.length} options, best pays ${formatCurrency(Math.max(...group.map((l) => l.netProfit ?? 0)))} after costs.`}
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <Button href="#next-load" size="sm" variant="primary">
+                    <Button href="#next-load" size="sm">
                       Choose <ArrowDown className="h-3.5 w-3.5" />
                     </Button>
                     {truck && !signedIn && (
                       <Button size="sm" variant="outline" onClick={() => setAutoChain(truck.id, true)}>
-                        <Sparkles className="h-3.5 w-3.5" /> Let AI pick
+                        Pick for me
                       </Button>
                     )}
                   </div>
@@ -450,7 +450,7 @@ export function NeedsYouList() {
           {showLater ? "Hide" : "Show"} {setAside.length} set aside for later
         </button>
       )}
-      <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-[5.5rem] z-[65] flex flex-col items-center gap-2 px-4 lg:bottom-6">
+      <div aria-live="polite" className="hide-when-driving pointer-events-none fixed inset-x-0 bottom-[5.5rem] z-[65] flex flex-col items-center gap-2 px-4 lg:bottom-6">
         <AnimatePresence>
           {pendingSwipes.map((p) => (
             <motion.div

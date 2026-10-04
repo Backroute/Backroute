@@ -74,7 +74,7 @@ The real version switches on from environment variables:
 
 Each load board switches on when Backroute's partner login for it is set. Emergencies still need a person on the support team.
 
-`DEPLOY.md` covers the setup; `docs/features.md` what it does and what isn't done yet; `docs/testing.md` and `tests/` the tests (`npm run test:unit` after a change, about 35 seconds). The server side is in `src/lib/agent`, `src/lib/channels` and `src/app/api`. The app's store (the demo and the screens' state) is in `src/lib/store/`. The database schema and access rules are in `supabase/migrations/`.
+`DEPLOY.md` covers the setup; `docs/features.md` what it does and what isn't done yet; `docs/design.md` the colours, type and wording rules; `docs/testing.md` and `tests/` the tests (`npm run test:unit` after a change, about 35 seconds). The server side is in `src/lib/agent`, `src/lib/channels` and `src/app/api`. The app's store (the demo and the screens' state) is in `src/lib/store/`. The database schema and access rules are in `supabase/migrations/`.
 
 ## Stack
 

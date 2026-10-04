@@ -71,7 +71,7 @@ function SidebarContent({
             </button>
           )}
         </div>
-        <div className={cn("mt-1 px-1 text-[11px] font-medium uppercase tracking-wider", dark ? "text-white/40" : "text-ink-400")}>
+        <div className={cn("mt-0.5 px-1 text-xs", dark ? "text-white/40" : "text-ink-400")}>
           {portalLabel}
         </div>
 
@@ -104,8 +104,8 @@ function SidebarContent({
                 {typeof item.badge === "number" && item.badge > 0 && (
                   <span
                     className={cn(
-                      "rounded-full px-1.5 text-[11px] tabular",
-                      active ? (dark ? "bg-ink-950/10 text-ink-950" : "bg-white/20 text-white") : "bg-[var(--accent-warn)]/15 text-[var(--accent-warn)]",
+                      "rounded-full px-1.5 text-xs tabular",
+                      active ? (dark ? "bg-ink-950/10 text-ink-950" : "bg-white/20 text-white") : "bg-ink-150 text-ink-700",
                     )}
                   >
                     {item.badge}
@@ -231,7 +231,7 @@ function BottomTabs({ navItems, pathname }: { navItems: NavItem[]; pathname: str
             transitionTypes={slideTypes(navItems.map((n) => n.href), activeHref, item.href)}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-[11px] font-medium transition-colors",
+              "relative flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-xs font-medium transition-colors",
               active ? "text-ink-950" : "text-ink-500",
             )}
           >
@@ -240,7 +240,7 @@ function BottomTabs({ navItems, pathname }: { navItems: NavItem[]; pathname: str
             </span>
             {item.label}
             {typeof item.badge === "number" && item.badge > 0 && (
-              <span className="absolute right-[calc(50%-1.6rem)] top-0.5 min-w-4 rounded-full bg-[var(--accent-warn)] px-1 text-center text-[10px] font-semibold leading-4 text-white">
+              <span className="absolute right-[calc(50%-1.6rem)] top-0.5 min-w-4 rounded-full bg-[var(--accent-danger)] px-1 text-center text-xs font-semibold leading-4 text-white">
                 {item.badge}
               </span>
             )}

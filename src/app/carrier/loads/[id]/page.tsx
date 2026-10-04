@@ -260,7 +260,7 @@ export default function LoadDetailPage() {
                           <div>
                             <p className="text-sm font-medium text-ink-900">{doc.name}</p>
                             <p className="text-xs text-ink-400">{doc.uploadedBy === "driver" ? "Uploaded by driver · " : ""}{formatDateTime(doc.generatedAt)}</p>
-                            {doc.aiNote && <p className={`mt-0.5 text-xs ${doc.flagged || doc.status === "failed" ? "text-[var(--accent-warn)]" : "text-[var(--accent-live)]"}`}>AI checked: {doc.aiNote}</p>}
+                            {doc.aiNote && <p className={`mt-0.5 text-xs ${doc.flagged || doc.status === "failed" ? "text-[var(--accent-warn)]" : "text-ink-500"}`}>Checked: {doc.aiNote}</p>}
                           </div>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
@@ -448,7 +448,7 @@ function CancelForm({ stage, onCancel, onConfirm }: { stage: LoadStage; onCancel
   const tonuApplies = TONU_STAGES.includes(stage);
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl border border-[var(--accent-danger)]/30 bg-danger-soft/50 p-3.5">
+    <div className="flex flex-col gap-2.5 rounded-xl border border-line bg-danger-soft/50 p-3.5">
       {tonuApplies && (
         <p className="flex items-start gap-1.5 text-xs font-medium text-[var(--accent-warn)]">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -541,7 +541,7 @@ function Row({ label, value, strong, tone }: { label: string; value: string; str
         className={
           "tabular text-sm " +
           (strong ? "font-semibold " : "font-medium ") +
-          (tone === "success" ? "text-[var(--accent-live)]" : tone === "danger" ? "text-[var(--accent-danger)]" : "text-ink-950")
+          (tone === "success" ? "text-ink-950" : tone === "danger" ? "text-[var(--accent-danger)]" : "text-ink-950")
         }
       >
         {value}

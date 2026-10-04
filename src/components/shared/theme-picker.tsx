@@ -24,7 +24,7 @@ export function ThemePicker({ className, compact }: { className?: string; compac
           onClick={() => setTheme(value)}
           className={cn(
             "flex items-center justify-center gap-1.5 rounded-full font-medium transition-colors",
-            compact ? "px-2 py-1 text-[11px]" : "px-3 py-2 text-xs",
+            compact ? "px-2 py-1 text-xs" : "px-3 py-2 text-xs",
             choice === value ? "bg-white text-ink-950 shadow-sm" : "text-ink-500 hover:text-ink-950",
           )}
         >
