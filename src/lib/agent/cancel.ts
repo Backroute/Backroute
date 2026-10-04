@@ -24,7 +24,7 @@ const DEFAULT_TONU = 150;
 const ROLLING = new Set(["dispatched", "at_pickup"]);
 
 /** "TONU $250" on the rate con → 250. */
-export function tonuOnRateCon(load: Load): number | null {
+function tonuOnRateCon(load: Load): number | null {
   const text = [...(load.rateConReading?.finesAndFees ?? []), ...(load.rateConReading?.otherConcerns ?? []), load.rateConReading?.summary ?? ""].join(" ");
   const m = text.match(/(?:tonu|truck ordered not used)[^$]{0,30}\$\s?(\d{2,4})/i);
   return m ? Number(m[1]) : null;
@@ -105,7 +105,7 @@ export async function cancelLoad(ctx: CarrierContext, load: Load, reason: string
 }
 
 /** A truck that just lost its load: offers it passed on come back, and within the rules the AI asks for the best. */
-export async function rebook(ctx: CarrierContext, truck: Truck) {
+async function rebook(ctx: CarrierContext, truck: Truck) {
   const now = Date.now();
   const again = ctx.loads.filter((l) => l.truckId === truck.id && l.stage === "declined" && l.offerGroupId && (!l.pickupAt || Date.parse(l.pickupAt) > now + 2 * 3600_000) && Date.parse(l.createdAt) > now - 24 * 3600_000);
   for (const l of again) {

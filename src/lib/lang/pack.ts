@@ -1,6 +1,6 @@
 import type { DispatchCallOption, Lang } from "../types";
 
-export interface LangInfo {
+interface LangInfo {
   code: Lang;
   /** The language's own name, as the driver would pick it. */
   native: string;

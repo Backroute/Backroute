@@ -38,7 +38,7 @@ const money = (n: number) => `${n.toLocaleString("en-US")} dollars`;
 const MAX_LBS: Record<Load["equipmentType"], number> = { "Dry Van": 45000, Reefer: 43500, Flatbed: 48000, Container: 44000 };
 
 /** Why the freight is too heavy for our truck, or null when it fits. */
-export function overweight(load: Pick<Load, "weight" | "equipmentType">): string | null {
+function overweight(load: Pick<Load, "weight" | "equipmentType">): string | null {
   const max = MAX_LBS[load.equipmentType] ?? 45000;
   return load.weight > max ? `at ${load.weight.toLocaleString("en-US")} pounds it's over what our ${load.equipmentType.toLowerCase()} can legally carry (about ${max.toLocaleString("en-US")}).` : null;
 }
@@ -127,7 +127,7 @@ export const VOICEMAIL = (ctx: CarrierContext, load: Load) => {
 
 /** Voicemail on a phone-only broker: one more call, on the next follow-up round. */
 /** A broker who doesn't want to talk to an AI, however they put it. */
-export const NO_AI = /\b(don'?t|do not|won'?t|not going to|no) (talk|deal|speak|work)(ing)? (to|with) (a |an )?(robots?|bots?|ai|a\.i\.|machines?|computers?|recordings?)\b|\bno (robots|bots|ai calls)\b|\b(put|get) (me )?(a )?(real )?(person|human) on\b|\bare you a (robot|bot|machine)\?? (no|then) (thanks|thank you)\b/i;
+const NO_AI = /\b(don'?t|do not|won'?t|not going to|no) (talk|deal|speak|work)(ing)? (to|with) (a |an )?(robots?|bots?|ai|a\.i\.|machines?|computers?|recordings?)\b|\bno (robots|bots|ai calls)\b|\b(put|get) (me )?(a )?(real )?(person|human) on\b|\bare you a (robot|bot|machine)\?? (no|then) (thanks|thank you)\b/i;
 
 /** A broker call the AI couldn't finish: an email picking it up where it stopped, or one more call. */
 async function followUpDroppedCall(ctx: CarrierContext, load: Load, said: string) {
@@ -177,7 +177,7 @@ Rules:
 
 ${TRUCKING}`;
 
-export interface CallTurnResult {
+interface CallTurnResult {
   reply: string;
   hangUp: boolean;
   failed?: boolean;

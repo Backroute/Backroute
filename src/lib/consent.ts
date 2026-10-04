@@ -12,7 +12,7 @@ import { last10, sendText } from "./channels/texting";
 
 export { CONSENT_VERSION, DRIVER_AGREES, FIRST_TEXT, OWNER_ATTESTS, THANKS_YES, type ConsentVia } from "./consent-words";
 
-export interface ConsentRecord {
+interface ConsentRecord {
   driverId: string;
   granted: boolean;
   via: ConsentVia;
@@ -36,7 +36,7 @@ export async function consentsFor(carrierId: string): Promise<Map<string, Consen
   return out;
 }
 
-export async function consentOf(carrierId: string, driverId: string): Promise<ConsentRecord | null> {
+async function consentOf(carrierId: string, driverId: string): Promise<ConsentRecord | null> {
   const { data } = await admin().from("driver_consents").select("driver_id, granted, via, at, version").eq("carrier_id", carrierId).eq("driver_id", driverId).order("at", { ascending: false }).limit(1);
   const r = data?.[0];
   return r ? { driverId: r.driver_id as string, granted: r.granted as boolean, via: r.via as ConsentVia, at: r.at as string, version: r.version as string } : null;
@@ -57,7 +57,7 @@ export interface Recipient {
   appOnly: boolean;
 }
 
-export const consentRequired = () => process.env.CONSENT_REQUIRED === "1";
+const consentRequired = () => process.env.CONSENT_REQUIRED === "1";
 
 export async function recipientPolicy(carrierId: string, to: string): Promise<Recipient> {
   const none: Recipient = { driverId: null, notice: null, hold: false, appOnly: false };

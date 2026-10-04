@@ -16,7 +16,7 @@ import { nextStop, tripLoads } from "../trip-plan";
 const ROLLING = new Set<Load["stage"]>(["dispatched", "at_pickup", "in_transit", "at_delivery"]);
 const at = (iso: string | undefined, state: string, fallback: string) => (iso ? formatAtStop(iso, state) : when(fallback));
 
-export function planFor(ctx: Pick<CarrierContext, "loads" | "drivers">, truck: Truck, now: number): string[] {
+function planFor(ctx: Pick<CarrierContext, "loads" | "drivers">, truck: Truck, now: number): string[] {
   const lines: string[] = [];
   const current = ctx.loads.find((l) => l.id === truck.currentLoadId && ROLLING.has(l.stage));
   // What's lined up after it, in pickup order (lib/agent/chain): up to three loads ahead.

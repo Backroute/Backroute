@@ -94,7 +94,7 @@ const specKey = (s: Spec) => `${s.table}/${s.kind ?? ""}`;
 const conflictOf = (s: Spec) => conflictKey(s.kind);
 
 /** JSON with sorted keys: Postgres stores jsonb in its own key order, so plain JSON.stringify can't compare. */
-export function stable(v: unknown): string {
+function stable(v: unknown): string {
   if (v === null || typeof v !== "object") return JSON.stringify(v) ?? "null";
   if (Array.isArray(v)) return `[${v.map(stable).join(",")}]`;
   const o = v as Record<string, unknown>;
@@ -108,7 +108,7 @@ export function stable(v: unknown): string {
 // ─── Status, for the small "not saved" notice ────────────────────────────────
 
 /** "cached": showing what this phone saved last time, while the latest loads. */
-export type SyncState = "saved" | "saving" | "offline" | "cached";
+type SyncState = "saved" | "saving" | "offline" | "cached";
 export const useSyncStatus = create<{ state: SyncState; savedAt: number | null }>(() => ({ state: "saved", savedAt: null }));
 
 // ─── Connection ──────────────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ const itemKey = (s: Spec, id: string) => `${specKey(s)}/${id}`;
  * into the current row instead of replacing it (supabase/migrations/20261001000000_merge_edits.sql). Null for a load
  * this screen never had: that one goes in whole.
  */
-export function changedFields(baseJson: string | undefined, item: Item): string[] | null {
+function changedFields(baseJson: string | undefined, item: Item): string[] | null {
   if (!baseJson) return null;
   let base: Record<string, unknown>;
   try {
@@ -157,7 +157,7 @@ export function changedFields(baseJson: string | undefined, item: Item): string[
 }
 
 /** The settings keys that changed since `baseJson` (a removed key is sent as null, and the database drops it). */
-export function settingsPatch(baseJson: string, now: Record<string, unknown>): Record<string, unknown> {
+function settingsPatch(baseJson: string, now: Record<string, unknown>): Record<string, unknown> {
   let base: Record<string, unknown> = {};
   try {
     base = baseJson ? (JSON.parse(baseJson) as Record<string, unknown>) : {};
@@ -465,7 +465,7 @@ export function showCached(v: View) {
   useSyncStatus.setState({ state: "cached" });
 }
 
-export function forgetViews() {
+function forgetViews() {
   try {
     window.localStorage.removeItem(VIEW_KEY);
     window.localStorage.removeItem(OUTBOX_KEY);
@@ -474,7 +474,7 @@ export function forgetViews() {
   }
 }
 
-export function disconnect() {
+function disconnect() {
   if (!conn) return;
   conn.unsubscribe();
   if (conn.timer) clearTimeout(conn.timer);

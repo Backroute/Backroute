@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Deterministic PRNG so server-rendered and client-hydrated markup match exactly.
-export function mulberry32(seed: number) {
+function mulberry32(seed: number) {
   let a = seed;
   return function rand() {
     a |= 0;

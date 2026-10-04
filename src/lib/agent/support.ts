@@ -9,7 +9,7 @@ import { admin, logChannel } from "./db";
  * through the server after it checks the person is on that list.
  */
 
-export interface SupportPerson {
+interface SupportPerson {
   userId: string;
   name: string;
 }

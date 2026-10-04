@@ -8,7 +8,7 @@ import { distanceMiles, type LatLng } from "./trip-geo";
 
 const HOUR = 3600_000;
 
-export interface HosNow {
+interface HosNow {
   /** Hours left. */
   drive: number;
   shift: number;

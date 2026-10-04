@@ -53,7 +53,7 @@ function isoDay(d: string): string | null {
   return `${y}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
 }
 
-export function parseLoadSearch(xml: string): BoardLoad[] {
+function parseLoadSearch(xml: string): BoardLoad[] {
   const items = [...xml.matchAll(/<(?:\w+:)?LoadSearchItem>([\s\S]*?)<\/(?:\w+:)?LoadSearchItem>/g)].map((m) => fields(m[1]));
   return items
     .filter((f) => f.OriginCity && f.OriginState && f.DestinationCity && f.DestinationState)

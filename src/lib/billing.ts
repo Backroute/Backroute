@@ -32,7 +32,7 @@ function encode(params: Record<string, unknown>, prefix = ""): string[] {
   return out;
 }
 
-export async function stripe<T = Record<string, unknown>>(method: "GET" | "POST" | "DELETE", path: string, params: Record<string, unknown> = {}, idempotencyKey?: string): Promise<T> {
+async function stripe<T = Record<string, unknown>>(method: "GET" | "POST" | "DELETE", path: string, params: Record<string, unknown> = {}, idempotencyKey?: string): Promise<T> {
   const body = encode(params).join("&");
   const url = `${base()}/v1/${path}${method === "GET" && body ? `?${body}` : ""}`;
   const res = await fetch(url, {
@@ -67,8 +67,8 @@ export function verifyWebhook(raw: string, header: string | null, secret: string
 
 // ─── A carrier's billing ─────────────────────────────────────────────────────
 
-export type BillingStatus = "none" | "trialing" | "active" | "past_due" | "unpaid" | "canceled" | "incomplete";
-export interface Billing {
+type BillingStatus = "none" | "trialing" | "active" | "past_due" | "unpaid" | "canceled" | "incomplete";
+interface Billing {
   carrier_id: string;
   customer_id: string | null;
   subscription_id: string | null;
@@ -171,7 +171,7 @@ export async function billingPortal(carrierId: string, returnUrl: string): Promi
   return s.url;
 }
 
-export interface InvoiceLine {
+interface InvoiceLine {
   id: string;
   number: string | null;
   amount: number;

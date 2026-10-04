@@ -14,7 +14,7 @@ const KEY = "backroute.lockStop";
 const TAG = "next-stop";
 const listeners = new Set<() => void>();
 
-export function lockStopOn(): boolean {
+function lockStopOn(): boolean {
   try {
     return localStorage.getItem(KEY) === "1";
   } catch {
@@ -53,7 +53,7 @@ async function clearNextStop() {
 }
 
 /** What the notification says for this load, or null when there's no stop ahead. */
-export function nextStopText(load: Load | null | undefined): { title: string; body: string } | null {
+function nextStopText(load: Load | null | undefined): { title: string; body: string } | null {
   if (!load) return null;
   const before = ["rate_confirmed", "booked", "dispatched", "at_pickup"].includes(load.stage);
   const after = ["in_transit", "at_delivery"].includes(load.stage);

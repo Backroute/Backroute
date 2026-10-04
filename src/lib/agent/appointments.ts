@@ -34,7 +34,6 @@ const CALL_OVER_MS = 20 * 60_000;
 const phoneOf = (load: Load, stop: Stop) => (stop === "pickup" ? load.rateConReading?.shipperPhone : load.rateConReading?.receiverPhone) ?? null;
 const nameOf = (load: Load, stop: Stop) => (stop === "pickup" ? load.rateConReading?.shipper : load.rateConReading?.receiver) ?? (stop === "pickup" ? "the shipper" : "the receiver");
 const stateOf = (load: Load, stop: Stop) => (stop === "pickup" ? load.lane.originState : load.lane.destState);
-const cityOf = (load: Load, stop: Stop) => (stop === "pickup" ? `${load.lane.origin}, ${load.lane.originState}` : `${load.lane.destination}, ${load.lane.destState}`);
 const dueOf = (load: Load, stop: Stop) => (stop === "pickup" ? load.pickupAt : load.deliveryAt);
 const driverOf = (ctx: CarrierContext, load: Load) => ctx.drivers.find((d) => d.id === ctx.trucks.find((t) => t.id === load.truckId)?.driverId);
 /** Scheduling desks: 7 in the morning to 4 in the afternoon, their time, weekdays and Saturday. */
@@ -169,7 +168,7 @@ function facts(ctx: CarrierContext, load: Load): string {
 }
 
 /** What the facility said. Returns the words to say back and whether the call is over. */
-export async function facilityCallTurn(ctx: CarrierContext, load: Load, stop: Stop, said: string, asked: number): Promise<{ reply: string; hangUp: boolean }> {
+async function facilityCallTurn(ctx: CarrierContext, load: Load, stop: Stop, said: string, asked: number): Promise<{ reply: string; hangUp: boolean }> {
   const appt = load.appointments?.[stop];
   if (!appt || appt.status === "set") return { reply: "Thanks, we're all set.", hangUp: true };
   const state = stateOf(load, stop);

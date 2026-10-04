@@ -1,7 +1,7 @@
 import type { Load } from "./types";
 
 /** Average retail diesel by state this week, $/gal (demo data; live it comes from the fuel card's price feed). */
-export const DIESEL_PRICE: Record<string, number> = {
+const DIESEL_PRICE: Record<string, number> = {
   TX: 3.39, OK: 3.29, AR: 3.45, LA: 3.49, MS: 3.42, AL: 3.55, GA: 3.59, TN: 3.49, KY: 3.62, IL: 4.05, IN: 3.95,
   OH: 3.89, WV: 3.99, PA: 4.49, NJ: 3.95, NC: 3.69, SC: 3.55, FL: 3.75, MO: 3.39, CO: 3.79, WY: 3.59, UT: 3.89,
   NM: 3.65, AZ: 4.09, CA: 5.49, WA: 4.75, OR: 4.49,
@@ -47,13 +47,13 @@ const ROUTE_STATES: Record<string, string[]> = {
 };
 
 /** Two 100-gallon saddle tanks; the plan never lets the truck run below a quarter tank. */
-export const TANK_GALLONS = 200;
+const TANK_GALLONS = 200;
 const RESERVE_GALLONS = 50;
 /** In-network fuel card discount off the pump price. It varies by chain and location; this is a typical figure. */
 export const CARD_DISCOUNT = 0.25;
 const CHAINS = ["Pilot Flying J", "Love's"];
 
-export interface FuelStop {
+interface FuelStop {
   state: string;
   stateName: string;
   chain: string;
@@ -63,7 +63,7 @@ export interface FuelStop {
   cost: number;
 }
 
-export interface FuelPlan {
+interface FuelPlan {
   startPct: number;
   milesLeft: number;
   gallonsNeeded: number;
@@ -79,7 +79,7 @@ function hash(s: string): number {
 }
 
 /** Tank level for the demo, steady per load; live it's read from the engine through the ELD. */
-export function startingTankPct(load: Load): number {
+function startingTankPct(load: Load): number {
   return 40 + (hash(load.id) % 46);
 }
 

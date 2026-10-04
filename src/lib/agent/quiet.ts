@@ -16,7 +16,7 @@ function quietHours(): [number, number] {
 }
 
 /** Where the driver is now: the truck's last known state, else their home. */
-export function driverState(driver: Driver, truck?: Pick<Truck, "currentState"> | null): string {
+function driverState(driver: Driver, truck?: Pick<Truck, "currentState"> | null): string {
   return truck?.currentState || driver.homeBase?.split(",")[1]?.trim() || "TX";
 }
 

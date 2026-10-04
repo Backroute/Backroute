@@ -18,7 +18,7 @@ import { translateForDriver } from "../ai/translate";
 const SLACK_F = 2;
 const HOUR = 3600_000;
 
-export function reeferTerms(load: Load): ReeferTerms | null {
+function reeferTerms(load: Load): ReeferTerms | null {
   const r = load.rateConReading?.reefer;
   if (r && (r.setF !== null || r.minF !== null || r.maxF !== null)) return r;
   // A broker's email or notes that say "34F continuous" when there's no rate con reading yet.
@@ -28,7 +28,7 @@ export function reeferTerms(load: Load): ReeferTerms | null {
   return { setF: Number(m[1]), minF: null, maxF: null, mode: /cycle|start.?stop/i.test(text) ? "cycle" : /continuous/i.test(text) ? "continuous" : null, preCool: /pre-?cool/i.test(text) };
 }
 
-export function allowedRange(t: ReeferTerms): [number, number] | null {
+function allowedRange(t: ReeferTerms): [number, number] | null {
   if (t.minF !== null || t.maxF !== null) return [t.minF ?? -40, t.maxF ?? 120];
   return t.setF !== null ? [t.setF - SLACK_F, t.setF + SLACK_F] : null;
 }

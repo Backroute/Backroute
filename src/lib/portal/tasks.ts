@@ -22,7 +22,7 @@ import { PORTAL_KIND_LABEL, type PortalKind, type PortalStatus, type PortalTask,
  * the AI saw.
  */
 
-export const OPEN_STATUSES: PortalStatus[] = ["queued", "running", "needs_approval", "needs_answer", "needs_code"];
+const OPEN_STATUSES: PortalStatus[] = ["queued", "running", "needs_approval", "needs_answer", "needs_code"];
 const MAX_ATTEMPTS = 3;
 const WORKER_QUIET_MINUTES = 30;
 
@@ -38,9 +38,9 @@ const urls = (text: string) => [...text.matchAll(/https?:\/\/[^\s<>"')\]]+/gi)].
 /** Signing sites and where a broker's own "accept the load" link lives. */
 const SIGNING_HOSTS = /(^|\.)(docusign\.(net|com)|echosign\.com|adobesign\.com|documents\.adobe\.com|hellosign\.com|dropboxsign\.com|pandadoc\.com|signnow\.com|rightsignature\.com|zohosign\.com|sign\.zoho\.com)$/i;
 /** Carrier setup networks brokers use. */
-export const SETUP_HOSTS = /(^|\.)(mycarrierpackets\.com|rmis\.com|registrymonitoring\.com|highway\.com|carrierassure\.com|carrier411\.com|carrierok\.com|truckertools\.com|assure\.com|carriersource\.io|mycarrierportal\.com)$/i;
+const SETUP_HOSTS = /(^|\.)(mycarrierpackets\.com|rmis\.com|registrymonitoring\.com|highway\.com|carrierassure\.com|carrier411\.com|carrierok\.com|truckertools\.com|assure\.com|carriersource\.io|mycarrierportal\.com)$/i;
 /** Dock scheduling sites. */
-export const DOCK_HOSTS = /(^|\.)(opendock\.com|c3reservations\.com|c3solutions\.com|dockscheduler\.com|fourkites\.com|e2open\.com|retalix\.com|ncr\.com|dataDocks\.com|datadocks\.com|velostics\.com|yardview\.com)$/i;
+const DOCK_HOSTS = /(^|\.)(opendock\.com|c3reservations\.com|c3solutions\.com|dockscheduler\.com|fourkites\.com|e2open\.com|retalix\.com|ncr\.com|dataDocks\.com|datadocks\.com|velostics\.com|yardview\.com)$/i;
 
 /** The link to sign at: a signing site first, otherwise a link whose words say sign or accept. */
 export function signingLink(text: string): string | null {
@@ -50,7 +50,6 @@ export function signingLink(text: string): string | null {
   return all.find((u) => /sign|accept|confirm|rate-?con|tender|load/i.test(u) && !/unsubscribe|privacy|logo|\.(png|jpe?g|gif)$/i.test(u)) ?? null;
 }
 
-export const setupLink = (text: string) => urls(text).find((u) => SETUP_HOSTS.test(siteOf(u) ?? "")) ?? null;
 export const dockLink = (text: string) => urls(text).find((u) => DOCK_HOSTS.test(siteOf(u) ?? "")) ?? null;
 
 // ─── The queue ───────────────────────────────────────────────────────────────

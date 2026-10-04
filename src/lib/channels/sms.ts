@@ -20,7 +20,7 @@ const START = new Set(["START", "UNSTOP", "YES"]);
 const HELP = new Set(["HELP", "INFO"]);
 const YES = new Set(["YES", "Y", "YES.", "YES!", "OK", "SI", "SÍ", "OUI", "ДА", "ТАК", "ਹਾਂ", "हाँ", "हां"]);
 
-export interface IncomingText {
+interface IncomingText {
   from: string;
   body: string;
   /** The provider's id, so a retried webhook isn't answered twice. */

@@ -23,7 +23,7 @@ const REEFER = /\b(reefer|temp|temperature|thermo\w*|degrees)\b|°/i;
 type StopDoc = "bol" | "pod" | "lumper_receipt";
 const NAMES: Record<StopDoc, string> = { bol: "bill of lading", pod: "signed POD", lumper_receipt: "lumper receipt" };
 
-export function whichDocument(text: string, load: Pick<Load, "stage">): StopDoc {
+function whichDocument(text: string, load: Pick<Load, "stage">): StopDoc {
   if (/\b(lumper|receipt|unload(ing)? fee)\b/i.test(text)) return "lumper_receipt";
   if (/\b(bol|b\.o\.l|bill of lading|loaded|pick ?up)\b/i.test(text)) return "bol";
   if (/\b(pod|proof|delivered|signed|empty now|unloaded)\b/i.test(text)) return "pod";

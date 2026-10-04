@@ -25,9 +25,8 @@ function stepStatus(stage: LoadStage): { completed: number; active: number } {
   }
 }
 
-/** Named-milestone tracker (Dispatched -> At pickup -> In transit -> At delivery -> Delivered), the
- *  discrete complement to TripProgress's continuous line — for the detail page, where a driver
- *  checking "more info" wants to see exactly which checkpoints are done, not just an overall percentage. */
+/** Named-milestone tracker (Dispatched -> At pickup -> In transit -> At delivery -> Delivered) for the detail page,
+ *  where a driver checking "more info" wants to see exactly which checkpoints are done, not just an overall percentage. */
 export function TripStepper({ stage, invert }: { stage: LoadStage; invert?: boolean }) {
   const { completed, active } = stepStatus(stage);
   const filledClass = invert ? "bg-white" : "bg-ink-950";

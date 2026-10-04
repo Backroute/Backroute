@@ -36,7 +36,7 @@ const ALIAS = PRIMARY_CARRIER_ID;
 const uid = (p: string) => `${p}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 const now = () => new Date().toISOString();
 
-export interface Effects {
+interface Effects {
   /** What the AI did, in plain words, for the log. */
   done: string[];
   hangUp?: boolean;
@@ -62,7 +62,7 @@ function event(p: Omit<ActivityEvent, "id" | "timestamp" | "carrierId">): Activi
  * - "decider": a decision; the owner's. (On full autopilot the AI makes the ones it has rules for before this.)
  * Critical ones also text the support team's phones.
  */
-export type HandTo = "owner" | "support" | "decider";
+type HandTo = "owner" | "support" | "decider";
 
 async function raise(ctx: CarrierContext, p: { reason: string; loadId?: string; critical?: boolean; label?: string; source: MessageChannel; to: HandTo; brokerId?: string; portalTaskId?: string }) {
   const to = p.to === "support" ? "support" : "owner";
@@ -103,7 +103,7 @@ async function raise(ctx: CarrierContext, p: { reason: string; loadId?: string; 
 const REPORTS = { at_pickup: "at_pickup", loaded: "in_transit", at_delivery: "at_delivery" } as const satisfies Record<string, LoadStage>;
 
 /** Where a person is talking to the AI: a text, a phone call, or the chat in the app. */
-export type Talk = "sms" | "voice" | "chat";
+type Talk = "sms" | "voice" | "chat";
 const sourceOf = (t: Talk): MessageChannel => (t === "chat" ? "app" : t);
 const BY: Record<Talk, string> = { sms: "by text", voice: "by phone", chat: "in the app" };
 
@@ -353,7 +353,7 @@ export function dryRun(tools: BetaRunnableTool<any>[], picked: { tool: string; i
   return tools.map((t) => ({ ...t, run: async (input: unknown) => (picked.push({ tool: t.name, input }), "Done.") }));
 }
 
-export interface Turn {
+interface Turn {
   from: "them" | "ai";
   text: string;
 }
@@ -585,7 +585,7 @@ export async function answerBrokerQuestion(ctx: CarrierContext, load: Load, ques
   }
 }
 
-export interface BrokerEmail {
+interface BrokerEmail {
   from: string;
   fromName?: string;
   subject: string;
@@ -665,4 +665,4 @@ async function tellOwner(ctx: CarrierContext, p: { reason: string; loadId?: stri
   return raise(ctx, { reason: p.reason, loadId: p.loadId, label: p.label ?? "Got it", source: p.source, to: "owner", brokerId: p.brokerId });
 }
 
-export { ALIAS, event, uid, raise as passToOwner, tellOwner };
+export { event, uid, raise as passToOwner, tellOwner };

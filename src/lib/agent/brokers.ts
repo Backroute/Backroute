@@ -20,7 +20,7 @@ const words = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(
 const initials = (s: string) => words(s).filter((w) => !["llc", "inc", "co", "corp", "ltd", "the", "and", "of"].includes(w)).map((w) => w[0]).join("");
 
 /** Whether the name a broker uses (or their email domain) belongs to the company FMCSA has on file. */
-export function sameCompany(onFile: string[], used: string, email?: string): boolean {
+function sameCompany(onFile: string[], used: string, email?: string): boolean {
   const domain = email?.split("@")[1]?.split(".").slice(-2, -1)[0]?.toLowerCase();
   const usedKey = words(used).filter((w) => !FILLER.has(w) && w.length >= 3);
   return onFile.filter(Boolean).some((name) => {

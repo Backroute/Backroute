@@ -3,12 +3,12 @@ import type { Load } from "./types";
 /** Stages where a load's rate is locked — it's real money for the week, not a quote. */
 const EARNING_STAGES = new Set(["rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery", "delivered"]);
 
-export const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /** Rough hands-on time a human dispatcher spends per piece of work the AI did instead. */
 const DISPATCHER_MINUTES = { perLoad: 35, perMessage: 6, perCall: 12, perDocument: 8 };
 
-export interface WeekEarnings {
+interface WeekEarnings {
   loads: Load[];
   gross: number;
   net: number;

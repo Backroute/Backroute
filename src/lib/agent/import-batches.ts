@@ -11,7 +11,7 @@ import { admin } from "./db";
 const KIND = "import_batch";
 const keyOf = (batch: string) => `import:${batch}`;
 
-export interface ImportBatch {
+interface ImportBatch {
   id: string;
   at: string;
   via: "spreadsheet" | "upload" | "email";

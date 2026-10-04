@@ -12,13 +12,13 @@ const GEOCODE = () => process.env.HERE_GEOCODE_BASE?.replace(/\/$/, "") ?? "http
 const ROUTER = () => process.env.HERE_ROUTER_BASE?.replace(/\/$/, "") ?? "https://router.hereapi.com";
 
 type Point = { lat: number; lon: number };
-export type Place = Point | { city: string; state: string };
+type Place = Point | { city: string; state: string };
 
 const places = new Map<string, Point | null>();
 const routes = new Map<string, { at: number; route: Route | null }>();
 const FRESH = 24 * 3600_000;
 
-export interface Route {
+interface Route {
   miles: number;
   hours: number;
   /** Live routes: the drive time with no traffic, so the traffic's share is `hours - freeHours`. */
@@ -115,7 +115,7 @@ export async function geocodeAddress(address: string): Promise<{ lat: number; lo
   }
 }
 
-export interface TruckSize {
+interface TruckSize {
   heightIn: number;
   weightLbs: number;
   lengthFt: number;

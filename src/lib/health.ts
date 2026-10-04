@@ -16,8 +16,8 @@ import { spokenRepliesConfigured, transcriptionConfigured } from "./channels/voi
  * once more when it's fixed.
  */
 
-export type Level = "ok" | "warn" | "down" | "off";
-export interface Check {
+type Level = "ok" | "warn" | "down" | "off";
+interface Check {
   key: string;
   label: string;
   level: Level;

@@ -4,7 +4,7 @@ import type { LoadStage } from "./types";
  * One way to show where anything stands, on every screen: done (green), moving (blue: the AI or the truck is on it),
  * waiting on someone (amber: a broker, a driver, an appointment), needs you (red), and set aside (gray).
  */
-export type StatusKind = "done" | "moving" | "waiting" | "needs_you" | "off";
+type StatusKind = "done" | "moving" | "waiting" | "needs_you" | "off";
 
 export const STATUS_CLASS: Record<StatusKind, string> = {
   done: "bg-live-soft text-[var(--accent-live)]",

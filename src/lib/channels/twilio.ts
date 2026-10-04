@@ -30,7 +30,7 @@ export function absoluteUrl(path: string): string | null {
  * Checks that a webhook really came from Twilio: HMAC-SHA1 over the full URL plus the POST fields sorted by name,
  * keyed with the auth token (Twilio's documented scheme).
  */
-export function validTwilioSignature(url: string, params: Record<string, string>, signature: string | null): boolean {
+function validTwilioSignature(url: string, params: Record<string, string>, signature: string | null): boolean {
   const token = process.env.TWILIO_AUTH_TOKEN;
   if (!token || !signature) return false;
   const payload = url + Object.keys(params).sort().map((k) => k + params[k]).join("");
@@ -121,7 +121,7 @@ export function twiml(inner = ""): Response {
  * The voice and speech-recognition language for each language drivers can pick. Google voices through Twilio cover
  * all seven; check the Twilio console lists each one for your account before relying on it.
  */
-export const VOICE: Record<Lang, { speech: string; voice: string }> = {
+const VOICE: Record<Lang, { speech: string; voice: string }> = {
   en: { speech: "en-US", voice: "Google.en-US-Standard-C" },
   es: { speech: "es-US", voice: "Google.es-US-Standard-A" },
   pa: { speech: "pa-IN", voice: "Google.pa-IN-Standard-A" },
@@ -138,7 +138,7 @@ export function say(text: string, lang: Lang) {
 
 /** Speaks, then listens for the driver's answer and posts it to `action`. */
 /** Words speech recognition should expect on a dispatch call (Twilio's hints), so "reefer" isn't heard as "real fur". */
-export const SPEECH_HINTS = [
+const SPEECH_HINTS = [
   "reefer", "dry van", "flatbed", "step deck", "power only", "rate con", "rate confirmation", "BOL", "bill of lading", "POD", "lumper", "detention", "TONU",
   "deadhead", "bobtail", "drop and hook", "live unload", "check call", "all in", "per mile", "MC number", "DOT", "weigh station", "scale", "blowout",
   "breakdown", "loaded", "empty", "at the shipper", "at the receiver", "hours of service", "34 reset", "out of hours", "10-4", "copy that",

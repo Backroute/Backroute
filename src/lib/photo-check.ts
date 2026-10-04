@@ -3,7 +3,7 @@
  * copy of the picture (brightness, and how sharp its edges are), so the driver retakes it at the dock instead of
  * hearing about it hours later. PDFs and anything the browser can't open pass.
  */
-export type PhotoVerdict = { ok: true } | { ok: false; why: "dark" | "blurry" | "bright" };
+type PhotoVerdict = { ok: true } | { ok: false; why: "dark" | "blurry" | "bright" };
 
 export async function checkPhoto(file: Blob): Promise<PhotoVerdict> {
   if (!file.type.startsWith("image/") || typeof createImageBitmap === "undefined") return { ok: true };

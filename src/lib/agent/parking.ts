@@ -120,7 +120,7 @@ export async function reserveParking(ctx: CarrierContext, truck: Truck, spot: Pa
 }
 
 /** What the driver gets: the place and street address (for the truck GPS), the confirmation, and how to check in. */
-export function parkingText(r: ParkingReservation, address = r.address): string {
+function parkingText(r: ParkingReservation, address = r.address): string {
   return `Parking reserved: ${r.place}, ${address}. Confirmation ${r.confirmation}, $${r.price} for the night.${r.checkIn ? ` ${r.checkIn}` : ""} Say cancel parking if you'd rather not.`;
 }
 

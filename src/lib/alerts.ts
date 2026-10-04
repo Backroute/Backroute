@@ -1,7 +1,7 @@
 import type { ActivityEvent } from "./types";
 
 /** The only three things worth interrupting someone for. Everything else the AI does lives in its log. */
-export type AlertKind = "needs_you" | "money" | "safety";
+type AlertKind = "needs_you" | "money" | "safety";
 
 export const ALERT_LABEL: Record<AlertKind, string> = { needs_you: "Needs you", money: "Money", safety: "Safety" };
 
@@ -22,7 +22,7 @@ export function isAlert(e: ActivityEvent): boolean {
 }
 
 /** Alerts of one kind close together, shown as one line ("3 loads delivered") that opens to the list. */
-export interface AlertGroup {
+interface AlertGroup {
   id: string;
   lead: ActivityEvent;
   items: ActivityEvent[];

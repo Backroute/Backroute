@@ -48,7 +48,7 @@ function rateConStep(load: Load): string | undefined {
   return { checking: "Checking the rate con", fixing: "Getting the broker to fix the rate con", needs_you: "Rate con needs the owner's OK", signed: undefined, walked: undefined }[load.rateCon.status];
 }
 
-export function tripCardFor(stage: LoadStage): TripCard {
+function tripCardFor(stage: LoadStage): TripCard {
   if (BOOKING_STAGES.includes(stage)) return "booking";
   return stage === "dispatched" || stage === "at_pickup" ? "pickup" : "delivery";
 }

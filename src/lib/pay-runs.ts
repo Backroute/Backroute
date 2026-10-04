@@ -20,7 +20,7 @@ export function weekOf(iso: string): string {
 export const weekEnd = (monday: string) => new Date(Date.parse(`${monday}T12:00:00Z`) + 6 * DAY).toISOString().slice(0, 10);
 
 /** When a load counts as delivered, for pay. */
-export const deliveredOn = (l: Load) => (l.tripChecklist?.unloadedAt ?? l.deliveryAt ?? l.updatedAt).slice(0, 10);
+const deliveredOn = (l: Load) => (l.tripChecklist?.unloadedAt ?? l.deliveryAt ?? l.updatedAt).slice(0, 10);
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
@@ -121,7 +121,7 @@ export function payRunsCsv(runs: PayRun[], drivers: Driver[]): string {
   return [head, ...rows].map((r) => r.map(csvCell).join(",")).join("\n");
 }
 
-export interface Form1099 {
+interface Form1099 {
   driverId: string;
   name: string;
   year: number;

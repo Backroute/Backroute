@@ -12,7 +12,7 @@ import { passToOwner } from "./dispatcher";
 
 const DAY = 86400_000;
 
-export function deadlines(ctx: Pick<CarrierContext, "trucks" | "drivers">, now: number, insuranceExpires?: string | null): { key: string; due: string; days: number; text: string }[] {
+function deadlines(ctx: Pick<CarrierContext, "trucks" | "drivers">, now: number, insuranceExpires?: string | null): { key: string; due: string; days: number; text: string }[] {
   const out: { key: string; due: string; days: number; text: string }[] = [];
   // Plates, inspections, CDLs, medical cards, insurance and IFTA: a reminder 30, 14 and 7 days out, and once it's run
   // out (lib/expiry). Each is its own mark, so each goes once.

@@ -60,7 +60,7 @@ export interface Sender {
 }
 
 /** The broker by their email, or a new one (the owner sees it on the Brokers page). */
-export async function brokerFor(ctx: CarrierContext, email: string, name: string, companyName?: string | null): Promise<Broker> {
+async function brokerFor(ctx: CarrierContext, email: string, name: string, companyName?: string | null): Promise<Broker> {
   const found = email
     ? ctx.brokers.find((b) => b.email?.toLowerCase() === email.toLowerCase())
     : ctx.brokers.find((b) => !!companyName && b.company.toLowerCase() === companyName.trim().toLowerCase());
@@ -313,36 +313,6 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
     }
   }
   return { added, asked };
-}
-
-/**
- * Which of a truck's offers the AI goes for, the way a dispatcher weighs it: a load that would make the driver miss
- * their home time is out; when the driver needs to head home (or the owner said to get them home first), the one
- * that ends closest to home; otherwise the one that makes the most.
- */
-export function pickForTruck(ctx: Pick<CarrierContext, "trucks" | "drivers"> & { loads?: Load[] }, loads: Load[], now = new Date()): Load | undefined {
-  if (!loads.length) return undefined;
-  const allLoads = ctx.loads;
-  const truck = ctx.trucks.find((t) => t.id === loads[0].truckId);
-  const driver = ctx.drivers.find((d) => d.id === truck?.driverId);
-  if (!truck || !driver?.homeBase) {
-    const worth = (l: Load) => (l.netProfit ?? 0) + reloadValue(reloadOutlook(allLoads ?? loads, l.lane.destination, l.lane.destState, l.equipmentType, now.getTime()).outlook);
-    return [...loads].sort((a, b) => worth(b) - worth(a))[0];
-  }
-  // Judged when the load is done (a load for Sunday is checked against next week's home day, not today's clock).
-  const after = (l: Load) => {
-    const at = new Date(Math.max(now.getTime(), Date.parse(l.deliveryAt ?? l.pickupAt ?? "") || 0));
-    const local = driver.runType === "local" || driver.runType === "intown";
-    const d = local && at.toDateString() !== now.toDateString() ? { ...driver, hoursRemaining: 11 } : driver;
-    return homeTimeStatus(d, l.lane.destination, l.lane.destState, at);
-  };
-  const ok = loads.filter((l) => after(l).state !== "late");
-  const nowState = homeTimeStatus(driver, truck.currentCity, truck.currentState, now).state;
-  if (driver.homePriority || nowState === "head_home" || nowState === "late")
-    return ok.sort((a, b) => (after(a).hoursHome ?? 999) - (after(b).hoursHome ?? 999) || (b.netProfit ?? 0) - (a.netProfit ?? 0))[0];
-  // Thinking a load ahead: the profit, less what it'll likely take to reload where it ends (lib/agent/chain).
-  const worth = (l: Load) => (l.netProfit ?? 0) + reloadValue(reloadOutlook(allLoads ?? loads, l.lane.destination, l.lane.destState, l.equipmentType, now.getTime()).outlook);
-  return ok.sort((a, b) => worth(b) - worth(a))[0];
 }
 
 /**

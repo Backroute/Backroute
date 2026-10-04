@@ -26,7 +26,7 @@ export function floorFor(load: Pick<Load, "lane"> & Partial<Pick<Load, "partial"
 const milesOf = (load: Pick<Load, "lane"> & Partial<Pick<Load, "partial">>) => load.lane.miles * partialShare(load);
 
 /** How a broker has dealt with this carrier before (lib/agent/memory), for pricing the next load with them. */
-export interface BrokerHabits {
+interface BrokerHabits {
   /** Loads hauled for them, and what they paid on average per mile. */
   booked: number;
   avgRpm: number | null;

@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
 
 /** What each dot's color means, the same words as everywhere else. */
-export type TruckSpot = "moving" | "stop" | "late" | "empty";
+type TruckSpot = "moving" | "stop" | "late" | "empty";
 
 const SPOT_LABEL: Record<TruckSpot, string> = { moving: "Moving", stop: "At a stop", late: "Running late", empty: "Empty" };
 const SPOT_COLOR: Record<TruckSpot, string> = {
@@ -23,7 +23,7 @@ const SPOT_COLOR: Record<TruckSpot, string> = {
 
 const STYLE = { light: "https://tiles.openfreemap.org/styles/positron", dark: "https://tiles.openfreemap.org/styles/dark" };
 
-export interface FleetDot {
+interface FleetDot {
   truck: Truck;
   driver?: Driver;
   current?: Load;

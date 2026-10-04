@@ -16,7 +16,7 @@ import type { EquipmentType } from "../types";
  * The addresses are all settings, and the stand-ins used for testing implement exactly these shapes.
  */
 
-export interface MarketRate {
+interface MarketRate {
   /** Average all-in rate per mile. */
   rpm: number;
   /** The top of the usual range, when the service gives one. */
@@ -28,7 +28,7 @@ const CODE: Record<EquipmentType, string> = { "Dry Van": "VAN", Reefer: "REEFER"
 const cache = new Map<string, { at: number; rate: MarketRate | null }>();
 const FRESH = 6 * 3600_000;
 
-export const ratesConfigured = () => Boolean(process.env.GREENSCREENS_API_KEY || process.env.RATES_API_URL || (process.env.DAT_RATES_URL && process.env.DAT_SERVICE_EMAIL));
+const ratesConfigured = () => Boolean(process.env.GREENSCREENS_API_KEY || process.env.RATES_API_URL || (process.env.DAT_RATES_URL && process.env.DAT_SERVICE_EMAIL));
 
 function at(obj: unknown, path: string): unknown {
   return path.split(".").reduce<unknown>((o, k) => (o && typeof o === "object" ? (o as Record<string, unknown>)[k] : undefined), obj);

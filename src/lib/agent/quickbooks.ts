@@ -38,7 +38,7 @@ export interface QuickbooksConfig {
   lastSync?: string;
 }
 
-export class QuickbooksError extends Error {}
+class QuickbooksError extends Error {}
 
 // ─── Connecting ──────────────────────────────────────────────────────────────
 

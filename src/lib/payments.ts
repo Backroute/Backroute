@@ -6,18 +6,18 @@ import type { Broker, Load } from "./types";
 const FUNDING_CUTOFF_HOUR = 11;
 const FUNDED_BY_HOUR = 17;
 /** Recourse factoring: if the broker hasn't paid the factor by then, the advance is charged back to the carrier. */
-export const RECOURSE_DAYS = 90;
+const RECOURSE_DAYS = 90;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type PaymentState = "held" | "submitted" | "funded" | "invoiced" | "overdue" | "paid";
 
-export interface PaymentStep {
+interface PaymentStep {
   label: string;
   detail?: string;
   state: "done" | "current" | "todo" | "problem";
 }
 
-export interface PaymentStatus {
+interface PaymentStatus {
   method: "factoring" | "direct";
   state: PaymentState;
   /** Linehaul plus approved extras (detention, lumper) that went on this invoice. */
@@ -40,7 +40,7 @@ const shortDate = (d: Date) => `${MONTH[d.getMonth()]} ${d.getDate()}`;
 const isWeekend = (d: Date) => d.getDay() === 0 || d.getDay() === 6;
 
 /** When a factoring submission funds: same business day if it's in before the cutoff, otherwise the next one. */
-export function fundingTime(submitted: Date): Date {
+function fundingTime(submitted: Date): Date {
   const d = new Date(submitted);
   const sameDay = !isWeekend(d) && d.getHours() < FUNDING_CUTOFF_HOUR;
   if (!sameDay) {

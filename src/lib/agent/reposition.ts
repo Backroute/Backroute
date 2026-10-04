@@ -22,14 +22,14 @@ const IDLE_HOURS = 12;
 const BUSY = new Set<Load["stage"]>(["negotiating", "booked", "rate_confirmed", "dispatched", "at_pickup", "in_transit", "at_delivery"]);
 
 /** When the truck's last load was unloaded (the driver's tap), or when it was marked delivered. Later paperwork doesn't count. */
-export function emptySince(ctx: Pick<CarrierContext, "loads">, truck: Truck): number | null {
+function emptySince(ctx: Pick<CarrierContext, "loads">, truck: Truck): number | null {
   const at = (l: Load) => Date.parse(l.tripChecklist?.unloadedAt ?? l.updatedAt);
   const last = ctx.loads.filter((l) => l.truckId === truck.id && l.stage === "delivered").sort((a, b) => at(b) - at(a))[0];
   return last ? at(last) : null;
 }
 
 /** Where the freight is: origins of loads seen lately, counted, with how far each is from the truck. */
-export function markets(ctx: Pick<CarrierContext, "loads">, truck: Truck, now: number, equipmentOnly = true) {
+function markets(ctx: Pick<CarrierContext, "loads">, truck: Truck, now: number, equipmentOnly = true) {
   const counts = new Map<string, { city: string; state: string; loads: number }>();
   for (const l of ctx.loads) {
     if (Date.parse(l.createdAt ?? l.updatedAt) < now - 21 * DAY) continue;

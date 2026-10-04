@@ -23,7 +23,7 @@ const APPS: { name: string; re: RegExp }[] = [
   { name: "Highway", re: /highway (app|tracking)/i },
 ];
 
-export interface TrackingNeed {
+interface TrackingNeed {
   app: string | null;
   link: string | null;
 }

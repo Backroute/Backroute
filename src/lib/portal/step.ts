@@ -18,7 +18,7 @@ import type { PortalStepLog, PortalTask } from "./types";
  * is let through only when it's safe (lib/portal/tasks says when), otherwise it waits for the owner.
  */
 
-export interface PageElement {
+interface PageElement {
   i: number;
   tag: string;
   type?: string;
@@ -31,7 +31,7 @@ export interface PageElement {
   disabled?: boolean;
 }
 
-export interface PageSnapshot {
+interface PageSnapshot {
   url: string;
   title: string;
   text: string;
@@ -40,14 +40,14 @@ export interface PageSnapshot {
   screenshot?: string;
 }
 
-export interface LastResult {
+interface LastResult {
   ok: boolean;
   error?: string;
   /** A file the page gave when the worker clicked download. */
   download?: { name: string; contentType: string; base64: string };
 }
 
-export type WorkerAction =
+type WorkerAction =
   | { do: "click"; element: number; download?: boolean }
   | { do: "check" | "uncheck"; element: number }
   | { do: "fill"; element: number; value: string }
@@ -86,7 +86,7 @@ type Decision = z.infer<typeof Decision>;
 // ─── Facts for the AI ────────────────────────────────────────────────────────
 
 const money = (n: number) => `$${n.toLocaleString("en-US")}`;
-export const agreedRate = (load: Load) => load.bookedRate ?? load.bookRequest?.ask ?? load.targetRate;
+const agreedRate = (load: Load) => load.bookedRate ?? load.bookRequest?.ask ?? load.targetRate;
 const accountEmail = (ctx: CarrierContext) => (ctx.carrier.inbound_key ? inboundAddress(ctx.carrier.inbound_key) : null) ?? ctx.settings.remitEmail ?? null;
 
 async function carrierFacts(ctx: CarrierContext): Promise<string> {

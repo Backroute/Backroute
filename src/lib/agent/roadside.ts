@@ -30,7 +30,7 @@ const PLACES = () => process.env.PLACES_API_BASE?.replace(/\/$/, "") ?? "https:/
 const ROLLING = new Set<Load["stage"]>(["dispatched", "at_pickup", "in_transit", "at_delivery"]);
 
 /** What to search for, from how the driver described it. */
-export function helpFor(details: string): string {
+function helpFor(details: string): string {
   if (/\b(tire|tyre|flat|blow ?out|blew)\b/i.test(details)) return "semi truck tire repair";
   if (/\b(tow|wreck|won'?t (start|move)|can'?t (move|drive)|stuck|ditch)\b/i.test(details)) return "heavy duty towing";
   return "semi truck repair";
@@ -49,7 +49,7 @@ interface PlacesAnswer {
 
 type Place = Omit<RoadsideShop, "phone"> & { phone?: string };
 
-export async function findShops(what: string, near: { lat: number; lon: number } | null, whereText: string): Promise<RoadsideShop[]> {
+async function findShops(what: string, near: { lat: number; lon: number } | null, whereText: string): Promise<RoadsideShop[]> {
   return (await searchPlaces(what, near, whereText)).filter((p): p is RoadsideShop => !!p.phone).slice(0, 3);
 }
 
@@ -260,7 +260,7 @@ async function readShopAnswer(said: string): Promise<z.infer<typeof ShopAnswer>>
 }
 
 /** What the shop said. Returns the words to say back and whether the call is over. */
-export async function shopCallTurn(ctx: CarrierContext, truck: Truck, said: string): Promise<{ reply: string; hangUp: boolean }> {
+async function shopCallTurn(ctx: CarrierContext, truck: Truck, said: string): Promise<{ reply: string; hangUp: boolean }> {
   const r = truck.roadside;
   if (!r) return { reply: "Sorry, wrong number. Thanks.", hangUp: true };
   const shop = r.shops[r.calling];

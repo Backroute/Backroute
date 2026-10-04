@@ -15,11 +15,11 @@ import { event } from "./dispatcher";
  * CREDIT_API_NAME.
  */
 
-export const creditConfigured = () => Boolean(process.env.CREDIT_API_URL);
-export const DEFAULT_MIN_CREDIT = 70;
+const creditConfigured = () => Boolean(process.env.CREDIT_API_URL);
+const DEFAULT_MIN_CREDIT = 70;
 /** Days to pay past which the AI asks for more, and the extra. */
-export const SLOW_DAYS = 40;
-export const SLOW_PAY_PCT = 4;
+const SLOW_DAYS = 40;
+const SLOW_PAY_PCT = 4;
 const FRESH = 7 * 86400_000;
 const DAY = 86400_000;
 
@@ -29,7 +29,7 @@ function at(obj: unknown, path: string): unknown {
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v.trim() && Number.isFinite(Number(v)) ? Number(v) : null);
 
 /** The credit service's answer for an MC number: a score out of 100 and days to pay, either null when it has none. */
-export async function creditLookup(mc: string): Promise<{ score: number | null; daysToPay: number | null } | null> {
+async function creditLookup(mc: string): Promise<{ score: number | null; daysToPay: number | null } | null> {
   if (!creditConfigured()) return null;
   try {
     const url = process.env.CREDIT_API_URL!.replace(/\{\{mc\}\}/g, encodeURIComponent(mc));
@@ -47,12 +47,12 @@ export async function creditLookup(mc: string): Promise<{ score: number | null; 
 }
 
 /** Average days from invoice to payment on this broker's loads the carrier was paid for; null under two. */
-export function ownDaysToPay(loads: Load[], brokerId: string): number | null {
+function ownDaysToPay(loads: Load[], brokerId: string): number | null {
   const paid = loads.filter((l) => l.brokerId === brokerId && l.invoice?.sentAt && l.invoice.paidAt).map((l) => (Date.parse(l.invoice!.paidAt!) - Date.parse(l.invoice!.sentAt!)) / DAY);
   return paid.length >= 2 ? Math.round(paid.reduce((a, b) => a + b, 0) / paid.length) : null;
 }
 
-export interface CreditVerdict {
+interface CreditVerdict {
   broker: Broker;
   /** Under the owner's lowest score: don't book on the AI's own. */
   blocked: boolean;

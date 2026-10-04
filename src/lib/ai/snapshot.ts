@@ -11,7 +11,7 @@ import { PRIMARY_CARRIER_ID } from "../mock-data";
  */
 
 /** The parts of the app's state a snapshot reads. */
-export interface StoreSnapshotSource {
+interface StoreSnapshotSource {
   carriers: Carrier[];
   trucks: Truck[];
   drivers: Driver[];

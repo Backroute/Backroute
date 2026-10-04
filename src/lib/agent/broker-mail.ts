@@ -44,7 +44,7 @@ const Reading = z.object({
   appointmentLocal: z.string().nullable(),
   appointmentConfirmation: z.string().nullable(),
 });
-export type BrokerMailReading = z.infer<typeof Reading>;
+type BrokerMailReading = z.infer<typeof Reading>;
 /** A load a broker offered. The partial's size is optional for feeds and boards that don't say. */
 export type OfferReading = Omit<z.infer<typeof Offer>, "partial" | "pallets" | "lengthFeet"> & Partial<Pick<z.infer<typeof Offer>, "partial" | "pallets" | "lengthFeet">>;
 

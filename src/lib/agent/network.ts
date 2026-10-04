@@ -37,7 +37,7 @@ export async function shareFacilityVisits(ctx: CarrierContext, now: number): Pro
 }
 
 /** The shared record for one facility: how many visits and the average time, or null under three visits. */
-export async function networkStats(name: string | null | undefined, city: string, state: string): Promise<FacilityStats | null> {
+async function networkStats(name: string | null | undefined, city: string, state: string): Promise<FacilityStats | null> {
   if (!name || !norm(name)) return null;
   const { data, error } = await admin().from("facility_visits").select("minutes").eq("name_key", norm(name)).eq("city", city.toLowerCase()).eq("state", state.toUpperCase()).order("at", { ascending: false }).limit(200);
   if (error || !data || data.length < MIN_VISITS) return null;

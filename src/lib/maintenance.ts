@@ -27,7 +27,7 @@ export function inspectionStatus(truck: Truck, now: number): ServiceStatus {
 const DAY = 86400_000;
 
 /** How many miles a day the truck has been running lately, from its loads (loaded and empty miles). */
-export function milesPerDay(truck: Truck, loads: Load[], now: number, days = 30): number {
+function milesPerDay(truck: Truck, loads: Load[], now: number, days = 30): number {
   const since = now - days * DAY;
   const miles = loads
     .filter((l) => l.truckId === truck.id && l.stage === "delivered" && Date.parse(l.updatedAt) >= since)

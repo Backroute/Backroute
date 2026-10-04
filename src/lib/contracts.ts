@@ -20,7 +20,7 @@ export function upcomingPickups(lane: ContractLane, from: string, through: strin
   return out;
 }
 
-export interface ContractLoadPlan {
+interface ContractLoadPlan {
   shipper: Broker;
   lane: ContractLane;
   date: string;

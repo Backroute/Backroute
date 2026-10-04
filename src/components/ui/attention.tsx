@@ -19,7 +19,7 @@ const EDGE: Record<AttentionTone, string> = {
   done: "bg-[var(--accent-live)]",
 };
 
-export const TONE_LABEL: Record<AttentionTone, string> = {
+const TONE_LABEL: Record<AttentionTone, string> = {
   urgent: "Needs a decision now",
   waiting: "Waiting on you",
   info: "For your information",

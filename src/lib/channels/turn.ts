@@ -9,7 +9,7 @@ import type { CallReply } from "./ivr";
 import { forCarrier } from "../agent/scope";
 import { driverCallReply, ownerCallReply } from "./voice";
 
-export type TurnKind = "driver" | "broker" | "shop" | "owner" | "facility";
+type TurnKind = "driver" | "broker" | "shop" | "owner" | "facility";
 
 /**
  * One turn of a phone call: what the other person just said, and what the AI says back (and whether it hangs up).

@@ -28,7 +28,7 @@ const HOUR = 60 * MIN;
 const BEFORE_PICKUP: LoadStage[] = ["rate_confirmed", "booked", "dispatched"];
 const ROLLING: LoadStage[] = ["at_pickup", "in_transit"];
 
-export interface Due {
+interface Due {
   load: Load;
   driver: Driver;
   kind: CheckinKind;
@@ -42,7 +42,7 @@ const hasPod = (l: Load) => l.documents.some((d) => d.type === "pod" && d.status
  * What's due right now, at most one per load: pure, so the timing rules can be read and tested on their own.
  * `marks` holds what was already sent ("loadId:kind" → when).
  */
-export function dueCheckins(ctx: Pick<CarrierContext, "loads" | "trucks" | "drivers">, marks: Map<string, { at: string }>, now: number): Due[] {
+function dueCheckins(ctx: Pick<CarrierContext, "loads" | "trucks" | "drivers">, marks: Map<string, { at: string }>, now: number): Due[] {
   const due: Due[] = [];
   for (const load of ctx.loads) {
     const truck = ctx.trucks.find((t) => t.id === load.truckId);

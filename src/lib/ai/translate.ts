@@ -12,7 +12,7 @@ import { AI_MODEL, FALLBACK, aiConfigured, claude } from "./server";
 const SYSTEM = (language: string) => `Translate this email from a trucking dispatcher into ${language}. Keep it just as short, plain and friendly, the way a dispatcher who speaks ${language} would write it. Copy exactly, character for character: every dollar amount (like $1,600), every number, load reference, MC number, email address, web address, company and person name, and the signature lines. Output only the translated email, nothing else.`;
 
 /** The pieces that must come through untouched: money, numbers, references, addresses. */
-export function mustKeep(text: string): string[] {
+function mustKeep(text: string): string[] {
   const keep = new Set<string>();
   for (const m of text.matchAll(/\$[\d,]+(?:\.\d{2})?|\b[A-Z]{2,}-?\d[\w-]*|\S+@\S+\.\w+|https?:\/\/\S+|\b\d[\d,]*(?:\.\d+)?\b/g)) keep.add(m[0].replace(/[.,;:)]+$/, ""));
   return [...keep].filter(Boolean);

@@ -1,4 +1,4 @@
-export interface Addon {
+interface Addon {
   id: string;
   name: string;
   tagline: string;

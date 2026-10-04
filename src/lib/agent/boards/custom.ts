@@ -15,7 +15,7 @@ import { BoardError, type Board, type BoardLoad, type BoardQuery } from "./types
 
 const CODE = { "Dry Van": "V", Reefer: "R", Flatbed: "F", Container: "C" } as const;
 
-export function fill(template: string, q: BoardQuery, encode: (s: string) => string = (s) => s): string {
+function fill(template: string, q: BoardQuery, encode: (s: string) => string = (s) => s): string {
   const values: Record<string, string> = {
     originCity: q.originCity,
     originState: q.originState,
@@ -27,7 +27,7 @@ export function fill(template: string, q: BoardQuery, encode: (s: string) => str
   return template.replace(/\{\{(\w+)\}\}/g, (_, k: string) => encode(values[k] ?? ""));
 }
 
-export function at(obj: unknown, path: string): unknown {
+function at(obj: unknown, path: string): unknown {
   return path.split(".").reduce<unknown>((o, k) => (o && typeof o === "object" ? (o as Record<string, unknown>)[k] : undefined), obj);
 }
 

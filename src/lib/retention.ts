@@ -41,7 +41,7 @@ function history(driver: Driver) {
  * What a real account knows, instead of the demo's made-up history: when the driver was last home (ELD), their pay
  * from the loads they ran, how long docks kept them, and the last weekly check-in and how they said they were.
  */
-export interface RealHistory {
+interface RealHistory {
   loads: Load[];
   truckId: string | null;
 }

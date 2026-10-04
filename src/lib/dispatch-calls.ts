@@ -59,7 +59,7 @@ function hash(s: string): number {
 const from = <T,>(arr: T[], seed: number) => arr[seed % arr.length];
 
 /** "482719" → "4 8 2, 7 1 9": the way a dispatcher reads a number so it sticks. Digits are read in any language. */
-export function sayDigits(n: string): string {
+function sayDigits(n: string): string {
   const groups = n.match(/.{1,3}/g) ?? [n];
   return groups.map((g) => g.split("").join(" ")).join(", ");
 }
@@ -78,7 +78,7 @@ export function lateOnThisLoad(loadId: string): boolean {
   return hash(loadId + "late") % 10 < 3;
 }
 
-export type QuietState = { kind: "sleeper" | "off_duty" } | { kind: "early"; hour: number } | null;
+type QuietState = { kind: "sleeper" | "off_duty" } | { kind: "early"; hour: number } | null;
 
 /** Why a call can't ring right now, or null when it can. Sleeper and off duty are never interrupted. */
 export function quietState(driver: Driver, now: Date): QuietState {
@@ -105,7 +105,7 @@ interface NewCall {
   options?: DispatchCallOption[];
 }
 
-export function newDispatchCall({ kind, driver, load, facts = {}, options }: NewCall): DispatchCall {
+function newDispatchCall({ kind, driver, load, facts = {}, options }: NewCall): DispatchCall {
   return {
     id: `dcall-${Math.random().toString(36).slice(2, 10)}`,
     driverId: driver.id,
@@ -405,7 +405,7 @@ const PREF_VALUES: Record<PrefKey, DriverPrefs> = {
 };
 
 /** The driver's call settings in plain words, for the end of the setup call and the Profile page. */
-export function describePrefs(prefs: DriverPrefs, lang: Lang = "en"): string[] {
+function describePrefs(prefs: DriverPrefs, lang: Lang = "en"): string[] {
   const L = pack(lang);
   const avoid = prefs.avoidStates ?? [];
   return [

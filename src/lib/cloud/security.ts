@@ -73,7 +73,7 @@ function deviceId(): string {
 }
 
 /** "Chrome on Mac", "Safari on iPhone". */
-export function deviceLabel(ua = typeof navigator === "undefined" ? "" : navigator.userAgent): string {
+function deviceLabel(ua = typeof navigator === "undefined" ? "" : navigator.userAgent): string {
   const os = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android" : /Mac OS X/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "a device";
   const browser = /Edg\//.test(ua) ? "Edge" : /CriOS|Chrome\//.test(ua) ? "Chrome" : /FxiOS|Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "Browser";
   const standalone = typeof window !== "undefined" && window.matchMedia?.("(display-mode: standalone)").matches;

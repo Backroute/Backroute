@@ -71,7 +71,7 @@ export const onSite = (host: string, site: string) => host === site || host.ends
 
 const bindOf = (carrierId: string, kind: "login" | "fact", site: string, field: "secret" | "totp" = "secret") => `${carrierId}|${kind}|${site}|${field}`;
 
-export interface LoginSummary {
+interface LoginSummary {
   id: string;
   site: string;
   label: string;
@@ -123,7 +123,7 @@ export async function forget(carrierId: string, id: string) {
   if (error) throw error;
 }
 
-export interface OpenLogin {
+interface OpenLogin {
   site: string;
   username: string | null;
   password: string;

@@ -9,7 +9,7 @@ import { pack } from "@/lib/lang";
 
 /** The owner's end-of-day text: what got done, what it made, and the one thing that needs them — for owners who'll
  *  never open a dashboard but read every text. */
-export function useDailyText(): string | null {
+function useDailyText(): string | null {
   const now = useNow();
   const carrier = usePrimaryCarrier();
   const loads = useCarrierLoads();

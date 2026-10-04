@@ -31,7 +31,7 @@ Get what a dispatcher needs to see if a truck fits: pickup city and state, deliv
 
 ${TRUCKING}`;
 
-export interface DeskResult {
+interface DeskResult {
   reply: string;
   hangUp: boolean;
   carrierId?: string;

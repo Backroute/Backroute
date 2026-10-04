@@ -15,7 +15,7 @@ import { admin, claimMark, logChannel, type CarrierContext } from "./db";
 
 const DAY = 86400_000;
 
-export interface WeeklyReview {
+interface WeeklyReview {
   week: string;
   from: string;
   to: string;
@@ -36,7 +36,7 @@ export interface WeeklyReview {
 }
 
 /** "2026-W40" for the week an instant is in (ISO weeks, Monday first). */
-export function isoWeek(at: number): string {
+function isoWeek(at: number): string {
   const d = new Date(at);
   const day = (d.getUTCDay() + 6) % 7;
   d.setUTCDate(d.getUTCDate() - day + 3);
@@ -53,7 +53,7 @@ const pay = (l: Load) => l.invoice?.amount ?? l.bookedRate ?? 0;
 const netOf = (l: Load) => l.netProfit ?? pay(l) - (l.fuelCost ?? 0) - (l.tollCost ?? 0) - (l.deadheadCost ?? 0) - (l.commission ?? 0);
 
 /** The review of the 7 days before `now`. */
-export function reviewFor(ctx: CarrierContext, now: number): WeeklyReview {
+function reviewFor(ctx: CarrierContext, now: number): WeeklyReview {
   const from = now - 7 * DAY;
   const week = deliveredIn(ctx.loads, from, now);
   const last = deliveredIn(ctx.loads, from - 7 * DAY, from);
@@ -141,7 +141,7 @@ const WEEKDAYS = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "
  * slower (or faster) than their terms, a lane that pays more on one day of the week, a broker who takes the first
  * number. Each says what it means for the carrier. At most three.
  */
-export function learnedFrom(ctx: Pick<CarrierContext, "loads" | "brokers">, now: number): string[] {
+function learnedFrom(ctx: Pick<CarrierContext, "loads" | "brokers">, now: number): string[] {
   const out: string[] = [];
   const nameOf = (id: string) => ctx.brokers.find((b) => b.id === id)?.company ?? "A broker";
   // Pay speed, from invoices paid in the last 90 days.
@@ -186,7 +186,7 @@ export function learnedFrom(ctx: Pick<CarrierContext, "loads" | "brokers">, now:
 }
 
 /** The review as a text: the numbers in two lines, then the one change. */
-export function reviewText(r: WeeklyReview, carrier: string): string {
+function reviewText(r: WeeklyReview, carrier: string): string {
   const delta = r.lastWeekGross ? Math.round(((r.gross - r.lastWeekGross) / r.lastWeekGross) * 100) : null;
   return [
     `${carrier}, your week: ${r.loads} load${r.loads === 1 ? "" : "s"}, ${money(r.gross)}${delta !== null ? ` (${delta >= 0 ? "+" : ""}${delta}% on last week)` : ""}, ${money(r.net)} after costs.`,

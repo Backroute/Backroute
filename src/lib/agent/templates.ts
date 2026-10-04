@@ -213,7 +213,7 @@ Thanks,
 ${signature(carrier, settings)}`;
 }
 
-export interface DetentionFacts {
+interface DetentionFacts {
   stop: "pickup" | "delivery";
   arrived: string;
   left: string;

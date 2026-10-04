@@ -8,7 +8,7 @@ import { useSyncExternalStore } from "react";
  * phone's own settings.
  */
 
-export type Haptic = "tap" | "success" | "warning";
+type Haptic = "tap" | "success" | "warning";
 export type Chime = "approve" | "delivered" | "paid";
 
 const PATTERN: Record<Haptic, number | number[]> = { tap: 8, success: [10, 50, 16], warning: [24, 60, 24] };
@@ -42,7 +42,7 @@ export function haptic(kind: Haptic = "tap") {
 const SOUND_KEY = "backroute.sounds";
 const SOUND_EVENT = "backroute:sounds";
 
-export function soundsOn(): boolean {
+function soundsOn(): boolean {
   try {
     return localStorage.getItem(SOUND_KEY) !== "off";
   } catch {

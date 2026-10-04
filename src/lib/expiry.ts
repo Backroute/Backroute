@@ -8,10 +8,9 @@ import type { Driver, Truck } from "./types";
 
 const DAY = 86400_000;
 
-export const REMIND_AT = [30, 14, 7] as const;
-export type Stage = 30 | 14 | 7 | 0;
+type Stage = 30 | 14 | 7 | 0;
 
-export interface PaperworkItem {
+interface PaperworkItem {
   /** Stable for this item and this due date: a renewed date is a new reminder cycle. */
   key: string;
   kind: "registration" | "inspection" | "cdl" | "med_card" | "insurance" | "ifta_return" | "ifta_decals";

@@ -58,7 +58,7 @@ async function post<T>(path: string, body: BodyInit, json: boolean, timeoutMs: n
   }
 }
 
-export interface ChatTurn {
+interface ChatTurn {
   from: "user" | "ai";
   text: string;
 }
@@ -70,7 +70,7 @@ export async function askAi(body: { role: "owner" | "driver"; question: string; 
 }
 
 /** What was agreed on the load, for the rate con reader to check the paper against. */
-export interface AgreedTerms {
+interface AgreedTerms {
   broker: string;
   rate: number;
   origin: string;
@@ -82,14 +82,14 @@ export interface AgreedTerms {
   paymentTerms: string;
 }
 
-export interface RateConMismatch {
+interface RateConMismatch {
   item: string;
   agreed: string;
   onDoc: string;
   serious: boolean;
 }
 
-export interface RateConReading {
+interface RateConReading {
   isRateCon: boolean;
   broker: string | null;
   brokerMc: string | null;
@@ -118,7 +118,7 @@ export interface RateConReading {
   summary: string;
 }
 
-export type RateConResult = { ok: true; reading: RateConReading } | { ok: false; reason: "off" | "failed" };
+type RateConResult = { ok: true; reading: RateConReading } | { ok: false; reason: "off" | "failed" };
 
 /** Sends a rate con PDF to the real AI. Unlike chat there's no scripted stand-in: a PDF needs the real thing. */
 export async function readRateCon(file: File, agreed: AgreedTerms | null): Promise<RateConResult> {

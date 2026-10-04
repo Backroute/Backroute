@@ -30,9 +30,9 @@ import { tripEtas } from "./trips";
  * when the account allows it and skipped quietly when it doesn't.
  */
 
-export type EldKind = "samsara" | "motive";
+type EldKind = "samsara" | "motive";
 
-export interface EldVehicle {
+interface EldVehicle {
   unit: string;
   lat: number;
   lon: number;
@@ -40,14 +40,14 @@ export interface EldVehicle {
   description?: string;
   odometerMiles?: number;
 }
-export interface EldFault {
+interface EldFault {
   unit: string;
   code: string;
   description: string;
   lamp?: "red" | "amber" | "protect" | "mil" | null;
   at: string;
 }
-export interface EldClock {
+interface EldClock {
   driverName: string;
   /** Hours left. */
   drive: number;
@@ -199,7 +199,7 @@ const sameUnit = (a: string, b: string) => {
 const sameName = (a: string, b: string) => key(a) === key(b) || key(a.split(/\s+/).reverse().join("")) === key(b);
 
 /** "Dallas, TX" or "1200 Main St, Dallas, TX 75201" → city and state. */
-export function cityState(description?: string): { city: string; state: string } | null {
+function cityState(description?: string): { city: string; state: string } | null {
   const m = description?.match(/([A-Za-z .'-]+),\s*([A-Z]{2})\b(?:\s*\d{5})?(?:,?\s*(?:USA|US|Canada))?\s*$/);
   return m ? { city: m[1].trim(), state: m[2] } : null;
 }
@@ -279,7 +279,7 @@ const MPH = 50;
 const RESET_HOURS = 10;
 
 /** When the truck gets there, from where it is now and the driver's hours. Null when there's nothing solid to go on. */
-export function etaTo(truck: Truck, driver: Driver | undefined, city: string, state: string, now: number): number | null {
+function etaTo(truck: Truck, driver: Driver | undefined, city: string, state: string, now: number): number | null {
   const pos = truck.position;
   const target = roughCoords(city, state);
   if (!pos || !target?.exact || now - Date.parse(pos.at) > 30 * 60_000) return null;
@@ -392,7 +392,7 @@ export function canMakePickup(driver: Driver | undefined, deadheadMiles: number,
 
 
 /** The rate con asks for tracking or check calls (or the owner wants them on every load). */
-export function wantsCheckCalls(load: Load, always: boolean | undefined): boolean {
+function wantsCheckCalls(load: Load, always: boolean | undefined): boolean {
   if (always) return true;
   const r = load.rateConReading;
   const text = [...(r?.otherConcerns ?? []), ...(r?.finesAndFees ?? []), r?.summary ?? ""].join(" ");

@@ -15,7 +15,7 @@ export interface WeatherAlert {
 
 const MATTERS = /winter|ice|freez|blizzard|snow|wind|dust|fog|flood|tornado|hurricane|tropical|storm|heat/i;
 
-export const weatherOn = () => process.env.WEATHER_ALERTS !== "off";
+const weatherOn = () => process.env.WEATHER_ALERTS !== "off";
 
 // Warnings change slowly: the same few miles asked again within 15 minutes (every truck, every round, on any server)
 // is answered from the cache (lib/agent/lookup-cache).

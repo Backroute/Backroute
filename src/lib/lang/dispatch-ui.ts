@@ -4,7 +4,7 @@ import type { Lang } from "../types";
 /** The driver app's words for how dispatch reaches them: notifications, SMS or WhatsApp, the morning text, consent. */
 export type QuickKey = "onWay" | "late" | "loaded" | "waiting" | "lumper" | "onTime" | "parking" | "unloaded" | "nextLoad" | "goHome" | "dayOff" | "address";
 
-export interface DispatchUi {
+interface DispatchUi {
   title: string;
   alerts: AlertWords;
   textsBy: string;

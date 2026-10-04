@@ -1,4 +1,5 @@
 import "server-only";
+import { parseCsvRecords } from "../csv";
 import type { OfferReading } from "./broker-mail";
 import { offersFromEmail } from "./booking";
 import type { CarrierContext } from "./db";
@@ -74,38 +75,6 @@ export function toRow(r: Record<string, unknown>): FeedRow | null {
   return row;
 }
 
-/** A small CSV reader: a header row, commas, and double-quoted fields that may hold commas or quotes. */
-export function parseCsv(text: string): Record<string, string>[] {
-  const rows: string[][] = [];
-  let field = "";
-  let row: string[] = [];
-  let quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (quoted) {
-      if (c === '"' && text[i + 1] === '"') {
-        field += '"';
-        i++;
-      } else if (c === '"') quoted = false;
-      else field += c;
-    } else if (c === '"') quoted = true;
-    else if (c === ",") {
-      row.push(field);
-      field = "";
-    } else if (c === "\n" || c === "\r") {
-      if (c === "\r" && text[i + 1] === "\n") i++;
-      row.push(field);
-      if (row.some((f) => f.trim())) rows.push(row);
-      row = [];
-      field = "";
-    } else field += c;
-  }
-  row.push(field);
-  if (row.some((f) => f.trim())) rows.push(row);
-  const [header, ...body] = rows;
-  if (!header) return [];
-  return body.map((r) => Object.fromEntries(header.map((h, i) => [h.trim(), r[i] ?? ""])));
-}
 
 export class FeedError extends Error {}
 
@@ -120,7 +89,7 @@ export async function readFeed(cfg: FeedConfig): Promise<FeedRow[]> {
   if (!res.ok) throw new FeedError(`The feed answered ${res.status}.`);
   const text = await res.text();
   let raw: Record<string, unknown>[];
-  if (cfg.format === "csv") raw = parseCsv(text);
+  if (cfg.format === "csv") raw = parseCsvRecords(text);
   else {
     let body: unknown;
     try {

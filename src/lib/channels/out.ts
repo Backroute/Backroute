@@ -106,7 +106,7 @@ async function heldForYes(carrierId: string, driverId: string) {
   await pushToOffice(carrierId, { title: message, body: detail, url: "/carrier/settings", tag: `consent-${driverId}` }).catch(() => 0);
 }
 
-export interface EmailOut {
+interface EmailOut {
   to: string;
   subject: string;
   text: string;
@@ -149,9 +149,6 @@ export async function callTo(c: Sender, to: string, url: string | null, call: { 
   if (!url) throw new Error("No public address for the call (set PUBLIC_BASE_URL).");
   return (await startCall(to, url, { machineDetection: call.machineDetection })) ?? "";
 }
-
-/** Whether an id from textTo / emailTo / callTo is a real send (not held or waiting to retry). */
-export const wentOut = (id: string | null | undefined) => !!id && !id.startsWith("held:") && !id.startsWith("queued:");
 
 /**
  * The dispatcher's rounds: sends again what failed, oldest first, with backoff. Gives up on a text after 30 minutes

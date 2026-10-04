@@ -10,7 +10,7 @@ import type { Load } from "../types";
 const DAY = 86400_000;
 const LATE_MIN = 30;
 
-export interface CarrierRecord {
+interface CarrierRecord {
   loads: number;
   /** Stops with an appointment and an arrival time, and how many were on time. */
   timedStops: number;

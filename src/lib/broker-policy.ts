@@ -7,9 +7,9 @@ export type BrokerPolicy = "normal" | "surcharge" | "block";
 export const STANDARD_TERMS_DAYS = 30;
 /** What the AI adds to its ask for a slow-paying broker: roughly the cost of waiting a few extra weeks for the
  *  money, or of factoring it. Some brokers will say no, and the load goes to someone else. */
-export const SLOW_PAY_SURCHARGE_PCT = 4;
+const SLOW_PAY_SURCHARGE_PCT = 4;
 
-export interface BrokerAssessment {
+interface BrokerAssessment {
   policy: BrokerPolicy;
   /** What the AI would do on its own, before any override from the carrier. */
   auto: BrokerPolicy;

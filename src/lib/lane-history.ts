@@ -5,7 +5,7 @@ import type { Load } from "./types";
  * paid what the lane is worth, and which way it's going. A lane is state to state, so a few loads add up to a line.
  */
 
-export interface LanePoint {
+interface LanePoint {
   /** yyyy-mm */
   month: string;
   yours: number;
@@ -14,7 +14,7 @@ export interface LanePoint {
   loads: number;
 }
 
-export interface LaneHistory {
+interface LaneHistory {
   key: string;
   label: string;
   loads: number;

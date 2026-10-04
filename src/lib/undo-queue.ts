@@ -6,7 +6,7 @@ import { useSyncExternalStore } from "react";
  * A one-move action (a swipe) that waits a few seconds before it counts, with Undo. It lives outside any one screen,
  * so leaving the page doesn't lose it: when its time is up it runs wherever the owner is.
  */
-export interface Pending {
+interface Pending {
   id: string;
   label: string;
   at: number;

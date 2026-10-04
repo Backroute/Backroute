@@ -479,7 +479,7 @@ function WaitingOn({ text }: { text: string }) {
 }
 
 /** The map bleeds to the card's edges with the status floating on it and a fade into the sheet below. */
-export function MapHeader({
+function MapHeader({
   from,
   to,
   laneKey,

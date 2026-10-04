@@ -2,7 +2,7 @@ import type { Load } from "./types";
 
 /** Compliance & IFTA AI: estimates miles run per state from lane data (half attributed to origin, half to destination —
  *  a reasonable approximation without full routing/ELD breadcrumb data), and the quarterly fuel tax it implies. */
-export interface StateMiles {
+interface StateMiles {
   state: string;
   miles: number;
 }
@@ -20,7 +20,7 @@ export function estimateMilesByState(loads: Load[]): StateMiles[] {
 }
 
 /** Blended average net IFTA rate across states — a placeholder estimate, not a filing-ready figure. */
-export const IFTA_NET_RATE_PER_GALLON = 0.24;
+const IFTA_NET_RATE_PER_GALLON = 0.24;
 
 export function estimateFuelTaxOwed(totalMiles: number, avgMpg: number): number {
   const gallons = totalMiles / avgMpg;

@@ -25,7 +25,7 @@ export function weatherFactor(alerts: Pick<WeatherAlert, "event">[]): number {
   return f;
 }
 
-export interface Eta {
+interface Eta {
   at: number;
   /** Why it's later than a plain drive would be, in a few words each ("traffic adds 40 min", "winter storm warning"). */
   reasons: string[];

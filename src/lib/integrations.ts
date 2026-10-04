@@ -1,4 +1,4 @@
-export interface IntegrationItem {
+interface IntegrationItem {
   id: string;
   name: string;
   connected: boolean;
@@ -6,7 +6,7 @@ export interface IntegrationItem {
   detail: string;
 }
 
-export interface IntegrationCategory {
+interface IntegrationCategory {
   name: string;
   items: IntegrationItem[];
 }

@@ -22,7 +22,7 @@ const Reading = z.object({
   isFleetList: z.boolean().describe("False if the picture isn't a list of trucks or drivers"),
   rows: z.array(Row),
 });
-export type FleetRow = z.infer<typeof Row>;
+type FleetRow = z.infer<typeof Row>;
 
 const SYSTEM = `You read a photo of a small trucking company's fleet list: a whiteboard, a printed sheet or a spreadsheet on a screen. Return one row per truck (with its driver) or per driver, with only what's written there. Never invent a phone number, name, unit or city; leave a field empty when it isn't written or can't be read. Map trailer words to equipment: van/dry van/53' → Dry Van, reefer/refrigerated → Reefer, flatbed/step deck → Flatbed, container/chassis/day cab → Container, else unknown. Mark a row not sure when anything in it was hard to read.`;
 

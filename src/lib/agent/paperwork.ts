@@ -108,7 +108,7 @@ export async function confirmPhoneBooking(ctx: CarrierContext, load: Load, to: s
  * What goes on the invoice: the line haul, detention the broker was already sent a claim for, and a lumper the driver
  * paid (read off the receipt). A cancelled load that was claimed as TONU is billed for that alone.
  */
-export function invoiceLines(load: Load): { label: string; amount: number }[] {
+function invoiceLines(load: Load): { label: string; amount: number }[] {
   if (load.stage === "cancelled") return load.tonuFee ? [{ label: "Truck ordered, not used (TONU)", amount: load.tonuFee }] : [];
   const lines = [{ label: "Line haul, all in", amount: load.bookedRate ?? 0 }];
   for (const c of load.detentionClaims ?? []) if (c.sentAt && c.amount > 0) lines.push({ label: `Detention at ${c.stop} (${Math.round(c.minutes / 6) / 10} hours, claimed ${c.sentAt.slice(0, 10)})`, amount: c.amount });
@@ -236,7 +236,7 @@ export async function sendInvoices(ctx: CarrierContext): Promise<string[]> {
 // ─── Detention ───────────────────────────────────────────────────────────────
 
 /** "$50/hr after 2 hours" on the rate con → 50 and 2. Missing parts come back null. */
-export function detentionTerms(text: string | null | undefined): { perHour: number | null; freeHours: number | null } {
+function detentionTerms(text: string | null | undefined): { perHour: number | null; freeHours: number | null } {
   if (!text) return { perHour: null, freeHours: null };
   const perHour = text.match(/\$\s?(\d{2,3})(?:\.\d{2})?\s*(?:\/|per)\s*(?:hr|hour)/i);
   const free = text.match(/(\d(?:\.\d)?)\s*(?:hrs?|hours?)\s*(?:free|of free)/i) ?? text.match(/after\s*(\d(?:\.\d)?)\s*(?:hrs?|hours?)/i);
@@ -244,7 +244,7 @@ export function detentionTerms(text: string | null | undefined): { perHour: numb
 }
 
 /** How long the truck sat at each stop, from the driver's check-in and check-out times. */
-export function dwell(load: Load): { stop: "pickup" | "delivery"; arrived: string; left: string; minutes: number }[] {
+function dwell(load: Load): { stop: "pickup" | "delivery"; arrived: string; left: string; minutes: number }[] {
   const c = load.tripChecklist;
   const out: { stop: "pickup" | "delivery"; arrived: string; left: string; minutes: number }[] = [];
   if (c?.arrivedPickupAt && c.loadedAt) out.push({ stop: "pickup", arrived: c.arrivedPickupAt, left: c.loadedAt, minutes: Math.round((Date.parse(c.loadedAt) - Date.parse(c.arrivedPickupAt)) / 60000) });

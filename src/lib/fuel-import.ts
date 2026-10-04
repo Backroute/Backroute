@@ -1,3 +1,4 @@
+import { parseCsv as readCsv } from "./csv";
 import type { FuelTx, Load, TollTx, Truck } from "./types";
 
 /**
@@ -8,35 +9,9 @@ import type { FuelTx, Load, TollTx, Truck } from "./types";
  * gallons by state.
  */
 
-export function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cell = "";
-  let quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (quoted) {
-      if (ch === '"' && text[i + 1] === '"') {
-        cell += '"';
-        i++;
-      } else if (ch === '"') quoted = false;
-      else cell += ch;
-    } else if (ch === '"') quoted = true;
-    else if (ch === "," || ch === "\t" || ch === ";") {
-      row.push(cell.trim());
-      cell = "";
-    } else if (ch === "\n" || ch === "\r") {
-      if (ch === "\r" && text[i + 1] === "\n") i++;
-      row.push(cell.trim());
-      if (row.some((c) => c)) rows.push(row);
-      row = [];
-      cell = "";
-    } else cell += ch;
-  }
-  row.push(cell.trim());
-  if (row.some((c) => c)) rows.push(row);
-  return rows;
-}
+/** Fuel card exports use commas, tabs or semicolons, with padded cells. */
+const parseCsv = (text: string) => readCsv(text, { separators: ",\t;", trim: true });
+
 
 const norm = (h: string) => h.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -93,7 +68,7 @@ function truckFor(unit: string, trucks: Truck[]): Truck | undefined {
   );
 }
 
-export interface ImportResult<T> {
+interface ImportResult<T> {
   rows: T[];
   /** Lines that couldn't be read (no date or no amount), with why. */
   skipped: { line: number; why: string }[];
@@ -215,7 +190,7 @@ export function onlyNew<T extends { id: string }>(existing: T[], incoming: T[]):
   return incoming.filter((x) => !have.has(x.id));
 }
 
-export interface LoadCosts {
+interface LoadCosts {
   fuel: number;
   gallons: number;
   tolls: number;

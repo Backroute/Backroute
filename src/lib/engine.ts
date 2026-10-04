@@ -47,12 +47,12 @@ function appointmentWindow(): string {
 }
 
 /** Where a truck will be empty and ready for its next pickup. */
-export interface TruckOrigin {
+interface TruckOrigin {
   city: string;
   state: string;
 }
 
-export interface LanePlacement {
+interface LanePlacement {
   lane: Lane;
   deadheadMiles: number;
 }
@@ -148,7 +148,7 @@ export function createSourcedLoad(
   };
 }
 
-export interface OfferOptions {
+interface OfferOptions {
   excludeTiers?: Broker["tier"][];
   /** Where the truck will be free — offers are sourced from the lanes loading nearest to it. */
   from?: TruckOrigin;
@@ -270,7 +270,7 @@ export function resolveLoadOffer(loads: Load[], offerGroupId: string, chosenId: 
 /** Offers left unattended past the timeout get auto-resolved when autonomy is enabled. */
 /** On "within my rules": an option the AI may book without anyone picking — it makes money and pays at least the
  *  carrier's floor against the lane's market rate. Anything else waits for a person. */
-export function clearsRules(load: Load, rateFloorPct: number): boolean {
+function clearsRules(load: Load, rateFloorPct: number): boolean {
   return (load.netProfit ?? 0) > 0 && load.targetRate >= load.lane.miles * load.lane.marketRpm * (rateFloorPct / 100);
 }
 
@@ -858,7 +858,7 @@ export function resolveOfferAsk(load: Load, broker: Broker | undefined, draft: O
 
 const SHOPS = ["Rush Truck Center", "TA Truck Service", "Love's Truck Care", "Speedco", "Freightliner Service"];
 
-export interface IncidentContext {
+interface IncidentContext {
   load?: Load;
   brokerName?: string;
   truck?: Truck;

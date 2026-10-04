@@ -8,7 +8,7 @@ import { extractDollarAmount } from "@/lib/engine";
 import type { CallTranscriptLine, LiveBrokerCall, VoiceCall } from "@/lib/types";
 
 type TimedLine = CallTranscriptLine & { atMs: number };
-export interface PlayableCall {
+interface PlayableCall {
   lines: TimedLine[];
   durationMs: number;
   openingOffer?: number;
@@ -19,7 +19,7 @@ const RING_MS = 2600;
 const lineMs = (text: string) => Math.max(2800, text.split(/\s+/).length * 330);
 
 /** A finished call, re-timed so it can be played back the same way a live one plays. */
-export function playableFromVoiceCall(call: VoiceCall): PlayableCall {
+function playableFromVoiceCall(call: VoiceCall): PlayableCall {
   let at = RING_MS;
   const lines = call.transcript.map((l) => {
     const timed = { ...l, offer: l.offer ?? extractDollarAmount(l.text), atMs: at };
@@ -77,7 +77,7 @@ function useSpeech(lines: TimedLine[], shown: number, on: boolean) {
 }
 
 /** The call as it happens: ringing, the transcript line by line, and a ticker of where each side's number stands. */
-export function BrokerCallPlayer({
+function BrokerCallPlayer({
   call,
   startedAt,
   brokerName,

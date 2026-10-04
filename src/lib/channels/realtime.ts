@@ -11,14 +11,14 @@ import { xml } from "./twilio";
  * Languages the streaming speech services handle well; others (Punjabi) keep the turn-by-turn calls.
  */
 
-export const REALTIME_LANGS = new Set<Lang>(["en", "es", "fr", "hi", "ru", "uk"]);
+const REALTIME_LANGS = new Set<Lang>(["en", "es", "fr", "hi", "ru", "uk"]);
 
-export const realtimeConfigured = () => Boolean(process.env.VOICE_SERVER_URL && process.env.VOICE_SERVER_SECRET);
+const realtimeConfigured = () => Boolean(process.env.VOICE_SERVER_URL && process.env.VOICE_SERVER_SECRET);
 export const realtimeFor = (lang: Lang) => realtimeConfigured() && REALTIME_LANGS.has(lang);
 
-export type CallKind = "driver" | "broker" | "shop" | "owner" | "facility";
+type CallKind = "driver" | "broker" | "shop" | "owner" | "facility";
 
-export function voiceToken(kind: CallKind, carrier: string, ref: string, callSid: string): string {
+function voiceToken(kind: CallKind, carrier: string, ref: string, callSid: string): string {
   return crypto.createHmac("sha256", process.env.VOICE_SERVER_SECRET!).update(`${kind}|${carrier}|${ref}|${callSid}`).digest("hex");
 }
 

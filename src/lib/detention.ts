@@ -5,7 +5,7 @@ export const DETENTION_FREE_MIN = 120;
 export const DETENTION_RATE_HR = 75;
 /** Demo pacing, like the trip legs: every real second at the dock counts as five minutes, so free time runs out
  *  in 24 seconds instead of two hours. */
-export const DOCK_MINUTES_PER_SEC = 5;
+const DOCK_MINUTES_PER_SEC = 5;
 
 const SESSION_START = typeof window === "undefined" ? 0 : Date.now();
 
@@ -15,9 +15,9 @@ export function switchToRealDockClock() {
   minutesPerSecond = 1 / 60;
 }
 
-export type DockStop = "pickup" | "delivery";
+type DockStop = "pickup" | "delivery";
 
-export interface DockClock {
+interface DockClock {
   stop: DockStop;
   minutes: number;
   freeLeft: number;

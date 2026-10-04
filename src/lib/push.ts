@@ -18,7 +18,7 @@ function setup() {
   ready = true;
 }
 
-export interface PushMessage {
+interface PushMessage {
   title: string;
   body: string;
   url?: string;

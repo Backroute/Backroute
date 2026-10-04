@@ -3,7 +3,7 @@ import { placeCoords, roadMiles } from "./trip-geo";
 import type { Driver, RunType } from "./types";
 
 /** Federal hours of service: 11 hours driving inside a 14-hour on-duty window. */
-export const HOS = { driveMax: 11, windowMax: 14 } as const;
+const HOS = { driveMax: 11, windowMax: 14 } as const;
 const AVG_MPH = 50;
 const DOCK_HOURS = 2;
 /** A realistic day of driving once traffic, fuel and breaks are in — less than the 11 hours the law allows. */

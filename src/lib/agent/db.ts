@@ -190,7 +190,7 @@ export async function saveDriverMessage(carrierId: string, message: DriverMessag
   await pushToDriver(carrierId, message.driverId, { title: "Dispatch", body: message.content, url: link, tag: `dm-${message.driverId}` }).catch((e) => console.error("[push] driver push failed", e));
 }
 
-export interface ChannelLog {
+interface ChannelLog {
   carrierId: string;
   channel: "sms" | "voice" | "email";
   direction: "in" | "out";
@@ -271,7 +271,7 @@ export async function heardFrom(carrierId: string, driverId: string, since: stri
 
 // ─── Files (carrier_files) ───────────────────────────────────────────────────
 
-export interface StoredFile {
+interface StoredFile {
   id: string;
   kind: string;
   name: string;

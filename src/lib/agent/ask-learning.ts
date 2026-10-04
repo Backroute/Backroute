@@ -13,7 +13,7 @@ import type { Load } from "../types";
 const DAY = 86400_000;
 const BOOKED = new Set<Load["stage"]>(["rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery", "delivered"]);
 
-export interface AskOutcome {
+interface AskOutcome {
   opening: number;
   /** What it booked at, when it did. */
   final: number | null;
@@ -46,7 +46,7 @@ const median = (xs: number[]) => {
   return s.length ? (s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2) : null;
 };
 
-export interface LearnedAsk {
+interface LearnedAsk {
   factor: number;
   source: "broker" | "lane" | null;
   /** One line for the owner (lib/agent/why), when it changed anything. */

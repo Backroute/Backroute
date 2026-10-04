@@ -10,7 +10,7 @@ export type Table = "drivers" | "trucks" | "loads" | "escalations" | "dispatch_c
 const str = (v: unknown) => (typeof v === "string" ? v : null);
 
 /** The indexed columns for each table (and each kind of record). */
-export const COLUMNS: Record<Exclude<Table, "records"> | RecordKind, (i: Item) => Record<string, unknown>> = {
+const COLUMNS: Record<Exclude<Table, "records"> | RecordKind, (i: Item) => Record<string, unknown>> = {
   drivers: (i) => ({ name: i.name, phone: str(i.phone) }),
   trucks: (i) => ({ unit_number: str(i.unitNumber), driver_id: str(i.driverId), second_driver_id: str(i.secondDriverId) }),
   loads: (i) => ({ truck_id: str(i.truckId), stage: i.stage }),

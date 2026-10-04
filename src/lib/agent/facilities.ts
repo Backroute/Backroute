@@ -24,7 +24,7 @@ function stops(load: Load): { name: string; city: string; minutes: number }[] {
 }
 
 /** The history at one facility (by name and city), or null when the trucks haven't been there. */
-export function facilityStats(loads: Load[], name: string | null | undefined, city: string, excludeLoadId?: string): FacilityStats | null {
+function facilityStats(loads: Load[], name: string | null | undefined, city: string, excludeLoadId?: string): FacilityStats | null {
   if (!name) return null;
   const key = norm(name);
   const visits = loads

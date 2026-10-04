@@ -1,5 +1,6 @@
 import "server-only";
 import { rowFor, type Item } from "../cloud/rows";
+import { parseCsv } from "../csv";
 import { estimateMiles, guessEquipment, makeBroker, makeLoad } from "../fleet";
 import type { Broker, Load, Truck } from "../types";
 import { admin, save, type CarrierContext } from "./db";
@@ -12,7 +13,7 @@ import { newBatchId, recordBatch } from "./import-batches";
  * no paperwork, so nothing is invoiced, texted or chased for them.
  */
 
-export interface HistoryResult {
+interface HistoryResult {
   /** The import these went in with, to take it back out (lib/agent/import-batches). */
   batch?: string;
   loads: number;
@@ -42,39 +43,9 @@ const NAMES: Record<Field, string[]> = {
 
 const squeeze = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-/** CSV text into rows of cells: quoted fields, commas and newlines inside quotes, "" for a quote. */
-export function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cell = "";
-  let quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (quoted) {
-      if (c === '"' && text[i + 1] === '"') {
-        cell += '"';
-        i++;
-      } else if (c === '"') quoted = false;
-      else cell += c;
-    } else if (c === '"') quoted = true;
-    else if (c === ",") {
-      row.push(cell);
-      cell = "";
-    } else if (c === "\n" || c === "\r") {
-      if (c === "\r" && text[i + 1] === "\n") i++;
-      row.push(cell);
-      if (row.some((x) => x.trim())) rows.push(row);
-      row = [];
-      cell = "";
-    } else cell += c;
-  }
-  row.push(cell);
-  if (row.some((x) => x.trim())) rows.push(row);
-  return rows;
-}
 
 /** Which column holds what, from the header row. */
-export function mapColumns(header: string[]): Partial<Record<Field, number>> {
+function mapColumns(header: string[]): Partial<Record<Field, number>> {
   const out: Partial<Record<Field, number>> = {};
   const names = header.map(squeeze);
   for (const field of Object.keys(NAMES) as Field[]) {

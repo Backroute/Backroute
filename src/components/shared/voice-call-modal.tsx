@@ -22,7 +22,7 @@ type NegotiationSpec = {
   dest: string;
 };
 
-export type VoiceCallSpec = CheckinSpec | FleetSpec | IncidentSpec | NegotiationSpec;
+type VoiceCallSpec = CheckinSpec | FleetSpec | IncidentSpec | NegotiationSpec;
 
 const INCIDENT_TYPES: { key: IncidentType; label: string; icon: typeof Wrench }[] = [
   { key: "breakdown", label: "Breakdown", icon: Wrench },

@@ -9,12 +9,12 @@ import { AI_MODEL, FALLBACK, claude } from "./server";
  * then a judge reads the whole conversation the way a veteran dispatcher would. Never used for a real carrier.
  */
 
-export interface Line {
+interface Line {
   from: "them" | "ai";
   text: string;
 }
 
-export interface Partner {
+interface Partner {
   role: "broker" | "driver" | "owner" | "shop" | "facility";
   channel: "email" | "sms" | "call";
   /** Who they are and how they talk. */
@@ -76,7 +76,7 @@ const Verdict = z.object({
   mistakes: z.array(z.string()).describe("Each concrete mistake: wrong facts, a bad promise, money left on the table, missed questions, rudeness, the wrong language. Empty if none."),
   better: z.string().describe("In one or two sentences, what a veteran dispatcher would have done differently. Empty if nothing."),
 });
-export type SimVerdict = z.infer<typeof Verdict>;
+type SimVerdict = z.infer<typeof Verdict>;
 
 export async function judge(situation: string, expectations: string[], transcript: Line[], outcome: string): Promise<SimVerdict | null> {
   const system = `You are a veteran US truck dispatcher with 20 years of experience, reviewing how an AI dispatcher handled a conversation. Be strict and specific, the way you'd coach a new dispatcher. Judge only what the dispatcher (DISPATCHER lines) did.`;

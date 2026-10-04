@@ -21,7 +21,7 @@ import { translateEmail } from "../ai/translate";
  * Anything outside the rules waits, whatever the setting.
  */
 
-export interface Outgoing {
+interface Outgoing {
   purpose: DraftPurpose;
   to: string;
   toName?: string;
@@ -41,7 +41,7 @@ export interface Outgoing {
   why: string;
 }
 
-export function goesNow(settings: Pick<CarrierContext["settings"], "autonomy" | "ownerRules" | "paused">, o: Pick<Outgoing, "purpose" | "withinRules" | "rule">): boolean {
+function goesNow(settings: Pick<CarrierContext["settings"], "autonomy" | "ownerRules" | "paused">, o: Pick<Outgoing, "purpose" | "withinRules" | "rule">): boolean {
   // Paused: nothing goes on its own, not even a short "got it".
   if (settings.paused) return false;
   const on = (r?: OwnerRule) => !!r && !!settings.ownerRules?.[r];

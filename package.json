@@ -14,7 +14,6 @@
     "@anthropic-ai/sdk": "^0.128.0",
     "@supabase/supabase-js": "^2.117.1",
     "clsx": "^2.1.1",
-    "date-fns": "^4.4.0",
     "framer-motion": "^13.3.0",
     "lucide-react": "^1.46.0",
     "maplibre-gl": "^6.11.1",

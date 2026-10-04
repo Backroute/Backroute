@@ -26,14 +26,14 @@ export async function noteInbound(phone: string, via: Via) {
     .then(({ error }) => error && console.error("[texting] couldn't note the route", error.message));
 }
 
-export interface Route {
+interface Route {
   via: Via;
   /** WhatsApp's 24 hours are open: a free-form message can go. */
   open: boolean;
 }
 
 /** How to reach a number right now. */
-export async function routeFor(phone: string, now = Date.now()): Promise<Route> {
+async function routeFor(phone: string, now = Date.now()): Promise<Route> {
   if (!whatsappConfigured()) return { via: "sms", open: false };
   const key = last10(phone);
   const [{ data: row }, { data: drivers }] = await Promise.all([

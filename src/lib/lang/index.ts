@@ -9,7 +9,7 @@ import { ru } from "./ru";
 import { uk } from "./uk";
 
 export { LANGS, LANG_INFO } from "./pack";
-export type { CallPack, LangInfo, PrefKey, QuickPhrase } from "./pack";
+export type { CallPack, PrefKey, QuickPhrase } from "./pack";
 
 const PACKS: Record<Lang, CallPack> = { en, es, pa, hi, ru, uk, fr };
 

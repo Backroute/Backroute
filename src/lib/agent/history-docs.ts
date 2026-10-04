@@ -25,7 +25,7 @@ export interface DocFile {
   contentType: string;
 }
 
-export interface DocsResult {
+interface DocsResult {
   /** The import these went in with, to take it back out (lib/agent/import-batches). */
   batch?: string;
   read: number;
@@ -190,7 +190,7 @@ async function historyInbox(carrierId: string): Promise<{ until: string; token: 
 }
 
 /** PDFs (and big photos) inside an email forwarded as an attachment (.eml): a small reader for base64 MIME parts. */
-export function filesInEml(raw: string, depth = 0): DocFile[] {
+function filesInEml(raw: string, depth = 0): DocFile[] {
   if (depth > 3) return [];
   const boundary = raw.match(/boundary="?([^";\r\n]+)"?/i)?.[1];
   if (!boundary) return [];

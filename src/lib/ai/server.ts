@@ -19,7 +19,7 @@ export function claude(): Anthropic {
   return client;
 }
 
-export type Access = { ok: true; who: "account" | "demo" } | { ok: false; status: number; error: string };
+type Access = { ok: true; who: "account" | "demo" } | { ok: false; status: number; error: string };
 
 // Demo visitors, when the owner allows real AI in the demo: a few questions each per hour. In memory, so it's per
 // server instance: good enough to stop casual overuse, not a hard spending cap.

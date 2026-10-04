@@ -15,7 +15,7 @@ const DISMISS_MS = 6000;
 
 const OPEN_BELL = "backroute:open-bell";
 /** Opens the bell's list (top bar), e.g. from "3 more" under the pop-ups. */
-export function openBell() {
+function openBell() {
   window.dispatchEvent(new Event(OPEN_BELL));
 }
 export const OPEN_BELL_EVENT = OPEN_BELL;

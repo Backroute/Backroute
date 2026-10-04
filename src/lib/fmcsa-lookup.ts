@@ -5,7 +5,7 @@ import "server-only";
  * check a broker's authority before booking with them. Needs FMCSA_WEB_KEY (free, mobile.fmcsa.dot.gov/QCDevsite).
  */
 
-export interface McRecord {
+interface McRecord {
   legalName: string;
   dbaName?: string;
   dotNumber?: string;
@@ -18,12 +18,10 @@ export interface McRecord {
   liabilityOnFile?: number;
 }
 
-export type McLookup = { ok: true; record: McRecord | null } | { ok: false; reason: "no_key" | "bad_number" | "unreachable" };
+type McLookup = { ok: true; record: McRecord | null } | { ok: false; reason: "no_key" | "bad_number" | "unreachable" };
 
 const base = () => process.env.FMCSA_API_BASE?.replace(/\/$/, "") ?? "https://mobile.fmcsa.dot.gov/qc/services";
 const thousands = (v: unknown) => ((typeof v === "string" || typeof v === "number") && Number(v) > 0 ? Number(v) * 1000 : undefined);
-
-export const fmcsaConfigured = () => Boolean(process.env.FMCSA_WEB_KEY);
 
 export async function lookupMc(mc: string): Promise<McLookup> {
   const docket = mc.replace(/^\s*MC[-\s#]*/i, "").trim();

@@ -22,16 +22,16 @@ import { floorFor } from "./pricing";
  *   down in smaller steps: they'll move, so it doesn't have to as fast.
  */
 
-export const MAX_COUNTERS = 3;
+const MAX_COUNTERS = 3;
 const STEPS = [0.3, 0.6, 0.85];
 const PATIENT = [0.15, 0.4, 0.7];
 
 const round25 = (n: number) => Math.ceil(n / 25) * 25;
 const money = (n: number) => `$${n.toLocaleString("en-US")}`;
 
-export type BookRequest = NonNullable<Load["bookRequest"]>;
+type BookRequest = NonNullable<Load["bookRequest"]>;
 
-export type Move =
+type Move =
   | { action: "accept"; amount: number }
   | { action: "counter"; amount: number; round: number; final: boolean; held: boolean; split?: boolean; reason: string }
   | { action: "owner"; why: string }
@@ -41,7 +41,7 @@ export type Move =
 const closeEnough = (offer: number, ours: number) => offer >= ours - Math.max(50, ours * 0.03);
 
 /** Where the AI is willing to end up: the owner's lowest, or 90% of what the lane pays today if that's more. */
-export function targetFor(load: Pick<Load, "lane" | "market">, settings: Pick<AgentSettings, "minRpm">): number | null {
+function targetFor(load: Pick<Load, "lane" | "market">, settings: Pick<AgentSettings, "minRpm">): number | null {
   const floor = floorFor(load, settings);
   if (!floor) return null;
   const market = load.market?.rpm ? round25(0.9 * load.market.rpm * load.lane.miles) : 0;
@@ -54,7 +54,7 @@ export const roundsOf = (req: Load["bookRequest"]) => req?.rounds ?? (req?.count
 type ReasonLoad = Pick<Load, "lane" | "market" | "deadheadMiles" | "pickupAt" | "reloadMarket">;
 
 /** Every reason for our number that holds for this load, most persuasive first. Numbers come from the load. */
-export function reasonsFor(load: ReasonLoad, amount: number, now = Date.now()): string[] {
+function reasonsFor(load: ReasonLoad, amount: number, now = Date.now()): string[] {
   const out: string[] = [];
   if (load.market?.rpm && amount <= round25(load.market.rpm * load.lane.miles * 1.1)) out.push(`Lanes like this are paying about $${load.market.rpm.toFixed(2)} a mile right now.`);
   if (load.deadheadMiles >= 75) out.push(`We're running ${Math.round(load.deadheadMiles)} miles empty to get to it.`);
@@ -66,7 +66,7 @@ export function reasonsFor(load: ReasonLoad, amount: number, now = Date.now()): 
 }
 
 /** The reason for this round: a different one each time, while there are others to give. */
-export function reasonFor(load: ReasonLoad, amount: number, round = 1, now = Date.now()): string {
+function reasonFor(load: ReasonLoad, amount: number, round = 1, now = Date.now()): string {
   const all = reasonsFor(load, amount, now);
   return all[(Math.max(1, round) - 1) % all.length];
 }

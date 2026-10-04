@@ -74,7 +74,7 @@ const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "
  * A date out of a window the broker wrote in words ("Thu 11/26 8-12", "Nov 26", "2026-11-26"), as YYYY-MM-DD, for
  * loads with no exact appointment time. The year is the next one that date falls in from now.
  */
-export function dateFromText(text: string | undefined, now = Date.now()): string | null {
+function dateFromText(text: string | undefined, now = Date.now()): string | null {
   if (!text) return null;
   const iso = text.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;

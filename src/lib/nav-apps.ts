@@ -8,7 +8,7 @@ import type { NavApp, TruckProfile } from "./types";
  * once in the app; the screen shows them to check.
  */
 
-export interface NavAppInfo {
+interface NavAppInfo {
   id: NavApp;
   name: string;
   /** The link that opens the app with directions to the stop. */

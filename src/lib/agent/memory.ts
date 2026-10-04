@@ -11,7 +11,7 @@ const DAY = 86400_000;
 /** A load the carrier actually hauled (or has booked), with the rate it got. */
 const worked = (l: Load) => WORKED.has(l.stage) && (l.bookedRate ?? 0) > 0 && l.lane.miles > 0;
 
-export interface LaneMemory {
+interface LaneMemory {
   /** Loads booked on this lane (state to state) in the last 120 days. */
   count: number;
   /** Their average rate per mile. */
@@ -33,7 +33,7 @@ export function laneMemory(loads: Load[], brokers: Broker[], lane: { originState
   };
 }
 
-export interface BrokerMemory {
+interface BrokerMemory {
   booked: number;
   /** Of our asks they answered: how often they took our number as it was. */
   tookOurAsk: number;

@@ -1,12 +1,12 @@
 import { cn } from "@/lib/utils";
 
 /** A grey stand-in for something still loading, with a soft shimmer (none for people who turned motion off). */
-export function Skeleton({ className }: { className?: string }) {
+function Skeleton({ className }: { className?: string }) {
   return <span aria-hidden className={cn("skeleton block rounded-xl", className)} />;
 }
 
 /** The shape of a card: a title line, two lines of text and a button. */
-export function SkeletonCard({ className }: { className?: string }) {
+function SkeletonCard({ className }: { className?: string }) {
   return (
     <div aria-hidden className={cn("rounded-2xl border border-line bg-white p-4", className)}>
       <Skeleton className="h-3 w-24" />

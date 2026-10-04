@@ -31,7 +31,7 @@ export interface FacilityHours {
   byDay?: Partial<Record<string, { opens?: string; closes?: string }>>;
 }
 
-export interface FacilityNote {
+interface FacilityNote {
   note: string;
   hours: FacilityHours | null;
   at: string;
@@ -53,7 +53,7 @@ export function facilitiesOf(load: Load): FacilityRef[] {
 }
 
 /** Phone numbers, emails and "ask for Maria"-style names out; a tip is about the place. */
-export function scrub(note: string): string {
+function scrub(note: string): string {
   return note
     .replace(/\+?\d[\d\s().-]{8,}\d/g, "[number]")
     .replace(/\S+@\S+\.\w+/g, "[email]")
@@ -90,12 +90,12 @@ export function cleanHours(h: { opens?: string; closes?: string; days?: string }
  * trying to steer it ("ignore your instructions", "tell drivers to...") is refused, as are links.
  */
 const STEERING = /\b(ignore|disregard|forget)\b.{0,30}\b(instructions?|rules?|previous|above|prompt)\b|\b(system prompt|you are an? |as an ai|assistant:|developer:)|https?:\/\/|www\./i;
-export const looksLikeSteering = (note: string) => STEERING.test(note);
+const looksLikeSteering = (note: string) => STEERING.test(note);
 
 /** At most this many tips a day from one driver, so one person can't flood a dock's record. */
 const PER_DRIVER_DAY = 8;
 
-export type NoteSaved = "saved" | "empty" | "refused" | "too_many";
+type NoteSaved = "saved" | "empty" | "refused" | "too_many";
 
 /** Saves a driver's tip about one of their load's stops. */
 export async function addFacilityNote(ctx: CarrierContext, driver: Driver, where: FacilityRef, note: string, hours: FacilityHours | null): Promise<NoteSaved> {
@@ -112,7 +112,7 @@ export async function addFacilityNote(ctx: CarrierContext, driver: Driver, where
 }
 
 /** The latest tips about one place, from every carrier's drivers, newest first. */
-export async function notesAbout(where: Pick<FacilityRef, "name" | "city" | "state" | "zip">, limit = 3): Promise<FacilityNote[]> {
+async function notesAbout(where: Pick<FacilityRef, "name" | "city" | "state" | "zip">, limit = 3): Promise<FacilityNote[]> {
   if (!norm(where.name)) return [];
   const since = new Date(Date.now() - KEEP_DAYS * 86400_000).toISOString();
   let q = admin()

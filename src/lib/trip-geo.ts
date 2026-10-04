@@ -87,9 +87,9 @@ const SEEDED_HEAD_START_MS = 30_000;
 const SESSION_START = typeof window === "undefined" ? 0 : Date.now();
 const AVG_MPH = 52;
 
-export type TripLeg = "pickup" | "delivery";
+type TripLeg = "pickup" | "delivery";
 
-export function legFor(stage: LoadStage): TripLeg | null {
+function legFor(stage: LoadStage): TripLeg | null {
   if (stage === "dispatched" || stage === "at_pickup") return "pickup";
   if (stage === "in_transit" || stage === "at_delivery") return "delivery";
   return null;
@@ -100,7 +100,7 @@ export function legFor(stage: LoadStage): TripLeg | null {
  * sample fleet keep the simulated drive ("simulate"). A real truck with no fresh position is "not located": the app
  * says so instead of moving a dot along a made-up timer.
  */
-export type Locate = (load: Load) => { lat: number; lon: number } | null | "simulate";
+type Locate = (load: Load) => { lat: number; lon: number } | null | "simulate";
 let locate: Locate | null = null;
 export function setLocator(fn: Locate | null) {
   locate = fn;

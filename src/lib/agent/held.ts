@@ -19,7 +19,7 @@ export const HELD_PURPOSES = new Set(["book_request", "counter", "accept"]);
 export const undoWindow = (settings: Pick<CarrierContext["settings"], "undoSeconds" | "sandbox">) =>
   settings.sandbox ? 0 : Math.max(0, Math.min(600, settings.undoSeconds ?? Number(process.env.UNDO_SECONDS ?? 90)));
 
-export interface HeldSend {
+interface HeldSend {
   id: string;
   loadId: string | null;
   purpose: string;
@@ -57,7 +57,7 @@ export async function hold(ctx: CarrierContext, draft: DraftMessage, loadId: str
 }
 
 /** Sends one held email if it's due and still held. Claimed atomically, so it goes once. */
-export async function release(id: string, now = Date.now()): Promise<boolean> {
+async function release(id: string, now = Date.now()): Promise<boolean> {
   const db = admin();
   const { data: claimed } = await db.from("held_sends").update({ status: "sending" }).eq("id", id).eq("status", "held").lte("send_at", new Date(now + 1000).toISOString()).select("carrier_id, load_id, draft").maybeSingle();
   if (!claimed) return false;

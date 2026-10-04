@@ -16,10 +16,10 @@ import * as mail from "./templates";
  */
 
 const DAY = 24 * 3600_000;
-export const DEFAULT_LAYOVER = 250;
+const DEFAULT_LAYOVER = 250;
 
 /** "Layover $300/day" or "$250 layover" on the rate con, or null. */
-export function layoverTerms(r: RateConPdfReading | undefined): number | null {
+function layoverTerms(r: RateConPdfReading | undefined): number | null {
   if (!r) return null;
   const text = [r.detention ?? "", ...r.finesAndFees, ...r.otherConcerns, r.summary].join("\n");
   const m = text.match(/layover[^$\n]{0,40}\$\s?(\d{2,4})/i) ?? text.match(/\$\s?(\d{2,4})[^.\n$]{0,30}layover/i);
@@ -27,7 +27,7 @@ export function layoverTerms(r: RateConPdfReading | undefined): number | null {
 }
 
 /** Whole days a truck has been held at each stop it reached on time (still there, or since left). */
-export function heldDays(load: Load, now: number): { stop: "pickup" | "delivery"; arrived: string; days: number; left?: string }[] {
+function heldDays(load: Load, now: number): { stop: "pickup" | "delivery"; arrived: string; days: number; left?: string }[] {
   const c = load.tripChecklist;
   const out: { stop: "pickup" | "delivery"; arrived: string; days: number; left?: string }[] = [];
   const at = (stop: "pickup" | "delivery", arrived?: string, left?: string, due?: string) => {

@@ -18,7 +18,7 @@ import * as mail from "./templates";
  * it goes now. A price under their own lowest still goes: it's their call, and the load says so.
  */
 
-export type InstructResult = { done: "counter" | "ask" | "pass" | "relay"; amount?: number; note: string } | { error: string };
+type InstructResult = { done: "counter" | "ask" | "pass" | "relay"; amount?: number; note: string } | { error: string };
 
 const WALK = /\b(walk away|pass on it|pass|decline|forget it|drop it|no thanks|not interested)\b/i;
 
@@ -42,7 +42,7 @@ async function relayLine(text: string): Promise<string> {
 }
 
 /** The price the owner named: "$2,600", "2.6k", or a bare number after "for/at/counter/ask" (not a time or a load number). */
-export function priceIn(text: string): number | undefined {
+function priceIn(text: string): number | undefined {
   const explicit = dollarAmounts(text)[0];
   if (explicit) return explicit;
   const m = text.match(/\b(?:for|counter(?: at)?|ask(?: for)?|offer|rate(?: of)?|at|to)\s+([1-9]\d{0,1},\d{3}|[1-9]\d{2,4})(?:\s*(k)\b)?(?!\s*(?:am|pm|a\.m|p\.m|hrs?|hours|mi|miles|lbs|pounds|:))/i);

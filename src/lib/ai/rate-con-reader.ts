@@ -16,9 +16,9 @@ export const Agreed = z.object({
   detention: z.string().max(200),
   paymentTerms: z.string().max(100),
 });
-export type AgreedTerms = z.infer<typeof Agreed>;
+type AgreedTerms = z.infer<typeof Agreed>;
 
-export const Reading = z.object({
+const Reading = z.object({
   isRateCon: z.boolean(),
   broker: z.string().nullable(),
   brokerMc: z.string().nullable(),
@@ -62,7 +62,7 @@ export const Reading = z.object({
   otherConcerns: z.array(z.string()),
   summary: z.string(),
 });
-export type RateConReading = z.infer<typeof Reading>;
+type RateConReading = z.infer<typeof Reading>;
 
 export class ReadError extends Error {
   constructor(public code: "declined" | "unreadable") {

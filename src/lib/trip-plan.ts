@@ -267,11 +267,3 @@ export function planTrip(loads: TripLoad[], start: TripStart, trailer: { feet: n
 export function restackNotes(run: TripRun): string[] {
   return run.restacks.map((r) => `At ${r.at}, ${r.blocking.join(" and ")} ${r.blocking.length === 1 ? "is" : "are"} in front of ${r.out}: ask the shipper to load ${r.out} by the doors if there's room, or be ready to move ${r.blocking.length === 1 ? "it" : "them"} at the drop.`);
 }
-
-/**
- * After a load moves a stage: the load the truck is working on is the one at its next stop. Null when the trip has no
- * stop left (the truck goes on to whatever is lined up after it).
- */
-export function tripCurrent(truck: Pick<Truck, "trip">, loads: Load[]): string | null {
-  return nextStop(truck, loads)?.load.id ?? null;
-}

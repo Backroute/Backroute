@@ -18,7 +18,7 @@ import { route } from "./routing";
  * is taken; anything less goes to the owner.
  */
 
-export const DEFAULT_STOP_PAY = 75;
+const DEFAULT_STOP_PAY = 75;
 const round25 = (n: number) => Math.round(n / 25) * 25;
 type Place = { city: string; state: string };
 
@@ -27,7 +27,7 @@ async function miles(a: Place, b: Place): Promise<number | null> {
 }
 
 /** Extra loaded miles the change adds (0 when it's shorter), or null when a city can't be placed. */
-export async function extraMiles(load: Load, kind: LoadChange["kind"], places: Place[]): Promise<number | null> {
+async function extraMiles(load: Load, kind: LoadChange["kind"], places: Place[]): Promise<number | null> {
   const origin = { city: load.lane.origin, state: load.lane.originState };
   const dest = { city: load.lane.destination, state: load.lane.destState };
   if (kind === "reroute") {
@@ -48,7 +48,7 @@ export async function extraMiles(load: Load, kind: LoadChange["kind"], places: P
 }
 
 /** What the change is worth: the extra miles at the load's rate a mile (at least the owner's lowest) and stop pay. */
-export function priceChange(load: Load, kind: LoadChange["kind"], stops: number, extra: number, settings: CarrierContext["settings"]): number {
+function priceChange(load: Load, kind: LoadChange["kind"], stops: number, extra: number, settings: CarrierContext["settings"]): number {
   const rate = load.bookedRate ?? load.targetRate;
   const rpm = Math.max(rate / Math.max(1, load.lane.miles), settings.minRpm ?? 0);
   const stopPay = kind === "add_stop" ? stops * (settings.stopPay ?? DEFAULT_STOP_PAY) : 0;
@@ -94,7 +94,7 @@ export async function answerChange(ctx: CarrierContext, load: Load, kind: LoadCh
 }
 
 /** The broker said yes to the change (or sent a rate con for it): on the load, to the driver, on the invoice. */
-export async function agreeChange(ctx: CarrierContext, load: Load, total: number): Promise<Load> {
+async function agreeChange(ctx: CarrierContext, load: Load, total: number): Promise<Load> {
   const c = load.change!;
   const rate = load.bookedRate ?? load.targetRate;
   const at = new Date().toISOString();

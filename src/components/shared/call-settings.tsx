@@ -24,7 +24,7 @@ function quietText(driver: Driver, t: UiText): string | null {
 }
 
 /** Duty status as the ELD reports it — the one switch that decides whether the AI's calls ring or wait. */
-export function DutyStatusPicker({ driver }: { driver: Driver }) {
+function DutyStatusPicker({ driver }: { driver: Driver }) {
   const setDutyStatus = useStore((s) => s.actions.setDutyStatus);
   const t = uiFor(driver);
   return (

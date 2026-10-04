@@ -1,9 +1,9 @@
 import { clamp } from "./utils";
 
 /** Backroute's flat take-rate, applied to every booked load regardless of plan. */
-export const COMMISSION_RATE = 0.02;
+const COMMISSION_RATE = 0.02;
 
-export interface LoadEconomics {
+interface LoadEconomics {
   deadheadCost: number;
   commission: number;
   netProfit: number;

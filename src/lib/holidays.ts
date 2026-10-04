@@ -4,7 +4,7 @@
  * province gets Canada's (and Quebec's own).
  */
 
-export interface Holiday {
+interface Holiday {
   name: string;
   /** Most docks are closed. Otherwise many are, or close early. */
   closed: boolean;
@@ -33,7 +33,7 @@ function observed(y: number, m: number, d: number): string | null {
 
 const cache = new Map<number, Map<string, Holiday>>();
 
-export function holidaysIn(y: number): Map<string, Holiday> {
+function holidaysIn(y: number): Map<string, Holiday> {
   const hit = cache.get(y);
   if (hit) return hit;
   const out = new Map<string, Holiday>();
@@ -76,13 +76,13 @@ function easter(y: number): [number, number] {
   return [month, ((h + l - 7 * m + 114) % 31) + 1];
 }
 
-export const PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
+const PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 const FAMILY_DAY = new Set(["AB", "BC", "NB", "ON", "SK"]);
 
 const caCache = new Map<string, Map<string, Holiday>>();
 
 /** Canada's, for a province: statutory days most docks close, and the ones only some do. */
-export function canadianHolidaysIn(y: number, province: string): Map<string, Holiday> {
+function canadianHolidaysIn(y: number, province: string): Map<string, Holiday> {
   const key = `${y}-${province}`;
   const hit = caCache.get(key);
   if (hit) return hit;

@@ -13,7 +13,7 @@ export function asUser(request: Request): SupabaseClient | null {
   return createClient(url, anon, { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-export interface Caller {
+interface Caller {
   userId: string;
   carrierId: string;
   role: "owner" | "dispatcher" | "driver" | "bookkeeper";

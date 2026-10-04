@@ -4,14 +4,14 @@
  * when someone picks up. Decided here in code from what was heard, before the AI answers anything.
  */
 
-export type PhoneTree = { kind: "menu"; digit: string; option: string } | { kind: "hold" } | null;
+type PhoneTree = { kind: "menu"; digit: string; option: string } | { kind: "hold" } | null;
 
 const WORDS: Record<string, string> = { zero: "0", oh: "0", one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", star: "*", pound: "#", hash: "#" };
 const KEY = String.raw`(\d|\*|#|zero|one|two|three|four|five|six|seven|eight|nine|star|pound|hash)`;
 const digitOf = (k: string) => WORDS[k.toLowerCase()] ?? k;
 
 /** The options a menu reads out: "for carrier sales, press 2", "press 3 for accounting", "dispatch, press 4". */
-export function menuOptions(heard: string): { digit: string; option: string }[] {
+function menuOptions(heard: string): { digit: string; option: string }[] {
   const out: { digit: string; option: string }[] = [];
   const add = (digit: string, option: string) => {
     const o = option.trim().replace(/^(the|our)\s+/i, "");
@@ -40,7 +40,7 @@ const HOLD = /\b(please (hold|wait|stay on the line|remain on the line)|hold (on
  * What to do with what was just heard: press a key on a menu (the option matching `want`, else the operator), wait
  * silently on hold, or nothing special (null) and the AI answers as usual.
  */
-export function phoneTree(heard: string, want: RegExp): PhoneTree {
+function phoneTree(heard: string, want: RegExp): PhoneTree {
   const options = menuOptions(heard);
   if (options.length) {
     const pick =
@@ -74,7 +74,7 @@ export interface CallReply {
 }
 
 /** Most keys pressed on one call (a menu that keeps coming back), and turns on hold (about 30 seconds each), before giving up. */
-export const MAX_PRESSES = 4;
+const MAX_PRESSES = 4;
 export const MAX_HOLDS = 20;
 
 /**

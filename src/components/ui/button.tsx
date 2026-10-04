@@ -33,7 +33,7 @@ type ButtonAsLink = BaseProps & { href: string } & Omit<
     "href"
   >;
 
-export type ButtonProps = ButtonAsButton | ButtonAsLink;
+type ButtonProps = ButtonAsButton | ButtonAsLink;
 
 export function Button({ variant = "primary", size = "md", className, children, ...props }: ButtonProps) {
   const classes = cn(

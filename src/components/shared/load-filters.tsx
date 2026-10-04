@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 const DAY = 86400_000;
 
-export interface LoadFilter {
+interface LoadFilter {
   text: string;
   truckId: string;
   brokerId: string;
@@ -100,7 +100,7 @@ export function filterLoads(loads: Load[], f: LoadFilter, brokers: Map<string, B
   });
 }
 
-export const isFiltered = (f: LoadFilter) => !!(f.text || f.truckId || f.brokerId || f.days || f.view);
+const isFiltered = (f: LoadFilter) => !!(f.text || f.truckId || f.brokerId || f.days || f.view);
 
 const control = "h-9 rounded-full border border-line bg-white px-3 text-sm text-ink-900 outline-none focus:border-ink-400";
 

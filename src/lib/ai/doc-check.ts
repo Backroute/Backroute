@@ -13,7 +13,7 @@ const Check = z.object({
   readable: z.enum(["clear", "hard", "unreadable"]).describe("Can a broker's billing clerk read it: clear; hard (some parts blurry, cut off or in shadow); unreadable."),
   retakeTip: z.string().nullable().describe("When it isn't clear: one short tip for a better photo (closer, flash, flat on a surface, all four corners). Otherwise null."),
 });
-export type DocCheck = z.infer<typeof Check>;
+type DocCheck = z.infer<typeof Check>;
 
 const WHAT = { bol: "bill of lading (BOL)", pod: "proof of delivery (POD, usually the signed BOL from the receiver)", lumper_receipt: "lumper receipt" };
 

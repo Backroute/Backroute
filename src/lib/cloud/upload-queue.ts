@@ -45,7 +45,7 @@ export async function enqueue(item: Omit<Queued, "id" | "at">): Promise<string> 
   return id;
 }
 
-export async function queued(): Promise<Queued[]> {
+async function queued(): Promise<Queued[]> {
   try {
     return ((await tx("readonly", (s) => s.getAll())) as Queued[]).sort((a, b) => a.at - b.at);
   } catch {
@@ -53,7 +53,7 @@ export async function queued(): Promise<Queued[]> {
   }
 }
 
-export async function drop(id: string) {
+async function drop(id: string) {
   await tx("readwrite", (s) => s.delete(id));
   await refreshCount();
 }
@@ -68,7 +68,7 @@ let sender: Sender | null = null;
 let flushing = false;
 
 /** Tries everything waiting, oldest first; stops at the first one the network refuses. */
-export async function flush() {
+async function flush() {
   if (flushing || !sender || (typeof navigator !== "undefined" && !navigator.onLine)) return;
   flushing = true;
   try {

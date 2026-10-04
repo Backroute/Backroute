@@ -53,11 +53,6 @@ function summary(read: number, fresh: { loadId: string | null; truckId: string |
   };
 }
 
-/** Tries again to match what didn't have a load (a load added after the statement came in). */
-export function rematchCosts() {
-  set((s) => ({ fuelTx: matchToLoads(s.fuelTx, s.loads), tollTx: matchToLoads(s.tollTx, s.loads) }));
-}
-
 /** Ties a statement's unit or card number to a truck, then matches its lines again. */
 export function assignUnit(unit: string, truckId: string) {
   set((s) => ({

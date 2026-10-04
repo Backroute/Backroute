@@ -759,7 +759,7 @@ export interface AgentSettings {
   pausedAt?: string;
 }
 
-export interface LiveMetrics {
+interface LiveMetrics {
   activeCalls: number;
   activeSmsThreads: number;
   activeEmailThreads: number;
@@ -823,7 +823,7 @@ const ESCALATION_TEMPLATES: EscalationTemplate[] = [
  * dispatcher: this browser runs the AI and saves the fleet. "driver" sees and answers only their own things.
  * `driverId` is the driver this person is (drivers and owner-operators).
  */
-export interface CloudSession {
+interface CloudSession {
   /** "books": a bookkeeper's session (sees the money and the fleet, keeps the books, doesn't dispatch). */
   mode: "demo" | "office" | "driver" | "books";
   carrierId?: string;
@@ -2731,5 +2731,3 @@ export const useStore = create<StoreState>((set, get) => ({
       }),
   },
 }));
-
-export const useStoreActions = () => useStore((s) => s.actions);

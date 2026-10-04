@@ -606,7 +606,7 @@ function sampleDock(key: string, city: string, state: string): string {
 
 // ---------- World builder ----------
 
-export interface World {
+interface World {
   carriers: Carrier[];
   brokers: Broker[];
   trucks: Truck[];
