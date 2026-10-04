@@ -1,0 +1,17 @@
+import { readingIn } from "../../src/lib/reefer-reading.ts";
+let ok = 0, bad = 0;
+const t = (text: string, want: number | null) => { const got = readingIn(text); const pass = got === want; pass ? ok++ : bad++; console.log(`${pass ? "PASS" : "FAIL"} ${JSON.stringify(text)} -> ${got}${pass ? "" : ` (want ${want})`}`); };
+t("reefer reads 34", 34);
+t("temp 34F unit 12", 34);
+t("unit 12 reefer", null);
+t("reefer on trailer 5301", null);
+t("set at -10", -10);
+t("-10° frozen", -10);
+t("2 C reefer", 36);
+t("reefer temp at door 4 is 36", 36);
+t("pulp 35.5", 35.5);
+t("reefer 450 miles out", null);
+t("temp 34 degrees", 34);
+t("reefer 35", 35);
+t("reefer unit 7 reads 33", 33);
+console.log(`\n${ok} passed, ${bad} failed`);

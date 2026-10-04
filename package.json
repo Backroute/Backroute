@@ -8,7 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "measure": "node eval/measure.mjs",
-    "pilot:carrier": "node scripts/pilot-carrier.mjs"
+    "pilot:carrier": "node scripts/pilot-carrier.mjs",
+    "test:setup": "bash tests/setup.sh",
+    "test:unit": "bash tests/unit.sh",
+    "test:quick": "bash tests/quick.sh",
+    "test:e2e": "bash tests/e2e.sh",
+    "test:rls": "bash tests/db/rls.sh",
+    "test:offline": "bash tests/offline.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
@@ -36,6 +42,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

@@ -47,3 +47,11 @@ next-env.d.ts
 eval/results.json
 eval/sim-results.json
 eval/report-*.md
+
+# test runs (tests/README.md): keys, downloads, logs and screenshots, and what the stand-ins record
+/tests/.out/
+/tests/fakes/*.jsonl
+/tests/fakes/*.json
+/tests/fakes/*.log
+/tests/fakes/carrier.txt
+/tests/fakes/outage-*

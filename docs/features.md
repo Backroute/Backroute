@@ -1,0 +1,375 @@
+# What Backroute does
+
+What the real version does today, and what it doesn't do yet. How to switch each part on is in
+[DEPLOY.md](../DEPLOY.md) (the "step" numbers below are its setup steps). How it was tested is in [testing.md](testing.md).
+
+## What the real version does
+
+- **Accounts and roles.** Sign in with a phone number and a texted code.
+  - **Owner:** everything, and the only one who can add people.
+  - **Dispatcher:** everything except adding people.
+  - **Driver:** only their own profile, truck, loads, calls and messages.
+  - **Owner-operator:** an owner who drives.
+- **Your own fleet, no sample data.**
+  - At sign-up the owner types in each truck and its driver, with the driver's cell number.
+  - More trucks can be added on the Fleet page.
+  - In a real account, nothing is simulated.
+- **Loads the owner booked.**
+  - On Loads, choose **Add a load** and upload the broker's rate con: the AI fills in the form, you check it, pick the truck and add it.
+  - The load goes to the driver's app, and the driver gets a text with the pickup and delivery.
+- **The dispatch number.** One Twilio number for all carriers. A driver is recognized by the number they text or call from.
+  - **Texts:** drivers text it about their load. The AI answers in the driver's language from the carrier's real data.
+    - It can mark the load at pickup, loaded or at delivery when the driver says so.
+    - It passes problems (breakdown, running late, a crash) to the owner's **Needs you** list.
+    - If the AI can't answer, the office gets the message and the driver is told someone will get back to them.
+  - **Calls:** drivers call the same number and talk with the AI in their own language (7 languages).
+    - It opens by saying it's an AI dispatcher for their carrier.
+    - It can do everything the texts can, and says goodbye and hangs up when they're done.
+- **Broker email.** Each carrier gets its own address, shown in Settings → General → Phone, text and email. Brokers email it, or the owner forwards to it. The AI handles each email the way a dispatcher would:
+  - **Loads offered** (one load or a list): each one that fits a truck goes on the dashboard as an offer, priced by the owner's rules. A truck fits when it has the right equipment, is free (or delivers at least 2 hours before the pickup) and is within 300 miles.
+  - **Booking:** the owner taps **Ask to book it**, or on **Within my rules** the AI asks for the best offer per truck by itself. The ask is 5% over the posted rate, never under the owner's lowest rate per mile.
+  - **Haggling, like a dispatcher** (`src/lib/agent/negotiation.ts`): the AI opens at its ask and comes down in steps, up to three counters, each with a reason a broker hears every day (what the lane pays now, the empty miles to get there, a hard place to reload, a truck ready on time), a different one each round. If the broker doesn't move, neither does it. When the numbers get close, it offers to meet in the middle, and on its last number it says it'll book right now if they can do it. An offer within $50 or 3% of its number, and over the owner's lowest, it takes. It aims no lower than 90% of what the lane pays today when a rate service is connected, and never under the owner's lowest. After three counters: at or over the lowest it takes it, just under (within 5%) the owner decides, further under it passes politely and leaves the door open. If the broker comes back with more while the truck is still free, it takes it.
+  - **Terms, not just the price:** every book request and acceptance asks for detention (default $50/hour after 2 hours free) and TONU (default $150) on the rate con. The owner sets both in Settings → Your rules.
+  - These emails come from templates, so every number in them is exactly what the rules picked, and they read like a dispatcher's: "Can we get it? Our van is empty in Dallas." The back-and-forth is shown on the load. Replies the AI writes itself (a broker's question) are two or three short lines that answer the question first.
+  - **Rate cons:** the AI reads the PDF and checks it against the load. If it confirms a load the AI asked for and matches, the load goes on its truck and the driver gets a text. If anything doesn't match, the owner is told.
+  - **Setup requests:** the AI replies with the carrier's W-9, insurance certificate and authority from Settings → General → Your papers. If one is missing or expired, the owner is told.
+  - **Anything else:** the AI writes a reply.
+- **Check-ins with drivers,** in each driver's language, by text, or by phone for drivers who texted STOP:
+  - 2 hours before pickup and 3 hours before delivery: "on track?"
+  - 30 minutes after a missed appointment: "are you there?"
+  - No answer 45 minutes later: the AI calls the driver and texts the owner.
+  - After delivery: a reminder to photograph the signed POD, and the owner is told if it doesn't come.
+  - The driver's answer goes to the same AI that handles their texts and calls, so "I'm loaded" moves the load.
+  - Turn them off in Settings → General → Rates, billing and check-ins.
+- **Paperwork after delivery:**
+  - **POD photos:** the driver uploads them in the app. The AI checks each one: that it's the right document, that it's signed, and whether a shortage or damage is written on it.
+  - **Invoice:** once a signed POD is in, the AI makes the invoice PDF and emails it with the POD, to the broker or to the factoring company if one is set.
+  - **Detention:** when the driver's check-in and check-out times show a stop ran past free time, the AI emails the broker a claim with the times. It uses the rate con's detention terms. Without them, it assumes $50 an hour after 2 hours and asks the owner first.
+- **The autopilot switch decides what goes out without the owner:**
+  - **Ask me first** (the default): every email to a broker waits in Needs you. The owner can edit it, then **Send** or **Don't send**.
+  - **Within my rules:** book requests, counters and acceptances at or over the lowest rate, invoices, detention claims with known terms, and setup packets go on their own. Replies the AI wrote itself wait.
+  - **Full autopilot:** the AI's own replies go too, unless one names a price that isn't already in the conversation.
+  - Whatever the setting, anything under the owner's lowest rate, a POD with a problem on it, or an unverified broker waits for the owner. The AI won't book on its own without a lowest rate per mile set.
+- **The AI finishes almost everything; your support team gets only a few kinds of thing.** Backroute's support team works at `/ops`, for every carrier at once, and gets only:
+  1. **Safety emergencies:** a crash, an injury, danger on the road, or a stranded truck no repair shop or tow company the AI called could help.
+  2. **Other companies' websites the AI couldn't finish:** signing in DocuSign or a broker's portal, a carrier setup (MyCarrierPackets, RMIS, Highway), or a dock scheduling site. With the browser worker (step 15) switched on for the carrier, the AI does these itself; support gets the ones that beat it, with the link, its steps and its last screenshot. Without it, support does them all (a signing is asked for as a PDF first).
+  3. **Our own systems failing:** the AI couldn't answer a text, call or email even on a second try, or the text or email service was down the whole time a message was worth sending.
+  4. **The owner asks for a person.**
+  5. **Backup:** something urgent the owner hasn't picked up within an hour (a driver who won't answer on a late load goes to the owner first, since they know the driver).
+
+  Everything else the AI does itself, and what's the carrier's own money goes to the owner. See "What the AI handles instead of support" below.
+  - Each item comes with the carrier, load, driver, broker, how to reach them, and the texts, calls or emails it came from.
+  - Support can take it, call, text the driver from the dispatch number, send or fix the AI's draft, mark a broker as checked, hand it to the owner, or close it with a note the owner sees.
+  - Urgent ones (a crash, a missing driver on a late load) also text the support team's phones.
+  - Each item shows its kind and a short playbook, for example emergency, possible fraud, breakdown, broker check or money. It turns red once it's late: 15 minutes for urgent items, 2 hours for the rest.
+  - The **Numbers** tab shows hand-offs to support per truck per week, by kind, how fast they're closed, and how many ran late. That's the number to push down.
+  - The owner sees these items as "Backroute support is on it".
+  - The owner gets the carrier's own decisions: a price just under their lowest, filing on a broker's bond, a claim to their insurer, a broker the AI won't book with. On **Full autopilot**, what the AI already handled is only in the activity log, not in Needs you.
+- **What the AI handles instead of support:**
+  - **A broker with no MC number:** it emails them for it, checks it with FMCSA when they answer, and asks to book their load if it passes. A broker who fails the check isn't booked; the owner can mark them trusted.
+  - **A dock appointment the facility won't set or can't be reached for:** the broker is asked to set it, reminded once after 2 hours, and the time they send goes on the load and to the driver.
+  - **Short payments:** the broker is asked what the difference is for and for the balance, with the invoice lines.
+  - **Late invoices:** a reminder at 3 days, another at 13, and a final notice at 30 that names the broker's bond. Filing on the bond is the owner's call.
+  - **Bank-detail requests:** the standing answer (payment details never change by email), nothing shared, and the owner is told.
+  - **Impostors:** no answer and nothing done; the real broker is warned at the address the carrier already had, and the owner is told.
+  - **Double brokering:** not booked. The broker the carrier dealt with is asked, at the known address, for a rate con from their own company.
+  - **Tracking still off at pickup:** the broker is asked to resend it to the driver's number, and the driver is told.
+  - **A broker call the AI couldn't finish:** it follows up by email with where things stood, or calls back.
+  - **No email or phone to book a load:** the AI lets it go; the truck stays free.
+  - **No broker email for an invoice or claim:** it uses the one on their rate con.
+  - **A breakdown with no repair shop found:** it searches for heavy-duty towing and calls those too, before support.
+  - **A change after booking priced too low by the broker:** it holds its number once, with the reason.
+  - **A hiccup in the AI service:** each answer is tried a second time before anyone is asked.
+- **Brokers are checked** before the AI books with them. The broker's MC number (from their email signature or rate con) is looked up with FMCSA: broker authority active, and the name on file matching the name and email domain they use. Someone posing as a real broker, or using a free email, is flagged. The AI won't book with a broker who doesn't pass; one with no MC yet is asked for it.
+- **Getting paid:**
+  - Payment emails (ACH notices, remittances) mark invoices paid. A short payment gets an email asking what the difference is for.
+  - An invoice past its terms gets a polite reminder 3 days late, another at 13 days, and a final notice at 30 naming the broker's bond. Skipped when the carrier factors.
+- **Cancellations:** when a broker cancels, the load comes off the truck and the driver is told not to go, in their language. If the truck was already dispatched, a TONU claim is sent, using the rate con's amount, or $150 checked first. The truck's other offers come back, and within the rules the AI asks for the best one.
+- **The AI calls brokers:**
+  - When a book request gets no email answer in 30 minutes, the AI phones the broker. It does the same right away for a broker who only gave a phone number (most load board posts).
+  - A broker it has no MC number for is asked for it on the call, and it's checked with FMCSA before the AI agrees to book.
+  - After booking by phone with a broker it has no email for, it asks where to send the confirmation, then emails a written confirmation with the carrier packet so the rate con comes back to the carrier's address.
+  - It says it's an AI and that the call is transcribed, and asks the price the rules set.
+  - The call goes the way a dispatcher's does: who's calling (and that it's an AI), which load, is it still available; then the freight (commodity, weight, appointments); then "what are you paying on it?". If the broker asks what we need, it gives our number with a reason. It understands a rate per mile ("two eighty a mile").
+  - It answers the broker's usual questions from the carrier's data: where the truck is, how far from the pickup, the driver's hours, the MC number.
+  - It talks like a dispatcher (short, friendly, confident) and haggles with the same rules as email, saying the reason for each number. It can't be talked into a number the rules didn't give it.
+  - Before booking it asks what the freight is, the weight and the appointments. Freight over what the truck can legally carry isn't booked, and hazmat waits for the owner unless they've said they haul it.
+  - It leaves a short voicemail if nobody answers, and a phone-only broker gets one more call.
+  - The booking is still confirmed by the broker's rate con.
+- **Load boards** (Settings → General → ELD, load boards and feeds), once Backroute has the board's agreement:
+  - **Truckstop** (the carrier's Integration ID) and **DAT** (the carrier's DAT login email). Any other board with an API (123Loadboard, Direct Freight, a broker's portal) is described in JSON by Backroute support, with no new code.
+  - Every 30 minutes, for each truck that's empty or delivers within a day and a half, the AI searches within 150 miles of where it will be empty, from when it will be. That lines up the reload before delivery.
+  - Loads heading toward the driver's home come first. They go through the same broker check, pricing and booking as email.
+  - If the owner turns it on, each truck is also posted as available once a day.
+  - Before the agreement is in place, the carrier can still save their side; it shows "waiting on Backroute's agreement".
+- **Load feeds:** any list of loads a broker, shipper or load board publishes as JSON or CSV at a web address (Settings → General → ELD, load boards and feeds). It's read every round, and the loads go through the same matching and booking as email. Format below.
+- **ELD (Samsara or Motive):**
+  - Truck locations and drivers' hours are read every round.
+  - The AI offers a truck only loads its driver has the hours to reach in time.
+  - It emails the broker as soon as a truck can't make an appointment, instead of 30 minutes after.
+- **Pricing and planning like a dispatcher who's been there a while:**
+  - **Lane history:** when the carrier has hauled a lane at least twice in the last 4 months, the AI asks what it usually gets there, up to 15% over the posted rate. It never goes under the owner's lowest rate.
+  - **Broker memory:** on calls and replies, the AI knows what the carrier hauled with that broker, what it got, and whether they usually push back.
+  - **Home time:** when a driver needs to head home, or the owner said "get them home first", the AI picks the load that ends closest to home. It never picks one that would make the driver miss their home day. It skips states a driver said they won't go to.
+  - **Capacity emails:** when a truck has nothing lined up, the AI emails up to 4 checked brokers who've sent loads out of that state, saying the truck will be free. That's at most once a day to each broker.
+  - **A plan per truck** on the Fleet page: what it's on, what's next or where the AI is looking, and whether the driver makes it home on time.
+- **Breakdowns:** when a driver reports one, the AI:
+  - finds repair shops, tire service or towing (Google Places) near the ELD position, or near where the driver says they are.
+  - texts the driver the nearest open ones.
+  - phones them one by one until one says they can come, then texts the driver that shop's number and how soon.
+  - emails the broker that the load is delayed.
+  - puts the repair bill in front of the owner. The AI never agrees to a repair price.
+- **Your rules** (Settings → General): judgment calls the owner can hand to the AI:
+  - TONU at the usual amount
+  - detention at the usual rate
+  - invoices with a noted POD
+  - the AI's own email replies on Within my rules
+  - the most empty miles to a pickup
+
+  All are off to start. When the owner has sent 3 of the same kind in a row without changing a word, the AI offers once to stop asking.
+- **Drivers:**
+  - A weekly "how's it going?" text in each driver's language, answered by the same AI.
+  - If a driver is unhappy, asks for the owner or mentions quitting, the owner is asked to call them.
+  - A home-day request is noted and planned around.
+  - The ELD notes when the truck was at the driver's home. After 3 weeks away, the owner is told.
+  - If the owner turns it on, each driver gets a weekly text with their loads, miles and estimated pay before deductions.
+- **Market rates** (with a rate data service): the AI knows what the lane pays now. When the post is under the market, it opens at the market average, never past the top of the market's range. Offers show the market next to the post.
+- **Invoices with everything on them:**
+  - the line haul
+  - detention the broker was already sent a claim for
+  - a lumper the driver paid, read off the receipt photo (receipt attached)
+  - a claimed TONU is invoiced on its own, without a POD
+
+  The Downloads card in Settings exports invoices in QuickBooks Online's import columns, and each driver's pay per load.
+- **Fraud checks before money moves:**
+  - A rate con from a different MC than the broker the load was booked with (double brokering): the truck doesn't go until support confirms.
+  - An email from a domain one letter off a broker the carrier knows is treated as an impostor, even when it quotes the real broker's MC.
+  - An email asking to change bank or payment details, or to "verify" an account: the AI doesn't reply, and support confirms by phone.
+- **Check calls:** when the rate con asks for tracking, or the owner turns it on for every load, the broker gets a location and ETA email from the ELD every 4 hours.
+- **Carrier setup networks:** the carrier's MyCarrierPackets, Highway or RMIS profile links go out with every setup packet. With the browser worker on, a broker's portal invite is filled in on the site by the AI (below); without it, an invite for a network the carrier has a profile on gets the link, and any other goes to support to fill out once.
+- **Truck routing** (HERE, truck mode): real road miles for loads posted without them, and ETAs by road for late notices and check calls. Without it, miles are estimated from city coordinates.
+- **The whole fleet at once:** when two loads both want the same nearest truck, it takes the better one and the other goes to the next free truck that can reach it.
+- **Moving an idle truck to the freight:** a truck that's sat empty 12 hours with nothing that fits is pointed at the nearest place the carrier's loads actually come from (at least 3 in 3 weeks). On full autopilot, within half the owner's empty-miles limit, the AI texts the driver to go. Otherwise it asks the owner. Board searches then run from there.
+- **Slow docks:** the AI remembers how long each shipper and receiver kept the carrier's trucks (from the rate con names and the driver's in and out taps). Drivers hear about a 3-hour-plus dock with the new load.
+- **Deadlines:** each truck's annual DOT inspection, the quarterly IFTA return, UCR and Form 2290. The owner is reminded ahead of each, once.
+- **Natural phone calls** (with the voice server running): the AI hears while it talks and stops when interrupted. Driver calls are covered in English, Spanish, French, Hindi, Russian and Ukrainian, and so are calls to brokers and repair shops. Punjabi calls keep taking turns.
+- **Ask the AI** (dashboard) and driver **Messages** in the app are answered by the AI from the carrier's own data.
+- **Every email and call gets an answer**, the way a dispatcher's desk works:
+  - A broker's yes gets a thank-you and "send the rate con" with the detention and TONU terms. A question alongside a price ("when can you get there?") is answered in the same email, from the carrier's data and never with a new price. A rate per mile ("we can do 2.90 a mile") is handled like any offer.
+  - A rate con that matches gets "got it, truck 102 with Ana is set for pickup". One that doesn't gets a list of what's off and a request for a corrected one (and the owner hears).
+  - A cancellation before the truck rolled gets "got it, thanks". Loads that fit no truck get "not today, here's what we run", once a day per broker. A request for papers that aren't uploaded yet gets "coming shortly".
+  - An email the AI can't answer, even on a second try, gets "thanks, we'll get back to you shortly", and support takes it.
+  - These short notes carry no price or promise, so they go out on every autopilot setting.
+  - On the phone, brokers asking for the carrier packet get it by email. Questions only the carrier can answer go to the owner.
+  - A broker calling back the number the AI called them from reaches the AI, which picks up about that load.
+  - The owner can call or text the dispatch line: the AI answers from the fleet data in the owner's language, and passes anything that needs a person to support.
+  - A broker who saw a carrier's truck on a load board calls the dispatch line. The post says to call it and ask for the carrier; the owner can switch that back to their own number in Settings → Your rules. The front desk finds the carrier, takes the load down (lanes, time, equipment, weight, company, MC), checks it fits a truck, and works the price on the same call.
+  - Anyone else who calls hears who it is and is asked who's calling; the message goes to the support team's phones.
+  - Brokers who write in French or Spanish (or another language) get our emails in theirs. Template emails are translated, and every amount, load number and MC is checked to have come through exactly; if anything differs, the English goes. The AI's own replies are written in the broker's language.
+  - The owner's calls go through the voice server too, when it's running.
+- **One AI, however people reach it.** A driver's text, call or message in the app, and the owner's text, call or message in the app, all go to the same AI with the same tools. So "I'm loaded" moves the load whichever way it's said. In the app's chat the owner can also answer what's waiting ("send it", "don't"); by text or phone they're pointed to the app, because a phone number can't prove it's them.
+- **Photos:** a driver can text a photo of the BOL, the signed POD or a lumper receipt. It's stored and checked like an upload in the app and put on their load, and a clean POD finishes the delivery so the invoice can go out. A broker's photo of a rate con by email is read like a PDF.
+- **How people really talk:** the AI knows trucking talk (bobtail, deadhead, 34 reset, lumper, TONU, "what's your 20") and what phone transcription does to it ("real fur" is reefer). It handles typos, texting shorthand, all caps, emoji and mixed languages. Phone lines listen for trucking words (Twilio speech hints, Deepgram key terms). A price written as "2,300 dollars" or "$2.3k" is caught by the same guard as "$2,300".
+- **Measuring it:** `eval/` generates about 900,000 different messages from 24 things drivers, brokers and broker emails say. They come with typos, shorthand, voice-transcript errors and 7 languages, each marked with what a dispatcher would do. `node eval/run.mjs --n 300` sends a sample to the real AI (dry run: nothing saved or sent) and scores it by intent and by how it was typed. Set `EVAL_SECRET` on the app and in your shell first; the endpoint doesn't exist without it.
+- **Practice mode (a shadow week):** in Settings → Phone, text and email, an owner can switch on practice mode. The AI reads their broker email (forward a copy to the carrier's address) and does its whole job: booking, haggling, check-ins, invoices. But nothing leaves: no text, email or call goes out. Each one is kept, shown in Settings as "what the AI would have sent", and a black bar on every screen says practice mode is on. The owner keeps dispatching as they do today and compares. It's the no-risk way to try Backroute before letting it talk to anyone.
+- **Simulated brokers and drivers:** `node eval/sim.mjs` plays a week of a small fleet's dispatch work against the real app. It runs whole conversations, by email, text and phone, on practice carriers it makes and deletes, so nothing leaves and no real carrier is touched. The scenarios:
+  - brokers who lowball, rush, won't name a price, add a stop after agreeing, write in Spanish, or pose as a known broker to get bank details;
+  - a brokerage phone menu with hold and a transfer;
+  - drivers running late, broken down on the interstate, stuck at a dock, or angry about pay;
+  - the owner checking in.
+
+  Each broker has a hidden most-they'll-pay. With the AI on, the AI plays the other side and a veteran-dispatcher judge scores each conversation. Without it, each follows its script. Hard rules are checked in code:
+  - never under the carrier's lowest rate;
+  - never less than the broker already offered;
+  - nothing sent to an impostor;
+  - no internal words.
+
+  The run reports how much of what brokers would really pay the AI got, and exits with an error if a hard rule broke. Set `EVAL_SECRET` on the app and in your shell. It uses the app's own AI key.
+- **Negotiation that opens with room and knows each broker:**
+  - **Opening:** a bit over a post that already pays (about 8%), and well over the carrier's lowest when the post is under it. It never goes past the top of what the lane pays when a rate service knows it.
+  - **Broker history:** it asks at least what this broker has paid on loads the carrier hauled for them (up to 20% over the post). It adds a little with a broker who always takes the first number, and leaves room with one who always pushes back.
+  - **Pace:** with a broker who usually comes up 10% or more from their first number, it comes down in smaller steps.
+- **Phone menus and hold, on the AI's calls to brokers and repair shops:**
+  - "For carrier sales, press 2" gets a 2. A shop's menu gets road service, a language menu gets English, and anything else gets the operator.
+  - It waits quietly through hold music and "please hold" (up to about ten minutes), then says who it is again when a person picks up.
+  - A menu that keeps looping gets the operator, then a hang-up and the usual follow-up.
+  - On natural calls the key press goes into the live call.
+- **Fast on load boards:**
+  - A truck that's empty now or within six hours is searched every round, not every 30 minutes.
+  - When it's empty now and the board load lists a phone number, the AI calls the poster instead of emailing, the way dispatchers cover a load before someone else does. The email is the fallback.
+  - An unanswered book request on a load picking up within a day gets a call after 10 minutes instead of 30.
+- **Provider outages don't lose messages:** a text or email that fails because Twilio or Postmark is down is kept and sent again by the dispatcher's rounds, with backoff. It gives up once it's too old to make sense (a text after 30 minutes, an email after a day), and support is then asked to reach the person another way. A bad number or address isn't retried. Calls aren't retried either; each call already falls back to a text or email. Everything goes out through one place (`src/lib/channels/out.ts`), and a lint rule stops code from calling the providers directly.
+- **Stuck work gets a person:** besides messages that couldn't be delivered, an urgent support item nobody has taken after 15 minutes texts the support team again, once.
+- **Two screens on one load:** a screen saves only the fields the person changed, and the database merges them into the current load. An owner fixing a pickup time on a copy from a minute ago can't undo the negotiation, rate con or invoice the AI recorded in that minute.
+- **What each carrier costs to run:** every AI call's tokens are counted against the carrier it was for. The support console's Numbers tab shows this month per carrier: AI, texts, emails and call turns, the estimated total and the cost per truck. Set the `COST_*` rates (see `.env.example`) to your own.
+- **Bring your history:** in Settings, the owner uploads a spreadsheet of the past year's loads (CSV from a TMS, QuickBooks or their own sheet).
+  - It reads the columns by name ("Linehaul", "Pickup City", "Customer", "Load #"...), shows what it found and what it skipped and why, and imports on the owner's OK.
+  - The brokers and finished loads it adds give the AI lane prices and broker habits from day one.
+  - Importing the same sheet twice doesn't double it, and nothing is invoiced or texted for old loads.
+- **The rest of a dispatcher's paperwork and phone work:**
+  - **Signing the rate con:** in Settings → Your rules → Rate cons, the owner names who's authorized to sign. When a broker's rate con matches what was agreed on a load the AI booked, the AI adds a signature page (the load, the rate, the terms, the signer's name and the time) and sends the signed copy back with its thanks. Both the broker's copy and the signed one are kept on the load. A rate con that doesn't match is sent back for a fix, never signed. A broker who wants it signed in their own portal (DocuSign and the like) has it signed there by the browser worker when it's on (below); otherwise they're asked for a PDF first, and support signs it there if they insist. With no signer named, the owner is asked once to add one.
+  - **Broker websites** (with the browser worker, step 15, and the owner's switch in Settings → Broker websites):
+    - **Signing:** a DocuSign, Adobe Sign or broker-portal link for a booked load is signed there in the authorized signer's name. Before the signature the AI reads the rate on the page; if it isn't what was agreed it doesn't sign, asks the broker to fix it and tells the owner. The signed copy is downloaded to the load.
+    - **Carrier setup:** a MyCarrierPackets, RMIS or Highway invite is filled in from the carrier's details and papers (W-9, COI, authority, voided check). It signs in with the carrier's login, or opens the account itself with the carrier's AI email address and a strong password it keeps in the vault. The final submit waits for the owner unless they turn on "Submit carrier setups on broker websites" in Your rules (or run full autopilot).
+    - **Dock appointments:** a scheduling-site link (Opendock, C3 and the like) for a stop still waiting on its time is booked there: the load number, the earliest slot in the load's window, and the confirmation number go on the load, to the driver and to the broker. A slot outside the window waits for the owner.
+    - **What it doesn't know it asks once:** a login, a tax ID, a code texted to the owner. The answer is kept encrypted for next time. Codes the site emails come to the carrier's AI address and are typed in without anyone.
+    - **Passwords are never shown:** the owner adds logins in Settings and can't read them back; the AI writes a placeholder and the real value goes to the worker only for that field, only on that website. Nothing typed from the vault is kept in the job's log. Every signature and submit has a screenshot from just before it.
+    - **When the site beats it** (it broke, three tries, or the worker is down), a signing asks the broker for a PDF; anything else goes to support with the link, what the AI did and its last screenshot. The owner can send a failed job back to the AI, or stop one.
+  - **The broker's tracking app:** when the rate con or the broker's email asks for Macropoint, Trucker Tools, FourKites, project44 or the like, the driver is texted what to accept, with the link when there is one. "Yes" back turns it on and tells the broker. Not on 2 hours before pickup, the driver gets a reminder; still not on at pickup, the broker is asked to resend it to the driver's number.
+  - **Dock appointments by phone:** a rate con that says to call for an appointment gets a call to the shipper or receiver (their number from the rate con) to book one, in their working hours, up to three tries. A truck that will miss its appointment gets a call to move it, before the late notice goes to the broker. The time they give goes on the load, the driver is texted it and the broker hears. It goes through their phone menu (receiving, shipping, scheduling), answers the usual questions from the load (load number, weight, what it is), and a facility that says the broker has to set it gets the broker asked by email and support told.
+  - **Layover:** a truck held overnight at a stop it reached on time is claimed a day's layover per day, while it's still waiting, at the rate con's layover terms or the owner's rate (default $250). That stop gets no hourly detention on top, and the layover goes on the invoice. Without the broker's terms it waits for the owner's OK, like detention.
+  - **Broker credit:** before asking to book, the AI checks the broker's credit: a credit service by MC number (step 14) and, once a broker has paid a couple of invoices, how long they really took. Under the owner's lowest score (default 70 of 100), or 60+ days to pay, it doesn't book on its own and says why. Slower than 40 days, it asks 4% more.
+  - **Changes after booking:** a broker adding a stop or sending the truck somewhere else gets a price first: the extra miles at what the load pays a mile (never under the owner's lowest) plus stop pay (default $75 a stop). Their yes, or a revised rate con at the new total, puts it on the load, the driver hears, and it goes on the invoice. A lower number that covers most of it is taken; less goes to the owner.
+  - **Factoring:** with a factoring email set, each delivered load's packet goes to the factor the way they want it: a schedule of accounts on top, then the invoice, the (signed) rate con, the signed POD and BOL, and any receipts billed. A load with no rate con on file still goes, and the owner is asked to send it.
+  - **Cargo claims:** a broker's claim email (damage, a shortage, OS&D) is acknowledged in writing with what they still need to send (the written amount, the commercial invoice, the noted POD, photos). The driver is asked what happened while it's fresh, and their answer and any damage photos they text go in the claim file. A POD with damage or a shortage written on it starts the file before anyone asks. The file (the load, the times from the driver's app, what the BOL and POD say, the statement) goes to the cargo insurer's claims email once the owner OKs it. Paying a claim or filing it with insurance is always the owner's call.
+- **Closer to a veteran dispatcher:**
+  - **It remembers drivers.** What a driver mentions about their life or how they like to work (a kid's game, a bad back, no night driving) is kept on their profile and brought up naturally later. The owner's AI sees it too when they ask how someone's doing.
+  - **Dock knowledge shared across every carrier.** Each finished stop (the facility, the city, and how long the truck waited, from the driver's app) goes into a shared record, so a driver heading to a dock their carrier has never been to still hears "this one usually takes 4 hours." Nothing else is shared: no load, broker, rate or carrier name. Only the server reads it (`20261004000000_facility_network.sql`).
+  - **The carrier's report card.** Once a carrier has at least 5 delivered loads in six months and 90% or more on time, book requests and setup packets say so: loads run, on-time %, tracking on every load that asked, paperwork the same day, no claims. It's the kind of record that gets a carrier on a broker's preferred list. Nothing is said while the record is short or not good.
+  - **It asks for reloads.** The rate con thanks tells the broker when and where the truck will be empty and asks if they have anything out of there, unless the truck already has its next load.
+  - **Brokers who won't talk to an AI** ("we don't deal with robots") get a polite goodbye, an email right away with where things stood, and email only from then on.
+  - **Blurry paperwork** a broker's billing clerk couldn't read is asked for again on the spot, with a tip (flash, flat, all four corners), before the driver leaves the dock. It isn't filed or used to mark the load delivered.
+  - **The weekly review:** the support console's Numbers tab lists what came up most this week, to support or to owners, grouped and with an example each. Each repeat is the next thing to teach the AI.
+- **Reaching drivers the way they already talk:**
+  - **WhatsApp** (step 19): a driver who writes on WhatsApp is answered there, from the dispatch line's WhatsApp number, and hears from dispatch there after. WhatsApp only takes a free-form message within 24 hours of the driver's last one; after that the text goes as the approved template (one variable: the message) or, without one, by SMS. A driver can pick SMS or WhatsApp in the app (Profile → How dispatch reaches you).
+  - **Voice messages** (step 20): a WhatsApp voice note or an MMS recording is turned into text and handled like any text (a status, a reefer reading, a question). What they said is kept with the recording. The answer also comes back spoken (on WhatsApp, or as MMS to a driver who sent one), so the driver never has to look down; the audio is fetched from a link that works for two hours and only opens spoken answers. One that can't be made out gets "type it, or call".
+  - **Notifications in the driver app:** a driver turns them on in Profile. Every message from dispatch shows on their lock screen (a new load opens Home). Texts still go too, so nothing depends on the phone keeping the permission. The office's alerts never go to a driver's phone.
+  - **Consent to texts and calls:** the owner checks that a driver agreed when adding them (the wording is in `docs/legal/driver-text-consent.md`), or the driver taps I agree in the app (shown in their app's language), or answers YES to the first text. A driver with nothing on record gets that first text before anything else (once per number; never the owner, who agreed when signing up): who's texting, that it's an AI, rates, HELP and STOP. STOP and START are recorded too. With `CONSENT_REQUIRED=1`, nothing else goes to a driver until they say yes: their texts wait (the owner is told once), and go out when they answer YES, agree in the app, or the owner says they agreed. Off by default until your lawyer says which way. A driver can also turn texts off in the app (Profile → How dispatch reaches you) and get notifications instead, as long as their phone takes them; texts come back if it stops for two weeks. Every record keeps the words shown, when, how, and (in the app) the address it came from, and the table refuses changes and deletes (`20261009000000_natural_dispatch.sql`). The owner sees each driver's latest answer in Settings → Billing & Team.
+  - **Dock tips, passed on:** a driver mentions "check in at the guard shack, back in from the east gate, receiving closes at 2" and the AI saves it as a tip about that place (names and phone numbers taken out), with the hours. The next driver going there hears it with the new load, in the check-in before the stop, in the morning text, and whenever they ask the AI about the dock. Tips are pooled across carriers, like dock times, and kept to the place: names, phone numbers and links are taken out, a tip that reads like orders to the AI is refused, a driver can leave at most 8 a day, and the AI treats tips as information only. With the rate con's ZIP, two docks with the same name in a city don't share tips.
+  - **The morning text:** in each driver's morning (5 to 9 local, never before their "no calls before" hour), on days with a stop, one text with the stops and times, appointment numbers, dock tips, slow docks, the reefer setting, National Weather Service warnings where the truck is and is going, and hours left. The AI writes it in the driver's language; a plain list if it can't. The owner can turn it off for everyone (Settings → Notifications), a driver for themselves.
+  - **Reefer loads:** the rate con's set point or range, mode and pre-cool are read off it and go to the driver with the load and before pickup. Once loaded the AI asks for the unit's reading and the pulp temperature, and again before delivery. A reading (texted, said in a voice message, or in a photo of the display with the number) is kept on the load; one out of range tells the driver what to check and reaches the owner (urgent at 5°F off). A warm pulp temperature at pickup: don't sign the BOL until it's written on it. The readings go in the cargo claim file.
+- **Quick to steer, easy to use:**
+  - **Undo:** an email the AI writes on its own to book, counter or accept waits 90 seconds before it goes (Settings → Basics: send at once, 1 minute, 90 seconds or 5 minutes; `UNDO_SECONDS` sets the default). Home shows it under "About to send" with Undo. A stopped book request puts the load back with its offers; a stopped counter or acceptance leaves the broker's number for the owner to answer. Sent by a short wait after the request that wrote it, and by the dispatcher's rounds if that was cut off (`20261011000000_owner_ux.sql`).
+  - **Answer from the notification:** what needs the owner arrives on their phone with Yes / No buttons (Android and desktop; iPhone opens the app). The button carries a signed token for that one item, good for two days.
+  - **Teach the AI** on each load: never this broker, never below a rate on this lane, get this driver home first.
+  - **Settings → Basics:** five plain questions (lowest rate, empty miles, how much the AI does alone, each driver's home time, how to reach the owner); everything else is under More.
+  - **Home:** a getting-set-up checklist with progress until the first load is booked, money this week (in, out, kept) with late invoices and what the AI already sent, and empty screens that say what to do next.
+  - **Weekly review** adds up to three things the AI learned (a broker paying slower than their terms, a lane that pays more on one weekday, a broker who takes the first number).
+  - **Late trucks:** when the ELD says a stop will be missed, the owner hears it with the new arrival time at the same moment the broker does.
+  - **Fleet from a photo:** in the truck and driver form, "Fill in from a photo" reads a whiteboard, printed list or spreadsheet on screen. Nothing is saved until the owner checks it; rows hard to read are marked, and phone numbers are kept only when whole.
+  - **Opens at once, and with no signal:** the last view is kept on the device for three days (forgotten on sign-out), shown right away and refreshed in the background. The installed app keeps its own pages and files on the phone too (`public/sw.js`, built app only), so it opens even when the phone has no signal at all.
+  - **Nothing lost offline:** a tap made with no signal (arrived, loaded, a setting, a message) is tried again every few seconds while the app is open, and also kept on the phone. If the phone closes the app first, it goes as soon as the app is opened with signal again, on top of what the database has, field by field (an office change to another field isn't undone), with the time it was tapped. Photos wait the same way. The app shows "N waiting to send" until it's all gone. Parked off duty, a truck's ELD spot still comes in (that's where the AI plans its next load); a personal-conveyance trip isn't followed.
+  - **Drivers:** one-tap answers to dispatch in their language, picked for where they are on the trip; this week's pay with what the current load adds and payday; hands-free switching on by itself once the phone moves at road speed (only if location is already allowed; a driver can turn it off); a framing hint and a blur, dark or glare check before a document photo goes; photos taken without signal kept on the phone and sent when it's back, with "N waiting to send".
+  - **Look:** one set of status colors on every screen (green done, blue in progress, amber waiting on someone, red needs you), helper text dark enough to read in sunlight, larger tap targets in the driver app, visible keyboard focus, and no animation for people who turned motion off.
+- **Modern and quick to run:**
+  - **Dark mode** that follows the phone, or Light, Dark or Auto in the account menu, Settings and the driver's profile (kept on that device). It's applied before the page draws, so a dark phone never flashes white.
+  - **Needs you:** plain cards with a colored edge for how urgent each is (red decide now, amber waiting on you, grey for your information), most urgent first. On a phone, swipe right to do a card's one-tap action and left to set it aside for later. Several of the same paperwork (detention, layover and TONU claims, invoices, payment reminders, ETA updates, setup packets, short replies) can be sent together; offers, counters and anything with a new price never are.
+  - **Since you were last here:** after three hours or more away, Home opens with what the AI did meanwhile (booked, delivered, paid, calls) and what waits.
+  - **Fleet map** on Home: every truck as a dot by what it's doing (moving, at a stop, running late, empty), from the ELD when connected; tap one for its trip. Map tiles from OpenFreeMap (no key).
+  - **Money:** the last 8 weeks in bars (what came in, what it cost, what was kept), and the same per truck and per lane, from the carrier's own loads.
+  - **On a phone:** a tab bar for the owner like the driver's; the app icon shows how many things need the owner (installed app); long-press the icon for Needs you, Ask the AI, and the driver's next stop.
+  - **Command bar** (Ctrl+K or the search box): find a load, truck or driver; run "pause the AI" or "dark mode"; anything else, like "book Marcus home by Friday", goes to the AI dispatcher as an order or a question.
+  - **Pause everything:** the AI status pill at the top. Paused, the AI keeps reading email and answering drivers, but books nothing, sends nothing to brokers, and calls no broker or dock; what it would send waits in Needs you, and emails waiting for Undo wait too and go on the first round after Resume. The owner's own taps (send this, ask to book that) still go. Breakdown calls to repair shops still go.
+  - **Load timeline:** every load from the offer to the money: asked to book (by the AI or by you), booked, rate con, picked up, delivered, invoiced, paid, with when and who.
+  - **Loads:** search and filters (truck, broker, time) remembered on the device, ready-made views (unpaid over 30 days, running late, no rate con yet, delivered with no POD) and your own saved views.
+  - **Sample fleet:** a new owner can open a made-up fleet from Home to practice (answer Needs you, pick a load, ask the AI, open a timeline, pause and resume), with a checklist that ticks off. It lives only in that browser tab, nothing is saved or sent, and Back to my fleet returns to the real account. It's on the real site too (separate from the public demo); `NEXT_PUBLIC_SAMPLE=off` removes it.
+  - **Drivers:** quick replies learn their own words (short things they've sent twice come first); a microphone on the message box types what they say, in their language; and an optional next stop on the lock screen (a quiet notification that changes as the trip moves).
+  - **Help on settings:** a "?" beside each of the main settings with two plain lines and an example.
+  - Loading shows the page's outline instead of a spinner, alerts never stack more than two (the rest are in the bell), and cards and alerts move gently (none for people who turned motion off).
+- **Owners seeing why:**
+  - **Why-lines:** every load the AI asks to book says why, on the load and on anything waiting for the owner's OK: what it pays a mile against their lowest and the market, empty miles to the pickup, what it does for the driver's home time, how the broker pays (their own invoices first), and what else the truck had. Each counter or acceptance adds a line with the broker's number and the AI's answer.
+  - **Holidays, dock hours and drive time:** each offer and booking is checked against the days most docks close (New Year's, Memorial Day, July 4th, Labor Day, Thanksgiving, Christmas, and the observed days), days many close early, the hours drivers reported for that dock, and whether one driver (or a team) can legally drive it between pickup and delivery: 11 hours driving in a 14-hour day, the 30-minute break, 10 hours off, about an hour a day for the pre-trip and fuel, and, for a pickup soon, the hours the driver has left by the ELD. A stop in a Canadian province is checked against Canada's holidays (and Quebec's). A dock's hours from the carrier's own drivers can stop a booking; another carrier's driver's are a heads-up. A hard problem is shown on the load and keeps the AI from asking for it on its own; a new one found at booking goes to the owner.
+  - **The weekly review:** Monday morning (owner's time), the week in a minute: loads, gross and net, per mile, empty miles, best broker (from two loads or more) and worst (a slow payer first), and one thing to change, like dropping a broker who pays in 40 days or a driver 3 weeks from home. On Home, by text, and on the owner's phone.
+  - **History from old rate cons:** in Settings → Bring your history, besides a spreadsheet: upload up to 40 old rate cons (PDFs or photos) at a time (the app sends them in parts of 4 MB; a bigger file goes by email), or forward them from email to the history address (`inbound+KEY-hXXXXXXXXXX@...`, with a new random part each time it's opened, so a broker who knows the carrier's address can't guess it), which opens for a week from the app. Each is read for the broker (name, email, MC, payment terms), lane, rate and docks, and becomes finished history for pricing, never invoiced or texted. The same file twice is read once. Each import (spreadsheet, upload or email) is listed under Your imports with an Undo that takes out its loads and the brokers it added that nothing else uses (`src/lib/agent/import-batches.ts`).
+- **The back office:**
+  - **Paperwork reminders:** each truck's registration and annual DOT inspection, each driver's CDL and medical card, the insurance certificate, the IFTA return each quarter and the decals each December. The owner hears 30, 14 and 7 days ahead and once it runs out, each once (Needs you, and their phone). They're listed on Compliance. A truck with a lapsed inspection or registration or an engine code that means stop, or a driver whose CDL or medical card ran out, isn't booked by the AI.
+  - **Fuel & tolls** (Money): fuel card and toll statements as CSV (WEX, Comdata, EFS, BestPass and most others export one), uploaded or read once a day from the report's link (Settings → Integrations, with the header it needs). Each line goes on the load its truck was on that day; a unit number the app doesn't know is asked once: pick the truck and every line with that unit goes on its loads. The same line from an overlapping statement is saved once. Shows what each load really cost and diesel by state for the IFTA quarter.
+  - **Driver pay** (Money): each week's pay worked out from the loads (percentage, per mile or flat), less deductions, escrow and advances. An advance bigger than the week's pay is carried to the next week, never a pay below zero. Check, pay, mark paid, and download as CSV; at year end, the 1099-NEC list: what each contractor was paid (reimbursements left out) and who needs one ($2,000 or more from 2026).
+  - **Customers:** shippers who book the carrier directly, with their terms, and lanes they run every week. The AI makes those loads a week ahead on a truck that fits, once each.
+  - **Lanes** (Money): the carrier's rate per mile on each lane, month by month, against the market.
+  - **A bookkeeper:** an account that sees loads, money, fuel, pay and the fleet list, records advances and marks invoices paid, and nothing else: no booking, no messages to brokers or drivers, no AI chat, no settings.
+  - **Who did what:** every change to loads and settings, trucks and drivers added or removed, who can sign in, and pay, advances and payments is in Settings → Security, with who (owner, dispatcher, bookkeeper, driver or the AI) and when. Only the owner reads it.
+  - **Two-step sign-in:** the owner can add an authenticator app (Settings → Security). After that, an account's data stays out of reach until the 6-digit code is entered, in the database itself. The same page lists the devices signed in, with Sign out everywhere else.
+  - **From the ELD:** the odometer (for service due by miles) and engine codes, each with what it means and what to do. One that means stop reaches the owner at once.
+- **On the road (driver app):**
+  - **Directions, truck-safe only:** the big button opens the driver's truck GPS app (Sygic Truck or CoPilot Truck, picked once; "Get the app" if it isn't on the phone) at the dock itself. Google Maps, Apple Maps and Waze are left out on purpose: they route like a car, under low bridges and onto parkways. The dock's street address comes from the rate con (or the office types it on the load) and is looked up to its exact spot at street level (HERE, step 12); a city-only match is never used. Without an exact spot the driver copies the address and is told to check the pin; with no address at all the card says so and to ask dispatch, never "go to Memphis". The new-load text has the address too, and the AI tells drivers the same: truck GPS, the dock's address, no car apps.
+  - **The trip map** draws the road a truck this size takes (HERE truck routing), or, without it, a dashed straight line marked "Straight line · not directions". In a real account the truck's dot, miles left and arrival time come from its ELD position (fresh within 30 minutes); with none the card says "No GPS yet" instead of moving a dot on a timer. On the owner's fleet map a truck placed without GPS is faded and the legend says it's estimated.
+  - The fuel plan (where diesel is cheapest on the way) uses sample prices, so it shows only in the demo until a fuel card price feed is connected. The Lanes page compares against the market only when a rate service gives one (step 11); a load the owner typed in isn't treated as the market.
+  - **Hours clock** at the top, counting down from the ELD's last reading, with a spoken heads-up at 60, 30 and 15 minutes left (Profile turns the voice off), and where on the way the hours run out, with truck parking near there.
+  - **Weather on the route:** National Weather Service warnings along the way to the next stop (`/api/weather`, US points only).
+  - **Lumper money:** the driver asks for the amount at the dock; the office gets it on their phone and in Needs you, sends the express code (Comdata, EFS) back, and the driver sees it in the app, never on the lock screen.
+  - **Paperwork photos** are cropped to the page, with the contrast lifted so they read like a scan, before they go.
+  - **Location only on duty:** the app stops sending where the phone is once the driver is off duty.
+- **Drivers can ask for what's near them:** truck parking, a truck stop, diesel, a CAT scale, a truck wash, a repair or tire shop, by text or on a call (needs the Places key from the breakdown step).
+- **Evening text:** at 6 PM Central the owner gets a text: what was delivered, what it made, how many trucks are rolling, and what needs them.
+- **The log:** every text, call and email in or out is listed in Settings, with what the AI did.
+- **Access rules in the database:** they decide who sees what, so it isn't only the app hiding things. See `supabase/migrations/`.
+  - A driver's app can change only the trip on their own truck's loads: the stage along the trip, times, documents and stops. The rate, broker, invoice and rate con stay as the office and the AI set them, even when a phone saves an old copy (`20260929000000_driver_edits.sql`).
+  - Texts, emails and calls that didn't go straight out (held in practice mode, or waiting to be sent again after a provider outage) are readable by the carrier's office only, and only the server writes them (`20260930000000_outbound.sql`).
+  - A screen's save of a load carries only what it changed, merged into the current row (`20261001000000_merge_edits.sql`).
+  - What each carrier costs to run is server-only: no one who signs in can read or change it (`20261002000000_usage.sql`).
+  - The signed rate con, the factoring schedule, claim files and damage photos are kept with the load's other files (`20261003000000_paperwork_kinds.sql`).
+  - Trucks, drivers and Needs you items merge the same way loads do, and an old copy can't reopen a closed Needs you item. (This also fixed loads: the app's upsert used to replace the whole load; now it merges.) (`20261006000000_merge_more.sql`)
+  - Billing, push devices and the system's heartbeats are server-only; no one can mark their own account paid (`20261007000000_pilot_readiness.sql`). Rate-limit counters too (`20261008000000_rate_limits.sql`).
+  - Consent records can't be changed or deleted, even by the server; a carrier's office reads its own drivers', a driver their own. Dock tips: each office reads its own drivers', the server all. How each number texts us is server-only. The weekly review is the office's (`20261009000000_natural_dispatch.sql`).
+  - The bookkeeper's limits, the audit log (written by the database, read by the owner only), the device list (each person their own), and two-step sign-in, checked on every table: with an authenticator app on, nothing is readable or writable until its code is entered. Marking an invoice paid goes through one function that changes nothing else on the load (`20261012000000_owner_tools.sql`).
+  - Website logins and the answers the owner gives for them are encrypted by the server before they're stored, and no one who signs in can read the table, not even the owner. The website job queue is server-only too, and only the server can hand a job to the worker (`20261005000000_portal_worker.sql`).
+- **Dispatching like a senior dispatcher.**
+  - **Loads lined up.** The AI books up to three loads ahead per truck, each picking up after the one before delivers (with two hours between). Load boards are searched from where the last load ends. The truck's plan shows the current load, then "Next" and "Then".
+  - **The whole fleet at once.** When several offers come in, trucks and loads are paired for the best total, not each load's nearest truck in turn. Each pairing counts the empty miles to the pickup, home time, and how easy it is to reload where the load ends (from the carrier's own offers in the last three weeks).
+  - **Asks that learn.** The opening number follows how the last asks went: with this broker (three answered asks or more), else on this lane with anyone (four or more). It opens 5–7% higher when brokers keep taking the first number, and 3–8% lower when most asks are lost. The owner's lowest and the market's top still bound it, and the why line says so.
+  - **Rules from repeated answers.** Sending an empty truck to busier freight is a Yes/No for the owner. After three yeses in a row, the AI offers to make it a rule.
+- **Weather along the whole route**, not only at the stops: the truck's road (HERE) or the straight line is checked every ~100 miles, in the US (National Weather Service) and Canada (Environment Canada).
+- **Dock hours no driver has reported**: the place's posted hours on Google Places, as a heads-up only. They're often the office's hours, so they never stop a booking; drivers' word always wins.
+- **Truck parking, only when asked.** The driver taps **Reserve a spot** (spots near where their hours run out, with prices), or asks the AI by text, call or chat. The owner can ask in the app's chat, or book from the app. The AI never books a spot on its own; the tool refuses unless the person's own words asking for it are in their message. The driver gets the address, confirmation and gate code.
+- **Late trucks seen sooner.** ETAs use live traffic (HERE), weather warnings on the road ahead, and the driver's hours. Within 30 minutes either side of the appointment, the owner hears it's tight, with why. Past that, the broker is told, as before. A truck stopped 90 minutes or more away from its stops, with the driver on duty, gets an "everything OK?" text.
+- **Offline, finished.** The trip's map area is kept on the phone when the trip map opens (the road ahead, whole-trip to town level), so the map still draws with no signal. A Yes/No tapped on a notification with no signal is kept and sent once the phone is back online, with a note saying so.
+- **QuickBooks Online, kept in step.** The owner connects their company once (Settings → General). Every hour the AI puts in:
+  - each invoice sent to a broker, with the broker as the customer and one line per charge
+  - the payment when the broker pays
+  - fuel, tolls, and the lumpers and scales drivers paid that the owner approved
+
+  Each goes in once. The company's sign-in is stored encrypted (`20261013000000_quickbooks.sql`). The CSV downloads stay for anyone not on QuickBooks.
+  - When a load's charges change after its invoice went in (detention, a lumper added), the invoice in QuickBooks is brought up to date. A cancelled load's invoice is voided, not deleted (a TONU stays billed).
+  - A fuel or toll charge already typed into QuickBooks (same day, same amount) isn't put in again.
+  - When Intuit asks for the company to be connected again, the owner is told once.
+- **Several partial loads on one trip.** Drivers often haul 5, 6, 7 or more partial (LTL-sized) loads on one run, picking up and dropping along the way. Each load keeps its own broker, rate con and invoice. The AI:
+  - reads partials from broker emails, feeds and boards: the full/partial flag, pallets, or feet of trailer (a pallet is about 2 feet of a 53-foot trailer)
+  - plans the stops in order, up to 8 loads on a trip: every pickup before its drop, the trailer never over its feet or its weight (44,000 lbs unless the owner set the truck's own), each appointment made, and 10 hours off after 11 of driving
+  - keeps freight apart that can't share: hazmat with food, reefer loads set more than 2°F apart, a load the shipper wants the trailer to itself for
+  - picks the order with the fewest miles, and avoids making a load come off from behind another. When it can't, the driver is told which load to ask the shipper to put by the doors.
+  - asks for a partial only when it fits the truck's trip. It's priced by the share of the trailer it takes (never under about a third of a full load's price) and costed by the miles it adds, so a load on roads the truck drives anyway shows its real profit.
+  - books it onto the trip, and texts the driver which stop to pick it up and drop it at
+  - The driver's home screen shows **Your trip**: every stop in order, the next one marked, each opening its own load. The Fleet page shows "Trip: 4 loads · stop 3 of 8".
+  - Loaded or dropped (in the app, by text, or by texting the POD), the truck moves on to the next stop. A cancelled load's stops come off, and the rest keep their order.
+  - Late checks and check-call ETAs for a stop further down the trip count the stops before it.
+- **Late warnings for every fleet.** The truck's ETA is checked even when the carrier hasn't set up broker email. The owner is then told to call the broker. When it's tight, the driver gets a heads-up too, with why, and is told not to rush. The broker's late email says why (traffic, weather, the driver's hours).
+- **Parking that follows through.** The owner can book a spot for a truck from the Fleet page. A booked spot is on the books as a company-paid cost (not something to pay the driver back). The driver gets the spot again about an hour before getting there. A spot for a load that's cancelled is cancelled with it.
+- **Board results matched across the fleet**, like emailed loads: every truck's search is pooled, then trucks and loads are paired for the best total.
+- **The lineup, shown.** Under "Up next", the driver and the owner see what's booked after it ("Then …"). The phone keeps the next two loads' map areas for no signal, and the offline badge says how many answers are waiting to send.
+- **Dock hours by day.** A dock that keeps short Saturday hours (or other odd days) is checked against that day's hours.
+- **Lookups kept for every server.** Posted dock hours (a week) and weather warnings (15 minutes) are kept in the database, so a paid lookup isn't repeated on each server (`20261014000000_lookup_cache.sql`, server-only).
+
+## What it doesn't do yet
+
+The AI now does the day-to-day work of a dispatcher by email, text and phone. What's still out of its reach, or needs something from outside:
+
+- **Load boards need Backroute's agreement with each board.** The code is ready, and each board switches on when its logins are set (below).
+  - Truckstop is built from its public web-service reference.
+  - DAT's developer documents are only open to partners, so the DAT addresses and fields must be checked against DAT's documents when access is granted. They're marked in `src/lib/agent/boards/dat.ts`.
+  - Boards' terms usually limit how results are used; check them when signing.
+- **Natural calls need the voice server running** (step 13). Without it, calls take turns through Twilio's speech recognition, with a short pause after each person speaks.
+  - Even with it, the AI answers in about a second or two, since each answer goes through the same checks as email.
+  - Punjabi calls always take turns.
+  - Some brokers won't deal with an AI and hang up. Those come back to email.
+- **Rate data and routing need their own accounts** (steps 11 and 12). The DAT and Greenscreens request formats must be checked against their documents when access is granted, the same as DAT's load board.
+- **Emergencies need a person.** For a crash, the AI tells the driver to call 911 and alerts support and the owner. A person reaches the driver, deals with the police report and the insurance claim, and approves any repair.
+- **Where it guesses, it asks first**, until the owner turns on the matching rule:
+  - a TONU amount the rate con doesn't give
+  - detention pay without the broker's terms
+  - a POD with a shortage written on it
+  - layover pay without the broker's terms
+  - sending a claim file to the insurer
+  - A new broker that fails the check, or whose credit is under the owner's lowest, always waits.
+- **Broker websites are built but not yet tried on the real sites.** The browser worker (step 15) signs in DocuSign and brokers' portals, fills carrier setups and books dock appointments, and it's tested end to end against stand-in sites. Each real site (DocuSign, Adobe Sign, MyCarrierPackets, RMIS, Highway, Opendock, C3) needs a supervised run first: `portal-worker/README.md` has the plan. Until a carrier's owner switches it on, support does these. Sites that want a selfie or a phone call to prove who you are always need the owner.
+- **Credit scores need a credit service** (step 14). Until one is set, the AI only has the carrier's own payment history, which starts empty.
+- **Miles and ETAs without a routing account** (step 12) come from about 130 freight cities and each state's middle. For a town not on the list, miles are rough, and the AI doesn't send late notices from them.
+- **Negotiation is by rules, not instinct.** The AI haggles in steps with reasons, and adjusts to each broker's history. But it doesn't read a broker's mood, bluff about other loads, or trade favors across loads the way a long-time dispatcher might. Every number comes from the rules, on purpose, so it can't be talked below the owner's lowest.
+- **The simulator's scores with the real AI haven't been measured yet.** It needs the app running with `ANTHROPIC_API_KEY` and `EVAL_SECRET`. The scripted runs check the money rules and the plumbing; only the AI-played runs say how human it sounds.
+- **The legal paperwork is drafted, not done.** `docs/legal/` has drafts of the carrier agreement (with the authority to act and sign for the carrier), terms, privacy policy, driver text consent and the call notice, plus the questions for your lawyer. The consent checkbox, the first text and the records are built with the draft wording; change it in `src/lib/consent-words.ts` (and bump `CONSENT_VERSION`) once your lawyer approves.
+- **WhatsApp needs Meta's approval** of the business and the template (step 19), and voice messages need Deepgram and ElevenLabs accounts (step 20). Punjabi voice messages are auto-detected and may not come through; those drivers are asked to type or call.
+- **Weather covers the US and Canada only.** Mexico isn't covered.
+- **Holidays are the US ones.** A dock's hours come from what drivers told the AI, else its posted hours on Google Places (a heads-up only). A dock with neither is assumed open.
+- **Parking needs a reservation partner** (step 23). The API Backroute expects is small and written down. Each network (Truck Parking Club, TA, Pilot) has its own partner terms. Without one, the AI finds lots nearby and the driver books in their truck stop app.
+- **QuickBooks Online needs Backroute's Intuit app approved** for production (step 24); until then it runs against Intuit's sandbox companies. QuickBooks Desktop isn't supported, and a payment already in QuickBooks isn't changed when a load's charges change after it was paid.
+- **Partial trips are planned on rough miles.** The stop order uses straight-line miles times the usual detour, not truck routing, and trailer space in feet only (not pallet height or stacking). The AI adds partials to the trip a truck is on; it doesn't build a whole trip of partials ahead for a truck that's still on a full load. A load that has to come off from behind another is a heads-up to the driver, not something the AI arranges with the shipper.

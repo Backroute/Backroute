@@ -13,7 +13,7 @@ This repo contains a working product prototype: two dashboards and a driver app,
 
 ## The simulation engine
 
-`src/lib/engine.ts` and `src/lib/store.ts` implement a client-side "AI dispatcher" that continuously sources loads, scores net profit (rate − fuel − tolls − deadhead), negotiates over email/SMS/voice with converging offers, books and syncs to a TMS, dispatches, tracks in-transit status, captures documents, delivers, and **pre-negotiates the next load before the current one delivers** (load chaining) — all visible live across every screen.
+`src/lib/engine.ts` and `src/lib/store/` implement a client-side "AI dispatcher" that continuously sources loads, scores net profit (rate − fuel − tolls − deadhead), negotiates over email/SMS/voice with converging offers, books and syncs to a TMS, dispatches, tracks in-transit status, captures documents, delivers, and **pre-negotiates the next load before the current one delivers** (load chaining) — all visible live across every screen.
 
 ## Getting started
 
@@ -74,7 +74,7 @@ The real version switches on from environment variables:
 
 Each load board switches on when Backroute's partner login for it is set. Emergencies still need a person on the support team.
 
-`DEPLOY.md` covers the setup, the tests, and what isn't done yet. The server side is in `src/lib/agent`, `src/lib/channels` and `src/app/api`. The database schema and access rules are in `supabase/migrations/`.
+`DEPLOY.md` covers the setup; `docs/features.md` what it does and what isn't done yet; `docs/testing.md` and `tests/` the tests (`npm run test:unit` after a change, about 35 seconds). The server side is in `src/lib/agent`, `src/lib/channels` and `src/app/api`. The app's store (the demo and the screens' state) is in `src/lib/store/`. The database schema and access rules are in `supabase/migrations/`.
 
 ## Stack
 

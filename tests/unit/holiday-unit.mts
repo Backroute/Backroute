@@ -1,0 +1,25 @@
+import { holidayOn } from "../../src/lib/holidays.ts";
+let ok = 0, bad = 0;
+const t = (label: string, cond: boolean, got?: unknown) => { cond ? ok++ : bad++; console.log(`${cond ? "PASS" : "FAIL"} ${label}${cond ? "" : ` (${JSON.stringify(got)})`}`); };
+t("Thanksgiving 2026 is Nov 26, closed", holidayOn("2026-11-26")?.closed === true && /Thanksgiving/.test(holidayOn("2026-11-26")!.name), holidayOn("2026-11-26"));
+t("the day after is a short day, not closed", holidayOn("2026-11-27")?.closed === false, holidayOn("2026-11-27"));
+t("Memorial Day 2026 is May 25", holidayOn("2026-05-25")?.name === "Memorial Day");
+t("Labor Day 2026 is Sep 7", holidayOn("2026-09-07")?.name === "Labor Day");
+t("July 4, 2026 falls on a Saturday: observed Friday July 3", holidayOn("2026-07-03")?.name === "Independence Day (observed)" && holidayOn("2026-07-04")?.closed === true);
+t("Christmas 2027 on a Saturday: Friday Dec 24 counts as closed", holidayOn("2027-12-24")?.closed === true, holidayOn("2027-12-24"));
+t("New Year's Day 2028 on a Saturday: observed Dec 31, 2027", holidayOn("2027-12-31")?.closed === true, holidayOn("2027-12-31"));
+t("Christmas 2026 on a Friday: no extra closed day", holidayOn("2026-12-28") === null && holidayOn("2026-12-25")?.closed === true);
+t("an ordinary Tuesday is no holiday", holidayOn("2026-09-29") === null);
+t("MLK Day 2027 is Jan 18", holidayOn("2027-01-18")?.name === "Martin Luther King Jr. Day");
+// Canada
+t("Canada: Victoria Day 2026 is May 18 in Ontario", holidayOn("2026-05-18", "ON")?.name === "Victoria Day" && holidayOn("2026-05-18", "ON")?.closed === true, holidayOn("2026-05-18", "ON"));
+t("Canada: Good Friday 2026 is Apr 3", holidayOn("2026-04-03", "ON")?.name === "Good Friday", holidayOn("2026-04-03", "ON"));
+t("Canada: Thanksgiving 2026 is Oct 12, closed", holidayOn("2026-10-12", "BC")?.closed === true && holidayOn("2026-10-12", "BC")?.name === "Thanksgiving", holidayOn("2026-10-12", "BC"));
+t("Canada: US Thanksgiving isn't a holiday in Ontario", holidayOn("2026-11-26", "ON") === null, holidayOn("2026-11-26", "ON"));
+t("Canada: July 4 isn't one either", holidayOn("2026-07-03", "ON") === null);
+t("Quebec: Saint-Jean-Baptiste Jun 24", holidayOn("2026-06-24", "QC")?.closed === true);
+t("Quebec: no Saint-Jean in Ontario", holidayOn("2026-06-24", "ON") === null);
+t("Canada Day 2029 on a Sunday: observed Monday Jul 2", holidayOn("2029-07-02", "AB")?.name === "Canada Day (observed)", holidayOn("2029-07-02", "AB"));
+t("Good Friday 2027 is Mar 26", holidayOn("2027-03-26", "MB")?.name === "Good Friday", holidayOn("2027-03-26", "MB"));
+t("US stop on Canada's Thanksgiving: Columbus Day short day, not closed", holidayOn("2026-10-12", "NY")?.closed === false);
+console.log(`\n${ok} passed, ${bad} failed`);
