@@ -33,6 +33,21 @@ const ARGS = [`--proxy-server=${process.env.HTTPS_PROXY}`, "--proxy-bypass-list=
   await box.press("Enter");
   await p.waitForTimeout(4000);
   check("the demo AI answers the driver's message", (await p.locator("body").innerText()).split("Where is my next load?").length > 1);
+  // Plans: the AI offers several loads as one choice (back to back, or partials on one trailer), and booking one books
+  // the whole plan, so the row of choices for that truck goes away.
+  await p.goto(BASE + "/driver/loads", { waitUntil: "domcontentloaded" });
+  await p.getByText("Choose your next load").waitFor({ timeout: 90000 }).catch(() => {});
+  const rail = await p.locator("body").innerText();
+  check("the AI offers multi-load plans among the choices", /\d loads back to back|\d loads, one trailer/.test(rail), rail.slice(0, 200));
+  const later = p.getByRole("button", { name: /Later, text me/ });
+  if (await later.count()) await later.first().click().catch(() => {});
+  const bookAll = p.getByRole("button", { name: /^Book all \d loads$/ }).first();
+  if (await bookAll.count()) {
+    await bookAll.scrollIntoViewIfNeeded();
+    await bookAll.click();
+    await p.waitForTimeout(1500);
+    check("booking a plan books it whole: the truck's choices are gone", (await p.getByRole("button", { name: /^Book all \d loads$|^Select this load$/ }).count()) === 0);
+  } else check("a plan's card has a Book all button", false);
   // Nothing covers a button: on a phone, every button in driving mode is the thing a tap at its centre lands on.
   const ph = await b.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   ph.on("pageerror", (e) => errors.push(e.message));

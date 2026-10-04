@@ -31,7 +31,7 @@ export const tripActions = (set: SetState, get: GetState): Pick<Actions, "driver
         trucks = trucks.map((t) => (t.id === tu.id ? { ...t, ...tu } : t));
         if (tu.status === "available" && tu.currentLoadId === null) {
           trucks = trucks.map((t) => (t.id === tu.id ? { ...t, lastDeliveredLoadId: load.id } : t));
-          const promoted = promoteChainedLoad(trucks, tu.id, load.carrierId);
+          const promoted = promoteChainedLoad(trucks, tu.id, load.carrierId, state.loads.map((l) => (l.id === result.load.id ? result.load : l)));
           trucks = promoted.trucks;
           if (promoted.event) events = [...events, promoted.event];
         }

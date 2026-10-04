@@ -75,7 +75,7 @@ export function OfferRail({
         {/* Room above for the "Best fit" tag and below for the shadow, which a scrolling row would otherwise clip. */}
         <div
           ref={ref}
-          className={cn("flex snap-x snap-mandatory overflow-x-auto pb-8 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", bleed && "-mx-5 scroll-px-5 px-5")}
+          className={cn("flex snap-x snap-mandatory items-start overflow-x-auto pb-8 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", bleed && "-mx-5 scroll-px-5 px-5")}
           style={{ gap: GAP }}
         >
           {Children.map(children, (child) => (

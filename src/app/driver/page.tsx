@@ -33,6 +33,7 @@ import { STAGE_CONFIRM } from "@/lib/stage-confirm";
 import { PRE_TRIP_STAGES } from "@/lib/trip-state";
 import { cn, formatCurrency } from "@/lib/utils";
 import { Lane } from "@/components/ui/lane";
+import { stopDates } from "@/lib/load-dates";
 
 
 export default function DriverHomePage() {
@@ -283,7 +284,7 @@ export default function DriverHomePage() {
                     <span className="text-ink-500">
                       Then <span className="font-medium text-ink-900"><Lane from={l.lane.origin} to={l.lane.destination} /></span>
                     </span>
-                    <span className="shrink-0 text-ink-500">{l.pickupWindow}</span>
+                    <span className="shrink-0 text-ink-500">{(now !== null && stopDates(l, now).pickup.date) || l.pickupWindow}</span>
                   </li>
                 ))}
             </ol>

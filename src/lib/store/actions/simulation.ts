@@ -1,6 +1,6 @@
 /** The demo's clock: each tick moves the sample fleet's loads, offers, calls and incidents along. */
 import { PRIMARY_CARRIER_ID } from "../../mock-data";
-import { advanceIncident, advanceLoad, autoResolveStaleOffers, createLoadOfferBatch, createSourcedLoad, pickLaneNear, shouldChainNextLoad } from "../../engine";
+import { advanceIncident, advanceLoad, autoResolveStaleOffers, createLoadOfferBatch, createSourcedLoad, lineUpChoice, pickLaneNear, replacePlanLeg, shouldChainNextLoad } from "../../engine";
 import { dockClock } from "../../detention";
 import { bookableBrokers } from "../../broker-policy";
 import { autoBookedText, driverLang, type EmptyAt } from "../../dispatch-calls";
@@ -108,13 +108,10 @@ export const simulationActions = (set: SetState, get: GetState): Pick<Actions, "
         loads = staleResolved.loads;
         newEvents.push(...staleResolved.events);
         for (const ev of staleResolved.events) {
-          const chosen = loads.find((l) => l.id === ev.loadId);
-          if (chosen?.truckId) {
-            trucks = trucks.map((t) => {
-              if (t.id !== chosen.truckId) return t;
-              return t.currentLoadId ? { ...t, nextLoadId: chosen.id } : t;
-            });
-          }
+          if (!ev.loadId) continue;
+          const lined = lineUpChoice(trucks, loads, ev.loadId);
+          loads = lined.loads;
+          trucks = lined.trucks;
         }
       }
 
@@ -162,6 +159,15 @@ export const simulationActions = (set: SetState, get: GetState): Pick<Actions, "
           : advanceLoad(workingLoad, broker, effectiveTruck);
         loads = loads.map((l) => (l.id === result.load.id ? result.load : l));
         newEvents.push(...result.events);
+        // A broker in a plan gave their load to someone else: the AI finds another so the plan still runs.
+        if (result.load.stage === "declined" && target.stage !== "declined" && result.load.plan) {
+          const replaced = replacePlanLeg(result.load, loads, trucks, bookable, state.tickCount + 7, surcharges);
+          if (replaced) {
+            loads = replaced.loads;
+            trucks = replaced.trucks;
+            newEvents.push(replaced.event);
+          }
+        }
 
         if (result.truckUpdates) {
           const tu = result.truckUpdates;
@@ -169,7 +175,7 @@ export const simulationActions = (set: SetState, get: GetState): Pick<Actions, "
 
           if (tu.status === "available" && tu.currentLoadId === null) {
             trucks = trucks.map((t) => (t.id === tu.id ? { ...t, lastDeliveredLoadId: result.load.id } : t));
-            const promoted = promoteChainedLoad(trucks, tu.id, PRIMARY_CARRIER_ID);
+            const promoted = promoteChainedLoad(trucks, tu.id, PRIMARY_CARRIER_ID, loads);
             trucks = promoted.trucks;
             if (promoted.event) {
               newEvents.push(promoted.event);

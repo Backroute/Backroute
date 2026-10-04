@@ -4,6 +4,11 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { tripLoads, tripStops } from "@/lib/trip-plan";
 import type { Load, Truck } from "@/lib/types";
+import { useMounted } from "@/lib/hooks";
+import { stopDates, type StopWhen } from "@/lib/load-dates";
+
+/** "Mon, Oct 5 · 6 am–4 pm CDT", the stop's own day and hours; the load's words when it has no date. */
+const whenText = (w: StopWhen | undefined, raw: string) => (w?.date ? [w.date, w.time].filter(Boolean).join(" · ") : raw);
 
 /**
  * A multi-load trip on the driver's screen: every pickup and drop in the order the AI planned them, the one they're
@@ -11,6 +16,7 @@ import type { Load, Truck } from "@/lib/types";
  */
 export function TripStops({ truck, loads, hrefFor }: { truck: Truck; loads: Load[]; hrefFor: (loadId: string) => string }) {
   const stops = tripStops(truck, loads);
+  const mounted = useMounted();
   const on = tripLoads(truck, loads);
   if (stops.length < 3 || !on.length) return null;
   const nextAt = stops.findIndex((s) => !s.done);
@@ -41,7 +47,9 @@ export function TripStops({ truck, loads, hrefFor }: { truck: Truck; loads: Load
                   <span className="block truncate text-sm font-medium">
                     {pickup ? "Pick up" : "Drop"} {load.referenceNumber} · {pickup ? load.lane.origin : load.lane.destination}, {pickup ? load.lane.originState : load.lane.destState}
                   </span>
-                  <span className="block truncate text-xs text-ink-500">{pickup ? load.pickupWindow : load.deliveryWindow}</span>
+                  <span className="block truncate text-xs text-ink-500">
+                    {whenText(mounted ? stopDates(load)[pickup ? "pickup" : "delivery"] : undefined, pickup ? load.pickupWindow : load.deliveryWindow)}
+                  </span>
                 </span>
               </Link>
             </li>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { LoadStagePill } from "@/components/shared/load-stage";
 import { LoadOfferCard } from "@/components/shared/load-offer-card";
 import { OfferRail } from "@/components/shared/offer-rail";
+import { offerOptions } from "@/lib/plans";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -43,11 +44,13 @@ export default function DriverLoadsPage() {
               </>
             }
           >
-            {pendingOffers.map((offer) => (
+            {offerOptions(pendingOffers).map(([offer, ...rest]) => (
               <LoadOfferCard
                 key={offer.id}
                 load={offer}
+                legs={[offer, ...rest]}
                 broker={brokers.get(offer.brokerId)}
+                brokers={brokers}
                 viewer="driver"
                 onSelect={() => offer.offerGroupId && selectLoadOffer(offer.offerGroupId, offer.id, "driver")}
                 onAsk={(text) => requestOfferDetail(offer.id, text)}

@@ -1,6 +1,6 @@
 /** Loads: offers, booking, rate cons, the fleet, cancelling, reassigning and haggling with brokers. */
 import { PRIMARY_CARRIER_ID } from "../../mock-data";
-import { applyNegotiationInstruction, draftOfferAsk, finishBrokerCall, pushForBetterRate, resolveLoadOffer, resolveOfferAsk } from "../../engine";
+import { applyNegotiationInstruction, draftOfferAsk, finishBrokerCall, lineUpChoice, pushForBetterRate, resolveLoadOffer, resolveOfferAsk } from "../../engine";
 import { makeBroker, makeLoad, makeTruckAndDriver } from "../../fleet";
 import { formatDuration } from "../../utils";
 import type { ActivityEvent, Load, VoiceCall } from "../../types";
@@ -16,12 +16,9 @@ export const loadsActions = (set: SetState, get: GetState): Pick<Actions, "selec
       return;
     }
     set((state) => {
-      const { loads, events } = resolveLoadOffer(state.loads, offerGroupId, loadId, actor);
-      const chosen = loads.find((l) => l.id === loadId);
-      let trucks = state.trucks;
-      if (chosen?.truckId) {
-        trucks = trucks.map((t) => (t.id === chosen.truckId && t.currentLoadId ? { ...t, nextLoadId: loadId } : t));
-      }
+      const resolved = resolveLoadOffer(state.loads, offerGroupId, loadId, actor);
+      const { loads, trucks } = lineUpChoice(state.trucks, resolved.loads, loadId);
+      const events = resolved.events;
       return {
         loads,
         trucks,

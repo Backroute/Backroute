@@ -1,6 +1,6 @@
 /** Helpers the store's actions share: ids, the demo simulation's pieces, and replies the demo AI gives. */
 import { generateWorld, PRIMARY_CARRIER_ID } from "../mock-data";
-import { createIncident, incidentOpenedEvent, resolveLoadOffer, scriptBrokerCall, type InstructionCategory } from "../engine";
+import { createIncident, incidentOpenedEvent, lineUpChoice, nextInPlan, resolveLoadOffer, scriptBrokerCall, type InstructionCategory } from "../engine";
 import { nextStop } from "../load-status";
 import { cityCoords, distanceMiles } from "../trip-geo";
 import { homeTimeStatus } from "../home";
@@ -27,12 +27,14 @@ export const EXPENSE_CATEGORY_LABEL: Record<Expense["category"], string> = {
  *  by the automatic tick (AI-side deliveries, if any ever land there again) and driverConfirmStage (the
  *  only place physical deliveries actually happen now), so "zero empty miles" chaining can't quietly stop
  *  working just because one of its two call sites goes unreachable. */
-export function promoteChainedLoad(trucks: Truck[], truckId: string, carrierId: string): { trucks: Truck[]; event: ActivityEvent | null } {
+export function promoteChainedLoad(trucks: Truck[], truckId: string, carrierId: string, loads: Load[] = []): { trucks: Truck[]; event: ActivityEvent | null } {
   const truck = trucks.find((t) => t.id === truckId);
   if (!truck?.nextLoadId) return { trucks, event: null };
   const chainedId = truck.nextLoadId;
+  // Loads back to back: the one after it in its plan becomes the next.
+  const following = nextInPlan(loads, loads.find((l) => l.id === chainedId));
   return {
-    trucks: trucks.map((t) => (t.id === truckId ? { ...t, currentLoadId: chainedId, nextLoadId: null } : t)),
+    trucks: trucks.map((t) => (t.id === truckId ? { ...t, currentLoadId: chainedId, nextLoadId: following?.id ?? null } : t)),
     event: {
       id: uid("act"), timestamp: new Date().toISOString(), type: "chained",
       message: "Next load already chained, zero empty miles", detail: `${truck.unitNumber} rolling straight into the next lane`,
@@ -47,11 +49,8 @@ export function autoPickOffer(loads: Load[], trucks: Truck[], offers: Load[], tr
   const best = offers.find((o) => o.recommended) ?? offers.reduce((a, b) => (b.score > a.score ? b : a), offers[0]);
   if (!best?.offerGroupId) return { loads, trucks, events: [] };
   const resolved = resolveLoadOffer(loads, best.offerGroupId, best.id, "ai");
-  return {
-    loads: resolved.loads,
-    trucks: trucks.map((t) => (t.id === truckId && t.currentLoadId ? { ...t, nextLoadId: best.id } : t)),
-    events: resolved.events,
-  };
+  const lined = lineUpChoice(trucks, resolved.loads, best.id);
+  return { loads: lined.loads, trucks: lined.trucks, events: resolved.events };
 }
 
 /** What the AI tells the broker and does in the background at each physical milestone — the calls, emails and

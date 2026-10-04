@@ -2,6 +2,7 @@
 
 import { LoadOfferCard } from "./load-offer-card";
 import { OfferRail } from "./offer-rail";
+import { offerOptions } from "@/lib/plans";
 import { TruckDriverChip } from "./truck-driver-chip";
 import type { OfferAskDraft } from "@/lib/engine";
 import { useStore } from "@/lib/store";
@@ -32,7 +33,8 @@ export function NextLoadOffers({
   // A real account's offers are loads brokers emailed; there's no load board behind them, and questions go by email.
   const real = useStore((s) => s.session.mode !== "demo");
   if (offerGroups.length === 0) return null;
-  const totalCount = offerGroups.reduce((sum, [, loads]) => sum + loads.length, 0);
+  // Choices, not loads: a plan of three loads is one choice.
+  const totalCount = offerGroups.reduce((sum, [, loads]) => sum + offerOptions(loads).length, 0);
 
   return (
     <div>
@@ -49,18 +51,22 @@ export function NextLoadOffers({
       )}
       <div className="flex flex-col gap-6">
         {offerGroups.map(([groupId, groupLoads]) => {
-          // The best fit leads: it can beat a higher score once home time and the next reload are counted.
-          const loads = [...groupLoads].sort((a, b) => Number(!!b.recommended) - Number(!!a.recommended) || b.score - a.score);
+          // Each choice is a load or a plan of several. The best fit leads: it can beat a higher score once home time,
+          // the next reload and the empty miles between loads are counted.
+          const options = offerOptions(groupLoads);
+          const loads = options.map((o) => o[0]);
           const truck = trucks && loads[0].truckId ? trucks.get(loads[0].truckId) : undefined;
           const driver = drivers && truck?.driverId ? drivers.get(truck.driverId) : undefined;
           return (
             <div key={groupId}>
               <OfferRail bleed={bleed} header={trucks ? <TruckDriverChip truck={truck} driver={driver} /> : undefined}>
-                {loads.map((load) => (
+                {options.map(([load, ...rest]) => (
                   <LoadOfferCard
                     key={load.id}
                     load={load}
+                    legs={[load, ...rest]}
                     broker={brokers.get(load.brokerId)}
+                    brokers={brokers}
                     viewer={trucks ? "owner" : "driver"}
                     onSelect={() => onSelect(groupId, load.id)}
                     onAsk={real ? undefined : (text) => onAsk(load.id, text)}

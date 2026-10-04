@@ -1,6 +1,6 @@
 /** The demo's AI phone calls to drivers: ringing, answering, the back-and-forth, and ending them. */
 import { PRIMARY_CARRIER_ID, PRIMARY_DRIVER_ID } from "../mock-data";
-import { resolveLoadOffer } from "../engine";
+import { lineUpChoice, resolveLoadOffer } from "../engine";
 import { legMiles, legProgress } from "../trip-geo";
 import { pack } from "../lang";
 import { briefCall, CALL_GAP_MS, KIND_LABEL, lateCall, driverLang, lateOnThisLoad, type EmptyAt, type Turn, nextLoadCall, openCall, parkingCall, quietReason, respond, RING_MS, stillRelevant, textCopyFor } from "../dispatch-calls";
@@ -171,9 +171,9 @@ export function endCall(d: CallDraft, callId: string) {
     if (effect.type === "book") {
       if (!d.loads.some((l) => l.id === effect.loadId && l.stage === "offered")) continue;
       const resolved = resolveLoadOffer(d.loads, effect.groupId, effect.loadId, "driver");
-      d.loads = resolved.loads;
-      const chosen = d.loads.find((l) => l.id === effect.loadId);
-      if (chosen?.truckId) d.trucks = d.trucks.map((t) => (t.id === chosen.truckId && t.currentLoadId ? { ...t, nextLoadId: chosen.id } : t));
+      const lined = lineUpChoice(d.trucks, resolved.loads, effect.loadId);
+      d.loads = lined.loads;
+      d.trucks = lined.trucks;
       d.events.push(...resolved.events);
     } else if (effect.type === "reserve_parking") {
       callEvent(d, call, `AI reserved parking for ${first}`, `${effect.place} · $${effect.cost} on the fleet card`, "success");

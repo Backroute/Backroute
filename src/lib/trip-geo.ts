@@ -38,6 +38,43 @@ const CITY_COORDS: Record<string, LatLng> = {
   "Wilmer, TX": [32.5893, -96.6853],
 };
 
+const IN_TOWN_SPOTS = new Set(["Wilmer, TX", "Lancaster, TX", "Haslet, TX", "Coppell, TX", "Grand Prairie, TX", "Garland, TX"]);
+
+/** The known freight city nearest a point (a rest stop's town), or undefined when none is within `maxMiles`. */
+export function nearestCity(at: LatLng, maxMiles = 90): { city: string; state: string } | undefined {
+  let best: { key: string; d: number } | undefined;
+  for (const [key, ll] of [...Object.entries(CITY_COORDS), ...Object.entries(MORE_CITIES)]) {
+    // The rail ramps and warehouse districts in town aren't where anyone says they stopped for the night.
+    if (IN_TOWN_SPOTS.has(key)) continue;
+    const d = distanceMiles(at, ll);
+    if (d <= maxMiles && (!best || d < best.d)) best = { key, d };
+  }
+  if (!best) return undefined;
+  const [city, state] = best.key.split(", ");
+  return { city, state };
+}
+
+/** Freight cities lying along the road from `a` to `b`: within `width` miles of the line, between `min` and `max` of
+ *  the way, nearest the line first. For an extra drop on the way, or a partial that rides along. */
+export function citiesAlong(a: LatLng, b: LatLng, opts: { width?: number; min?: number; max?: number } = {}): { city: string; state: string; at: LatLng; frac: number }[] {
+  const { width = 45, min = 0.25, max = 0.8 } = opts;
+  const out: { city: string; state: string; at: LatLng; frac: number; off: number }[] = [];
+  const dx = b[1] - a[1];
+  const dy = b[0] - a[0];
+  const len2 = dx * dx + dy * dy || 1;
+  for (const [key, ll] of [...Object.entries(CITY_COORDS), ...Object.entries(MORE_CITIES)]) {
+    const frac = ((ll[1] - a[1]) * dx + (ll[0] - a[0]) * dy) / len2;
+    if (frac < min || frac > max) continue;
+    const foot: LatLng = [a[0] + dy * frac, a[1] + dx * frac];
+    const off = distanceMiles(ll, foot);
+    if (off > width) continue;
+    const [city, state] = key.split(", ");
+    if (out.some((o) => o.city === city && o.state === state)) continue;
+    out.push({ city, state, at: ll, frac, off });
+  }
+  return out.sort((x, y) => x.off - y.off).map(({ off: _off, ...rest }) => rest);
+}
+
 export function cityCoords(city: string, state: string): LatLng | undefined {
   const key = `${city}, ${state}`;
   if (CITY_COORDS[key]) return CITY_COORDS[key];

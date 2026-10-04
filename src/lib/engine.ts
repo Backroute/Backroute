@@ -3,6 +3,8 @@ import { computeEconomics, computeLoadScore } from "./scoring";
 import { cityCoords, distanceMiles, legHours, transitWindow } from "./trip-geo";
 import { homeTonight, hoursToHome, reloadMarket } from "./home";
 import { laneFits } from "./run-types";
+import { milesBetween, planTotals, sharedOrder, townOnTheWay } from "./plans";
+import { partialShare } from "./trip-plan";
 import type {
   ActivityEvent,
   ActivityType,
@@ -192,44 +194,275 @@ export function createLoadOfferBatch(
     : undefined;
 
   const candidates = Array.from({ length: count }, (_, i) => {
-    const base = createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType, placements?.[i], opts.surcharges);
-    const { netProfit, rpm } = computeEconomics(base.targetRate, base.lane.miles, base.deadheadMiles, base.fuelCost, base.tollCost);
-    const hoursHomeAfter = hoursHomeFrom(base.lane.destination, base.lane.destState) ?? undefined;
-    return {
-      ...base,
-      stage: "offered" as const,
-      netProfit,
-      rpm,
-      progressPct: 16,
-      hoursHomeAfter,
-      homeTonight: hoursHomeAfter !== undefined && homeTonight(base.lane.miles, base.deadheadMiles, hoursHomeAfter),
-      // Brings the driver meaningfully closer to home than where the truck empties out now.
-      homeTimeFit: hoursHomeAfter !== undefined && startHoursHome !== null && hoursHomeAfter < startHoursHome - 3,
-      reloadMarket: reloadMarket(base.lane.destination, base.lane.destState),
-    };
+    const base = withExtraStop(createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType, placements?.[i], opts.surcharges));
+    return priceOffer(base, hoursHomeFrom, startHoursHome);
   });
+
+  // Past single loads: what a dispatcher builds out of several. Each is one choice, booked whole.
+  const fits = runType && home ? (lane: Lane) => laneFits(lane, runType, home) && !avoid.includes(lane.destState) && !avoid.includes(lane.originState) : undefined;
+  const plans: Load[][] = [];
+  if (near?.length && runType !== "intown") {
+    const backToBack = buildBackToBack(brokers, carrierId, truckId, refSeed + count, isChained, opts, near, fits, hoursHomeFrom, startHoursHome);
+    if (backToBack) plans.push(backToBack);
+    const shared = buildSharedTrailer(brokers, carrierId, truckId, refSeed + count + 4, isChained, opts, near, hoursHomeFrom, startHoursHome);
+    if (shared) plans.push(shared);
+  }
+  const options: Load[][] = [...candidates.map((c) => [c]), ...plans];
 
   const offerGroupId = uid("offer");
   // The score itself only carries broker *reliability*, not the fraud-risk flag Broker Shield shows on the card.
   const brokerById = new Map(brokers.map((b) => [b.id, b]));
-  const isLowRisk = (c: (typeof candidates)[number]) => (brokerById.get(c.brokerId)?.fraudRisk ?? "low") === "low";
-  // A dispatcher's call on each load: what it nets per hour of the driver's time, marked down when it strands the truck
-  // somewhere nothing ships back out of. When it's time to head home, getting closer to home comes first.
-  const value = (c: (typeof candidates)[number]) => {
-    if (opts.headHome && c.hoursHomeAfter !== undefined) return -c.hoursHomeAfter * 1000 + (c.netProfit ?? 0);
-    const perHour = (c.netProfit ?? 0) / legHours(c.lane.miles, c.deadheadMiles);
-    return c.reloadMarket === "weak" ? perHour * 0.85 : perHour;
+  const isLowRisk = (o: Load[]) => o.every((c) => (brokerById.get(c.brokerId)?.fraudRisk ?? "low") === "low");
+  // A dispatcher's call on each choice: what it nets per hour of the driver's time (a plan's empty miles between loads
+  // and its docks counted), marked down when it ends somewhere nothing ships back out of. When it's time to head home,
+  // getting closer to home comes first.
+  const value = (o: Load[]) => {
+    const last = o[o.length - 1];
+    const totals = planTotals(o);
+    const net = totals.net;
+    if (opts.headHome && last.hoursHomeAfter !== undefined) return -last.hoursHomeAfter * 1000 + net;
+    const docks = o.length * 2 + o.reduce((n, l) => n + (l.stops?.length ?? 0), 0);
+    const perHour = net / (totals.totalMiles / 50 + docks * 2);
+    return last.reloadMarket === "weak" ? perHour * 0.85 : perHour;
   };
-  const top = (pool: typeof candidates) => pool.reduce((a, b) => (value(b) > value(a) ? b : a));
-  // Never pick a load that loses money when one that doesn't is on the table.
-  const profitable = candidates.filter((c) => (c.netProfit ?? 0) > 0);
-  const pool = profitable.length ? profitable : candidates;
-  // Broker Shield: a clean broker wins unless a flagged one is clearly better. Those get extra checks, not a pass.
+  const top = (pool: Load[][]) => pool.reduce((a, b) => (value(b) > value(a) ? b : a));
+  // Never pick a choice that loses money when one that doesn't is on the table.
+  const profitable = options.filter((o) => planTotals(o).net > 0);
+  const pool = profitable.length ? profitable : options;
+  // Broker Shield: clean brokers win unless a flagged one is clearly better. Those get extra checks, not a pass.
   const best = top(pool);
   const clean = pool.filter(isLowRisk);
-  const pick = clean.length && !opts.headHome && value(top(clean)) >= value(best) * 0.8 ? top(clean) : best;
+  const chosen = clean.length && !opts.headHome && value(top(clean)) >= value(best) * 0.8 ? top(clean) : best;
 
-  return candidates.map((c) => ({ ...c, offerGroupId, recommended: c.id === pick.id }));
+  return options.flatMap((o) => o.map((c) => ({ ...c, offerGroupId, recommended: o === chosen })));
+}
+
+type HoursHome = (city: string, state: string) => number | null;
+
+/** An offered load's own numbers: what it nets, its rate a mile, and what it means for getting the driver home. */
+function priceOffer(base: Load, hoursHomeFrom: HoursHome, startHoursHome: number | null): Load {
+  const { netProfit, rpm } = computeEconomics(base.targetRate, base.lane.miles, base.deadheadMiles, base.fuelCost, base.tollCost);
+  const hoursHomeAfter = hoursHomeFrom(base.lane.destination, base.lane.destState) ?? undefined;
+  return {
+    ...base,
+    stage: "offered" as const,
+    netProfit,
+    rpm,
+    progressPct: 16,
+    hoursHomeAfter,
+    homeTonight: hoursHomeAfter !== undefined && !base.stops?.length && homeTonight(base.lane.miles, base.deadheadMiles, hoursHomeAfter),
+    // Brings the driver meaningfully closer to home than where the truck empties out now.
+    homeTimeFit: hoursHomeAfter !== undefined && startHoursHome !== null && hoursHomeAfter < startHoursHome - 3,
+    reloadMarket: reloadMarket(base.lane.destination, base.lane.destState),
+  };
+}
+
+/** How much more a partial pays per foot of trailer than a full load (the going rate for LTL-sized freight). */
+const PARTIAL_PREMIUM = 1.25;
+
+/** What an extra drop pays on top of the line haul, about what brokers add per stop. */
+const STOP_PAY = 75;
+
+/** Now and then a load has a second drop on the way (a multi-stop load): one more stop for the driver, paid for. */
+function withExtraStop(load: Load): Load {
+  if (load.lane.moveKind || load.lane.miles < 250 || !chance(0.25)) return load;
+  const town = townOnTheWay({ city: load.lane.origin, state: load.lane.originState }, { city: load.lane.destination, state: load.lane.destState });
+  if (!town) return load;
+  return {
+    ...load,
+    stops: [{ id: uid("stop"), kind: "delivery", city: town.city, state: town.state, window: "", sequence: 1, completed: false }],
+    listedRate: load.listedRate + STOP_PAY,
+    targetRate: load.targetRate + STOP_PAY,
+  };
+}
+
+/** Days from today a window's first word means: "tomorrow" is 1, anything else today. */
+const dayOf = (window: string) => (/^tomorrow/i.test(window) ? 1 : 0);
+/** Days a load is on the road, the way transitWindow words it: same day, next day, or a day per 500 miles. */
+const transitDays = (miles: number) => (miles <= 300 ? 0 : miles <= 600 ? 1 : Math.ceil(miles / 500));
+/** A calendar date a number of days from today, for a later load's pickup window. */
+const isoDay = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+
+/**
+ * Loads back to back, the way a dispatcher plans a truck's next few days: the first loading near where the truck
+ * is, the next loading near where that one delivers, and (for long-haul drivers) a third. Each reload is the one that
+ * nets the most for the empty miles to it, or brings the driver home when that's what's needed.
+ */
+function buildBackToBack(
+  brokers: Broker[],
+  carrierId: string,
+  truckId: string,
+  refSeed: number,
+  isChained: boolean,
+  opts: OfferOptions,
+  near: LanePlacement[],
+  fits: ((lane: Lane) => boolean) | undefined,
+  hoursHomeFrom: HoursHome,
+  startHoursHome: number | null,
+): Load[] | null {
+  const legs = opts.runType === "otr" ? 3 : 2;
+  const firstAt = near[Math.min(near.length - 1, randInt(0, 2))];
+  const out: Load[] = [];
+  let placement: LanePlacement | undefined = firstAt;
+  let day = 0;
+  for (let i = 0; i < legs && placement; i++) {
+    const base = createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType, placement, opts.surcharges);
+    if (i > 0) base.pickupWindow = `${isoDay(day)}, ${randInt(7, 11)}:00–${randInt(14, 18)}:00`;
+    else day = dayOf(base.pickupWindow);
+    out.push(priceOffer(base, hoursHomeFrom, startHoursHome));
+    day += transitDays(base.lane.miles) + (base.lane.miles > 300 ? 0 : 1);
+    // The reload: loading near this delivery, not straight back over the same road, best for its empty miles.
+    const from = { city: base.lane.destination, state: base.lane.destState };
+    const reloads = (lanesNear(from, fits) ?? [])
+      .filter((r) => r.deadheadMiles <= 150 && !(r.lane.destination === base.lane.origin && r.lane.destState === base.lane.originState) && !out.some((o) => o.lane === r.lane))
+      .slice(0, 5);
+    if (!reloads.length) break;
+    const worth = (r: LanePlacement) =>
+      opts.headHome && opts.homeBase
+        ? -(hoursHomeFrom(r.lane.destination, r.lane.destState) ?? 99)
+        : (r.lane.miles * r.lane.marketRpm - r.deadheadMiles * 1.4) / legHours(r.lane.miles, r.deadheadMiles);
+    placement = reloads.reduce((a, b) => (worth(b) > worth(a) ? b : a));
+  }
+  if (out.length < 2) return null;
+  const id = uid("plan");
+  return out.map((l, i) => ({ ...l, plan: { id, kind: "back_to_back" as const, leg: i + 1, legs: out.length } }));
+}
+
+/**
+ * Partials sharing the trailer, the way a dispatcher fills a truck with LTL-sized freight: two or three loads picked
+ * up in the same place, the ones for towns on the way dropped first. Each is priced by its share of the trailer and
+ * carries its share of the run's fuel and tolls, so together they show what the trip really makes.
+ */
+function buildSharedTrailer(
+  brokers: Broker[],
+  carrierId: string,
+  truckId: string,
+  refSeed: number,
+  isChained: boolean,
+  opts: OfferOptions,
+  near: LanePlacement[],
+  hoursHomeFrom: HoursHome,
+  startHoursHome: number | null,
+): Load[] | null {
+  const main = near.find((p) => !p.lane.moveKind && p.lane.miles >= 250);
+  if (!main) return null;
+  const from = { city: main.lane.origin, state: main.lane.originState };
+  const to = { city: main.lane.destination, state: main.lane.destState };
+  const first = townOnTheWay(from, to);
+  if (!first) return null;
+  const second = chance(0.5) ? townOnTheWay(from, to, [`${first.city}, ${first.state}`]) : undefined;
+  const towns = [first, ...(second ? [second] : [])];
+
+  // The long one first, then the ones riding along to towns on the way.
+  const lanes: Lane[] = [
+    main.lane,
+    ...towns.map((t) => ({ origin: from.city, originState: from.state, destination: t.city, destState: t.state, miles: milesBetween(from, t) ?? t.milesFromStart, marketRpm: main.lane.marketRpm + 0.35 })),
+  ];
+  const pallets = lanes.length === 2 ? [randInt(10, 14), randInt(6, 11)] : [randInt(8, 10), randInt(5, 8), randInt(4, 7)];
+  const bases = lanes.map((lane, i) => {
+    const b = createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType, { lane, deadheadMiles: i === 0 ? main.deadheadMiles : 0 }, opts.surcharges);
+    const partial = { pallets: pallets[i] };
+    const share = partialShare({ partial });
+    // Partials pay more per foot of trailer than a full load does: the broker is saving the shipper a whole truck.
+    const pay = share * PARTIAL_PREMIUM;
+    return { ...b, partial, listedRate: Math.round(b.listedRate * pay), targetRate: Math.round(b.targetRate * pay), weight: Math.round(b.weight * share), pickupWindow: i === 0 ? b.pickupWindow : "" };
+  });
+  bases.forEach((b) => (b.pickupWindow ||= bases[0].pickupWindow));
+  // One run's fuel and tolls, carried by each load in proportion to what it pays; the empty miles to the first pickup by
+  // the first load.
+  const run = costsForLane(main.lane.miles, main.deadheadMiles);
+  const pay = bases.reduce((n, b) => n + b.targetRate, 0) || 1;
+  const priced = bases.map((b, i) => {
+    const part = b.targetRate / pay;
+    const withCosts = { ...b, fuelCost: Math.round(run.fuelCost * part), tollCost: Math.round(run.tollCost * part), deadheadMiles: i === 0 ? main.deadheadMiles : 0 };
+    const econ = computeEconomics(withCosts.targetRate, withCosts.lane.miles, withCosts.deadheadMiles, withCosts.fuelCost, withCosts.tollCost);
+    const broker = brokers.find((x) => x.id === b.brokerId);
+    const score = computeLoadScore({ rate: withCosts.targetRate, netProfit: econ.netProfit, miles: withCosts.lane.miles, deadheadMiles: withCosts.deadheadMiles, rpm: econ.rpm, marketRpm: withCosts.lane.marketRpm, brokerReliability: broker?.reliability ?? 70 });
+    return priceOffer({ ...withCosts, deadheadCost: econ.deadheadCost, commission: econ.commission, score }, hoursHomeFrom, startHoursHome);
+  });
+  const id = uid("plan");
+  const order =
+    priced.length === 2
+      ? sharedOrder(priced[0], priced[1])
+      : [
+          ...priced.map((l) => ({ loadId: l.id, kind: "pickup" as const })),
+          // Nearer towns first, the long one last.
+          ...[...priced.slice(1)].sort((a, b) => a.lane.miles - b.lane.miles).map((l) => ({ loadId: l.id, kind: "delivery" as const })),
+          { loadId: priced[0].id, kind: "delivery" as const },
+        ];
+  return priced.map((l, i) => ({ ...l, plan: { id, kind: "shared_trailer" as const, leg: i + 1, legs: priced.length, order } }));
+}
+
+/**
+ * Puts a booked choice in the truck's lineup. One load: next after the one it's on, or its own when it's free. Loads
+ * back to back: the first takes the truck's next free slot and the rest follow it in order (promoteChainedLoad moves
+ * each up). Partials sharing the trailer: the trip's stops go on the truck, and a free truck heads for the first pickup.
+ */
+export function lineUpChoice(trucks: Truck[], loads: Load[], chosenId: string): { trucks: Truck[]; loads: Load[] } {
+  const chosen = loads.find((l) => l.id === chosenId);
+  const truck = chosen?.truckId ? trucks.find((t) => t.id === chosen.truckId) : undefined;
+  if (!chosen || !truck) return { trucks, loads };
+  const legs = chosen.plan ? loads.filter((l) => l.plan?.id === chosen.plan!.id).sort((a, b) => a.plan!.leg - b.plan!.leg) : [chosen];
+  const set = (patch: Partial<Truck>) => trucks.map((t) => (t.id === truck.id ? { ...t, ...patch } : t));
+  if (chosen.plan?.kind === "shared_trailer" && chosen.plan.order) {
+    const tripId = chosen.plan.id;
+    const firstUp = chosen.plan.order[0]?.loadId ?? legs[0].id;
+    const onTrip = loads.map((l) => (l.plan?.id === tripId ? { ...l, tripId } : l));
+    const trip = { id: tripId, stops: chosen.plan.order, at: new Date().toISOString() };
+    return { loads: onTrip, trucks: set(truck.currentLoadId ? { trip, nextLoadId: firstUp } : { trip, currentLoadId: firstUp }) };
+  }
+  if (truck.currentLoadId) return { loads, trucks: set({ nextLoadId: legs[0].id }) };
+  return { loads, trucks: legs.length > 1 ? set({ nextLoadId: legs[1].id }) : trucks };
+}
+
+/** The load that follows one in its plan, while it's still going to happen. */
+export function nextInPlan(loads: Load[], load: Load | undefined): Load | undefined {
+  if (!load?.plan || load.plan.kind !== "back_to_back") return undefined;
+  return loads.find((l) => l.plan?.id === load.plan!.id && l.plan.leg === load.plan!.leg + 1 && l.stage !== "declined" && l.stage !== "cancelled" && l.stage !== "delivered");
+}
+
+/**
+ * A load in a plan that a broker gave to someone else: the AI finds another to take its place (loading near where the
+ * one before it delivers, or near the truck), so the plan still runs. Partials sharing a trailer just come off the trip.
+ */
+export function replacePlanLeg(
+  dropped: Load,
+  loads: Load[],
+  trucks: Truck[],
+  brokers: Broker[],
+  refSeed: number,
+  surcharges: Record<string, number> = {},
+): { loads: Load[]; trucks: Truck[]; event: ActivityEvent } | null {
+  if (!dropped.plan) return null;
+  const truck = trucks.find((t) => t.id === dropped.truckId);
+  const b = brokers.find((x) => x.id === dropped.brokerId);
+  if (dropped.plan.kind === "shared_trailer") {
+    const left = loads.filter((l) => l.plan?.id === dropped.plan!.id && l.id !== dropped.id && l.stage !== "declined" && l.stage !== "cancelled");
+    const fixed = truck && truck.currentLoadId === dropped.id ? trucks.map((t) => (t.id === truck.id ? { ...t, currentLoadId: left[0]?.id ?? null } : t)) : trucks;
+    return {
+      loads,
+      trucks: fixed,
+      event: mkEvent(dropped.carrierId, left[0]?.id ?? dropped.id, "load_cancelled", `${b?.company ?? "A broker"} gave their partial to someone else`, `The trip goes on with ${left.length} load${left.length === 1 ? "" : "s"}; its stops are reordered without it`, "info"),
+    };
+  }
+  const before = loads.find((l) => l.plan?.id === dropped.plan!.id && l.plan.leg === dropped.plan!.leg - 1);
+  const from = before ? { city: before.lane.destination, state: before.lane.destState } : truck ? { city: truck.currentCity, state: truck.currentState } : undefined;
+  const placement = pickLaneNear(from);
+  const base = createSourcedLoad(brokers.filter((x) => x.id !== dropped.brokerId), dropped.carrierId, refSeed, dropped.truckId, true, [], dropped.equipmentType, placement, surcharges);
+  const replacement: Load = { ...base, stage: "scoring", pickupWindow: dropped.pickupWindow, plan: dropped.plan, offerGroupId: dropped.offerGroupId, progressPct: STAGE_PROGRESS.scoring };
+  const swap = (id: string | null | undefined) => (id === dropped.id ? replacement.id : id ?? null);
+  return {
+    loads: [replacement, ...loads],
+    trucks: trucks.map((t) => (t.id === dropped.truckId ? { ...t, currentLoadId: swap(t.currentLoadId), nextLoadId: swap(t.nextLoadId) } : t)),
+    event: mkEvent(
+      dropped.carrierId,
+      replacement.id,
+      "chained",
+      `${b?.company ?? "A broker"} gave load ${dropped.plan.leg} of the plan to someone else`,
+      `Backroute is booking ${replacement.lane.origin} → ${replacement.lane.destination} in its place, so the plan still runs`,
+      "info",
+    ),
+  };
 }
 
 interface OfferResolution {
@@ -242,11 +475,14 @@ export function resolveLoadOffer(loads: Load[], offerGroupId: string, chosenId: 
   const group = loads.filter((l) => l.offerGroupId === offerGroupId);
   const chosen = group.find((l) => l.id === chosenId);
   if (!chosen) return { loads, events: [] };
+  // A plan is one choice: every load in it goes to its broker at once.
+  const picked = new Set(chosen.plan ? group.filter((l) => l.plan?.id === chosen.plan!.id).map((l) => l.id) : [chosenId]);
+  const options = new Set(group.map((l) => l.plan?.id ?? l.id)).size;
 
   const now = new Date().toISOString();
   const updated = loads.map((l) => {
     if (l.offerGroupId !== offerGroupId) return l;
-    if (l.id === chosenId) {
+    if (picked.has(l.id)) {
       return { ...l, stage: "scoring" as const, progressPct: 12, updatedAt: now, ticksInStage: 0 };
     }
     return { ...l, stage: "declined" as const, progressPct: 100, updatedAt: now };
@@ -259,7 +495,9 @@ export function resolveLoadOffer(loads: Load[], offerGroupId: string, chosenId: 
       chosen.id,
       "offer_selected",
       actorLabel,
-      `${chosen.lane.origin} → ${chosen.lane.destination} · est. net $${(chosen.netProfit ?? 0).toLocaleString()} · ${group.length - 1} other option${group.length - 1 === 1 ? "" : "s"} declined`,
+      chosen.plan
+        ? `${picked.size} loads ${chosen.plan.kind === "back_to_back" ? "back to back" : "on one trailer"}, every broker asked at once · est. net $${group.filter((l) => picked.has(l.id)).reduce((n, l) => n + (l.netProfit ?? 0), 0).toLocaleString()} · ${options - 1} other option${options - 1 === 1 ? "" : "s"} declined`
+        : `${chosen.lane.origin} → ${chosen.lane.destination} · est. net $${(chosen.netProfit ?? 0).toLocaleString()} · ${options - 1} other option${options - 1 === 1 ? "" : "s"} declined`,
       "success",
     ),
   ];
@@ -564,10 +802,16 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
     }
     case "booked": {
       if (!truck) break;
+      // Lined up behind the load the truck is on, or behind an earlier load of its plan: it waits its turn, booked.
+      // Partials on the truck's trip go out together; the truck heads for whichever stop is next.
+      const onTrip = !!truck.trip && load.tripId === truck.trip.id;
+      const busy = !!truck.currentLoadId && truck.currentLoadId !== load.id;
+      const laterInPlan = load.plan?.kind === "back_to_back" && load.plan.leg > 1 && truck.currentLoadId !== load.id;
+      if (!onTrip && (busy || truck.nextLoadId === load.id || laterInPlan)) break;
       next.stage = "dispatched";
       next.progressPct = STAGE_PROGRESS.dispatched;
       events.push(mkEvent(load.carrierId, load.id, "dispatched", "Driver dispatched", `${truck.unitNumber} en route to ${load.lane.origin}`, "info"));
-      return { load: next, events, truckUpdates: { id: truck.id, status: "on_load", currentLoadId: load.id } };
+      return { load: next, events, truckUpdates: onTrip && busy ? { id: truck.id, status: "on_load" } : { id: truck.id, status: "on_load", currentLoadId: load.id } };
     }
     // dispatched / at_pickup / in_transit / at_delivery are intentionally absent here: once a load is
     // dispatched it's the driver's load, and only confirmLoadStage (an explicit driver tap) may advance

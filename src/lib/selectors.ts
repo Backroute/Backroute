@@ -77,10 +77,15 @@ export function truckActiveLoads(loads: Load[], truck: Truck | undefined): { cur
  */
 export function truckLineup(loads: Load[], truck: Truck | undefined, now = Date.now()): Load[] {
   if (!truck) return [];
+  // A plan's loads are on the truck's lineup from the moment it's booked, while their brokers are still being asked.
+  const asking = (l: Load) => !!l.plan && (l.stage === "sourced" || l.stage === "scoring" || l.stage === "negotiating");
   const waiting = loads.filter(
-    (l) => l.truckId === truck.id && l.id !== truck.currentLoadId && (l.stage === "booked" || l.stage === "rate_confirmed") && !(l.pickupAt && Date.parse(l.pickupAt) < now - 86400_000),
+    (l) => l.truckId === truck.id && l.id !== truck.currentLoadId && (l.stage === "booked" || l.stage === "rate_confirmed" || asking(l)) && !(l.pickupAt && Date.parse(l.pickupAt) < now - 86400_000),
   );
   const next = waiting.find((l) => l.id === truck.nextLoadId);
   const at = (l: Load) => Date.parse(l.pickupAt ?? "") || Number.MAX_SAFE_INTEGER;
-  return [...(next ? [next] : []), ...waiting.filter((l) => l !== next).sort((a, b) => at(a) - at(b))];
+  // The rest of the next load's plan follows it in order, then anything else by pickup.
+  const sameTrip = (l: Load) => !!next?.plan && l.plan?.id === next.plan.id;
+  const planned = waiting.filter((l) => l !== next && sameTrip(l)).sort((a, b) => (a.plan?.leg ?? 0) - (b.plan?.leg ?? 0));
+  return [...(next ? [next] : []), ...planned, ...waiting.filter((l) => l !== next && !sameTrip(l)).sort((a, b) => at(a) - at(b))];
 }

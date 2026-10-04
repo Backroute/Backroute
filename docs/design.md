@@ -54,6 +54,11 @@ the round arrows on its left and right edges (`components/shared/offer-rail.tsx`
   load; beside it the rate per mile and what's left after costs. Details lists every cost (fuel, tolls, empty miles, the
   2% fee) down to what's left.
 - The whole card, button included, fits on an iPhone SE screen without scrolling.
+- A plan of several loads (back to back, or partials sharing the trailer) is one card: a blue label says what it is
+  ("3 loads back to back", "2 loads, one trailer"), every stop is listed in order with "load 1", "load 2", the drive
+  between stops says loaded or empty (empty drawn dashed), and a moon marks each overnight rest on a long run. The money
+  is the whole plan's; the button says "Book all 3 loads". Multi-stop loads list the extra drop; long single runs say
+  "Long run · 3 days".
 - One reason, one blue button.
 
 ## Notifications

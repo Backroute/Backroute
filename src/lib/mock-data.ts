@@ -80,6 +80,15 @@ export const LANES: Lane[] = [
   { origin: "Orlando", originState: "FL", destination: "Charlotte", destState: "NC", miles: 583, marketRpm: 2.29 },
   { origin: "Salt Lake City", originState: "UT", destination: "Denver", destState: "CO", miles: 525, marketRpm: 2.44 },
   { origin: "Oklahoma City", originState: "OK", destination: "Houston", destState: "TX", miles: 419, marketRpm: 2.15 },
+  // Long runs: two to four days on the road, a rest every 11 hours of driving. A little less a mile, a lot more a load.
+  { origin: "Dallas", originState: "TX", destination: "Los Angeles", destState: "CA", miles: 1435, marketRpm: 2.12 },
+  { origin: "Los Angeles", originState: "CA", destination: "Dallas", destState: "TX", miles: 1435, marketRpm: 1.95 },
+  { origin: "Chicago", originState: "IL", destination: "Los Angeles", destState: "CA", miles: 2015, marketRpm: 2.08 },
+  { origin: "Newark", originState: "NJ", destination: "Dallas", destState: "TX", miles: 1555, marketRpm: 2.18 },
+  { origin: "Atlanta", originState: "GA", destination: "Denver", destState: "CO", miles: 1405, marketRpm: 2.05 },
+  { origin: "Seattle", originState: "WA", destination: "Dallas", destState: "TX", miles: 2150, marketRpm: 1.98 },
+  { origin: "Chicago", originState: "IL", destination: "Dallas", destState: "TX", miles: 925, marketRpm: 2.3 },
+  { origin: "Dallas", originState: "TX", destination: "Chicago", destState: "IL", miles: 925, marketRpm: 2.36 },
   // Short hauls: fewer miles at a higher rate per mile (the dock time is the same), and often home the same night.
   { origin: "Dallas", originState: "TX", destination: "Austin", destState: "TX", miles: 195, marketRpm: 3.05 },
   { origin: "Austin", originState: "TX", destination: "Dallas", destState: "TX", miles: 195, marketRpm: 2.95 },

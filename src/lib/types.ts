@@ -722,6 +722,21 @@ export interface Load {
   exclusive?: boolean;
   /** The multi-load trip it rides on (Truck.trip), when it shares the trailer with others. */
   tripId?: string;
+  /** One load of a multi-load plan the AI put together and offers as one choice (lib/plans): loads back to back, or
+   *  partials sharing the trailer. Every load of the plan carries the same id; booking the plan books them all. */
+  plan?: LoadPlan;
+}
+
+export type PlanKind = "back_to_back" | "shared_trailer";
+
+export interface LoadPlan {
+  id: string;
+  kind: PlanKind;
+  /** 1-based: the order the loads are hauled in (for a shared trailer, the order they're picked up). */
+  leg: number;
+  legs: number;
+  /** A shared trailer: every pickup and drop in the order the truck makes them. */
+  order?: TripStop[];
 }
 
 export interface ScheduleWarning {
