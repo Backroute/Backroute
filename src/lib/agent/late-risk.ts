@@ -52,7 +52,8 @@ export async function etaWithReasons(truck: Truck, driver: Driver | undefined, c
   } else if (target?.exact) hours = roadMiles(here, target.at) / MPH;
   else return null;
   if (opts.weather !== false && target && distanceMiles(here, target.at) > 15) {
-    const alerts = await alertsAlong(pointsAlong([here, target.at], 4), 4).catch(() => [] as WeatherAlert[]);
+    // Along the truck's own road when the router gave it, else the straight line.
+    const alerts = await alertsAlong(pointsAlong(r?.path ?? [here, target.at], 4), 4).catch(() => [] as WeatherAlert[]);
     const f = weatherFactor(alerts);
     if (f > 1) {
       reasons.push(`${alerts.map((a) => a.event.toLowerCase()).slice(0, 2).join(" and ")} on the way`);

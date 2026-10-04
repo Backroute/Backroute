@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUpRight, ClipboardCheck, Link2, MapPin, Navigation, Phone } from "lucide-react";
 import { DrivingMode } from "@/components/shared/driving-mode";
 import { CallStatusLine } from "@/components/shared/call-settings";
@@ -22,9 +22,11 @@ import { useNextStopNotice } from "@/lib/next-stop";
 import { useMoving } from "@/lib/moving";
 import { OfflineBadge } from "@/components/shared/offline-badge";
 import { useNow } from "@/lib/hooks";
+import { keepLoadMap } from "@/lib/service-worker";
+import { cityCoords } from "@/lib/trip-geo";
 import { weekEarnings } from "@/lib/earnings";
 import { computeDriverPay } from "@/lib/settlements";
-import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap, truckActiveLoads } from "@/lib/selectors";
+import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap, truckActiveLoads, truckLineup } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { STAGE_CONFIRM } from "@/lib/stage-confirm";
 import { PRE_TRIP_STAGES } from "@/lib/trip-state";
@@ -63,6 +65,13 @@ export default function DriverHomePage() {
 
   const truck = trucks.find((t) => t.id === driver.truckId);
   const { current: currentLoad, next: nextLoad } = truckActiveLoads(loads, truck);
+  const lineup = truckLineup(loads, truck);
+  // The next loads' map areas are kept on the phone too, for the stretch after this one with no signal.
+  const lineupKey = lineup.map((l) => l.id).join(",");
+  useEffect(() => {
+    for (const l of lineup.slice(0, 2)) keepLoadMap(cityCoords(l.lane.origin, l.lane.originState), cityCoords(l.lane.destination, l.lane.destState));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lineupKey]);
   // The driver's next stop on the lock screen, when they turned it on (Profile).
   useNextStopNotice(currentLoad);
   // In a real account the office books loads with brokers; a company driver's app shows what's booked, not offers.
@@ -268,6 +277,20 @@ export default function DriverHomePage() {
             <div className="mt-3">
               <CounterOfferButton load={nextLoad} onSubmit={(amount) => requestBetterRate(nextLoad.id, "driver", amount)} variant="text" />
             </div>
+          )}
+          {lineup.filter((l) => l.id !== nextLoad.id).length > 0 && (
+            <ol className="mt-3 flex flex-col gap-1.5 border-t border-line pt-3 text-xs" aria-label="Then">
+              {lineup
+                .filter((l) => l.id !== nextLoad.id)
+                .map((l) => (
+                  <li key={l.id} className="flex items-center justify-between gap-2">
+                    <span className="text-ink-500">
+                      Then <span className="font-medium text-ink-900">{l.lane.origin} → {l.lane.destination}</span>
+                    </span>
+                    <span className="shrink-0 text-ink-500">{l.pickupWindow}</span>
+                  </li>
+                ))}
+            </ol>
           )}
         </div>
       )}

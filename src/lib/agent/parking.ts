@@ -1,11 +1,11 @@
 import "server-only";
 import { hosNow, whereHoursEnd } from "../hos-clock";
 import { cityCoords, distanceMiles, type LatLng } from "../trip-geo";
-import type { ActivityEvent, Driver, Load, ParkingReservation, ParkingSpot, Truck } from "../types";
+import type { ActivityEvent, Driver, Expense, Load, ParkingReservation, ParkingSpot, Truck } from "../types";
 import { PRIMARY_CARRIER_ID } from "../mock-data";
 import { zoneFor } from "../stop-time";
 import { textTo } from "../channels/out";
-import { addActivity, logChannel, save, saveDriverMessage, type CarrierContext } from "./db";
+import { addActivity, claimMark, logChannel, save, saveDriverMessage, type CarrierContext } from "./db";
 import type { Item } from "../cloud/rows";
 
 /**
@@ -106,6 +106,9 @@ export async function reserveParking(ctx: CarrierContext, truck: Truck, spot: Pa
   const next = { ...truck, parking: reservation };
   await save("trucks", ctx.carrier.id, next as unknown as Item);
   Object.assign(truck, next);
+  // The fee, as a cost the company paid: in the books (lib/agent/quickbooks), never reimbursed on the driver's pay.
+  if (driver && spot.price > 0)
+    await save("records", ctx.carrier.id, parkingExpense(reservation, driver.id, truck.currentLoadId ?? null, "approved") as unknown as Item, "expense");
   await addActivity(ctx.carrier.id, event({ type: "expense", message: `Parking reserved for ${truck.unitNumber}`, detail: `${spot.name}, ${spot.address} · $${spot.price} · ${askedBy === "owner" ? "you asked" : `${driver?.name.split(" ")[0] ?? "the driver"} asked`}`, severity: "success" }));
   if (textDriver && driver?.phone && !driver.prefs?.smsOptOut) {
     const text = parkingText(reservation, spot.address);
@@ -121,7 +124,13 @@ export function parkingText(r: ParkingReservation, address = r.address): string 
   return `Parking reserved: ${r.place}, ${address}. Confirmation ${r.confirmation}, $${r.price} for the night.${r.checkIn ? ` ${r.checkIn}` : ""} Say cancel parking if you'd rather not.`;
 }
 
-export async function cancelParking(ctx: CarrierContext, truck: Truck, by: "driver" | "owner"): Promise<boolean> {
+/** The parking fee as an expense record: company-paid (upfront), so it's a cost in the books and not on the driver's pay. */
+function parkingExpense(r: ParkingReservation, driverId: string, loadId: string | null, status: Expense["status"]): Expense {
+  return { id: `parking-${r.id}`, driverId, carrierId: PRIMARY_CARRIER_ID, loadId, category: "parking", amount: r.price, note: `Reserved: ${r.place}`, status, createdAt: r.at, respondedAt: new Date().toISOString(), upfront: true, facility: r.place };
+}
+
+/** `ai`: the AI cancelled it because the plan changed (the load was cancelled); never to book one. */
+export async function cancelParking(ctx: CarrierContext, truck: Truck, by: "driver" | "owner" | "ai", why?: string): Promise<boolean> {
   const r = truck.parking;
   if (!r || r.status !== "booked" || !parkingConfigured()) return false;
   const res = await fetch(`${BASE()}/v1/reservations/${encodeURIComponent(r.id)}/cancel`, { method: "POST", headers: headers(), signal: AbortSignal.timeout(15000), cache: "no-store" });
@@ -129,8 +138,32 @@ export async function cancelParking(ctx: CarrierContext, truck: Truck, by: "driv
   const next = { ...truck, parking: { ...r, status: "cancelled" as const } };
   await save("trucks", ctx.carrier.id, next as unknown as Item);
   Object.assign(truck, next);
-  await addActivity(ctx.carrier.id, event({ type: "expense", message: `Parking cancelled for ${truck.unitNumber}`, detail: `${r.place} · ${by === "owner" ? "you asked" : "the driver asked"}`, severity: "info" }));
+  // The fee comes back off the books.
+  if (truck.driverId) await save("records", ctx.carrier.id, parkingExpense(r, truck.driverId, null, "denied") as unknown as Item, "expense");
+  await addActivity(ctx.carrier.id, event({ type: "expense", message: `Parking cancelled for ${truck.unitNumber}`, detail: `${r.place} · ${by === "owner" ? "you asked" : by === "driver" ? "the driver asked" : (why ?? "the plan changed")}`, severity: "info" }));
   return true;
+}
+
+/**
+ * Once, about an hour before the driver gets there: the spot's address and how to get in, so they don't have to dig
+ * for it at the end of a long day.
+ */
+export async function parkingReminders(ctx: CarrierContext, now: number): Promise<string[]> {
+  const done: string[] = [];
+  for (const truck of ctx.trucks) {
+    const r = truck.parking;
+    if (!r || r.status !== "booked") continue;
+    const until = Date.parse(r.arriveAt) - now;
+    if (until > 75 * 60_000 || until < -30 * 60_000) continue;
+    const driver = ctx.drivers.find((d) => d.id === truck.driverId);
+    if (!driver?.phone || driver.prefs?.smsOptOut || !(await claimMark(ctx.carrier.id, `parking:${r.id}`, "reminder"))) continue;
+    const text = `Your parking tonight: ${r.place}, ${r.address}. Confirmation ${r.confirmation}.${r.checkIn ? ` ${r.checkIn}` : ""}`;
+    const sid = await textTo(ctx.carrier, driver.phone, text);
+    await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: new Date(now).toISOString(), channel: "sms", ai: true }, "/driver");
+    await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: driver.phone, body: text, data: { kind: "parking_reminder" } });
+    done.push(`Parking reminder to ${driver.name.split(" ")[0]}`);
+  }
+  return done;
 }
 
 /** For the AI: spots near where the truck will stop, as lines it can read out, with ids to book by. */

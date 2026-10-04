@@ -1,5 +1,6 @@
 import "server-only";
 import { chainOf } from "./chain";
+import { cancelParking } from "./parking";
 import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import { LOAD_CANCELLED } from "../channels/phrases";
@@ -58,6 +59,9 @@ export async function cancelLoad(ctx: CarrierContext, load: Load, reason: string
       }
     }
   }
+  // A spot reserved for the night on this load isn't needed now (the driver or owner can book again if they want).
+  if (truck?.parking?.status === "booked" && truck.currentLoadId === load.id)
+    await cancelParking(ctx, freed ?? truck, "ai", `${load.referenceNumber} was cancelled`).catch((e) => console.error("[parking] cancel failed", e));
   await addActivity(ctx.carrier.id, event({ type: "load_cancelled", loadId: load.id, message: `Broker cancelled ${load.referenceNumber}`, detail: `${reason}${tonu ? ` · claiming $${tonu} TONU` : ""}`, severity: "warning" }));
 
   // Tell the driver not to go.

@@ -5,7 +5,7 @@ import { CloudOff } from "lucide-react";
 import { useSyncStatus } from "@/lib/cloud/sync";
 import { refreshCount, useUploadQueue } from "@/lib/cloud/upload-queue";
 import { useStore } from "@/lib/store";
-import { registerServiceWorker } from "@/lib/service-worker";
+import { registerServiceWorker, waitingAnswers } from "@/lib/service-worker";
 
 /**
  * "3 waiting to send": photos kept on the phone for lack of signal, and taps not saved yet. Shows only while
@@ -16,21 +16,27 @@ export function OfflineBadge() {
   const photos = useUploadQueue((s) => s.waiting);
   const unsaved = useSyncStatus((s) => s.state === "offline");
   const [online, setOnline] = useState(true);
+  const [answers, setAnswers] = useState(0);
   useEffect(() => {
     if (!real) return;
     // Keeps a copy of the app on the phone, so it opens with no signal (built app only; lib/service-worker).
     void registerServiceWorker();
     void refreshCount().catch(() => {});
+    // Yes / No answers from notifications kept with no signal: counted here, sent by the worker when it's back.
+    const count = () => void waitingAnswers().then(setAnswers);
+    count();
+    const every = window.setInterval(count, 15000);
     const on = () => setOnline(true);
     const off = () => setOnline(false);
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
     return () => {
+      window.clearInterval(every);
       window.removeEventListener("online", on);
       window.removeEventListener("offline", off);
     };
   }, [real]);
-  const waiting = photos + (unsaved ? 1 : 0);
+  const waiting = photos + (unsaved ? 1 : 0) + answers;
   if (!real || (!waiting && online)) return null;
   return (
     <span role="status" className="flex items-center gap-1.5 rounded-full bg-warn-soft px-3 py-1.5 text-xs font-medium text-[var(--accent-warn)]">

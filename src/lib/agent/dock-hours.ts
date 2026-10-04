@@ -1,6 +1,7 @@
 import "server-only";
 import type { FacilityHours, FacilityRef } from "./facility-notes";
 import { placesConfigured } from "./roadside";
+import { cached } from "./lookup-cache";
 
 /**
  * A shipper's or receiver's posted hours (Google Places), for docks no driver has reported on yet. Posted hours are
@@ -11,7 +12,6 @@ import { placesConfigured } from "./roadside";
 const PLACES = () => process.env.PLACES_API_BASE?.replace(/\/$/, "") ?? "https://places.googleapis.com";
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY = 86400_000;
-const cache = new Map<string, { hours: FacilityHours | null; at: number }>();
 
 interface Period {
   open?: { day?: number; hour?: number; minute?: number };
@@ -34,10 +34,19 @@ export function hoursFromPeriods(periods: Period[] | undefined): FacilityHours |
   const opens = mostCommon(periods.map((p) => hhmm(p.open)).filter((x): x is string => !!x));
   // A close past midnight (or at it) leaves the evening open: no closing time to warn about.
   const closes = mostCommon(periods.filter((p) => p.close && p.close.day === p.open?.day).map((p) => hhmm(p.close)!));
+  // Days that keep other hours than the usual (a short Saturday).
+  const byDay: NonNullable<FacilityHours["byDay"]> = {};
+  for (const d of days) {
+    const p = periods.find((x) => x.open?.day === DAYS.indexOf(d));
+    const o = hhmm(p?.open);
+    const c = p?.close && p.close.day === p.open?.day ? hhmm(p.close) : undefined;
+    if ((o && o !== opens) || (c && c !== closes)) byDay[d] = { ...(o && o !== "00:00" ? { opens: o } : {}), ...(c ? { closes: c } : {}) };
+  }
   return {
     ...(days.length && days.length < 7 ? { days } : {}),
     ...(opens && opens !== "00:00" ? { opens } : {}),
     ...(closes ? { closes } : {}),
+    ...(Object.keys(byDay).length ? { byDay } : {}),
   };
 }
 
@@ -47,28 +56,26 @@ const words = (s: string) => new Set(s.toLowerCase().replace(/[^a-z0-9 ]/g, " ")
 export async function postedHours(f: Pick<FacilityRef, "name" | "city" | "state" | "zip">, address?: string | null): Promise<FacilityHours | null> {
   if (!placesConfigured() || !f.name) return null;
   const query = `${f.name}, ${address?.trim() || `${f.city}, ${f.state}${f.zip ? ` ${f.zip}` : ""}`}`;
-  const hit = cache.get(query);
-  if (hit && Date.now() - hit.at < 7 * DAY) return hit.hours;
-  let hours: FacilityHours | null = null;
   try {
-    const res = await fetch(`${PLACES()}/v1/places:searchText`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "X-Goog-Api-Key": process.env.GOOGLE_PLACES_API_KEY!, "X-Goog-FieldMask": "places.displayName,places.regularOpeningHours" },
-      body: JSON.stringify({ textQuery: query, maxResultCount: 1 }),
-      signal: AbortSignal.timeout(10000),
-      cache: "no-store",
+    // Kept a week, on every server (lib/agent/lookup-cache): Places is paid per search. A failed one isn't kept.
+    return await cached(`dock-hours:${query.toLowerCase()}`, 7 * DAY, async () => {
+      const res = await fetch(`${PLACES()}/v1/places:searchText`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "X-Goog-Api-Key": process.env.GOOGLE_PLACES_API_KEY!, "X-Goog-FieldMask": "places.displayName,places.regularOpeningHours" },
+        body: JSON.stringify({ textQuery: query, maxResultCount: 1 }),
+        signal: AbortSignal.timeout(10000),
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`Places ${res.status}`);
+      const data = (await res.json()) as { places?: { displayName?: { text?: string }; regularOpeningHours?: { periods?: Period[] } }[] };
+      const place = data.places?.[0];
+      // Only when it found the same business: a name word in common (a search for a small DC can land on a store).
+      const want = words(f.name);
+      const same = place?.displayName?.text && [...words(place.displayName.text)].some((w) => want.has(w));
+      return same ? hoursFromPeriods(place?.regularOpeningHours?.periods) : null;
     });
-    if (!res.ok) throw new Error(`Places ${res.status}`);
-    const data = (await res.json()) as { places?: { displayName?: { text?: string }; regularOpeningHours?: { periods?: Period[] } }[] };
-    const place = data.places?.[0];
-    // Only when it found the same business: a name word in common (a search for a small DC can land on a store).
-    const want = words(f.name);
-    const same = place?.displayName?.text && [...words(place.displayName.text)].some((w) => want.has(w));
-    hours = same ? hoursFromPeriods(place?.regularOpeningHours?.periods) : null;
   } catch (e) {
     console.error("[dock-hours] lookup failed", e);
-    return null; // Not cached: try again next time.
+    return null;
   }
-  cache.set(query, { hours, at: Date.now() });
-  return hours;
 }

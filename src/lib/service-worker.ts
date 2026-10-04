@@ -38,3 +38,29 @@ export function keepTripMap(style: string, path: [number, number][]) {
   const points = path.filter((_, i) => i % every === 0 || i === path.length - 1);
   tell({ type: "keep-trip-map", style, points });
 }
+
+/** Yes / No answers tapped on a notification with no signal, still waiting on the phone to go (public/sw.js). */
+export function waitingAnswers(): Promise<number> {
+  if (typeof indexedDB === "undefined") return Promise.resolve(0);
+  return new Promise((resolve) => {
+    const open = indexedDB.open("backroute-sw", 1);
+    open.onupgradeneeded = () => open.result.createObjectStore("answers", { keyPath: "id" });
+    open.onerror = () => resolve(0);
+    open.onsuccess = () => {
+      try {
+        const q = open.result.transaction("answers").objectStore("answers").count();
+        q.onsuccess = () => resolve(q.result);
+        q.onerror = () => resolve(0);
+      } catch {
+        resolve(0);
+      }
+    };
+  });
+}
+
+const STYLE = "https://tiles.openfreemap.org/styles/dark";
+
+/** The map for a load lined up after this one (its two ends and the straight line between), kept ahead too. */
+export function keepLoadMap(from: [number, number] | undefined, to: [number, number] | undefined) {
+  if (from && to) keepTripMap(STYLE, [from, to]);
+}

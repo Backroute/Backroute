@@ -17,8 +17,9 @@ import { useStore } from "@/lib/store";
 import { payLabel } from "@/lib/settlements";
 import type { Lang, RunType } from "@/lib/types";
 import { LANGS } from "@/lib/lang";
-import { useCarrierTrucks, useDriverMap, useCarrierLoads, truckActiveLoads } from "@/lib/selectors";
+import { useCarrierTrucks, useDriverMap, useCarrierLoads, truckActiveLoads, truckLineup } from "@/lib/selectors";
 import { useNow } from "@/lib/hooks";
+import { ParkingReserve } from "@/components/driver/parking-reserve";
 import { formatNumber } from "@/lib/utils";
 import type { HosStatus } from "@/lib/types";
 
@@ -77,6 +78,7 @@ export default function FleetPage() {
           const driver = drivers.get(truck.driverId ?? "");
           const secondDriver = truck.secondDriverId ? drivers.get(truck.secondDriverId) : undefined;
           const { current: currentLoad, next: nextLoad } = truckActiveLoads(loads, truck);
+          const lineup = truckLineup(loads, truck);
           const pendingOffers = loads.filter((l) => l.truckId === truck.id && l.stage === "offered");
           const hosPct = driver ? Math.min(100, (driver.hoursRemaining / 11) * 100) : 0;
           const at = emptiesAt(truck, currentLoad);
@@ -216,6 +218,16 @@ export default function FleetPage() {
                       <Link2 className="h-3 w-3" /> Next: {nextLoad.lane.origin} → {nextLoad.lane.destination}
                     </div>
                   )}
+                  {signedIn && driver && currentLoad && (
+                    <div className="mt-1">
+                      <ParkingReserve truck={truck} driver={driver} office />
+                    </div>
+                  )}
+                  {lineup.filter((l) => l.id !== nextLoad?.id).map((l) => (
+                    <p key={l.id} className="text-xs text-ink-500">
+                      Then: {l.lane.origin} → {l.lane.destination} <span className="text-ink-400">· {l.pickupWindow}</span>
+                    </p>
+                  ))}
                   {pendingOffers.length > 0 && (
                     <Link href="/carrier/loads" className="mt-1 flex items-center gap-1.5 rounded-lg bg-warn-soft px-2.5 py-1.5 text-xs text-[var(--accent-warn)]">
                       <Sparkles className="h-3 w-3" /> {pendingOffers.length} load options awaiting a pick

@@ -263,10 +263,10 @@ Thanks,
 ${signature(carrier, settings)}`;
 }
 
-export function etaUpdate(carrier: CarrierRow, settings: AgentSettings, load: Load, stop: "pickup" | "delivery", place: string, eta: string) {
+export function etaUpdate(carrier: CarrierRow, settings: AgentSettings, load: Load, stop: "pickup" | "delivery", place: string, eta: string, reason?: string) {
   return `Hi,
 
-Heads up on load ${load.referenceNumber}: our truck is running behind for the ${stop} in ${place}. Its current ETA is ${eta}, from its live location and the driver's hours.
+Heads up on load ${load.referenceNumber}: our truck is running behind for the ${stop} in ${place}${reason ? ` (${reason})` : ""}. Its current ETA is ${eta}, from its live location and the driver's hours.
 
 We'll keep you posted if that changes. Let us know if the ${stop === "pickup" ? "shipper" : "receiver"} needs a new appointment.
 

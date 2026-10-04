@@ -27,6 +27,8 @@ export interface FacilityHours {
   closes?: string;
   /** Days it's open, e.g. ["Mon","Tue","Wed","Thu","Fri"]. */
   days?: string[];
+  /** When a day keeps different hours (Saturday 08:00-12:00), from the posted hours. */
+  byDay?: Partial<Record<string, { opens?: string; closes?: string }>>;
 }
 
 export interface FacilityNote {
@@ -157,4 +159,9 @@ export async function tipsForLoad(load: Load, only?: StopKind): Promise<string[]
   return lines;
 }
 
-export const formatHours = (h: FacilityHours) => [h.days?.length ? h.days.join("/") : null, h.opens && h.closes ? `${h.opens}–${h.closes}` : h.closes ? `until ${h.closes}` : h.opens ? `from ${h.opens}` : null].filter(Boolean).join(" ");
+const span = (x: { opens?: string; closes?: string }) => (x.opens && x.closes ? `${x.opens}–${x.closes}` : x.closes ? `until ${x.closes}` : x.opens ? `from ${x.opens}` : null);
+export const formatHours = (h: FacilityHours) => {
+  const usual = [h.days?.length ? h.days.filter((d) => !h.byDay?.[d]).join("/") : null, span(h)].filter(Boolean).join(" ");
+  const odd = Object.entries(h.byDay ?? {}).map(([d, x]) => `${d} ${span(x ?? {}) ?? ""}`.trim());
+  return [usual, ...odd].filter(Boolean).join(", ");
+};

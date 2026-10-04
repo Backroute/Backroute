@@ -289,7 +289,7 @@ export function etaTo(truck: Truck, driver: Driver | undefined, city: string, st
 }
 
 /** Trucks that will miss their appointment by more than 30 minutes: the broker hears now, once per stop. */
-export async function lateNotices(ctx: CarrierContext, now: number): Promise<string[]> {
+export async function lateNotices(ctx: CarrierContext, now: number, opts: { email?: boolean } = { email: true }): Promise<string[]> {
   const done: string[] = [];
   for (const load of ctx.loads) {
     const stop = load.stage === "dispatched" ? "pickup" : load.stage === "in_transit" ? "delivery" : null;
@@ -312,6 +312,8 @@ export async function lateNotices(ctx: CarrierContext, now: number): Promise<str
         await save("loads", ctx.carrier.id, marked as unknown as Item);
         ctx.loads = ctx.loads.map((l) => (l.id === load.id ? marked : l));
         await pushToOffice(ctx.carrier.id, { title: `Truck ${truck!.unitNumber} tight on time`, body: `${load.referenceNumber}: ${line}`, url: `/carrier/loads/${load.id}`, tag: `late-${load.id}-${stop}` }).catch(() => 0);
+        // The driver hears it too, without being told to hurry: the AI handles the dock and the broker.
+        if (driver) await textDriver(ctx, driver, `Heads-up on ${load.referenceNumber}: ${seen.reasons.join(", ")}. You're looking at about ${etaText} for the ${stop} in ${city}. Drive safe, no need to rush: I'll handle the ${stop === "pickup" ? "shipper" : "receiver"} and the broker if it slips.`, { kind: "late_risk", loadId: load.id }, now);
         done.push(`${load.referenceNumber}: tight on time to the ${stop}`);
       }
       continue;
@@ -322,20 +324,24 @@ export async function lateNotices(ctx: CarrierContext, now: number): Promise<str
     if (phone && canCall(ctx.carrier) && load.appointments?.[stop]?.purpose !== "move" && (await claimMark(ctx.carrier.id, load.id, `appt_move_${stop}`)))
       done.push(`${load.referenceNumber}: ${await needAppointment(ctx, load, stop, "move", eta, now)}`);
     const to = load.brokerContactEmail ?? ctx.brokers.find((b) => b.id === load.brokerId)?.email;
-    if (!to || !(await claimMark(ctx.carrier.id, load.id, `late_notice_${stop}`))) continue;
+    if (!(await claimMark(ctx.carrier.id, load.id, `late_notice_${stop}`))) continue;
     const etaText = formatAtStop(new Date(eta).toISOString(), state);
-    const result = await sendOrQueue(ctx, {
-      purpose: "eta_update",
-      to,
-      subject: mail.subjectFor(load, "Running late"),
-      body: mail.etaUpdate(ctx.carrier, ctx.settings, load, stop, `${city}, ${state}`, etaText),
-      loadId: load.id,
-      withinRules: true,
-      why: `Truck ${truck!.unitNumber} won't make the ${stop} on ${load.referenceNumber} on time (ETA ${etaText}). Tell the broker?`,
-    });
+    // The broker hears by email (with why, in a few words); with no email to send from, the owner is told to call.
+    const result =
+      to && opts.email !== false
+        ? await sendOrQueue(ctx, {
+            purpose: "eta_update",
+            to,
+            subject: mail.subjectFor(load, "Running late"),
+            body: mail.etaUpdate(ctx.carrier, ctx.settings, load, stop, `${city}, ${state}`, etaText, seen?.reasons.filter((r) => !/hours run out/.test(r)).join("; ") || undefined),
+            loadId: load.id,
+            withinRules: true,
+            why: `Truck ${truck!.unitNumber} won't make the ${stop} on ${load.referenceNumber} on time (ETA ${etaText}). Tell the broker?`,
+          })
+        : "not_emailed";
     done.push(`${load.referenceNumber}: late notice for ${stop} ${result}`);
     // The owner hears it the same moment, with the new time, before anyone has to ask them.
-    const line = `Running late to the ${stop} in ${city}, ${state}: new arrival about ${etaText}${because}. ${result === "sent" ? "The AI told the broker." : "The note to the broker is waiting for your OK."}`;
+    const line = `Running late to the ${stop} in ${city}, ${state}: new arrival about ${etaText}${because}. ${result === "sent" ? "The AI told the broker." : result === "not_emailed" ? "Broker email isn't set up: give them a call." : "The note to the broker is waiting for your OK."}`;
     const marked = addWhy({ ...load, late: { stop, eta: new Date(eta).toISOString(), at: new Date(now).toISOString() } }, line);
     await save("loads", ctx.carrier.id, marked as unknown as Item);
     ctx.loads = ctx.loads.map((l) => (l.id === load.id ? marked : l));
@@ -343,6 +349,15 @@ export async function lateNotices(ctx: CarrierContext, now: number): Promise<str
     await pushToOffice(ctx.carrier.id, { title: `Truck ${truck!.unitNumber} running late`, body: `${load.referenceNumber}: ${line}`, url: `/carrier/loads/${load.id}`, tag: `late-${load.id}-${stop}` }).catch(() => 0);
   }
   return done;
+}
+
+/** A short text to the driver, in their language, kept in their thread. Nothing when they opted out of texts. */
+async function textDriver(ctx: CarrierContext, driver: Driver, english: string, log: { kind: string; loadId: string }, now: number) {
+  if (!driver.phone || driver.prefs?.smsOptOut) return;
+  const text = await translateForDriver(english, driver.prefs?.language ?? "en").catch(() => english);
+  const sid = await textTo(ctx.carrier, driver.phone, text);
+  await saveDriverMessage(ctx.carrier.id, { id: `dm-${now.toString(36)}${Math.random().toString(36).slice(2, 6)}`, driverId: driver.id, from: "ai", content: text, timestamp: new Date(now).toISOString(), channel: "sms", ai: true }, "/driver/messages");
+  await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: driver.phone, body: text, data: log });
 }
 
 /**
@@ -354,14 +369,7 @@ async function stoppedCheck(ctx: CarrierContext, load: Load, truck: Truck, drive
   if (!odd || !(await claimMark(ctx.carrier.id, load.id, `stopped:${truck.stoppedSince}`))) return false;
   const where = truck.position?.description ?? `${truck.currentCity}, ${truck.currentState}`;
   const hours = odd.minutes >= 120 ? `${Math.round(odd.minutes / 30) / 2} hours` : `${odd.minutes} minutes`;
-  if (driver?.phone && !driver.prefs?.smsOptOut) {
-    const text = await translateForDriver(`Checking in: the truck's been stopped about ${hours} near ${where}. Everything OK? Reply if you need anything (a shop, parking, more time at the dock).`, driver.prefs?.language ?? "en").catch(() => null);
-    if (text) {
-      const sid = await textTo(ctx.carrier, driver.phone, text);
-      await saveDriverMessage(ctx.carrier.id, { id: `dm-${now.toString(36)}${Math.random().toString(36).slice(2, 6)}`, driverId: driver.id, from: "ai", content: text, timestamp: new Date(now).toISOString(), channel: "sms", ai: true }, "/driver/messages");
-      await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: driver.phone, body: text, data: { kind: "stopped_check", loadId: load.id } });
-    }
-  }
+  if (driver) await textDriver(ctx, driver, `Checking in: the truck's been stopped about ${hours} near ${where}. Everything OK? Reply if you need anything (a shop, parking, more time at the dock).`, { kind: "stopped_check", loadId: load.id }, now);
   await addActivity(ctx.carrier.id, event({ type: "check_call", loadId: load.id, message: `Truck ${truck.unitNumber} stopped ${hours} near ${where}`, detail: `${load.referenceNumber} · not at a stop, driver on duty. The AI texted ${driver?.name.split(" ")[0] ?? "the driver"} to check in.`, severity: "warning" }));
   return true;
 }

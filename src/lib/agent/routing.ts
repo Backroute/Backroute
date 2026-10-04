@@ -23,6 +23,8 @@ export interface Route {
   hours: number;
   /** Live routes: the drive time with no traffic, so the traffic's share is `hours - freeHours`. */
   freeHours?: number;
+  /** Live routes: the road itself, thinned to about 100 points (for weather along the way). */
+  path?: [number, number][];
 }
 
 async function get(url: string): Promise<unknown> {
@@ -56,14 +58,21 @@ export async function route(from: Place, to: Place, opts: { live?: boolean } = {
     const hit = routes.get(key);
     if (hit && Date.now() - hit.at < (opts.live ? 15 * 60_000 : FRESH)) return hit.route;
     const when = opts.live ? `&departureTime=${encodeURIComponent(new Date().toISOString().replace(/\.\d{3}Z$/, "Z"))}` : "&departureTime=any";
-    const body = (await get(`${ROUTER()}/v8/routes?transportMode=truck&origin=${a.lat},${a.lon}&destination=${b.lat},${b.lon}&return=summary${when}&apiKey=${encodeURIComponent(process.env.HERE_API_KEY!)}`)) as {
-      routes?: { sections?: { summary?: { length?: number; duration?: number; baseDuration?: number } }[] }[];
+    const body = (await get(`${ROUTER()}/v8/routes?transportMode=truck&origin=${a.lat},${a.lon}&destination=${b.lat},${b.lon}&return=summary${opts.live ? ",polyline" : ""}${when}&apiKey=${encodeURIComponent(process.env.HERE_API_KEY!)}`)) as {
+      routes?: { sections?: { summary?: { length?: number; duration?: number; baseDuration?: number }; polyline?: string }[] }[];
     };
     const sections = body.routes?.[0]?.sections ?? [];
     const meters = sections.reduce((s, x) => s + (x.summary?.length ?? 0), 0);
     const seconds = sections.reduce((s, x) => s + (x.summary?.duration ?? 0), 0);
     const base = sections.reduce((s, x) => s + (x.summary?.baseDuration ?? x.summary?.duration ?? 0), 0);
-    const r = meters > 0 ? { miles: Math.round(meters / 1609.34), hours: Math.round((seconds / 3600) * 10) / 10, ...(opts.live ? { freeHours: Math.round((base / 3600) * 10) / 10 } : {}) } : null;
+    let path: [number, number][] | undefined;
+    if (opts.live) {
+      const { decodeFlexPolyline } = await import("../flexpolyline");
+      const all = sections.flatMap((x) => (x.polyline ? decodeFlexPolyline(x.polyline) : []));
+      const step = Math.max(1, Math.ceil(all.length / 100));
+      if (all.length >= 2) path = all.filter((_, i) => i % step === 0 || i === all.length - 1);
+    }
+    const r = meters > 0 ? { miles: Math.round(meters / 1609.34), hours: Math.round((seconds / 3600) * 10) / 10, ...(opts.live ? { freeHours: Math.round((base / 3600) * 10) / 10, ...(path ? { path } : {}) } : {}) } : null;
     routes.set(key, { at: Date.now(), route: r });
     return r;
   } catch (e) {

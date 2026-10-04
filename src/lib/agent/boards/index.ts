@@ -2,7 +2,7 @@ import "server-only";
 import { chainOf, doneAt, LINED_UP_MAX } from "../chain";
 import type { Truck } from "../../types";
 import { claimMark, type CarrierContext } from "../db";
-import { pullFeed } from "../feeds";
+import { pullFeed, type FeedRow } from "../feeds";
 import type { CustomBoardConfig, DatConfig, IntegrationRow, TruckstopConfig } from "../integrations";
 import { customBoard } from "./custom";
 import { datBoard, datConfigured } from "./dat";
@@ -82,7 +82,9 @@ export async function runBoards(ctx: CarrierContext, rows: IntegrationRow[], now
     }
     try {
       let found = 0;
-      let added = 0;
+      // Every free truck's results are gathered first and matched to the fleet together (lib/agent/match), so two
+      // trucks never chase the same board load.
+      const gathered: FeedRow[] = [];
       for (const { truck, q } of whereTrucksFree(ctx, now)) {
         const urgent = Date.parse(q.availableFrom) - now <= URGENT_WITHIN;
         const slot = urgent ? `u${Math.floor(now / SEARCH_URGENT)}` : `${Math.floor(now / SEARCH_EVERY)}`;
@@ -92,11 +94,12 @@ export async function runBoards(ctx: CarrierContext, rows: IntegrationRow[], now
         found += loads.length;
         // Loads heading toward the driver's home first, then by pay.
         loads.sort((a, b) => Number(b.destinationState === q.towardState) - Number(a.destinationState === q.towardState) || (b.rate ?? 0) / (b.miles || 1) - (a.rate ?? 0) / (a.miles || 1));
-        added += await pullFeed(ctx, loads.slice(0, 25), board.name);
+        for (const l of loads.slice(0, 25)) if (!gathered.some((g) => g.loadNumber && g.loadNumber === l.loadNumber && g.brokerName === l.brokerName)) gathered.push(l);
         const wantsPosting = (row.config as TruckstopConfig | DatConfig).postTrucks;
         if (wantsPosting && board.postTruck && (await claimMark(ctx.carrier.id, `truck:${truck.id}`, `board_post:${row.kind}:${day}`)))
           await board.postTruck({ unitNumber: truck.unitNumber, equipment: truck.equipmentType, originCity: q.originCity, originState: q.originState, availableAt: q.availableFrom, destinationState: q.towardState, ratePerMile: ctx.settings.minRpm, comments: postComment(ctx) });
       }
+      const added = gathered.length ? await pullFeed(ctx, gathered.slice(0, 80), board.name) : 0;
       if (added) done.push(`${added} load${added === 1 ? "" : "s"} from ${board.name}`);
       await onStatus(row, `Connected · last search ${new Date(now).toISOString().slice(11, 16)} UTC, ${found} load${found === 1 ? "" : "s"} seen`);
     } catch (e) {

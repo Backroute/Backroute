@@ -12,6 +12,7 @@ import { runCheckins } from "./checkins";
 import { complianceReminders } from "./compliance";
 import { pullStatements } from "./costs";
 import { quickbooksRound } from "./quickbooks";
+import { parkingReminders } from "./parking";
 import { makeContractLoads } from "./contracts";
 import { marksFor, type CarrierContext } from "./db";
 import { forCarrier } from "./scope";
@@ -83,6 +84,7 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   done.push(...(await suggestRepositions(ctx, now)));
   done.push(...(await complianceReminders(ctx, now)));
   done.push(...(await pullStatements(ctx, links, now)));
+  done.push(...(await parkingReminders(ctx, now).catch((e) => (console.error("[rounds] parking reminders failed", e), []))));
   done.push(...(await quickbooksRound(ctx, links, now).catch((e) => (console.error("[rounds] quickbooks failed", e), []))));
   done.push(...(await makeContractLoads(ctx, now)));
   done.push(...(await trackHomeTime(ctx, now)));
@@ -94,10 +96,9 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   done.push(...(await reeferRounds(ctx, now).catch((e) => (console.error("[rounds] reefer checks failed", e), []))));
   done.push(...(await weeklyReview(ctx, now).catch((e) => (console.error("[rounds] weekly review failed", e), []))));
   await refreshPlans(ctx, now);
-  if (canEmail(ctx.carrier)) {
-    done.push(...(await lateNotices(ctx, now)));
-    done.push(...(await checkCalls(ctx, now)));
-  }
+  // Late trucks and stopped trucks are watched for every fleet; the broker's email only when email is set up.
+  done.push(...(await lateNotices(ctx, now, { email: canEmail(ctx.carrier) })));
+  if (canEmail(ctx.carrier)) done.push(...(await checkCalls(ctx, now)));
   const expired = await expireOffers(ctx, now);
   if (expired) done.push(`${expired} old offer${expired === 1 ? "" : "s"} taken off the board`);
   // What this carrier's trucks learned at docks goes into the shared record every carrier's AI reads.

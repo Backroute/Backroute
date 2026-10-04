@@ -63,8 +63,8 @@ export function QuickbooksCard() {
   async function syncNow() {
     setBusy("sync");
     const res = await fetch("/api/integrations/quickbooks", { method: "PUT", headers: await authHeader() }).catch(() => null);
-    const body = res ? ((await res.json().catch(() => ({}))) as { invoices?: number; payments?: number; costs?: number; reason?: string }) : {};
-    setNote(res?.ok ? `Done: ${body.invoices ?? 0} invoices, ${body.payments ?? 0} payments, ${body.costs ?? 0} costs put in.` : (body.reason ?? "Couldn't reach QuickBooks. Try again in a minute."));
+    const body = res ? ((await res.json().catch(() => ({}))) as { invoices?: number; payments?: number; costs?: number; updated?: number; reason?: string }) : {};
+    setNote(res?.ok ? `Done: ${body.invoices ?? 0} invoices, ${body.payments ?? 0} payments, ${body.costs ?? 0} costs put in${body.updated ? `, ${body.updated} invoices brought up to date` : ""}.` : (body.reason ?? "Couldn't reach QuickBooks. Try again in a minute."));
     setBusy(null);
     void refresh();
   }

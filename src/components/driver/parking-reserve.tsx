@@ -15,7 +15,9 @@ type Found = { spots: ParkingSpot[]; where: string | null; arrive?: string; book
  * Reserving a parking spot from the driver's screen, signed in. Only what the driver taps: the AI never books one on
  * its own. Shows the spot that's booked (the driver's or the owner's ask), with the way there in the truck app.
  */
-export function ParkingReserve({ truck, driver }: { truck: Truck; driver: Driver }) {
+export function ParkingReserve({ truck, driver, office }: { truck: Truck; driver: Driver; office?: boolean }) {
+  // The owner's screen books for this truck; the driver's for their own.
+  const q = office ? `?truck=${encodeURIComponent(truck.id)}` : "";
   const [open, setOpen] = useState(false);
   const [found, setFound] = useState<Found | null>(null);
   const [state, setState] = useState<"idle" | "looking" | "booking" | "off" | "down">("idle");
@@ -29,7 +31,7 @@ export function ParkingReserve({ truck, driver }: { truck: Truck; driver: Driver
     setOpen(true);
     setState("looking");
     try {
-      const res = await fetch("/api/parking", { headers: await authHeader(), cache: "no-store" });
+      const res = await fetch(`/api/parking${q}`, { headers: await authHeader(), cache: "no-store" });
       const body = await res.json().catch(() => ({}));
       if (res.status === 503 && body.error === "parking_off") return setState("off");
       if (!res.ok) return setState("down");
@@ -44,7 +46,7 @@ export function ParkingReserve({ truck, driver }: { truck: Truck; driver: Driver
     setState("booking");
     haptic("tap");
     try {
-      const res = await fetch("/api/parking", { method: "POST", headers: { "content-type": "application/json", ...(await authHeader()) }, body: JSON.stringify({ spotId: spot.id }) });
+      const res = await fetch(`/api/parking${q}`, { method: "POST", headers: { "content-type": "application/json", ...(await authHeader()) }, body: JSON.stringify({ spotId: spot.id, ...(office ? { truck: truck.id } : {}) }) });
       const body = await res.json().catch(() => ({}));
       if (res.ok || body.error === "already_booked") {
         setBooked({ r: body.booked });
@@ -61,7 +63,7 @@ export function ParkingReserve({ truck, driver }: { truck: Truck; driver: Driver
   }
 
   async function cancel() {
-    const res = await fetch("/api/parking", { method: "DELETE", headers: await authHeader() }).catch(() => null);
+    const res = await fetch(`/api/parking${q}`, { method: "DELETE", headers: await authHeader() }).catch(() => null);
     if (res?.ok) setBooked({ r: null, id: booked?.id });
   }
 
@@ -113,7 +115,7 @@ export function ParkingReserve({ truck, driver }: { truck: Truck; driver: Driver
             ))}
           </ul>
         )}
-        <p className="mt-3 text-xs text-ink-500">Paid by your company. Only booked when you tap Book.</p>
+        <p className="mt-3 text-xs text-ink-500">{office ? `Paid by the company. ${driver.name.split(" ")[0]} gets the address and confirmation by text.` : "Paid by your company. Only booked when you tap Book."}</p>
       </Sheet>
     </>
   );

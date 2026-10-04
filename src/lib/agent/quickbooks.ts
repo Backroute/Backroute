@@ -5,6 +5,7 @@ import { open, seal, vaultConfigured } from "../portal/vault";
 import { admin, claimMark, releaseMark, type CarrierContext } from "./db";
 import { saveIntegration, setStatus, type IntegrationRow } from "./integrations";
 import { termsDays } from "./money";
+import { passToOwner } from "./dispatcher";
 
 /**
  * QuickBooks Online, kept in step on its own: the owner connects their company once (Intuit's sign-in), and every
@@ -205,25 +206,48 @@ async function recordsOf<T>(carrierId: string, kind: "fuel" | "toll" | "expense"
  * Puts what's new into QuickBooks: invoices sent, payments in, and costs, from the last 60 days (and never from before
  * the company was connected less 60 days). At most 60 entries a run; the rest go next hour.
  */
-export async function syncQuickbooks(ctx: CarrierContext, config: QuickbooksConfig, now = Date.now()): Promise<{ invoices: number; payments: number; costs: number }> {
+export async function syncQuickbooks(ctx: CarrierContext, config: QuickbooksConfig, now = Date.now()): Promise<{ invoices: number; payments: number; costs: number; updated: number }> {
   const ids = await setUp(ctx, config);
   const since = Math.max(now - 60 * DAY, Date.parse(config.connectedAt) - 60 * DAY);
   const after = (iso?: string) => !!iso && Date.parse(iso) >= since;
   const customers = new Map<string, string>();
   let budget = 60;
-  const n = { invoices: 0, payments: 0, costs: 0 };
-  const marks = await admin().from("agent_marks").select("load_id, data").eq("carrier_id", ctx.carrier.id).eq("kind", "qbo_invoice");
-  const invoiceIds = new Map((marks.data ?? []).map((m) => [m.load_id as string, (m.data as { id?: string })?.id]));
+  const n = { invoices: 0, payments: 0, costs: 0, updated: 0 };
+  const marks = await admin().from("agent_marks").select("load_id, kind, data").eq("carrier_id", ctx.carrier.id).in("kind", ["qbo_invoice", "qbo_payment"]);
+  type InvoiceMark = { id?: string; amount?: number; voided?: boolean };
+  const invoiceMarks = new Map((marks.data ?? []).filter((m) => m.kind === "qbo_invoice").map((m) => [m.load_id as string, (m.data ?? {}) as InvoiceMark]));
+  const invoiceIds = new Map([...invoiceMarks].map(([k, v]) => [k, v.id]));
+  const paidInBooks = new Set((marks.data ?? []).filter((m) => m.kind === "qbo_payment").map((m) => m.load_id as string));
+  const setMark = (loadId: string, data: InvoiceMark) => admin().from("agent_marks").update({ data }).eq("carrier_id", ctx.carrier.id).eq("load_id", loadId).eq("kind", "qbo_invoice");
+  const invoiceLines = (l: Load) => (l.invoice!.lines?.length ? l.invoice!.lines : [{ label: "Line haul, all in", amount: l.invoice!.amount }]).map((x) => ({ DetailType: "SalesItemLineDetail", Amount: money(x.amount), Description: `${x.label} · ${l.referenceNumber} · ${lane(l)}`, SalesItemLineDetail: { ItemRef: { value: ids.item }, Qty: 1, UnitPrice: money(x.amount) } }));
+  const syncToken = async (id: string) => ((await api(ctx.carrier.id, config, "GET", `/invoice/${encodeURIComponent(id)}`)) as { Invoice?: { SyncToken?: string } }).Invoice?.SyncToken ?? "0";
 
   for (const l of ctx.loads) {
     const inv = l.invoice;
     if (budget <= 0) break;
     if (!inv?.sentAt || !after(inv.sentAt)) continue;
-    if (!invoiceIds.has(l.id)) {
+    const mark = invoiceMarks.get(l.id);
+    if (mark?.id && !mark.voided && !paidInBooks.has(l.id)) {
+      // The broker cancelled after the invoice went out (and it isn't a TONU bill): voided in the books too.
+      if (l.stage === "cancelled" && !(inv.lines ?? []).some((x) => /tonu/i.test(x.label))) {
+        await api(ctx.carrier.id, config, "POST", "/invoice?operation=void", { Id: mark.id, SyncToken: await syncToken(mark.id) });
+        await setMark(l.id, { ...mark, voided: true });
+        n.updated++;
+        budget--;
+        continue;
+      }
+      // Charges changed after it went in (detention, a lumper added): the invoice in the books is brought up to date.
+      if (typeof mark.amount === "number" && money(mark.amount) !== money(inv.amount)) {
+        await api(ctx.carrier.id, config, "POST", "/invoice", { Id: mark.id, SyncToken: await syncToken(mark.id), sparse: true, Line: invoiceLines(l) });
+        await setMark(l.id, { ...mark, amount: inv.amount });
+        n.updated++;
+        budget--;
+      }
+    }
+    if (!invoiceIds.has(l.id) && l.stage !== "cancelled") {
       const customer = await customerFor(ctx, config, l, customers);
       const date = inv.sentAt.slice(0, 10);
       const days = termsDays(l.rateConReading?.paymentTerms);
-      const lines = inv.lines?.length ? inv.lines : [{ label: "Line haul, all in", amount: inv.amount }];
       await once(ctx, l.id, "qbo_invoice", async () => {
         // Already in the books under that number (typed in by hand, or sent before): linked, not made twice.
         const there = await query<{ Id: string }>(ctx.carrier.id, config, `select Id from Invoice where DocNumber = '${quote(inv.number.slice(0, 21))}'`);
@@ -238,7 +262,7 @@ export async function syncQuickbooks(ctx: CarrierContext, config: QuickbooksConf
           CustomerRef: { value: customer },
           PrivateNote: `Load ${l.referenceNumber} · ${lane(l)} · from Backroute`,
           ...(l.brokerContactEmail ? { BillEmail: { Address: l.brokerContactEmail } } : {}),
-          Line: lines.map((x) => ({ DetailType: "SalesItemLineDetail", Amount: money(x.amount), Description: `${x.label} · ${l.referenceNumber} · ${lane(l)}`, SalesItemLineDetail: { ItemRef: { value: ids.item }, Qty: 1, UnitPrice: money(x.amount) } })),
+          Line: invoiceLines(l),
         })) as { Invoice: { Id: string } };
         invoiceIds.set(l.id, made.Invoice.Id);
         return { id: made.Invoice.Id, customer, amount: inv.amount };
@@ -266,6 +290,9 @@ export async function syncQuickbooks(ctx: CarrierContext, config: QuickbooksConf
   const cost = async (key: string, date: string, amount: number, accountId: string, what: string) => {
     if (budget <= 0 || amount <= 0) return;
     const pushed = await once(ctx, key, "qbo_cost", async () => {
+      // Already typed in by hand (same day, same amount): left alone, so it isn't in the books twice.
+      const there = await query<{ Id: string }>(ctx.carrier.id, config, `select Id from Purchase where TxnDate = '${date}' and TotalAmt = '${money(amount)}'`);
+      if (there[0]) return { id: there[0].Id, amount: money(amount), found: true };
       const made = (await api(ctx.carrier.id, config, "POST", "/purchase", {
         PaymentType: ids.payType,
         AccountRef: { value: ids.pay },
@@ -310,11 +337,15 @@ export async function quickbooksRound(ctx: CarrierContext, links: IntegrationRow
   if (config.lastSync && now - Date.parse(config.lastSync) < 55 * 60_000) return [];
   try {
     const n = await syncQuickbooks(ctx, config, now);
-    const what = [n.invoices && `${n.invoices} invoice${n.invoices === 1 ? "" : "s"}`, n.payments && `${n.payments} payment${n.payments === 1 ? "" : "s"}`, n.costs && `${n.costs} cost${n.costs === 1 ? "" : "s"}`].filter(Boolean).join(", ");
+    const what = [n.invoices && `${n.invoices} invoice${n.invoices === 1 ? "" : "s"}`, n.payments && `${n.payments} payment${n.payments === 1 ? "" : "s"}`, n.costs && `${n.costs} cost${n.costs === 1 ? "" : "s"}`, n.updated && `${n.updated} invoice${n.updated === 1 ? "" : "s"} brought up to date`].filter(Boolean).join(", ");
     await setStatus(ctx.carrier.id, "quickbooks", `Connected${config.companyName ? ` to ${config.companyName}` : ""} · ${what ? `last put in ${what}` : "up to date"}`);
     return what ? [`QuickBooks: ${what}`] : [];
   } catch (e) {
-    await setStatus(ctx.carrier.id, "quickbooks", `Not working: ${e instanceof Error ? e.message : "error"}`);
+    const reason = e instanceof Error ? e.message : "error";
+    await setStatus(ctx.carrier.id, "quickbooks", `Not working: ${reason}`);
+    // Intuit let go of the sign-in (100 days unused, or revoked in QuickBooks): the owner hears once, with what to do.
+    if (/Connect it again/.test(reason) && (await claimMark(ctx.carrier.id, "quickbooks", `reconnect:${config.connectedAt}`)))
+      await passToOwner(ctx, { reason: "QuickBooks needs to be connected again: Intuit ended Backroute's sign-in. Settings → General → Connect QuickBooks. Nothing is lost; what's waiting goes in once it's back.", label: "Got it", source: "app", to: "owner" }).catch(() => 0);
     return [];
   }
 }

@@ -58,8 +58,13 @@ function local(iso: string, state: string) {
 
 function closedAt(h: FacilityHours, when: { time: string; weekday: string }): string | null {
   if (h.days?.length && !h.days.includes(when.weekday)) return `closed on ${when.weekday}s (open ${h.days.join("/")})`;
-  if (h.opens && when.time < h.opens) return `opens at ${h.opens}`;
-  if (h.closes && when.time >= h.closes) return `closes at ${h.closes}`;
+  // That day's own hours when it keeps different ones.
+  const day = h.byDay?.[when.weekday];
+  const opens = day?.opens ?? h.opens;
+  const closes = day?.closes ?? h.closes;
+  const on = day ? ` on ${when.weekday}s` : "";
+  if (opens && when.time < opens) return `opens at ${opens}${on}`;
+  if (closes && when.time >= closes) return `closes at ${closes}${on}`;
   return null;
 }
 

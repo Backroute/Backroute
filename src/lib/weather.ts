@@ -1,4 +1,5 @@
 import "server-only";
+import { cached } from "./agent/lookup-cache";
 
 /**
  * Weather that matters to a truck: active warnings and advisories at a point, like winter storms, ice, high wind, dense
@@ -16,20 +17,15 @@ const MATTERS = /winter|ice|freez|blizzard|snow|wind|dust|fog|flood|tornado|hurr
 
 export const weatherOn = () => process.env.WEATHER_ALERTS !== "off";
 
-// Warnings change slowly: the same few miles asked again within 15 minutes (every truck, every round) is answered from here.
-const recent = new Map<string, { at: number; alerts: WeatherAlert[] }>();
-
+// Warnings change slowly: the same few miles asked again within 15 minutes (every truck, every round, on any server)
+// is answered from the cache (lib/agent/lookup-cache).
 export async function alertsAt(lat: number, lon: number): Promise<WeatherAlert[]> {
   if (!weatherOn()) return [];
-  const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
-  const hit = recent.get(key);
-  if (hit && Date.now() - hit.at < 15 * 60_000) return hit.alerts;
-  const [us, ca] = await Promise.all([usAlerts(lat, lon), maybeCanada(lat, lon) ? canadaAlerts(lat, lon) : Promise.resolve([])]);
-  const seen = new Set<string>();
-  const alerts = [...us, ...ca].filter((a) => (seen.has(a.event) ? false : (seen.add(a.event), true))).slice(0, 3);
-  if (recent.size > 5000) recent.clear();
-  recent.set(key, { at: Date.now(), alerts });
-  return alerts;
+  return cached(`weather:${lat.toFixed(2)},${lon.toFixed(2)}`, 15 * 60_000, async () => {
+    const [us, ca] = await Promise.all([usAlerts(lat, lon), maybeCanada(lat, lon) ? canadaAlerts(lat, lon) : Promise.resolve([])]);
+    const seen = new Set<string>();
+    return [...us, ...ca].filter((a) => (seen.has(a.event) ? false : (seen.add(a.event), true))).slice(0, 3);
+  });
 }
 
 async function usAlerts(lat: number, lon: number): Promise<WeatherAlert[]> {

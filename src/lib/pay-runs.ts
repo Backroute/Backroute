@@ -57,7 +57,8 @@ export function buildPayRun(input: {
       pay: computeDriverPay(l, driver, !!truck?.secondDriverId),
     }));
   const extras = input.expenses
-    .filter((e) => e.driverId === driver.id && e.status === "approved" && (e.respondedAt ?? e.createdAt).slice(0, 10) <= end && (e.respondedAt ?? e.createdAt).slice(0, 10) >= period)
+    // Paid by the company up front (a lumper code, a reserved parking spot): nothing came out of the driver's pocket.
+    .filter((e) => e.driverId === driver.id && e.status === "approved" && !e.upfront && (e.respondedAt ?? e.createdAt).slice(0, 10) <= end && (e.respondedAt ?? e.createdAt).slice(0, 10) >= period)
     .map((e) => ({ label: `${e.category[0].toUpperCase()}${e.category.slice(1)} reimbursed${e.note ? `: ${e.note}` : ""}`, amount: e.amount }));
   const gross = round(lines.reduce((s, x) => s + x.pay, 0) + extras.reduce((s, x) => s + x.amount, 0));
 

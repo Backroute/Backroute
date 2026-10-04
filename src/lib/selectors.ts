@@ -70,3 +70,17 @@ export function truckActiveLoads(loads: Load[], truck: Truck | undefined): { cur
   );
   return { current: inProgress, next: undefined };
 }
+
+/**
+ * Everything booked on the truck after its current load, in order: the next one first, then the rest by pickup time
+ * (the AI books up to three ahead, lib/agent/chain). A booked load whose pickup is more than a day gone is left out.
+ */
+export function truckLineup(loads: Load[], truck: Truck | undefined, now = Date.now()): Load[] {
+  if (!truck) return [];
+  const waiting = loads.filter(
+    (l) => l.truckId === truck.id && l.id !== truck.currentLoadId && (l.stage === "booked" || l.stage === "rate_confirmed") && !(l.pickupAt && Date.parse(l.pickupAt) < now - 86400_000),
+  );
+  const next = waiting.find((l) => l.id === truck.nextLoadId);
+  const at = (l: Load) => Date.parse(l.pickupAt ?? "") || Number.MAX_SAFE_INTEGER;
+  return [...(next ? [next] : []), ...waiting.filter((l) => l !== next).sort((a, b) => at(a) - at(b))];
+}
