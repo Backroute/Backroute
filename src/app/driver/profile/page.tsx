@@ -20,6 +20,7 @@ import { HOME_TIME_OPTIONS, RUN_TYPE_DETAIL, RUN_TYPE_LABEL, RUN_TYPES } from "@
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { HosStatus, TimeOffRequest } from "@/lib/types";
 import { LargeTitle } from "@/components/ui/large-title";
+import { Lane } from "@/components/ui/lane";
 
 const TIME_OFF_TONE: Record<TimeOffRequest["status"], "warning" | "success" | "danger"> = {
   pending: "warning",
@@ -254,7 +255,7 @@ export default function DriverProfilePage() {
               {paidLoads.slice(0, 6).map((l) => (
                 <div key={l.id} className="flex items-center justify-between gap-2 py-2.5 first:pt-0 last:pb-0">
                   <div className="min-w-0">
-                    <p className="truncate text-sm text-ink-800">{l.lane.origin} → {l.lane.destination}</p>
+                    <p className="truncate text-sm text-ink-800"><Lane from={l.lane.origin} to={l.lane.destination} /></p>
                     <p className="text-xs text-ink-400">{formatDate(l.updatedAt)}</p>
                   </div>
                   <p className="shrink-0 text-sm font-semibold tabular text-ink-950">{formatCurrency(computeDriverPay(l, driver, isTeam))}</p>

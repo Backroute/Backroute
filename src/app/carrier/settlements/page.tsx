@@ -18,6 +18,7 @@ import { computeFactoringCommission } from "@/lib/commissions";
 import { downloadCsv } from "@/lib/csv-export";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { Driver, Expense, Load, Truck } from "@/lib/types";
+import { Lane } from "@/components/ui/lane";
 
 const EXPENSE_CATEGORY_LABEL: Record<Expense["category"], string> = {
   lumper: "Lumper fee",
@@ -93,7 +94,12 @@ function ExpensesList({
               <div>
                 <p className="text-sm font-medium text-ink-950">{EXPENSE_CATEGORY_LABEL[e.category]} · {driver?.name ?? "Driver"}</p>
                 <p className="text-xs text-ink-400">
-                  {load ? `${load.lane.origin} → ${load.lane.destination} · ` : ""}
+                  {load && (
+                    <>
+                      <Lane from={load.lane.origin} to={load.lane.destination} />
+                      {" · "}
+                    </>
+                  )}
                   {e.note || "No note"}
                 </p>
               </div>
@@ -178,7 +184,7 @@ function PaymentsList({ loads, now }: { loads: Load[]; now: number | null }) {
           <details key={load.id} className="group rounded-2xl border border-line bg-white p-4">
             <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-ink-950">{load.lane.origin} → {load.lane.destination}</p>
+                <p className="text-sm font-medium text-ink-950"><Lane from={load.lane.origin} to={load.lane.destination} /></p>
                 <p className="text-xs text-ink-400">
                   {load.referenceNumber} · {broker?.company ?? "Broker"} · {p.method === "factoring" ? "Factoring" : "Direct invoice"}
                   {p.fee ? ` · ${formatCurrency(p.fee)} fee` : ""}
@@ -285,7 +291,7 @@ function DriverPayList({ loads, drivers, trucks }: { loads: Load[]; drivers: Map
               <Avatar name={driver.name} size="sm" />
               <div>
                 <p className="text-sm font-medium text-ink-950">{driver.name}</p>
-                <p className="text-xs text-ink-400">{load.lane.origin} → {load.lane.destination} · {load.referenceNumber}</p>
+                <p className="text-xs text-ink-400"><Lane from={load.lane.origin} to={load.lane.destination} /> · {load.referenceNumber}</p>
               </div>
             </div>
             <div className="text-right">

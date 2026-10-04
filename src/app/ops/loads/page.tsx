@@ -11,6 +11,7 @@ import { LOAD_STAGE_ORDER, LOAD_STAGE_LABEL } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useBrokerMap } from "@/lib/selectors";
 import { formatCurrency } from "@/lib/utils";
+import { Lane } from "@/components/ui/lane";
 
 export default function OpsLoadsPage() {
   const loads = useStore((s) => s.loads);
@@ -53,7 +54,7 @@ export default function OpsLoadsPage() {
             <Link key={load.id} href={`/ops/loads/${load.id}`} className="block rounded-2xl border border-line bg-white p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-medium text-ink-950">{load.lane.origin} <span className="text-ink-300">→</span> {load.lane.destination}</p>
+                  <p className="font-medium text-ink-950"><Lane from={load.lane.origin} to={load.lane.destination} /></p>
                   <p className="text-xs text-ink-400">{load.referenceNumber} · {brokers.get(load.brokerId)?.company ?? "—"}</p>
                 </div>
                 <LoadScoreBadge score={load.score} size="sm" />
@@ -91,7 +92,7 @@ export default function OpsLoadsPage() {
                 <tr key={load.id} className="border-b border-line last:border-0 hover:bg-ink-50/60">
                   <td className="px-5 py-3.5">
                     <Link href={`/ops/loads/${load.id}`} className="block">
-                      <p className="font-medium text-ink-950">{load.lane.origin} <span className="text-ink-300">→</span> {load.lane.destination}</p>
+                      <p className="font-medium text-ink-950"><Lane from={load.lane.origin} to={load.lane.destination} /></p>
                       <p className="text-xs text-ink-400">{load.referenceNumber}</p>
                     </Link>
                   </td>

@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { LoadScoreBadge } from "./load-score";
 import { BrokerTrustBadge } from "./broker-trust-badge";
 import { TimeAgo } from "./time-ago";
+import { Lane } from "@/components/ui/lane";
 
 type AskState = "idle" | "composing" | "pending" | "replied";
 
@@ -82,74 +83,137 @@ export function LoadOfferCard({
   const reason = load.homeTonight && !load.lane.moveKind ? "Home tonight" : load.homeTimeFit ? "Heads toward home" : highlight;
   const askLabel = real ? (load.listedRate > 0 ? `Backroute asks ${formatCurrency(load.targetRate)} (posted ${formatCurrency(load.listedRate)})` : `Backroute asks ${formatCurrency(load.targetRate)}`) : null;
 
-  const [pickupDay, ...pickupRest] = load.pickupWindow.split(", ");
-  const [deliveryDay, ...deliveryRest] = load.deliveryWindow.split(", ");
-  const cap = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
+  const when = (w: string) => {
+    const [day, ...rest] = w.split(", ");
+    return { day: day.charAt(0).toUpperCase() + day.slice(1), time: rest.join(", ") };
+  };
+  const pickup = when(load.pickupWindow);
+  const delivery = when(load.deliveryWindow);
+
+  // What the rate turns into for the owner: what they keep, and where the rest goes.
+  const costs = [
+    { label: "Fuel", amount: load.fuelCost },
+    { label: "Tolls", amount: load.tollCost },
+    { label: "Empty miles", amount: load.deadheadCost },
+    { label: "Fee", amount: load.commission },
+  ].filter((c) => c.amount > 0);
+  const keep = Math.max(0, load.netProfit ?? 0);
+  const keepShare = load.targetRate > 0 ? Math.min(100, Math.round((keep / load.targetRate) * 100)) : 0;
 
   return (
     <article
       className={cn(
-        "flex h-full flex-col gap-4 rounded-3xl border bg-white p-5 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_-18px_rgb(0_0_0/0.18)]",
-        load.recommended ? "border-ink-950" : "border-line",
+        "group relative flex h-full flex-col rounded-[28px] border bg-white p-6 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_16px_40px_-24px_rgb(0_0_0/0.22)] transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgb(0_0_0/0.04),0_28px_56px_-28px_rgb(0_0_0/0.3)]",
+        load.recommended ? "border-ink-950 ring-1 ring-ink-950" : "border-line",
       )}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          {load.recommended && <span className="mb-2 inline-flex rounded-full bg-ink-950 px-2.5 py-0.5 text-xs font-semibold text-white">Best fit</span>}
-          <h3 className="text-xl font-semibold leading-tight tracking-[-0.02em] text-ink-950">
-            {load.lane.origin} <span className="font-normal text-ink-300">→</span> {load.lane.destination}
-          </h3>
-          <p className="mt-1 truncate text-sm text-ink-500">
-            {broker?.company ?? "Broker"} · {load.equipmentType}
+      {load.recommended && (
+        <span className="absolute -top-3 left-6 rounded-full bg-ink-950 px-3 py-1 text-xs font-semibold text-white">Best fit</span>
+      )}
+      <header className="flex items-start justify-between gap-4">
+        <div className="min-w-0 pt-1">
+          <p className="truncate text-[15px] font-semibold text-ink-950">{broker?.company ?? "Broker"}</p>
+          <p className="mt-0.5 truncate text-sm text-ink-500">
+            {load.equipmentType}
+            {load.weight ? ` · ${Math.round(load.weight / 1000)}k lb` : ""}
+            {load.lane.moveKind ? ` · ${MOVE_LABEL[load.lane.moveKind]}` : ""}
           </p>
         </div>
         <LoadScoreBadge score={load.score} size="xl" />
-      </div>
+      </header>
 
-      {/* The run itself: where it starts and ends, when, and how far. */}
-      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2.5 gap-y-1">
-        <span className="h-2.5 w-2.5 rounded-full bg-ink-950" />
-        <span className="relative flex h-px items-center bg-ink-200">
-          <span className="mx-auto bg-white px-2 text-xs font-medium tabular text-ink-500">{load.lane.miles} mi</span>
-        </span>
-        <span className="h-2.5 w-2.5 rounded-full border-2 border-ink-950 bg-white" />
-        <div className="col-span-3 mt-1 flex justify-between gap-4 text-sm">
+      {/* The run, top to bottom like a trip in Maps: where it starts, how far, where it ends, and when. */}
+      <h3 className="sr-only">
+        <Lane from={load.lane.origin} to={load.lane.destination} />
+      </h3>
+      <ol className="mt-5 grid grid-cols-[1.25rem_1fr_auto] gap-x-3">
+        <li className="contents">
+          <span className="flex flex-col items-center pt-[7px]">
+            <span className="h-3 w-3 shrink-0 rounded-full bg-ink-950" />
+            <span className="mt-[7px] w-0.5 flex-1 rounded-t-full bg-ink-200" />
+          </span>
           <div className="min-w-0">
-            <p className="font-medium text-ink-950">{cap(pickupDay)}</p>
-            <p className="truncate text-xs text-ink-500">Pickup{pickupRest.length ? ` · ${pickupRest.join(", ")}` : ""}</p>
+            <p className="truncate text-[22px] font-semibold leading-tight tracking-[-0.02em] text-ink-950">
+              {load.lane.origin}, <span className="text-ink-400">{load.lane.originState}</span>
+            </p>
+            <p className="text-sm text-ink-500">Pickup</p>
           </div>
-          <div className="min-w-0 text-right">
-            <p className="font-medium text-ink-950">{cap(deliveryDay)}</p>
-            <p className="truncate text-xs text-ink-500">Delivery{deliveryRest.length ? ` · ${deliveryRest.join(", ")}` : ""}</p>
+          <div className="text-right">
+            <p className="pt-1 text-[15px] font-semibold text-ink-950">{pickup.day}</p>
+            <p className="text-sm tabular text-ink-500">{pickup.time}</p>
           </div>
-        </div>
-      </div>
-
-      <div className="flex items-end justify-between gap-3 rounded-2xl bg-ink-50 px-4 py-3.5">
-        <div>
-          <p className="text-[34px] font-semibold leading-none tracking-[-0.04em] tabular text-ink-950">
-            {formatCurrency(owner ? (load.netProfit ?? 0) : load.targetRate)}
+        </li>
+        <li className="contents">
+          <span className="flex justify-center">
+            <span className="w-0.5 bg-ink-200" />
+          </span>
+          <p className="col-span-2 py-3 text-sm font-medium tabular text-ink-500">
+            {load.lane.miles.toLocaleString()} mi
+            {load.deadheadMiles > 0 ? <span className="font-normal text-ink-400"> · {load.deadheadMiles} empty to pickup</span> : null}
           </p>
-          <p className="mt-1.5 text-xs text-ink-500">{owner ? "You keep, after fuel and costs" : load.lane.moveKind ? `Flat per move · ${MOVE_LABEL[load.lane.moveKind]}` : "Load pays"}</p>
+        </li>
+        <li className="contents">
+          <span className="flex justify-center pt-[7px]">
+            <span className="h-3 w-3 rounded-full border-[3px] border-ink-950 bg-white" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-[22px] font-semibold leading-tight tracking-[-0.02em] text-ink-950">
+              {load.lane.destination}, <span className="text-ink-400">{load.lane.destState}</span>
+            </p>
+            <p className="text-sm text-ink-500">Delivery</p>
+          </div>
+          <div className="text-right">
+            <p className="pt-1 text-[15px] font-semibold text-ink-950">{delivery.day}</p>
+            <p className="text-sm tabular text-ink-500">{delivery.time}</p>
+          </div>
+        </li>
+      </ol>
+
+      <div className="mt-5 rounded-[20px] bg-ink-100 p-4">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="text-sm text-ink-500">{owner ? "You keep" : load.lane.moveKind ? "Flat per move" : "Load pays"}</p>
+            <p className="mt-1 text-[40px] font-semibold leading-none tracking-[-0.045em] tabular text-ink-950">
+              {formatCurrency(owner ? (load.netProfit ?? 0) : load.targetRate)}
+            </p>
+          </div>
+          <div className="pb-0.5 text-right">
+            <p className="text-[15px] font-semibold tabular text-ink-950">
+              ${(load.rpm ?? 0).toFixed(2)}
+              <span className="font-normal text-ink-500">/mi</span>
+            </p>
+            {owner && <p className="text-sm tabular text-ink-500">of {formatCurrency(load.targetRate)}</p>}
+          </div>
         </div>
-        <div className="text-right text-sm">
-          <p className="font-semibold tabular text-ink-950">${(load.rpm ?? 0).toFixed(2)}<span className="font-normal text-ink-500">/mi</span></p>
-          {owner && <p className="mt-0.5 tabular text-ink-500">of {formatCurrency(load.targetRate)}</p>}
-        </div>
+        {owner && load.targetRate > 0 && (
+          <>
+            <div className="mt-4 flex h-2 overflow-hidden rounded-full bg-ink-300" role="img" aria-label={`You keep ${keepShare}% of the rate`}>
+              <span className="h-full rounded-full bg-ink-950" style={{ width: `${keepShare}%` }} />
+            </div>
+            <p className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-xs tabular text-ink-500">
+              <span className="font-medium text-ink-950">{keepShare}% yours</span>
+              {costs.map((c) => (
+                <span key={c.label}>
+                  {c.label} {formatCurrency(c.amount)}
+                </span>
+              ))}
+            </p>
+          </>
+        )}
       </div>
 
-      <p className="flex items-center gap-2 text-sm font-medium text-ink-700">
-        {reason === highlight ? <Sparkles className="h-4 w-4 shrink-0 text-ink-400" /> : <Home className="h-4 w-4 shrink-0 text-ink-400" />}
+      <p className="mt-4 inline-flex items-center gap-2 self-start rounded-full bg-ink-100 px-3 py-1.5 text-sm font-medium text-ink-800">
+        {reason === highlight ? <Sparkles className="h-4 w-4 shrink-0 text-ink-500" /> : <Home className="h-4 w-4 shrink-0 text-ink-500" />}
         {reason}
       </p>
       {askLabel && (
-        <p className="-mt-2 text-xs text-ink-500">
+        <p className="mt-2 text-xs text-ink-500">
           {askLabel} · {load.source}
         </p>
       )}
 
       {open && (
-        <div className="flex flex-col gap-1.5 border-t border-line pt-3 text-sm text-ink-600">
+        <div className="mt-4 flex flex-col gap-1.5 border-t border-line pt-3 text-sm text-ink-600">
           {owner && broker && (
             <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <BrokerTrustBadge broker={broker} />
@@ -188,7 +252,7 @@ export function LoadOfferCard({
       )}
 
       {onAsk && onAskResolve && askState !== "idle" && (
-        <div className="rounded-xl bg-ink-50 p-2.5">
+        <div className="mt-4 rounded-xl bg-ink-50 p-2.5">
           {askState === "composing" ? (
             <div className="flex items-center gap-1.5">
               <input
@@ -222,7 +286,7 @@ export function LoadOfferCard({
         </div>
       )}
 
-      <div className="mt-auto flex flex-col gap-3 pt-1">
+      <div className="mt-auto flex flex-col gap-3 pt-5">
       <Button
         size="lg"
         className="w-full"

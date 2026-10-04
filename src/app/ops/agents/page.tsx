@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { CallTranscript } from "@/components/shared/call-transcript";
 import { useStore } from "@/lib/store";
 import { useCarrierLoads, useBrokerMap } from "@/lib/selectors";
+import { Lane } from "@/components/ui/lane";
 
 export default function AgentsPage() {
   const metrics = useStore((s) => s.liveMetrics);
@@ -64,7 +65,7 @@ export default function AgentsPage() {
                   {recentCalls.map(({ call, load }) => (
                     <div key={call.id}>
                       <p className="mb-2 text-xs text-ink-500">
-                        {load.lane.origin} → {load.lane.destination} · {brokers.get(load.brokerId)?.company}
+                        <Lane from={load.lane.origin} to={load.lane.destination} /> · {brokers.get(load.brokerId)?.company}
                       </p>
                       <CallTranscript call={call} defaultCollapsed brokerName={brokers.get(load.brokerId)?.company} />
                     </div>

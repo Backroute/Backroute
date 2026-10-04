@@ -27,6 +27,7 @@ import {
   waitingOn,
   type DriverTripCardProps,
 } from "./driver-trip-card";
+import { Lane } from "@/components/ui/lane";
 
 /** The small, always-current trip card — Uber's collapsed sheet: where, when, how far along, and the one next
  *  step (with its button when it's the driver's to take). Tap it for everything else. */
@@ -53,7 +54,7 @@ export function TripCompactCard({
   });
   const phase = s.card === "booking" ? "Booking" : s.card === "pickup" ? "Pickup" : "Delivery";
   const kicker = load.lane.moveKind ? `Move ${movesToday + 1} today · ${MOVE_LABEL[load.lane.moveKind]}` : phase;
-  const place = s.card === "booking" ? `${load.lane.origin} → ${load.lane.destination}` : s.card === "pickup" ? origin : destination;
+  const place = s.card === "booking" ? <Lane from={load.lane.origin} to={load.lane.destination} /> : s.card === "pickup" ? origin : destination;
   const status =
     s.card === "booking" ? "Booking" : s.arrived ? (s.card === "pickup" ? "At the shipper" : "At the receiver") : s.card === "pickup" ? "Heading to pickup" : "Heading to delivery";
   const mapFrom: LatLng | undefined = s.card === "pickup" ? pickupLegStart(load, props.truckCity, props.truckState) : originPt;

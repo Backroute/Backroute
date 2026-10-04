@@ -23,6 +23,7 @@ import { ParkingReserve } from "@/components/driver/parking-reserve";
 import { nextStop, tripLoads } from "@/lib/trip-plan";
 import { formatNumber } from "@/lib/utils";
 import type { HosStatus } from "@/lib/types";
+import { Lane } from "@/components/ui/lane";
 
 /** A believable "GPS just pinged" freshness readout — deterministic per truck, ticks with the shared clock. */
 function pingSecondsAgo(id: string, now: number): number {
@@ -212,7 +213,7 @@ export default function FleetPage() {
                     )}
                   </div>
                   {currentLoad && (
-                    <p className="text-xs text-ink-400">{currentLoad.lane.origin} → {currentLoad.lane.destination}</p>
+                    <p className="text-xs text-ink-400"><Lane from={currentLoad.lane.origin} to={currentLoad.lane.destination} /></p>
                   )}
                   {(() => {
                     // Several partials on one run (lib/trip-plan): how far along, and the stop it's heading to.
@@ -228,7 +229,7 @@ export default function FleetPage() {
                   })()}
                   {nextLoad && (
                     <div className="mt-1 flex items-center gap-1.5 rounded-lg bg-info-soft px-2.5 py-1.5 text-xs text-[var(--accent-info)]">
-                      <Link2 className="h-3 w-3" /> Next: {nextLoad.lane.origin} → {nextLoad.lane.destination}
+                      <Link2 className="h-3 w-3" /> Next: <Lane from={nextLoad.lane.origin} to={nextLoad.lane.destination} />
                     </div>
                   )}
                   {signedIn && driver && currentLoad && (
@@ -238,7 +239,7 @@ export default function FleetPage() {
                   )}
                   {lineup.filter((l) => l.id !== nextLoad?.id).map((l) => (
                     <p key={l.id} className="text-xs text-ink-500">
-                      Then: {l.lane.origin} → {l.lane.destination} <span className="text-ink-400">· {l.pickupWindow}</span>
+                      Then: <Lane from={l.lane.origin} to={l.lane.destination} /> <span className="text-ink-400">· {l.pickupWindow}</span>
                     </p>
                   ))}
                   {pendingOffers.length > 0 && (

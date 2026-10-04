@@ -32,6 +32,7 @@ import { useStore } from "@/lib/store";
 import { STAGE_CONFIRM } from "@/lib/stage-confirm";
 import { PRE_TRIP_STAGES } from "@/lib/trip-state";
 import { cn, formatCurrency } from "@/lib/utils";
+import { Lane } from "@/components/ui/lane";
 
 
 export default function DriverHomePage() {
@@ -257,7 +258,7 @@ export default function DriverHomePage() {
             <LoadScoreBadge score={nextLoad.score} size="sm" />
           </div>
           <p className="mt-2 font-medium text-ink-950">
-            {nextLoad.lane.origin} <span className="text-ink-300">→</span> {nextLoad.lane.destination}
+            <Lane from={nextLoad.lane.origin} to={nextLoad.lane.destination} />
           </p>
           <p className="mt-0.5 text-xs text-ink-500">
             {nextLoad.stage === "negotiating" || nextLoad.stage === "scoring" || nextLoad.stage === "sourced"
@@ -280,7 +281,7 @@ export default function DriverHomePage() {
                 .map((l) => (
                   <li key={l.id} className="flex items-center justify-between gap-2">
                     <span className="text-ink-500">
-                      Then <span className="font-medium text-ink-900">{l.lane.origin} → {l.lane.destination}</span>
+                      Then <span className="font-medium text-ink-900"><Lane from={l.lane.origin} to={l.lane.destination} /></span>
                     </span>
                     <span className="shrink-0 text-ink-500">{l.pickupWindow}</span>
                   </li>

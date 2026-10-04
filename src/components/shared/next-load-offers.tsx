@@ -56,10 +56,10 @@ export function NextLoadOffers({
                   truck={truck}
                   driver={driver}
                   trailing={<span className="ml-auto shrink-0 text-xs text-ink-400">{loads.length} option{loads.length === 1 ? "" : "s"}</span>}
-                  className="mb-2.5"
+                  className="mb-4"
                 />
               )}
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-x-4 gap-y-6 pt-3 md:grid-cols-2 xl:grid-cols-3">
                 {loads.map((load) => (
                   <LoadOfferCard
                     key={load.id}

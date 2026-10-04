@@ -14,6 +14,7 @@ import { weekEarnings } from "@/lib/earnings";
 import { paymentStatus } from "@/lib/payments";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { Driver, Load, Truck } from "@/lib/types";
+import { Lane } from "@/components/ui/lane";
 
 /**
  * Owner-operator mode: one truck, and the owner drives it. There's no office to wait on, so the driver app is the
@@ -190,7 +191,7 @@ export function OwnerMoney({ truck }: { truck: Truck | undefined }) {
                   <Link href={`/driver/loads/${l.id}`} className="flex items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-ink-950">
-                        {l.lane.origin} → {l.lane.destination}
+                        <Lane from={l.lane.origin} to={l.lane.destination} />
                       </p>
                       <p className={cn("text-xs", p.state === "overdue" ? "text-[var(--accent-danger)]" : "text-ink-500")}>{p.headline}</p>
                     </div>

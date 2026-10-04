@@ -20,6 +20,7 @@ import type { Expense } from "@/lib/types";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { ViewTransition } from "react";
 import { BACK } from "@/lib/nav-direction";
+import { Lane } from "@/components/ui/lane";
 
 const EXPENSE_CATEGORIES: { key: Expense["category"]; label: string }[] = [
   { key: "lumper", label: "Lumper fee" },
@@ -123,9 +124,7 @@ export default function DriverLoadDetailPage() {
         </div>
         <p className="mt-3 text-lg font-semibold">{LOAD_STATUS_HEADLINE[load.stage] ?? LOAD_STAGE_LABEL[load.stage]}</p>
         <p className="mt-0.5 text-sm text-white/70">
-          {load.lane.origin}, {load.lane.originState}
-          <span className="mx-1 text-white/40">→</span>
-          {load.lane.destination}, {load.lane.destState}
+          <Lane from={`${load.lane.origin}, ${load.lane.originState}`} to={`${load.lane.destination}, ${load.lane.destState}`} />
         </p>
         <p className="mt-0.5 text-xs text-white/40">{load.referenceNumber} · {load.equipmentType} · {load.lane.miles} mi</p>
         {load.stage === "cancelled" && load.cancellationReason && (

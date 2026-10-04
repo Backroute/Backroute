@@ -6,6 +6,7 @@ import { laneKey } from "@/lib/agent/pricing";
 import { useStore } from "@/lib/store";
 import type { Load } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Lane } from "@/components/ui/lane";
 
 /**
  * "Teach the AI" on a load: one tap turns what the owner thinks about it into a rule the AI follows from now on:
@@ -60,7 +61,15 @@ export function TeachAi({ load, className }: { load: Load; className?: string })
           </button>
         )}
         <button type="button" className={chip} onClick={() => setOpen(open === "lane" ? null : "lane")}>
-          {current ? `${load.lane.originState} → ${load.lane.destState}: at least $${current.toFixed(2)}/mi` : `Lowest rate on ${load.lane.originState} → ${load.lane.destState}`}
+          {current ? (
+            <>
+              <Lane from={load.lane.originState} to={load.lane.destState} />: at least ${current.toFixed(2)}/mi
+            </>
+          ) : (
+            <>
+              Lowest rate on <Lane from={load.lane.originState} to={load.lane.destState} />
+            </>
+          )}
         </button>
         {driver && (
           <button

@@ -19,6 +19,7 @@ import { BrokerCallRow } from "./broker-call";
 import type { DriverDocType } from "@/lib/store";
 import type { Load, LoadDocument } from "@/lib/types";
 import { autoCrop } from "@/lib/doc-scan";
+import { Lane } from "@/components/ui/lane";
 
 /** `file` goes to the server in a real account; the demo only keeps the name and a preview. */
 export type UploadedFile = { name: string; previewUrl?: string; file?: File };
@@ -82,7 +83,7 @@ function BookingCard({ load, brokerName, viewer = "driver", onCall, onCounter }:
           <Loader2 className="h-3.5 w-3.5 animate-spin text-white/70" /> AI is booking
         </MapHeader>
       )}
-      <CardHeading kicker="Booking" reference={load.referenceNumber} title={`${load.lane.origin} → ${load.lane.destination}`} sub={`Pickup ${load.pickupWindow} · ${load.lane.miles} mi`} />
+      <CardHeading kicker="Booking" reference={load.referenceNumber} title={<Lane from={load.lane.origin} to={load.lane.destination} />} sub={`Pickup ${load.pickupWindow} · ${load.lane.miles} mi`} />
       <CompletionBar value={s.done} caption="Backroute is on it" />
 
       <ol className="mt-5">
@@ -507,7 +508,7 @@ function MapHeader({
   );
 }
 
-function CardHeading({ kicker, reference, title, sub, aside }: { kicker: string; reference: string; title: string; sub: string; aside?: string }) {
+function CardHeading({ kicker, reference, title, sub, aside }: { kicker: string; reference: string; title: React.ReactNode; sub: string; aside?: string }) {
   return (
     <div>
       <div className="flex items-center justify-between gap-3">

@@ -10,6 +10,7 @@ import { makeRecognizer, say, type Recognizer } from "@/lib/speech";
 import { useDriverUi } from "@/lib/lang/use-driver-ui";
 import type { DriveCommand, UiText } from "@/lib/lang/ui";
 import type { Lang, Load } from "@/lib/types";
+import { Lane } from "@/components/ui/lane";
 
 /** Commands in the driver's language, checked in this order so "unloaded" wins over "loaded". English also keeps
  *  its looser patterns ("I'm loaded up", "at the dock"). */
@@ -140,7 +141,7 @@ export function DrivingMode({
 
       <div className="mt-8">
         <p className="text-sm text-white/50">{s.card === "pickup" ? t.pickup : s.card === "delivery" ? t.delivery : t.nextLoad}</p>
-        <p className="mt-1 text-4xl font-semibold leading-tight tracking-tight">{s.card === "booking" ? `${load.lane.origin} → ${load.lane.destination}` : place}</p>
+        <p className="mt-1 text-4xl font-semibold leading-tight tracking-tight">{s.card === "booking" ? <Lane from={load.lane.origin} to={load.lane.destination} /> : place}</p>
         {s.card !== "booking" && <p className="mt-2 text-2xl font-semibold tabular text-white/80">{s.drive}</p>}
       </div>
 

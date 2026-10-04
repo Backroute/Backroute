@@ -37,6 +37,7 @@ import { BookingCard } from "@/components/cloud/booking-card";
 import type { Driver, LoadStage, Truck } from "@/lib/types";
 import { ViewTransition } from "react";
 import { BACK } from "@/lib/nav-direction";
+import { Lane } from "@/components/ui/lane";
 
 /** Cancellable once rate is locked in; once in transit the freight is already moving, so that's a
  *  claim situation, not a cancellation. Dispatched/at_pickup carry a TONU fee since the truck already committed. */
@@ -103,7 +104,7 @@ export default function LoadDetailPage() {
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="font-display text-2xl text-ink-950">
-              {load.lane.origin}, {load.lane.originState} <span className="text-ink-300">→</span> {load.lane.destination}, {load.lane.destState}
+              <Lane from={`${load.lane.origin}, ${load.lane.originState}`} to={`${load.lane.destination}, ${load.lane.destState}`} />
             </h1>
             <p className="mt-1 text-sm text-ink-500">
               {load.referenceNumber} · {load.equipmentType} · {load.weight.toLocaleString()} lbs · Sourced from {load.source}

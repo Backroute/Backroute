@@ -36,6 +36,16 @@ Geist for everything; Geist Mono only for small labels (`t-label`), load IDs and
 
 Nothing smaller than 12px anywhere. Big text gets lighter and tighter, not bolder.
 
+A lane on screen is `<Lane from to />` (`components/ui/lane.tsx`): an arrow icon as heavy as the text, never the thin
+"→" character. Plain strings (CSV, texts, emails) keep the character.
+
+## Load cards
+
+`components/shared/load-offer-card.tsx`, the same card for owners and drivers: broker and the fit ring on top; the
+trip as a line from a dot to a ring with the cities big, pickup and delivery times on the right and the miles between;
+then the money (the owner sees what they keep and a bar of where the rest goes; a driver sees what the load pays); one
+reason; one blue button. "Best fit" sits on the card's top edge so the cards in a row line up.
+
 ## Notifications
 
 - One number in the whole owner dashboard: what needs the owner, on the Home tab. The bell is a quiet history.

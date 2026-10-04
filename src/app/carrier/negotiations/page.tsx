@@ -19,6 +19,7 @@ import { TimeAgo } from "@/components/shared/time-ago";
 import { useCarrierLoads, useBrokerMap, useTruckMap, useDriverMap } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { formatCurrency } from "@/lib/utils";
+import { Lane } from "@/components/ui/lane";
 
 const DECLINE_REASONS = ["Broker won't move on rate", "Better option found elsewhere", "Lane no longer needed", "Other"];
 
@@ -89,7 +90,7 @@ export default function NegotiationsPage() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="font-medium text-ink-950">{load.lane.origin} <span className="text-ink-300">→</span> {load.lane.destination}</p>
+                        <p className="font-medium text-ink-950"><Lane from={load.lane.origin} to={load.lane.destination} /></p>
                         <LoadScoreBadge score={load.score} size="sm" />
                       </div>
                       <p className="text-xs text-ink-500">{broker?.company} · {broker?.contact}</p>

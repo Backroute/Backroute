@@ -19,6 +19,7 @@ import { useStore } from "@/lib/store";
 import { STAGE_CONFIRM } from "@/lib/stage-confirm";
 import { aiDispatcherNote, isTransitStage } from "@/lib/load-status";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { Lane } from "@/components/ui/lane";
 
 /** Which document a stage is still waiting on — same source of truth the driver's confirm button
  *  reads from, so this card's pending rows can never disagree with what actually triggers capture. */
@@ -76,7 +77,7 @@ export default function OpsLoadDetailPage() {
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="font-display text-2xl text-ink-950">
-              {load.lane.origin}, {load.lane.originState} <span className="text-ink-300">→</span> {load.lane.destination}, {load.lane.destState}
+              <Lane from={`${load.lane.origin}, ${load.lane.originState}`} to={`${load.lane.destination}, ${load.lane.destState}`} />
             </h1>
             <p className="mt-1 text-sm text-ink-500">
               {carrier.name} · {load.referenceNumber} · {load.equipmentType} · Sourced from {load.source}

@@ -13,6 +13,7 @@ import { assignUnit, importStatement, type ImportSummary } from "@/lib/back-offi
 import { costsByLoad, gallonsByState } from "@/lib/fuel-import";
 import { iftaReturnDue } from "@/lib/expiry";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { Lane } from "@/components/ui/lane";
 
 /** The quarter a date is in, as yyyy-mm-dd bounds. */
 function quarterOf(now: number): { from: string; to: string; label: string } {
@@ -154,7 +155,7 @@ export default function CostsPage() {
                     <li key={l.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
                       <Link href={`/carrier/loads/${l.id}`} className="min-w-0">
                         <p className="truncate text-sm font-medium text-ink-950">
-                          {l.lane.origin} → {l.lane.destination}
+                          <Lane from={l.lane.origin} to={l.lane.destination} />
                         </p>
                         <p className="text-xs text-ink-500">
                           {l.referenceNumber} · fuel {formatCurrency(c.fuel)} ({Math.round(c.gallons)} gal) · tolls {formatCurrency(c.tolls)}

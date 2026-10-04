@@ -9,6 +9,7 @@ import { useStore } from "@/lib/store";
 import { OwnerMoney } from "@/components/shared/owner-operator";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { LargeTitle } from "@/components/ui/large-title";
+import { Lane } from "@/components/ui/lane";
 
 
 export default function DriverEarningsPage() {
@@ -102,7 +103,7 @@ export default function DriverEarningsPage() {
                 <Link href={`/driver/loads/${l.id}`} className="flex items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-ink-950">
-                      {l.lane.origin} → {l.lane.destination}
+                      <Lane from={l.lane.origin} to={l.lane.destination} />
                     </p>
                     <p className="text-xs text-ink-500">
                       {formatDate(l.createdAt)} · {l.lane.miles} mi · {formatCurrency(l.bookedRate ?? 0)} load

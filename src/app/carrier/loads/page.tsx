@@ -22,6 +22,7 @@ import { downloadCsv } from "@/lib/csv-export";
 import type { Broker, Load, LoadStage, Truck } from "@/lib/types";
 import { ViewTransition } from "react";
 import { FORWARD } from "@/lib/nav-direction";
+import { Lane } from "@/components/ui/lane";
 
 function exportLoads(loads: Load[], brokers: Map<string, Broker>, trucks: Map<string, Truck>) {
   downloadCsv(
@@ -144,7 +145,7 @@ export default function CarrierLoadsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-medium text-ink-950">
-                          {load.lane.origin}, {load.lane.originState} <span className="text-ink-300">→</span> {load.lane.destination}, {load.lane.destState}
+                          <Lane from={`${load.lane.origin}, ${load.lane.originState}`} to={`${load.lane.destination}, ${load.lane.destState}`} />
                           {load.stops && load.stops.length > 0 && <Badge tone="info" className="ml-1.5 align-middle">+{load.stops.length} stop{load.stops.length === 1 ? "" : "s"}</Badge>}
                         </p>
                         <p className="text-xs text-ink-400">{load.referenceNumber} · {broker?.company ?? "—"}</p>
@@ -200,7 +201,7 @@ export default function CarrierLoadsPage() {
                       <td className="px-5 py-3.5">
                         <Link href={`/carrier/loads/${load.id}`} transitionTypes={FORWARD} className="block">
                           <p className="font-medium text-ink-950">
-                            {load.lane.origin}, {load.lane.originState} <span className="text-ink-300">→</span> {load.lane.destination}, {load.lane.destState}
+                            <Lane from={`${load.lane.origin}, ${load.lane.originState}`} to={`${load.lane.destination}, ${load.lane.destState}`} />
                             {load.stops && load.stops.length > 0 && <Badge tone="info" className="ml-1.5 align-middle">+{load.stops.length} stop{load.stops.length === 1 ? "" : "s"}</Badge>}
                           </p>
                           <p className="text-xs text-ink-400">{load.referenceNumber} · {load.equipmentType} · {load.lane.miles} mi</p>

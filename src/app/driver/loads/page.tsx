@@ -9,6 +9,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { LargeTitle } from "@/components/ui/large-title";
 import { ViewTransition } from "react";
 import { FORWARD } from "@/lib/nav-direction";
+import { Lane } from "@/components/ui/lane";
 
 export default function DriverLoadsPage() {
   const driver = usePrimaryDriver();
@@ -64,7 +65,7 @@ export default function DriverLoadsPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-sm font-medium text-ink-950">
-                      {load.lane.origin} <span className="text-ink-300">→</span> {load.lane.destination}
+                      <Lane from={load.lane.origin} to={load.lane.destination} />
                     </p>
                     <p className="mt-0.5 text-xs text-ink-400">{load.referenceNumber} · {formatDate(load.updatedAt)}</p>
                   </div>

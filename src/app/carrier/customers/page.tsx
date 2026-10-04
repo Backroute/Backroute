@@ -15,6 +15,7 @@ import { dueBy, scheduleWords, WEEKDAYS } from "@/lib/contracts";
 import { estimateMiles } from "@/lib/fleet";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Broker, EquipmentType } from "@/lib/types";
+import { Lane } from "@/components/ui/lane";
 
 const input = "h-9 rounded-full border border-line bg-white px-3 text-sm outline-none focus:border-ink-400";
 
@@ -162,7 +163,7 @@ function ShipperCard({ shipper }: { shipper: Broker }) {
               <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-ink-950">
-                    {l.origin}, {l.originState} → {l.destination}, {l.destState}
+                    <Lane from={`${l.origin}, ${l.originState}`} to={`${l.destination}, ${l.destState}`} />
                   </p>
                   <p className="text-xs text-ink-500">
                     {scheduleWords(l)} · {l.equipmentType} · {formatCurrency(l.rate)} ({l.miles ? `$${(l.rate / l.miles).toFixed(2)}/mi` : "—"})
