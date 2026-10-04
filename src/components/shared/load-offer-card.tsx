@@ -119,16 +119,16 @@ export function LoadOfferCard({
   return (
     <article
       className={cn(
-        "group relative flex h-full w-full flex-col rounded-[28px] border bg-white p-6 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_16px_40px_-24px_rgb(0_0_0/0.22)] transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgb(0_0_0/0.04),0_28px_56px_-28px_rgb(0_0_0/0.3)]",
+        "group relative flex h-full w-full flex-col rounded-[24px] border bg-white p-4 min-[400px]:p-5 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_16px_40px_-24px_rgb(0_0_0/0.22)] transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgb(0_0_0/0.04),0_28px_56px_-28px_rgb(0_0_0/0.3)]",
         // The best one is the opposite colour of the page, so it's the first thing the eye lands on.
         load.recommended ? "theme-invert border-transparent shadow-[0_2px_4px_rgb(0_0_0/0.08),0_24px_48px_-20px_rgb(0_0_0/0.45)]" : "border-line",
       )}
     >
       {load.recommended && (
-        <span className="absolute -top-3 left-6 rounded-full bg-[var(--action)] px-3 py-1 text-xs font-semibold text-[var(--action-ink)] shadow-sm">Best fit</span>
+        <span className="absolute -top-3 left-5 rounded-full bg-[var(--action)] px-3 py-1 text-xs font-semibold text-[var(--action-ink)] shadow-sm">Best fit</span>
       )}
       <header className="flex items-start justify-between gap-4">
-        <div className="min-w-0 pt-1">
+        <div className="min-w-0 pt-0.5">
           <p className="truncate text-[15px] font-semibold text-ink-950">{broker?.company ?? "Broker"}</p>
           <p className="mt-0.5 truncate text-sm text-ink-500">
             {load.equipmentType}
@@ -136,84 +136,68 @@ export function LoadOfferCard({
             {load.lane.moveKind ? ` · ${MOVE_LABEL[load.lane.moveKind]}` : ""}
           </p>
         </div>
-        <LoadScoreBadge score={load.score} size="xl" />
+        <LoadScoreBadge score={load.score} size="xl" dim={56} />
       </header>
 
       {/* The run, top to bottom like a trip in Maps: where it starts, how far, where it ends, and when. */}
       <h3 className="sr-only">
         <Lane from={load.lane.origin} to={load.lane.destination} />
       </h3>
-      <ol className="mt-5 grid grid-cols-[1.25rem_1fr] gap-x-3">
+      <ol className="mt-4 grid grid-cols-[1rem_minmax(0,1fr)_auto] gap-x-3">
         <li className="contents">
           <span className="flex flex-col items-center pt-[7px]">
             <span className="h-3 w-3 shrink-0 rounded-full bg-ink-950" />
-            <span className="mt-[7px] w-0.5 flex-1 rounded-t-full bg-ink-200" />
+            <span className="mt-[6px] w-0.5 flex-1 rounded-t-full bg-ink-200" />
           </span>
-          <div className="min-w-0">
-            <p className="truncate text-[22px] font-semibold leading-tight tracking-[-0.02em] text-ink-950">
-              {load.lane.origin}, <span className="text-ink-400">{load.lane.originState}</span>
-            </p>
-            <StopDate stop="Pickup" when={dates?.pickup} raw={load.pickupWindow} />
-          </div>
+          <StopPlace city={load.lane.origin} state={load.lane.originState} stop="Pickup" when={dates?.pickup} />
+          <StopTime when={dates?.pickup} raw={load.pickupWindow} />
         </li>
         <li className="contents">
           <span className="flex justify-center">
             <span className="w-0.5 bg-ink-200" />
           </span>
-          <p className="py-3 text-sm font-medium tabular text-ink-500">
-            {load.lane.miles.toLocaleString()} mi loaded
-          </p>
+          <p className="col-span-2 py-1.5 text-[13px] font-medium tabular text-ink-500">{load.lane.miles.toLocaleString()} mi loaded</p>
         </li>
         <li className="contents">
           <span className="flex justify-center pt-[7px]">
             <span className="h-3 w-3 rounded-full border-[3px] border-ink-950 bg-white" />
           </span>
-          <div className="min-w-0">
-            <p className="truncate text-[22px] font-semibold leading-tight tracking-[-0.02em] text-ink-950">
-              {load.lane.destination}, <span className="text-ink-400">{load.lane.destState}</span>
-            </p>
-            <StopDate stop="Delivery" when={dates?.delivery} raw={load.deliveryWindow} />
-          </div>
+          <StopPlace city={load.lane.destination} state={load.lane.destState} stop="Delivery" when={dates?.delivery} />
+          <StopTime when={dates?.delivery} raw={load.deliveryWindow} />
         </li>
       </ol>
 
       {/* Three facts in the same place on every card, so a row of cards reads across (like the fields on a boarding pass). */}
-      <dl className="mt-5 grid grid-cols-3 divide-x divide-line border-y border-line py-3">
+      <dl className="mt-3.5 grid grid-cols-3 divide-x divide-line border-y border-line py-2.5">
         {facts.map((f) => (
           <div key={f.label} className="min-w-0 px-3 first:pl-0 last:pr-0">
             <dt className="truncate text-xs text-ink-500">{f.label}</dt>
-            <dd className="mt-0.5 truncate text-[17px] font-semibold tabular tracking-[-0.01em] text-ink-950">{f.value}</dd>
+            <dd className="truncate text-base font-semibold tabular tracking-[-0.01em] text-ink-950">{f.value}</dd>
           </div>
         ))}
       </dl>
 
-      <div className="mt-4 rounded-[20px] bg-ink-100 p-4">
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="text-sm text-ink-500">{load.lane.moveKind ? "Pays per move" : "Load pays"}</p>
-          <p className="text-sm font-semibold tabular text-ink-950">
-            ${(load.rpm ?? 0).toFixed(2)}
-            <span className="font-normal text-ink-500">/mi</span>
-          </p>
+      <div className="mt-3.5 flex items-end justify-between gap-3 rounded-2xl bg-ink-100 px-4 py-2.5">
+        <div>
+          <p className="text-[13px] text-ink-500">{load.lane.moveKind ? "Pays per move" : "Load pays"}</p>
+          <p className="text-[34px] font-semibold leading-none tracking-[-0.045em] tabular text-ink-950">{formatCurrency(load.targetRate)}</p>
         </div>
-        <p className="mt-1 text-[44px] font-semibold leading-none tracking-[-0.05em] tabular text-ink-950">{formatCurrency(load.targetRate)}</p>
-        {costs.length > 0 && (
-          <dl className="mt-4 flex flex-col gap-1.5 border-t border-line-strong pt-3 text-sm tabular">
-            {costs.map((c) => (
-              <div key={c.label} className="flex justify-between gap-3">
-                <dt className="text-ink-600">{c.label}</dt>
-                <dd className="text-ink-600">−{formatCurrency(c.amount)}</dd>
-              </div>
-            ))}
-            <div className="mt-1 flex items-baseline justify-between gap-3 border-t border-line-strong pt-2.5">
-              <dt className="font-semibold text-ink-950">{owner ? "You keep" : "Left after costs"}</dt>
-              <dd className="text-[17px] font-semibold text-ink-950">{formatCurrency(load.netProfit ?? 0)}</dd>
-            </div>
-          </dl>
-        )}
+        <div className="pb-0.5 text-right text-[13px] tabular text-ink-500">
+          <p>
+            <span className="font-semibold text-ink-950">${(load.rpm ?? 0).toFixed(2)}</span>/mi
+          </p>
+          {costs.length > 0 && (
+            <p>
+              {owner ? "You keep " : ""}
+              <span className="font-semibold text-ink-950">{formatCurrency(load.netProfit ?? 0)}</span>
+              {owner ? "" : " after costs"}
+            </p>
+          )}
+        </div>
       </div>
 
-      <p className="mt-4 inline-flex items-center gap-2 self-start rounded-full bg-ink-100 px-3 py-1.5 text-sm font-medium text-ink-800">
-        {reason === highlight ? <Sparkles className="h-4 w-4 shrink-0 text-ink-500" /> : <Home className="h-4 w-4 shrink-0 text-ink-500" />}
+      <p className="mt-2.5 inline-flex items-center gap-1.5 self-start rounded-full bg-ink-100 px-2.5 py-1 text-[13px] font-medium text-ink-800">
+        {reason === highlight ? <Sparkles className="h-3.5 w-3.5 shrink-0 text-ink-500" /> : <Home className="h-3.5 w-3.5 shrink-0 text-ink-500" />}
         {reason}
       </p>
       {askLabel && (
@@ -224,6 +208,22 @@ export function LoadOfferCard({
 
       {open && (
         <div className="mt-4 flex flex-col gap-1.5 border-t border-line pt-3 text-sm text-ink-600">
+          <dl className="mb-1.5 flex flex-col gap-1 tabular">
+            <div className="flex justify-between gap-3 font-medium text-ink-950">
+              <dt>Load pays</dt>
+              <dd>{formatCurrency(load.targetRate)}</dd>
+            </div>
+            {costs.map((c) => (
+              <div key={c.label} className="flex justify-between gap-3">
+                <dt>{c.label}</dt>
+                <dd>−{formatCurrency(c.amount)}</dd>
+              </div>
+            ))}
+            <div className="flex justify-between gap-3 border-t border-line pt-1 font-semibold text-ink-950">
+              <dt>{owner ? "You keep" : "Left after costs"}</dt>
+              <dd>{formatCurrency(load.netProfit ?? 0)}</dd>
+            </div>
+          </dl>
           {owner && broker && (
             <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <BrokerTrustBadge broker={broker} />
@@ -289,7 +289,7 @@ export function LoadOfferCard({
         </div>
       )}
 
-      <div className="mt-auto flex flex-col gap-3 pt-5">
+      <div className="mt-auto flex flex-col gap-2 pt-3.5">
       <Button
         size="lg"
         className="w-full"
@@ -316,15 +316,27 @@ export function LoadOfferCard({
   );
 }
 
-/** "Pickup · Sun, Oct 4 (today)", and the dock's hours in its own zone under it; the load's own words if it has no date. */
-function StopDate({ stop, when, raw }: { stop: string; when: StopWhen | null | undefined; raw: string }) {
+/** The city, and under it which stop it is and, when it's soon, "today" or "tomorrow". */
+function StopPlace({ city, state, stop, when }: { city: string; state: string; stop: string; when: StopWhen | null | undefined }) {
   return (
-    <div className="mt-0.5 text-[15px] leading-snug text-ink-500">
-      <p>
-        {stop} · <span className="font-semibold text-ink-950">{when?.date ?? raw.charAt(0).toUpperCase() + raw.slice(1)}</span>
-        {when?.relative && ` (${when.relative.toLowerCase()})`}
+    <div className="min-w-0">
+      <p className="text-lg font-semibold leading-tight tracking-[-0.02em] text-ink-950 min-[400px]:text-[19px]">
+        {city}, <span className="text-ink-400">{state}</span>
       </p>
-      {when?.time && <p className="tabular">{when.time}</p>}
+      <p className="text-[13px] text-ink-500">
+        {stop}
+        {when?.relative ? ` · ${when.relative.toLowerCase()}` : ""}
+      </p>
+    </div>
+  );
+}
+
+/** On the right: the stop's date, and the dock's hours in its own time zone; the load's own words if it has no date. */
+function StopTime({ when, raw }: { when: StopWhen | null | undefined; raw: string }) {
+  return (
+    <div className="text-right">
+      <p className="pt-0.5 text-[15px] font-semibold leading-tight text-ink-950">{when?.date ?? raw.charAt(0).toUpperCase() + raw.slice(1)}</p>
+      {when?.time && <p className="whitespace-nowrap text-[13px] tabular text-ink-500">{when.time}</p>}
     </div>
   );
 }

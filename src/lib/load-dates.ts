@@ -64,6 +64,8 @@ function parseDay(window: string, baseDay: number, today: number): { day: number
 function describe(day: number | null, rest: string, raw: string, zone: string, now: number): StopWhen {
   if (day === null) return { date: null, relative: null, time: null, raw };
   let time = rest.trim() ? friendlyClock(rest.trim().replace(/^by appointment$/i, "By appointment").replace(/^appointment\s+/i, "")) : null;
+  // "1 pm–6 pm" reads as "1–6 pm".
+  if (time) time = time.replace(/\b(\d{1,2}(?::\d{2})?) (am|pm)–(\d{1,2}(?::\d{2})?) \2\b/, "$1–$3 $2");
   // A clock time without a zone is the dock's own: say which zone that is.
   if (time && /\d (am|pm)/.test(time) && !/\b([A-Z]{1,2}[SD]?T|GMT[+-]?\d*)\b/.test(time)) time = `${time} ${zoneName(day, zone)}`;
   const diff = Math.round((day - dayIn(now, zone)) / DAY);

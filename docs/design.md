@@ -47,11 +47,13 @@ the arrows (`components/shared/offer-rail.tsx`: never moves on its own, the next
 - The best load is first and the opposite colour of the page (`.theme-invert`: dark on a light page, light on a dark
   one), with a blue "Best fit" tag on its top edge.
 - Top: broker, equipment and weight; the fit score as a number in a ring, nothing else.
-- The trip: a dot, a line and a ring, the cities big, and under each the stop's date and the dock's hours in the dock's
-  own time zone ("Pickup · Mon, Oct 5 (tomorrow)" / "9 am–5 pm CDT"), from `lib/load-dates.ts`.
+- The trip: a dot, a line and a ring with the cities, and on the right each stop's date and the dock's hours in the
+  dock's own time zone ("Mon, Oct 5" / "7 am–4 pm EDT", from `lib/load-dates.ts`); "today" or "tomorrow" under the city.
 - Three facts in fixed places: the miles they'll drive (empty to pickup plus loaded), the drive time, and the reload.
 - The money: the load's rate is the big number, because it's what the load pays and a smaller figure reads as a worse
-  load; under it every cost (fuel, tolls, empty miles, the 2% fee) and what's left ("You keep" for the owner).
+  load; beside it the rate per mile and what's left after costs. Details lists every cost (fuel, tolls, empty miles, the
+  2% fee) down to what's left.
+- The whole card, button included, fits on an iPhone SE screen without scrolling.
 - One reason, one blue button.
 
 ## Notifications

@@ -8,17 +8,20 @@ export function LoadScoreBadge({
   score,
   size = "md",
   invert,
+  dim: ringSize = 76,
   className,
 }: {
   score: number;
   /** "xl" is the ring, for wherever someone is choosing between loads. */
   size?: "sm" | "md" | "lg" | "xl";
   invert?: boolean;
+  /** The ring's width in px (xl only). */
+  dim?: number;
   className?: string;
 }) {
   if (size === "xl") {
-    const dim = 76;
-    const strokeWidth = 6;
+    const dim = ringSize;
+    const strokeWidth = Math.round(dim / 12.5);
     const radius = (dim - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
     const progress = Math.max(0.03, Math.min(1, score / 100));
@@ -40,7 +43,7 @@ export function LoadScoreBadge({
             style={{ transition: "stroke-dashoffset 700ms cubic-bezier(0.4, 0, 0.2, 1)" }}
           />
         </svg>
-        <span className={cn("absolute inset-0 flex items-center justify-center text-[30px] font-semibold leading-none tracking-[-0.04em] tabular", invert ? "text-white" : "text-ink-950")}>
+        <span style={{ fontSize: Math.round(dim * 0.39) }} className={cn("absolute inset-0 flex items-center justify-center font-semibold leading-none tracking-[-0.04em] tabular", invert ? "text-white" : "text-ink-950")}>
           {score}
         </span>
       </div>

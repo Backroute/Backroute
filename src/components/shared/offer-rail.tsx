@@ -89,7 +89,7 @@ export function OfferRail({
         style={{ gap: GAP }}
       >
         {Children.map(children, (child) => (
-          <div className={cn("flex w-[min(85vw,23rem)] shrink-0 snap-start", count === 1 && "w-full max-w-[26rem]")}>{child}</div>
+          <div className={cn("flex w-[min(88vw,23rem)] shrink-0 snap-start", count === 1 && "w-full max-w-[26rem]")}>{child}</div>
         ))}
       </div>
     </div>

@@ -24,7 +24,7 @@ eq("today pickup", [b.pickup.date, b.pickup.relative], ["Sun, Oct 4", "Today"]);
 eq("2 day transit", b.delivery.date, "Tue, Oct 6");
 
 const c = stopDates({ pickupWindow: "today, appointment 2:00 PM–3:00 PM", deliveryWindow: "Same day, by appointment", createdAt, lane }, now);
-eq("appointment window gets the zone", c.pickup.time, "2 pm–3 pm CDT");
+eq("appointment window gets the zone", c.pickup.time, "2–3 pm CDT");
 eq("same day by appointment", [c.delivery.date, c.delivery.relative, c.delivery.time], ["Sun, Oct 4", "Today", "By appointment"]);
 
 const d = stopDates({ pickupWindow: "Tue, Oct 6, 2:00 PM CDT", deliveryWindow: "Thu, Oct 8, 8:00 AM EDT", createdAt, lane }, now);
@@ -47,6 +47,6 @@ eq("appointments in each stop's zone", [h.pickup.date, h.pickup.time, h.delivery
 // Late at night UTC it's still the evening before in Dallas: "today" there, not the UTC date.
 const late = Date.UTC(2026, 9, 5, 3);
 const i = stopDates({ pickupWindow: "today, 20:00–23:00", deliveryWindow: "Next day", createdAt: new Date(Date.UTC(2026, 9, 5, 2)).toISOString(), lane }, late);
-eq("the stop's own calendar day", [i.pickup.date, i.pickup.relative, i.pickup.time], ["Sun, Oct 4", "Today", "8 pm–11 pm CDT"]);
+eq("the stop's own calendar day", [i.pickup.date, i.pickup.relative, i.pickup.time], ["Sun, Oct 4", "Today", "8–11 pm CDT"]);
 
 console.log(bad ? `${bad} BAD` : "all ok");
