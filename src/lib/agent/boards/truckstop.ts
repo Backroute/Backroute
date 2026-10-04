@@ -1,4 +1,5 @@
 import "server-only";
+import { partialOf } from "../feeds";
 import type { EquipmentType } from "../../types";
 import { BoardError, type Board, type BoardLoad, type BoardQuery, type TruckPosting } from "./types";
 
@@ -76,6 +77,8 @@ export function parseLoadSearch(xml: string): BoardLoad[] {
         miles: Number(f.Miles) > 0 ? Number(f.Miles) : null,
         weight: Number(f.Weight) > 0 ? Number(f.Weight) : null,
         notes: f.Days2Pay && f.Days2Pay !== "----" ? `Pays in about ${f.Days2Pay} days (Truckstop)` : null,
+        // Truckstop marks a partial with its full/partial flag (or LTL) and gives the feet it takes.
+        ...partialOf({ fullPartial: f.FullPartial ?? f.LoadType ?? (f.Ltl === "true" ? "P" : undefined), length: f.Length }),
         brokerName: f.CompanyName || "Truckstop poster",
         brokerEmail: null,
         brokerPhone: f.PointOfContactPhone || null,

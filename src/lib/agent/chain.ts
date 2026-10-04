@@ -1,5 +1,6 @@
 import { estimateMiles } from "../fleet";
 import { reloadMarket } from "../home";
+import { nextStop, tripLoads } from "../trip-plan";
 import type { Load, Truck } from "../types";
 
 /**
@@ -19,14 +20,38 @@ const pickupTime = (l: Load) => Date.parse(l.pickupAt ?? "") || Number.MAX_SAFE_
 /**
  * The truck's loads in order: the one it's on (its current load), then its next one, then the rest of what's booked
  * by pickup time. A booked load whose pickup is more than a day gone (never started, never cancelled) is left out, so
- * a forgotten one can't hold up the truck.
+ * a forgotten one can't hold up the truck. On a multi-load trip (lib/trip-plan), the load at the trip's next stop is
+ * the current one and the trip's other loads follow it, in the order they come off.
  */
-export function chainOf(loads: Load[], truck: Pick<Truck, "id" | "currentLoadId"> & { nextLoadId?: string | null }, now = Date.now()): Load[] {
-  const current = loads.find((l) => l.id === truck.currentLoadId && l.truckId === truck.id && ROLLING.has(l.stage));
-  const waiting = loads.filter((l) => l !== current && l.truckId === truck.id && WAITING.has(l.stage) && !(l.pickupAt && Date.parse(l.pickupAt) < now - DAY));
+export function chainOf(loads: Load[], truck: Pick<Truck, "id" | "currentLoadId"> & { nextLoadId?: string | null; trip?: Truck["trip"] }, now = Date.now()): Load[] {
+  const onTrip = truck.trip ? tripLoads(truck, loads) : [];
+  const tripIds = new Set(onTrip.map((l) => l.id));
+  const stop = truck.trip ? nextStop(truck, loads) : null;
+  const current = stop?.load ?? loads.find((l) => l.id === truck.currentLoadId && l.truckId === truck.id && ROLLING.has(l.stage));
+  const dropAt = (l: Load) => truck.trip!.stops.findIndex((s) => s.loadId === l.id && s.kind === "delivery");
+  const tripRest = onTrip.filter((l) => l !== current).sort((a, b) => dropAt(a) - dropAt(b));
+  const waiting = loads.filter((l) => l !== current && !tripIds.has(l.id) && l.truckId === truck.id && WAITING.has(l.stage) && !(l.pickupAt && Date.parse(l.pickupAt) < now - DAY));
   const next = waiting.find((l) => l.id === truck.nextLoadId);
   const rest = waiting.filter((l) => l !== next).sort((a, b) => pickupTime(a) - pickupTime(b));
-  return [...(current ? [current] : []), ...(next ? [next] : []), ...rest];
+  return [...(current ? [current] : []), ...tripRest, ...(next ? [next] : []), ...rest];
+}
+
+/** The load the truck finishes on: the last lined up, or on a trip with nothing after it, the trip's last drop. */
+export function chainEnd(loads: Load[], truck: Truck, now = Date.now()): Load | undefined {
+  const chain = chainOf(loads, truck, now);
+  const onTrip = truck.trip ? new Set(tripLoads(truck, loads).map((l) => l.id)) : new Set<string>();
+  const after = chain.filter((l) => !onTrip.has(l.id));
+  if (after.length) return after[after.length - 1];
+  if (!onTrip.size) return chain[chain.length - 1];
+  const lastDrop = [...truck.trip!.stops].reverse().find((s) => s.kind === "delivery" && onTrip.has(s.loadId));
+  return chain.find((l) => l.id === lastDrop?.loadId) ?? chain[chain.length - 1];
+}
+
+/** How many runs the truck has lined up, a whole multi-load trip counting as one (for the three the AI books ahead). */
+export function linedUp(loads: Load[], truck: Truck, now = Date.now()): number {
+  const chain = chainOf(loads, truck, now);
+  const onTrip = truck.trip ? tripLoads(truck, loads).length : 0;
+  return onTrip ? chain.length - onTrip + 1 : chain.length;
 }
 
 /**
@@ -41,22 +66,25 @@ export function doneAt(l: Load): number | null {
 
 /** Where the truck ends up after everything lined up, and when (null when the last load has no delivery time). */
 export function freeAfter(loads: Load[], truck: Truck): { city: string; state: string; at: number | null; lined: number } {
-  const chain = chainOf(loads, truck);
-  const last = chain[chain.length - 1];
+  const last = chainEnd(loads, truck);
   if (!last) return { city: truck.currentCity, state: truck.currentState, at: null, lined: 0 };
   const done = doneAt(last);
-  return { city: last.lane.destination, state: last.lane.destState, at: done ? done + 2 * HOUR : null, lined: chain.length };
+  return { city: last.lane.destination, state: last.lane.destState, at: done ? done + 2 * HOUR : null, lined: linedUp(loads, truck) };
 }
 
 /** The truck's current and next load from its chain, after a load is booked, delivered or dropped. */
-export function slotsFor(loads: Load[], truck: Truck): Pick<Truck, "currentLoadId" | "nextLoadId" | "status"> {
+export function slotsFor(loads: Load[], truck: Truck): Pick<Truck, "currentLoadId" | "nextLoadId" | "status" | "trip"> {
   const chain = chainOf(loads, truck);
   const current = chain[0] ?? null;
-  const next = chain.find((l) => l !== current) ?? null;
+  // A trip's other loads aren't "next": they're on the truck already. Next is what comes after the trip.
+  const onTrip = truck.trip ? new Set(tripLoads(truck, loads).map((l) => l.id)) : new Set<string>();
+  const next = chain.find((l) => l !== current && !onTrip.has(l.id)) ?? null;
   return {
     currentLoadId: current?.id ?? null,
     nextLoadId: next?.id ?? null,
     status: truck.status === "maintenance" ? "maintenance" : current ? "on_load" : "available",
+    // A trip with every stop made is over.
+    trip: onTrip.size ? truck.trip : undefined,
   };
 }
 

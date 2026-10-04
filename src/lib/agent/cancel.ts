@@ -1,5 +1,5 @@
 import "server-only";
-import { chainOf } from "./chain";
+import { chainOf, slotsFor } from "./chain";
 import { cancelParking } from "./parking";
 import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
@@ -42,7 +42,15 @@ export async function cancelLoad(ctx: CarrierContext, load: Load, reason: string
   // Off the truck: its next load (if any) moves up.
   const truck = ctx.trucks.find((t) => t.id === load.truckId);
   let freed: Truck | undefined;
-  if (truck && (truck.currentLoadId === load.id || truck.nextLoadId === load.id)) {
+  if (truck?.trip && truck.trip.stops.some((s) => s.loadId === load.id)) {
+    // Off a multi-load trip: its stops come out, the rest of the trip keeps its order, and the truck heads to the
+    // next stop (lib/trip-plan). A trip with nothing left is over.
+    const trip = { ...truck.trip, stops: truck.trip.stops.filter((s) => s.loadId !== load.id), warnings: truck.trip.warnings?.filter((w) => !w.includes(load.referenceNumber)) };
+    freed = { ...truck, trip, ...slotsFor(ctx.loads, { ...truck, trip }) };
+    if (!freed.trip) delete freed.trip;
+    await save("trucks", ctx.carrier.id, freed as unknown as Item);
+    ctx.trucks = ctx.trucks.map((t) => (t.id === truck.id ? freed! : t));
+  } else if (truck && (truck.currentLoadId === load.id || truck.nextLoadId === load.id)) {
     // Whatever's lined up behind it moves up (lib/agent/chain): the next load becomes current, the one after it next.
     const behind = chainOf(ctx.loads, { ...truck, currentLoadId: null }).filter((l) => l.id !== truck.currentLoadId);
     const next = truck.currentLoadId === load.id ? (behind[0]?.id ?? null) : truck.currentLoadId;
@@ -60,7 +68,7 @@ export async function cancelLoad(ctx: CarrierContext, load: Load, reason: string
     }
   }
   // A spot reserved for the night on this load isn't needed now (the driver or owner can book again if they want).
-  if (truck?.parking?.status === "booked" && truck.currentLoadId === load.id)
+  if (truck?.parking?.status === "booked" && truck.currentLoadId === load.id && !freed?.trip)
     await cancelParking(ctx, freed ?? truck, "ai", `${load.referenceNumber} was cancelled`).catch((e) => console.error("[parking] cancel failed", e));
   await addActivity(ctx.carrier.id, event({ type: "load_cancelled", loadId: load.id, message: `Broker cancelled ${load.referenceNumber}`, detail: `${reason}${tonu ? ` · claiming $${tonu} TONU` : ""}`, severity: "warning" }));
 

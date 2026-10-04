@@ -34,7 +34,9 @@ import { hardProblem, scheduleWarnings } from "./schedule";
 import { reeferLine } from "./reefer";
 import { translateForDriver } from "../ai/translate";
 import { cantRun } from "../expiry";
-import { chainOf, doneAt, LINED_UP_MAX, reloadOutlook, reloadValue } from "./chain";
+import { chainEnd, doneAt, LINED_UP_MAX, linedUp, reloadOutlook, reloadValue } from "./chain";
+import { isPartial, nextStop, type TripLoad } from "../trip-plan";
+import { newTrip, stopsLine, tripFit, tripWith, type TripFit } from "./trips";
 import { bestAssignment } from "./match";
 import { learnedAsk } from "./ask-learning";
 
@@ -74,9 +76,13 @@ export async function brokerFor(ctx: CarrierContext, email: string, name: string
   return broker;
 }
 
-/** Going for one of a truck's offers passes on the others (so the next free truck can have them). */
+/**
+ * Going for one of a truck's offers passes on the others (so the next free truck can have them). Going for a partial
+ * keeps the other partials: they may ride along on the same trip (lib/agent/trips).
+ */
 async function setAsideOthers(ctx: CarrierContext, chosen: Load, at: string) {
-  ctx.loads = ctx.loads.map((l) => (l.id === chosen.id ? chosen : l.offerGroupId && l.offerGroupId === chosen.offerGroupId && l.stage === "offered" ? { ...l, stage: "declined" as const, updatedAt: at } : l));
+  const keep = (l: Load) => isPartial(chosen) && isPartial(l);
+  ctx.loads = ctx.loads.map((l) => (l.id === chosen.id ? chosen : l.offerGroupId && l.offerGroupId === chosen.offerGroupId && l.stage === "offered" && !keep(l) ? { ...l, stage: "declined" as const, updatedAt: at } : l));
   for (const l of ctx.loads) if (l.offerGroupId === chosen.offerGroupId && l.id !== chosen.id && l.stage === "declined" && l.updatedAt === at) await save("loads", ctx.carrier.id, l as unknown as Item);
 }
 
@@ -90,32 +96,46 @@ function emptyNow(ctx: Pick<CarrierContext, "trucks" | "loads">, truckId: string
  * The truck that can take a load soonest with the least empty driving, if any. A truck with loads lined up (up to
  * three, lib/agent/chain) takes one that picks up after the last of them delivers, from where that one ends.
  */
-export function bestTruck(ctx: CarrierContext, o: LoadAsk, skip?: Set<string>, opts: { planned?: boolean } = {}) {
-  let best: { truck: Truck; deadhead: number } | null = null;
+export function bestTruck(ctx: CarrierContext, o: LoadAsk, skip?: Set<string>, opts: { planned?: boolean; tripOnly?: boolean } = {}) {
+  let best: { truck: Truck; deadhead: number; trip?: TripFit } | null = null;
   for (const truck of ctx.trucks) {
     if (skip?.has(truck.id)) continue;
-    const deadhead = fitFor(ctx, truck, o, opts);
-    if (deadhead === null) continue;
-    if (!best || deadhead < best.deadhead) best = { truck, deadhead };
+    const fit = fitDetail(ctx, truck, o, opts);
+    if (!fit || (opts.tripOnly && !fit.trip)) continue;
+    if (!best || fit.miles < best.deadhead) best = { truck, deadhead: fit.miles, ...(fit.trip ? { trip: fit.trip } : {}) };
   }
   return best;
 }
 
-type LoadAsk = { equipment: Load["equipmentType"]; originCity: string; originState: string; destinationState: string; pickupAt: number | null; miles: number };
-const askOf = (l: Load): LoadAsk => ({ equipment: l.equipmentType, originCity: l.lane.origin, originState: l.lane.originState, destinationState: l.lane.destState, pickupAt: l.pickupAt ? Date.parse(l.pickupAt) : null, miles: l.lane.miles });
+/** A load as the AI weighs it for a truck. A partial carries itself along, to be planned into a trip (lib/trip-plan). */
+type LoadAsk = { equipment: Load["equipmentType"]; originCity: string; originState: string; destinationState: string; pickupAt: number | null; miles: number; trip?: TripLoad };
+const askOf = (l: Load): LoadAsk => ({ equipment: l.equipmentType, originCity: l.lane.origin, originState: l.lane.originState, destinationState: l.lane.destState, pickupAt: l.pickupAt ? Date.parse(l.pickupAt) : null, miles: l.lane.miles, ...(isPartial(l) ? { trip: l } : {}) });
 
 /** Whether this truck can take the load, and the empty miles to it if so (null: it can't). */
 function fitFor(ctx: CarrierContext, truck: Truck, o: LoadAsk, opts: { planned?: boolean } = {}): number | null {
+  return fitDetail(ctx, truck, o, opts)?.miles ?? null;
+}
+
+/**
+ * The same, with how: a partial that rides along on the truck's trip (its miles are the ones it adds beyond its own,
+ * less than nothing when the truck drives that way anyway), or a load that goes after what's lined up.
+ */
+function fitDetail(ctx: CarrierContext, truck: Truck, o: LoadAsk, opts: { planned?: boolean } = {}): { miles: number; trip?: TripFit } | null {
   if (!truck.driverId || truck.equipmentType !== o.equipment || truck.status === "maintenance") return null;
   // Can't legally run: an inspection or plates past due, a critical engine fault, a driver whose CDL or medical card
   // ran out (lib/expiry). No load goes on it; the owner was reminded ahead of time.
   if (cantRun(truck, ctx.drivers.find((d) => d.id === truck.driverId), Date.now())) return null;
   // States the driver said they won't run into.
   if (ctx.drivers.find((d) => d.id === truck.driverId)?.prefs?.avoidStates?.includes(o.destinationState)) return null;
-  const chain = chainOf(ctx.loads, truck);
+  // A partial on the way: it joins the truck's trip when there's room and time for it (lib/agent/trips), along with
+  // any other partial the AI is asking for on this truck. Not with a full load being asked for.
+  if (o.trip && !ctx.loads.some((l) => l.truckId === truck.id && l.stage === "negotiating" && !isPartial(l))) {
+    const trip = tripFit(ctx, truck, o.trip);
+    if (trip && trip.extra <= (ctx.settings.maxDeadhead ?? MAX_DEADHEAD)) return { miles: trip.extra, trip };
+  }
   // Contract freight the shipper already agreed (planned) isn't held to the three the AI books ahead on its own.
-  if (!opts.planned && chain.length >= LINED_UP_MAX) return null;
-  const last = chain[chain.length - 1];
+  if (!opts.planned && linedUp(ctx.loads, truck) >= LINED_UP_MAX) return null;
+  const last = chainEnd(ctx.loads, truck);
   let from = { city: truck.currentCity, state: truck.currentState };
   if (last) {
     // A truck with loads lined up can take one that picks up after the last delivers, with a couple of hours to spare.
@@ -129,7 +149,7 @@ function fitFor(ctx: CarrierContext, truck: Truck, o: LoadAsk, opts: { planned?:
   if (deadhead > (ctx.settings.maxDeadhead ?? MAX_DEADHEAD)) return null;
   // With an ELD connected: only a driver who has the hours to get there in time.
   if (!last && !canMakePickup(ctx.drivers.find((d) => d.id === truck.driverId), deadhead, o.miles, o.pickupAt, Date.now())) return null;
-  return deadhead;
+  return { miles: deadhead };
 }
 
 /**
@@ -189,11 +209,15 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
     // Truck routing (real road miles) when it's set up, the built-in estimate otherwise.
     const miles = o.miles ?? (await route({ city: o.originCity, state: o.originState }, { city: o.destinationCity, state: o.destinationState }))?.miles ?? estimateMiles({ city: o.originCity, state: o.originState }, { city: o.destinationCity, state: o.destinationState });
     if (!miles) continue;
-    const fit = bestTruck(ctx, { equipment, originCity: o.originCity, originState: o.originState, destinationState: o.destinationState, pickupAt: pickupAt ? Date.parse(pickupAt) : null, miles });
+    // A partial (LTL-sized) load: how much of the trailer it takes, so it can ride with others on one trip.
+    const partial: Load["partial"] | undefined = o.partial ? { ...(o.lengthFeet ? { feet: o.lengthFeet } : {}), ...(o.pallets ? { pallets: o.pallets } : {}) } : undefined;
+    const lane = { origin: o.originCity, originState: o.originState, destination: o.destinationCity, destState: o.destinationState, miles, marketRpm: 0 };
+    const asTrip: TripLoad | undefined = partial ? { id: `offer-${o.loadNumber ?? added.length}`, referenceNumber: o.loadNumber ?? "the new load", lane, equipmentType: equipment, weight: o.weight ?? 0, pickupAt: pickupAt ?? undefined, deliveryAt: deliveryAt ?? undefined, partial } : undefined;
+    const fit = bestTruck(ctx, { equipment, originCity: o.originCity, originState: o.originState, destinationState: o.destinationState, pickupAt: pickupAt ? Date.parse(pickupAt) : null, miles, ...(asTrip ? { trip: asTrip } : {}) });
     if (!fit) continue;
 
     const posted = o.rate ?? 0;
-    const draft = { lane: { miles }, listedRate: posted } as Pick<Load, "lane" | "listedRate">;
+    const draft = { lane: { miles }, listedRate: posted, ...(partial ? { partial } : {}) } as Pick<Load, "lane" | "listedRate" | "partial">;
     const market = await marketRate({ originCity: o.originCity, originState: o.originState, destinationCity: o.destinationCity, destinationState: o.destinationState, equipment });
     const learned = learnedAsk(ctx.loads, { brokerId: broker.id, brokerName: broker.company, lane: { originState: o.originState, destState: o.destinationState } }, Date.now());
     const ask = askFor(draft as Load, ctx.settings, laneMemory(ctx.loads, ctx.brokers, { originState: o.originState, destState: o.destinationState }), market, brokerMemory(ctx.loads, broker.id), learned);
@@ -218,10 +242,17 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
       broker,
       fit.truck,
       "offered",
-      fit.deadhead,
+      Math.max(0, Math.round(fit.deadhead)),
     );
+    // Riding along on a trip: what it costs is the miles it adds, not its own (the truck drives most of them anyway).
+    if (fit.trip) {
+      const fuelCost = Math.round((Math.max(0, fit.trip.added) / fit.truck.mpg) * 3.9);
+      const rate = base.targetRate;
+      Object.assign(base, { fuelCost, deadheadMiles: 0, deadheadCost: 0, netProfit: Math.round(rate - fuelCost - base.commission) });
+    }
     const load: Load = {
       ...base,
+      ...(partial ? { partial } : {}),
       listedRate: posted,
       targetRate: ask ?? posted,
       bookedRate: null,
@@ -265,6 +296,19 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
         ctx.loads = ctx.loads.map((x) => (x.id === pick.id ? pick : x));
       }
       await requestBooking(ctx, pick, pick.targetRate, { byRules: true, callFirst: !!sender.feed && emptyNow(ctx, pick.truckId) });
+      asked.push(pick);
+    }
+    // More partials on the way: each truck asks for one load above; partials that ride along with what it's now
+    // asking for (or already hauling) are asked for too, a trip at a time (up to eight loads, lib/trip-plan).
+    for (const l of fair.filter((x) => isPartial(x) && !asked.some((a) => a.id === x.id))) {
+      const current = ctx.loads.find((x) => x.id === l.id);
+      if (!current || current.stage !== "offered") continue;
+      const fit = bestTruck(ctx, askOf(current), undefined, { tripOnly: true });
+      if (!fit) continue;
+      const pick: Load = { ...current, truckId: fit.truck.id, offerGroupId: `trip-${fit.truck.id}-${current.id}`, updatedAt: new Date().toISOString() };
+      await save("loads", ctx.carrier.id, pick as unknown as Item);
+      ctx.loads = ctx.loads.map((x) => (x.id === pick.id ? pick : x));
+      await requestBooking(ctx, pick, pick.targetRate, { byRules: true });
       asked.push(pick);
     }
   }
@@ -462,39 +506,60 @@ export async function bookIt(ctx: CarrierContext, load: Load, rate?: number): Pr
   const at = new Date().toISOString();
   const agreed = rate ?? load.rateConReading?.totalRate ?? load.bookRequest?.brokerOffer ?? load.bookRequest?.ask ?? load.targetRate;
   const free = truck && !truck.currentLoadId;
+  // A partial joins the truck's trip when it fits (pickups and drops in the best order), or starts one on a free truck.
+  const joins = truck && !free && isPartial(load) ? tripFit({ ...ctx, loads: ctx.loads.filter((l) => l.id === load.id || l.stage !== "negotiating") }, truck, load) : null;
   // The rate con names the docks: their hours (from drivers' notes) and the holidays are checked again.
   const warnings = await scheduleWarnings(load, truck, ctx.carrier.id, ctx.drivers.find((d) => d.id === truck?.driverId)).catch(() => load.scheduleWarnings ?? []);
   const newlyHard = warnings.filter((w) => w.hard && !(load.scheduleWarnings ?? []).some((x) => x.text === w.text));
   const booked: Load = {
     ...load,
     ...(warnings.length ? { scheduleWarnings: warnings } : {}),
-    stage: free ? "dispatched" : "booked",
+    stage: free || joins ? "dispatched" : "booked",
     bookedRate: agreed,
     targetRate: agreed,
-    isChained: !free,
-    progressPct: free ? 5 : 0,
+    isChained: !free && !joins,
+    progressPct: free || joins ? 5 : 0,
     updatedAt: at,
     bookRequest: load.bookRequest ? { ...load.bookRequest, status: "accepted" } : undefined,
   };
+  const trip = truck && joins ? tripWith(ctx, truck, joins) : truck && free && isPartial(load) ? newTrip(load) : undefined;
+  if (trip) booked.tripId = trip.id;
+  // The trip's other loads are on it too (a partial the truck was on before the trip started).
+  for (const s of trip?.stops ?? []) {
+    const other = ctx.loads.find((l) => l.id === s.loadId && l.id !== load.id && l.tripId !== trip!.id);
+    if (!other) continue;
+    const tagged = { ...other, tripId: trip!.id };
+    await save("loads", ctx.carrier.id, tagged as unknown as Item);
+    ctx.loads = ctx.loads.map((l) => (l.id === tagged.id ? tagged : l));
+  }
   await save("loads", ctx.carrier.id, booked as unknown as Item);
   ctx.loads = ctx.loads.map((l) => (l.id === load.id ? booked : l));
   let truckAfter: Truck | undefined;
   if (truck) {
     // On a load: this one is next, unless one is already next (then it waits behind it in the lineup, lib/agent/chain).
-    truckAfter = free ? { ...truck, currentLoadId: load.id, status: "on_load" } : truck.nextLoadId ? truck : { ...truck, nextLoadId: load.id };
-    if (truckAfter.currentLoadId !== truck.currentLoadId || truckAfter.nextLoadId !== truck.nextLoadId || truckAfter.status !== truck.status) {
+    // On a trip: the truck works the load at its next stop.
+    truckAfter = trip
+      ? { ...truck, trip, currentLoadId: nextStop({ trip }, ctx.loads)?.load.id ?? load.id, status: "on_load" }
+      : free
+        ? { ...truck, currentLoadId: load.id, status: "on_load" }
+        : truck.nextLoadId
+          ? truck
+          : { ...truck, nextLoadId: load.id };
+    if (trip || truckAfter.currentLoadId !== truck.currentLoadId || truckAfter.nextLoadId !== truck.nextLoadId || truckAfter.status !== truck.status) {
       await save("trucks", ctx.carrier.id, truckAfter as unknown as Item);
       ctx.trucks = ctx.trucks.map((t) => (t.id === truck.id ? truckAfter! : t));
     }
   }
   await addActivity(ctx.carrier.id, event({ type: "booked", loadId: load.id, message: `Booked: ${load.lane.origin} → ${load.lane.destination}`, detail: `${truck?.unitNumber ?? ""} · $${agreed.toLocaleString()}`, severity: "success" }));
   if (newlyHard.length) await passToOwner(ctx, { reason: `Heads-up on ${load.referenceNumber}: ${newlyHard.map((w) => w.text).join(" ")}`, loadId: load.id, label: "Checked", source: "email", to: "owner" });
-  await textNewLoad(ctx, booked).catch((e) => console.error("[booking] new-load text failed", e));
+  // Riding along: the driver hears where it fits in the trip, and about any freight that has to be moved to get it out.
+  const tripNote = joins && trip ? [`${stopsLine(trip, load.id)}`, ...(trip.warnings ?? []).filter((w) => w.includes(load.referenceNumber))].join(" ") : undefined;
+  await textNewLoad(ctx, booked, tripNote).catch((e) => console.error("[booking] new-load text failed", e));
   return { load: booked, truck: truckAfter };
 }
 
 /** The driver's text about a new load, in their language. False when it couldn't go (no texting, no number, STOP). */
-export async function textNewLoad(ctx: CarrierContext, load: Load): Promise<boolean> {
+export async function textNewLoad(ctx: CarrierContext, load: Load, tripNote?: string): Promise<boolean> {
   if (!canText(ctx.carrier)) return false;
   const truck = ctx.trucks.find((t) => t.id === load.truckId);
   const driver = ctx.drivers.find((d) => d.id === truck?.driverId);
@@ -505,7 +570,7 @@ export async function textNewLoad(ctx: CarrierContext, load: Load): Promise<bool
   // The shared record from every carrier on Backroute fills in docks this carrier hasn't been to.
   const slow = (await slowDocksAnywhere(ctx, load).catch(() => slowDocks(ctx.loads, load))).map((f) => SLOW_DOCK[lang]({ name: f.name, hours: (Math.round(f.avgMinutes / 30) / 2).toString() }));
   // What the driver should know before they go: the reefer setting, and what other drivers said about the docks.
-  const extra = [reeferLine(load), ...(await tipsForLoad(load).catch(() => [])), ...(load.scheduleWarnings ?? []).filter((w) => !w.hard).map((w) => w.text)].filter(Boolean).join(" ");
+  const extra = [tripNote, reeferLine(load), ...(await tipsForLoad(load).catch(() => [])), ...(load.scheduleWarnings ?? []).filter((w) => !w.hard).map((w) => w.text)].filter(Boolean).join(" ");
   const text = [NEW_LOAD[lang]({
     ref: load.referenceNumber,
     from: `${load.lane.origin}, ${load.lane.originState}`,

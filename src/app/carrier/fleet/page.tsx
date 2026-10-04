@@ -20,6 +20,7 @@ import { LANGS } from "@/lib/lang";
 import { useCarrierTrucks, useDriverMap, useCarrierLoads, truckActiveLoads, truckLineup } from "@/lib/selectors";
 import { useNow } from "@/lib/hooks";
 import { ParkingReserve } from "@/components/driver/parking-reserve";
+import { nextStop, tripLoads } from "@/lib/trip-plan";
 import { formatNumber } from "@/lib/utils";
 import type { HosStatus } from "@/lib/types";
 
@@ -213,6 +214,18 @@ export default function FleetPage() {
                   {currentLoad && (
                     <p className="text-xs text-ink-400">{currentLoad.lane.origin} → {currentLoad.lane.destination}</p>
                   )}
+                  {(() => {
+                    // Several partials on one run (lib/trip-plan): how far along, and the stop it's heading to.
+                    const stop = nextStop(truck, loads);
+                    const n = stop ? tripLoads(truck, loads).length : 0;
+                    if (!stop || n < 2) return null;
+                    const l = stop.load;
+                    return (
+                      <p className="text-xs text-ink-600">
+                        Trip: {n} loads · stop {stop.index} of {stop.total} · {stop.stop.kind === "pickup" ? `pick up ${l.referenceNumber} in ${l.lane.origin}` : `drop ${l.referenceNumber} in ${l.lane.destination}`}
+                      </p>
+                    );
+                  })()}
                   {nextLoad && (
                     <div className="mt-1 flex items-center gap-1.5 rounded-lg bg-info-soft px-2.5 py-1.5 text-xs text-[var(--accent-info)]">
                       <Link2 className="h-3 w-3" /> Next: {nextLoad.lane.origin} → {nextLoad.lane.destination}

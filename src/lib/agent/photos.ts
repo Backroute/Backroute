@@ -1,5 +1,6 @@
 import "server-only";
 import { slotsFor } from "./chain";
+import { followTrip, nextStopLine } from "./trips";
 import { aiConfigured } from "../ai/server";
 import { checkStopDocument } from "../ai/doc-check";
 import { twilioMedia } from "../channels/twilio";
@@ -83,14 +84,19 @@ export async function driverPhotos(ctx: CarrierContext, driver: Driver, media: {
   if (kind === "pod" && pod && ["in_transit", "at_delivery"].includes(current.stage)) {
     const at = new Date().toISOString();
     current = { ...current, stage: "delivered", progressPct: 100, ticksInStage: 0, tripChecklist: { ...current.tripChecklist, arrivedDeliveryAt: current.tripChecklist?.arrivedDeliveryAt ?? at, unloadedAt: current.tripChecklist?.unloadedAt ?? at } };
-    if (truck && truck.currentLoadId === load.id) {
+    let stopLine: string | null = null;
+    if (truck?.trip && load.tripId === truck.trip.id) {
+      // A drop on a multi-load trip: on to the next stop (lib/agent/trips).
+      ctx.loads = ctx.loads.map((l) => (l.id === current.id ? current : l));
+      stopLine = nextStopLine(await followTrip(ctx, truck), ctx.loads);
+    } else if (truck && truck.currentLoadId === load.id) {
       // Whatever's lined up behind it moves up (lib/agent/chain).
       const after = ctx.loads.map((l) => (l.id === current.id ? current : l));
       const next: Truck = { ...truck, ...slotsFor(after, { ...truck, currentLoadId: null }) };
       await save("trucks", ctx.carrier.id, next as unknown as Item);
       ctx.trucks = ctx.trucks.map((t) => (t.id === next.id ? next : t));
     }
-    said.push("Marked delivered. The invoice goes out with it.");
+    said.push(`Marked delivered. The invoice goes out with it.${stopLine ? ` ${stopLine}` : ""}`);
   }
   await save("loads", ctx.carrier.id, current as unknown as Item);
   ctx.loads = ctx.loads.map((l) => (l.id === current.id ? current : l));

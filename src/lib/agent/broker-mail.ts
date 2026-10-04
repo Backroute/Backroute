@@ -18,6 +18,9 @@ const Offer = z.object({
   miles: z.number().nullable(),
   weight: z.number().nullable(),
   notes: z.string().nullable(),
+  partial: z.boolean().nullable(),
+  pallets: z.number().nullable(),
+  lengthFeet: z.number().nullable(),
 });
 
 const Reading = z.object({
@@ -42,7 +45,8 @@ const Reading = z.object({
   appointmentConfirmation: z.string().nullable(),
 });
 export type BrokerMailReading = z.infer<typeof Reading>;
-export type OfferReading = z.infer<typeof Offer>;
+/** A load a broker offered. The partial's size is optional for feeds and boards that don't say. */
+export type OfferReading = Omit<z.infer<typeof Offer>, "partial" | "pallets" | "lengthFeet"> & Partial<Pick<z.infer<typeof Offer>, "partial" | "pallets" | "lengthFeet">>;
 
 const system = (today: string) => `You read email that freight brokers send a small trucking carrier, and pull out the facts. You never reply; code decides what to do with what you find.
 
@@ -56,7 +60,7 @@ Pick the kind:
 - change_request: on a load already booked, the broker adds a stop (changeKind add_stop, changePlaces the new stops in order) or sends the truck somewhere else (changeKind reroute, changePlaces the one new delivery). Set loadNumber.
 - other: anything else.
 
-Only report what the email says; use null for anything it doesn't. Rates are all-in totals in US dollars (if the email gives a rate per mile and the miles, multiply). For pickupLocal and deliveryLocal give YYYY-MM-DDTHH:mm in the stop's local time, only when the email shows the date (today is ${today}). States are two-letter codes. loadNumber is the broker's load or reference number the email is about. contactName is the sender's first name if they sign it. brokerCompany, brokerMc and brokerPhone are the brokerage's name, MC number and the sender's phone number as written in the email or signature, null if not there. brokerRpm is a rate per mile the broker names without the miles (e.g. "2.80 a mile"), else null. language is the two-letter ISO code of the language the email is written in (en, fr, es...). changeKind is null and changePlaces empty unless kind is change_request; the appointment fields are null unless kind is appointment. question is anything the broker asks besides the price (where the truck is, when it can get there, the MC, equipment, anything else), in a short sentence; null if they don't ask.`;
+Only report what the email says; use null for anything it doesn't. Rates are all-in totals in US dollars (if the email gives a rate per mile and the miles, multiply). For pickupLocal and deliveryLocal give YYYY-MM-DDTHH:mm in the stop's local time, only when the email shows the date (today is ${today}). States are two-letter codes. loadNumber is the broker's load or reference number the email is about. contactName is the sender's first name if they sign it. brokerCompany, brokerMc and brokerPhone are the brokerage's name, MC number and the sender's phone number as written in the email or signature, null if not there. brokerRpm is a rate per mile the broker names without the miles (e.g. "2.80 a mile"), else null. language is the two-letter ISO code of the language the email is written in (en, fr, es...). changeKind is null and changePlaces empty unless kind is change_request; the appointment fields are null unless kind is appointment. partial is true only when the email says the load is a partial, LTL or volume shipment that doesn't fill the trailer (a full truckload is false; null if it doesn't say); pallets and lengthFeet are how many pallets and how many feet of trailer it takes, when the email says. question is anything the broker asks besides the price (where the truck is, when it can get there, the MC, equipment, anything else), in a short sentence; null if they don't ask.`;
 
 /** What a broker's email is and the facts in it. Null when the AI isn't available or declines. */
 export async function readBrokerEmail(subject: string, text: string): Promise<BrokerMailReading | null> {

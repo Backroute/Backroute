@@ -15,6 +15,7 @@ import { etaWithReasons, stillSince, stoppedOddly } from "./late-risk";
 import { translateForDriver } from "../ai/translate";
 import * as mail from "./templates";
 import { addWhy } from "./why";
+import { tripEtas } from "./trips";
 
 /**
  * The carrier's ELD (Samsara or Motive): where each truck is and how many hours each driver has left. The AI uses it
@@ -298,9 +299,12 @@ export async function lateNotices(ctx: CarrierContext, now: number, opts: { emai
     const truck = ctx.trucks.find((t) => t.id === load.truckId);
     const driver = ctx.drivers.find((d) => d.id === truck?.driverId);
     const [city, state] = stop === "pickup" ? [load.lane.origin, load.lane.originState] : [load.lane.destination, load.lane.destState];
-    if (truck && (await stoppedCheck(ctx, load, truck, driver, now))) done.push(`${load.referenceNumber}: checked on the driver (truck stopped)`);
-    const seen = truck ? await etaWithReasons(truck, driver, city, state, now) : null;
-    const eta = seen?.at ?? (truck ? etaTo(truck, driver, city, state, now) : null);
+    // On a multi-load trip the truck is checked once, on the load it's working; a stop further down the trip is
+    // reached through the ones before it (lib/agent/trips).
+    const ahead = truck?.trip && load.tripId === truck.trip.id && truck.currentLoadId !== load.id ? tripEtas(ctx, truck, now)?.get(`${load.id}:${stop}`) : undefined;
+    if (truck && (!truck.trip || truck.currentLoadId === load.id) && (await stoppedCheck(ctx, load, truck, driver, now))) done.push(`${load.referenceNumber}: checked on the driver (truck stopped)`);
+    const seen = truck && ahead === undefined ? await etaWithReasons(truck, driver, city, state, now) : null;
+    const eta = ahead ?? seen?.at ?? (truck ? etaTo(truck, driver, city, state, now) : null);
     const because = seen?.reasons.length ? ` (${seen.reasons.join("; ")})` : "";
     if (!eta) continue;
     // Close: the owner hears it's tight while there's still time to do something, before anyone is late.
@@ -412,7 +416,8 @@ export async function checkCalls(ctx: CarrierContext, now: number): Promise<stri
     const toPickup = load.stage === "dispatched";
     const [city, state] = toPickup ? [load.lane.origin, load.lane.originState] : [load.lane.destination, load.lane.destState];
     const drv = ctx.drivers.find((d) => d.id === truck.driverId);
-    const eta = (await routedEta(truck, drv, city, state, now)) ?? etaTo(truck, drv, city, state, now);
+    const ahead = truck.trip && load.tripId === truck.trip.id && truck.currentLoadId !== load.id ? tripEtas(ctx, truck, now)?.get(`${load.id}:${toPickup ? "pickup" : "delivery"}`) : undefined;
+    const eta = ahead ?? (await routedEta(truck, drv, city, state, now)) ?? etaTo(truck, drv, city, state, now);
     const where = pos.description ?? `${truck.currentCity}, ${truck.currentState}`;
     const status = load.stage === "at_pickup" ? "At the shipper, loading" : load.stage === "at_delivery" ? "At the receiver, unloading" : toPickup ? `Heading to pickup in ${city}, ${state}` : `Loaded, heading to ${city}, ${state}`;
     await sendOrQueue(ctx, {

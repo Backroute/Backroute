@@ -1,5 +1,5 @@
 import "server-only";
-import { chainOf, doneAt, LINED_UP_MAX } from "../chain";
+import { chainEnd, doneAt, LINED_UP_MAX, linedUp } from "../chain";
 import type { Truck } from "../../types";
 import { claimMark, type CarrierContext } from "../db";
 import { pullFeed, type FeedRow } from "../feeds";
@@ -40,11 +40,11 @@ export function whereTrucksFree(ctx: Pick<CarrierContext, "trucks" | "loads" | "
   for (const truck of ctx.trucks) {
     if (!truck.driverId || truck.status === "maintenance") continue;
     // Up to three loads lined up (lib/agent/chain); one the AI is already asking for comes first.
-    const chain = chainOf(ctx.loads, truck);
-    if (chain.length >= LINED_UP_MAX || ctx.loads.some((l) => l.truckId === truck.id && l.stage === "negotiating")) continue;
+    // A multi-load trip counts as one (lib/trip-plan); the search starts where its last drop is.
+    if (linedUp(ctx.loads, truck) >= LINED_UP_MAX || ctx.loads.some((l) => l.truckId === truck.id && l.stage === "negotiating")) continue;
     const driver = ctx.drivers.find((d) => d.id === truck.driverId);
     const home = driver?.homeBase?.split(",").map((s) => s.trim());
-    const last = chain[chain.length - 1];
+    const last = chainEnd(ctx.loads, truck);
     let q: BoardQuery;
     // A truck the AI sent toward busier freight in the last day searches from where it's headed.
     const to = truck.repositionTo && Date.parse(truck.repositionTo.at) > now - 24 * HOUR ? truck.repositionTo : null;

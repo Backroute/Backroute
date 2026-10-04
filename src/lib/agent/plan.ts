@@ -5,7 +5,8 @@ import type { Item } from "../cloud/rows";
 import type { Load, Truck } from "../types";
 import { save, type CarrierContext } from "./db";
 import { when } from "./templates";
-import { chainOf, slotsFor } from "./chain";
+import { chainOf, chainEnd, slotsFor } from "./chain";
+import { nextStop, tripLoads } from "../trip-plan";
 
 /**
  * The plan a dispatcher keeps in their head for each truck, written down: what it's on, what's lined up next (or
@@ -19,12 +20,20 @@ export function planFor(ctx: Pick<CarrierContext, "loads" | "drivers">, truck: T
   const lines: string[] = [];
   const current = ctx.loads.find((l) => l.id === truck.currentLoadId && ROLLING.has(l.stage));
   // What's lined up after it, in pickup order (lib/agent/chain): up to three loads ahead.
-  const lined = chainOf(ctx.loads, truck).filter((l) => l !== current && l.id !== truck.currentLoadId);
+  const stop = nextStop(truck, ctx.loads);
+  const onTrip = new Set(stop ? tripLoads(truck, ctx.loads).map((l) => l.id) : []);
+  const lined = chainOf(ctx.loads, truck).filter((l) => l !== current && l.id !== truck.currentLoadId && !onTrip.has(l.id));
   const next = lined[0];
   const chasing = ctx.loads.find((l) => l.truckId === truck.id && l.stage === "negotiating");
   const offered = ctx.loads.filter((l) => l.truckId === truck.id && l.stage === "offered").length;
   if (truck.status === "maintenance") lines.push("In the shop.");
-  if (current) lines.push(`Now: ${current.referenceNumber} to ${current.lane.destination}, ${current.lane.destState}, delivering ${at(current.deliveryAt, current.lane.destState, current.deliveryWindow)}.`);
+  if (stop) {
+    // Several partials on one run (lib/trip-plan): where it is in the trip, and what's next.
+    const l = stop.load;
+    const what = stop.stop.kind === "pickup" ? `pick up ${l.referenceNumber} in ${l.lane.origin}, ${l.lane.originState}` : `drop ${l.referenceNumber} in ${l.lane.destination}, ${l.lane.destState}`;
+    lines.push(`Now: a trip of ${onTrip.size} load${onTrip.size === 1 ? "" : "s"}, stop ${stop.index} of ${stop.total}: ${what}.`);
+    for (const w of truck.trip?.warnings ?? []) lines.push(w);
+  } else if (current) lines.push(`Now: ${current.referenceNumber} to ${current.lane.destination}, ${current.lane.destState}, delivering ${at(current.deliveryAt, current.lane.destState, current.deliveryWindow)}.`);
   else if (truck.status !== "maintenance")
     lines.push(truck.repositionTo && Date.parse(truck.repositionTo.at) > now - 86400_000 ? `Empty, heading to ${truck.repositionTo.city}, ${truck.repositionTo.state} where the freight is.` : `Empty in ${truck.currentCity}, ${truck.currentState}.`);
   if (next) lines.push(`Next: ${next.referenceNumber}, ${next.lane.origin} → ${next.lane.destination}, picks up ${at(next.pickupAt, next.lane.originState, next.pickupWindow)}.`);
@@ -32,12 +41,13 @@ export function planFor(ctx: Pick<CarrierContext, "loads" | "drivers">, truck: T
   if (next && chasing) lines.push(`Also asking for ${chasing.lane.origin} → ${chasing.lane.destination} at $${(chasing.bookRequest?.ask ?? chasing.targetRate).toLocaleString()}, after that.`);
   else if (chasing) lines.push(`Next: asking ${chasing.lane.origin} → ${chasing.lane.destination} at $${(chasing.bookRequest?.ask ?? chasing.targetRate).toLocaleString()}, waiting on the broker.`);
   else if (truck.status !== "maintenance") {
-    const from = current ? `${current.lane.destination}, ${current.lane.destState}` : `${truck.currentCity}, ${truck.currentState}`;
+    const end = chainEnd(ctx.loads, truck);
+    const from = end ? `${end.lane.destination}, ${end.lane.destState}` : current ? `${current.lane.destination}, ${current.lane.destState}` : `${truck.currentCity}, ${truck.currentState}`;
     lines.push(`Next: nothing booked yet. The AI is looking near ${from}${offered ? ` (${offered} offer${offered === 1 ? "" : "s"} in hand)` : ""}.`);
   }
   const driver = ctx.drivers.find((d) => d.id === truck.driverId);
   if (driver?.homeBase) {
-    const lastLoad = lined[lined.length - 1] ?? current;
+    const lastLoad = lined[lined.length - 1] ?? chainEnd(ctx.loads, truck) ?? current;
     const empty = lastLoad ? { city: lastLoad.lane.destination, state: lastLoad.lane.destState, when: Date.parse(lastLoad.deliveryAt ?? "") || now } : { city: truck.currentCity, state: truck.currentState, when: now };
     const home = homeTimeStatus(driver, empty.city, empty.state, new Date(Math.max(now, empty.when)));
     const first = driver.name.split(" ")[0];
@@ -58,6 +68,16 @@ export async function refreshPlans(ctx: CarrierContext, now: number) {
   // A truck's next load is the first one lined up behind the one it's on: when that one goes (delivered and taken
   // over in the app, cancelled), the one after it moves up. A delivered load waiting for the driver's tap stays put.
   for (const truck of ctx.trucks) {
+    if (truck.trip) {
+      // A multi-load trip: the truck is on the load at its next stop; a trip with every stop made is over.
+      const s = slotsFor(ctx.loads, truck);
+      if (s.trip && s.currentLoadId === truck.currentLoadId && s.nextLoadId === truck.nextLoadId) continue;
+      const fixed: Truck = { ...truck, ...s };
+      if (!s.trip) delete fixed.trip;
+      await save("trucks", ctx.carrier.id, fixed as unknown as Item);
+      ctx.trucks = ctx.trucks.map((t) => (t.id === truck.id ? fixed : t));
+      continue;
+    }
     const current = ctx.loads.find((l) => l.id === truck.currentLoadId);
     if (!current || !ROLLING.has(current.stage)) continue;
     const want = slotsFor(ctx.loads, truck).nextLoadId;

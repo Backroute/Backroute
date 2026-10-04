@@ -23,6 +23,7 @@ import { useMoving } from "@/lib/moving";
 import { OfflineBadge } from "@/components/shared/offline-badge";
 import { useNow } from "@/lib/hooks";
 import { keepLoadMap } from "@/lib/service-worker";
+import { TripStops } from "@/components/driver/trip-stops";
 import { cityCoords } from "@/lib/trip-geo";
 import { weekEarnings } from "@/lib/earnings";
 import { computeDriverPay } from "@/lib/settlements";
@@ -220,6 +221,7 @@ export default function DriverHomePage() {
           <TripCompactCard {...tripProps} showMap={!hero} onOpen={() => setSheetOpen(true)} />
           <QuickReplies stage={tripProps.load.stage} onSent={(text) => setSentNote(text)} />
           {truck && <RoadTools load={tripProps.load} truck={truck} driver={driver} />}
+          {truck?.trip && <TripStops truck={truck} loads={loads} hrefFor={(id) => `/driver/loads/${id}`} />}
           <TripSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Trip details">
             <TripDetails {...tripProps} autoPick={autoPick} onAutoPick={toggleAutoPick} loadHref={`/driver/loads/${tripProps.load.id}`} />
           </TripSheet>

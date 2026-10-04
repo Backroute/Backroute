@@ -23,6 +23,7 @@ import { alertSupport } from "./support";
 import { addFacilityNote, cleanHours, facilitiesOf, tipsForLoad } from "./facility-notes";
 import { recordReefer } from "./reefer";
 import { askedForIt, bookForAi, cancelParking, spotsForAi } from "./parking";
+import { followTrip, nextStopLine } from "./trips";
 
 /**
  * The AI dispatcher on the server: one brain behind texts, calls and email. It reads the carrier's data, answers,
@@ -142,7 +143,9 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: Talk, effects
           event({ type: "check_call", loadId: load.id, message: `${first}: ${LOAD_STAGE_LABEL[target].toLowerCase()}`, detail: `${load.lane.origin} → ${load.lane.destination} · ${BY[channel]}`, severity: "info" }),
         );
         effects.done.push(`Marked ${load.referenceNumber} ${LOAD_STAGE_LABEL[target]}`);
-        return `Done: ${load.referenceNumber} is now ${LOAD_STAGE_LABEL[target]}.`;
+        // On a multi-load trip, loaded at one stop means on to the next one (lib/agent/trips).
+        const onTrip = truck?.trip && load.tripId === truck.trip.id ? nextStopLine(await followTrip(ctx, truck), ctx.loads) : null;
+        return `Done: ${load.referenceNumber} is now ${LOAD_STAGE_LABEL[target]}.${onTrip ? ` Tell them: ${onTrip}` : ""}`;
       },
     }),
     betaZodTool({

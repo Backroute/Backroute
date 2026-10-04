@@ -27,6 +27,7 @@ import { computeEconomics, computeLoadScore } from "./scoring";
 import { nextStop } from "./load-status";
 import { dockClock, dockMinutes, detentionFor, formatDockTime } from "./detention";
 import { cityCoords, distanceMiles, legMiles, legProgress } from "./trip-geo";
+import { nextStop as nextTripStop } from "./trip-plan";
 import { bookableBrokers, type BrokerPolicy } from "./broker-policy";
 import { homeTimeStatus } from "./home";
 import { HOME_TIME_OPTIONS, laneFits, RUN_TYPE_DETAIL, RUN_TYPE_LABEL } from "./run-types";
@@ -1713,7 +1714,14 @@ export const useStore = create<StoreState>((set, get) => ({
         let trucks = state.trucks;
         const aiEvent = aiMilestoneEvent(result.load, state.brokers.find((b) => b.id === load.brokerId)?.company ?? "the broker");
         let events = aiEvent ? [...result.events, aiEvent] : result.events;
-        if (result.truckUpdates) {
+        // A multi-load trip (lib/trip-plan): loaded or dropped at one stop, the truck goes on to the load at the next.
+        const onTrip = truck?.trip && load.tripId === truck.trip.id ? nextTripStop(truck, state.loads.map((l) => (l.id === result.load.id ? result.load : l))) : null;
+        if (truck && onTrip) {
+          const moved = result.load.stage === "delivered" ? { currentCity: load.lane.destination, currentState: load.lane.destState } : {};
+          trucks = trucks.map((t) => (t.id === truck.id ? { ...t, ...moved, currentLoadId: onTrip.load.id, status: "on_load" as const } : t));
+        } else if (result.truckUpdates) {
+          // The trip's last drop ends it.
+          if (truck?.trip && load.tripId === truck.trip.id) trucks = trucks.map((t) => (t.id === truck.id ? { ...t, trip: undefined } : t));
           const tu = result.truckUpdates;
           trucks = trucks.map((t) => (t.id === tu.id ? { ...t, ...tu } : t));
           if (tu.status === "available" && tu.currentLoadId === null) {

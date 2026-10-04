@@ -315,6 +315,27 @@ export interface Truck {
   registrationExpires?: string;
   /** What truck GPS apps route around: low bridges, weight limits, hazmat tunnels. */
   profile?: TruckProfile;
+  /** The trailer's floor and what it can legally carry, for putting partial loads together. Unset: 53 ft (48 ft
+   *  flatbed) and 44,000 lbs. */
+  trailer?: { feet: number; payloadLbs: number };
+  /** Real accounts: several partial loads hauled together on one run (lib/trip-plan): every pickup and drop in the
+   *  order the truck makes them. Each load keeps its own rate con and invoice. */
+  trip?: Trip;
+}
+
+/** One pickup or drop on a multi-load trip. */
+export interface TripStop {
+  loadId: string;
+  kind: "pickup" | "delivery";
+}
+
+export interface Trip {
+  id: string;
+  stops: TripStop[];
+  /** When the order was last worked out. */
+  at: string;
+  /** Things the driver should know about the order: a load that has to be moved to get another out (a restack). */
+  warnings?: string[];
 }
 
 export interface TruckProfile {
@@ -695,6 +716,12 @@ export interface Load {
   scheduleWarnings?: ScheduleWarning[];
   /** Real accounts: a reefer load's temperatures, as the driver read them off the unit (lib/agent/reefer). */
   reeferLog?: { at: string; tempF: number; pulp?: boolean; by: "driver" | "photo" }[];
+  /** A partial (LTL-sized) load: how much of the trailer it takes. Absent: a full truckload. */
+  partial?: { feet?: number; pallets?: number };
+  /** The shipper wants the trailer to itself (exclusive use): nothing rides with it. */
+  exclusive?: boolean;
+  /** The multi-load trip it rides on (Truck.trip), when it shares the trailer with others. */
+  tripId?: string;
 }
 
 export interface ScheduleWarning {

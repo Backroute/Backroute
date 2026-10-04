@@ -1,4 +1,5 @@
 import "server-only";
+import { partialOf } from "../feeds";
 import type { EquipmentType } from "../../types";
 import { BoardError, type Board, type BoardLoad, type BoardQuery, type TruckPosting } from "./types";
 
@@ -46,7 +47,7 @@ interface DatMatch {
     origin?: { city?: string; stateProv?: string };
     destination?: { place?: { city?: string; stateProv?: string } };
     equipmentType?: string;
-    capacity?: { shipment?: { maximumWeightPounds?: number } };
+    capacity?: { shipment?: { maximumWeightPounds?: number; maximumLengthFeet?: number; fullPartial?: "FULL" | "PARTIAL" } };
   };
   availability?: { earliestWhen?: string; latestWhen?: string };
   tripLength?: { miles?: number };
@@ -77,6 +78,7 @@ function toLoad(m: DatMatch): BoardLoad | null {
     miles: m.tripLength?.miles ?? null,
     weight: a?.capacity?.shipment?.maximumWeightPounds ?? null,
     notes: m.comments?.join(" ") || null,
+    ...partialOf({ fullPartial: a?.capacity?.shipment?.fullPartial, length: a?.capacity?.shipment?.maximumLengthFeet, notes: m.comments?.join(" ") }),
     brokerName: m.posterInfo?.companyName ?? "DAT poster",
     brokerEmail: m.posterInfo?.contact?.email?.toLowerCase() ?? null,
     brokerPhone: m.posterInfo?.contact?.phone ?? null,

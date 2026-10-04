@@ -32,6 +32,21 @@ const num = (v: unknown) => {
   return Number.isFinite(n) && String(v ?? "").trim() !== "" ? n : null;
 };
 
+/**
+ * A partial (LTL-sized) load, from what a feed or board says: a full/partial flag ("P", "Partial", "LTL", true), the
+ * pallets and the feet of trailer it takes, or words in the notes ("partial, 8 pallets", "12 ft"). Nothing when it's
+ * a full load or it doesn't say.
+ */
+export function partialOf(f: { fullPartial?: unknown; pallets?: unknown; length?: unknown; notes?: unknown }): { partial?: boolean; pallets?: number | null; lengthFeet?: number | null } {
+  const flag = f.fullPartial === true || /^(p|partial|ltl|ptl|volume)$/i.test(String(f.fullPartial ?? "").trim());
+  const notes = String(f.notes ?? "");
+  const said = /\b(partial|ltl|ptl|volume (load|shipment)|co-?load)\b/i.test(notes);
+  if (!flag && !said) return {};
+  const pallets = num(f.pallets) ?? (Number(notes.match(/\b(\d{1,2})\s*(pallets?|plts?|skids?)\b/i)?.[1]) || null);
+  const feet = num(f.length) ?? (Number(notes.match(/\b(\d{1,2})\s*(ft|feet|')(?![a-z])/i)?.[1]) || null);
+  return { partial: true, pallets: pallets && pallets > 0 && pallets <= 30 ? pallets : null, lengthFeet: feet && feet > 0 && feet < 53 ? feet : null };
+}
+
 export function toRow(r: Record<string, unknown>): FeedRow | null {
   const row: FeedRow = {
     loadNumber: str(r.loadNumber ?? r.load_number ?? r.reference),
@@ -48,6 +63,7 @@ export function toRow(r: Record<string, unknown>): FeedRow | null {
     miles: num(r.miles),
     weight: num(r.weight),
     notes: str(r.notes),
+    ...partialOf({ fullPartial: r.fullPartial ?? r.full_partial ?? r.partial ?? r.loadSize ?? r.load_size, pallets: r.pallets, length: r.lengthFeet ?? r.length_feet ?? r.length, notes: r.notes }),
     brokerName: str(r.brokerName ?? r.broker_name ?? r.broker),
     brokerEmail: str(r.brokerEmail ?? r.broker_email)?.toLowerCase() ?? null,
     brokerPhone: str(r.brokerPhone ?? r.broker_phone),

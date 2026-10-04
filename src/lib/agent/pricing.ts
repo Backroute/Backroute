@@ -1,5 +1,6 @@
 import type { AgentSettings } from "../store";
 import type { Load } from "../types";
+import { partialShare } from "../trip-plan";
 
 /**
  * The money rules, in code rather than in the AI's instructions, so a broker's email can't talk the AI below them:
@@ -13,10 +14,16 @@ const round25 = (n: number) => Math.ceil(n / 25) * 25;
 export const laneKey = (lane: Pick<Load["lane"], "originState" | "destState">) => `${lane.originState.toUpperCase()}>${lane.destState.toUpperCase()}`;
 
 /** The lowest the AI goes on a load: the owner's lowest rate a mile, or their own number for that lane if higher. */
-export function floorFor(load: Pick<Load, "lane">, settings: Pick<AgentSettings, "minRpm" | "laneFloors">): number | null {
+export function floorFor(load: Pick<Load, "lane"> & Partial<Pick<Load, "partial">>, settings: Pick<AgentSettings, "minRpm" | "laneFloors">): number | null {
   const rpm = Math.max(settings.minRpm ?? 0, settings.laneFloors?.[laneKey(load.lane)] ?? 0);
-  return rpm ? round25(rpm * load.lane.miles) : null;
+  return rpm ? round25(rpm * milesOf(load)) : null;
 }
+
+/**
+ * The miles a load is priced on: all of them for a full load; for a partial, its share of the trailer (lib/trip-plan),
+ * since it rides with others and pays for the room it takes, never under about a third of a truck.
+ */
+const milesOf = (load: Pick<Load, "lane"> & Partial<Pick<Load, "partial">>) => load.lane.miles * partialShare(load);
 
 /** How a broker has dealt with this carrier before (lib/agent/memory), for pricing the next load with them. */
 export interface BrokerHabits {
@@ -46,7 +53,7 @@ export function learnedFor<T extends { factor: number; source: "broker" | "lane"
 }
 
 export function askFor(
-  load: Pick<Load, "lane" | "listedRate">,
+  load: Pick<Load, "lane" | "listedRate"> & Partial<Pick<Load, "partial">>,
   settings: Pick<AgentSettings, "minRpm">,
   lane?: { count: number; avgRpm: number | null },
   market?: { rpm: number; high?: number } | null,
@@ -61,13 +68,13 @@ export function askFor(
   else if (floor) ask = round25(floor * 1.25);
   // The carrier has hauled this lane for more, more than once: ask for what it usually gets, up to 15% over the post.
   if (lane?.avgRpm && lane.count >= 2) {
-    const usual = round25(lane.avgRpm * load.lane.miles);
+    const usual = round25(lane.avgRpm * milesOf(load));
     const cap = posted ? round25(posted * 1.15) : usual;
     ask = Math.max(ask ?? 0, Math.min(usual, cap));
   }
   // This broker has paid more before, on loads we hauled for them: at least that, up to 20% over the post.
   if (broker?.avgRpm && broker.booked >= 2) {
-    const paid = round25(broker.avgRpm * load.lane.miles);
+    const paid = round25(broker.avgRpm * milesOf(load));
     ask = Math.max(ask ?? 0, Math.min(paid, posted ? round25(posted * 1.2) : paid));
   }
   // How the last asks went (lib/agent/ask-learning) moves the opening number; when that's from this broker it replaces
@@ -80,8 +87,8 @@ export function askFor(
   }
   if (ask && learnedNow) ask = round25(ask * learnedNow.factor);
   if (market?.rpm) {
-    const average = round25(market.rpm * load.lane.miles);
-    const top = market.high ? round25(market.high * load.lane.miles) : round25(average * 1.1);
+    const average = round25(market.rpm * milesOf(load));
+    const top = market.high ? round25(market.high * milesOf(load)) : round25(average * 1.1);
     // The market pays more than we'd ask: open at its average. Asking past its top just loses the load.
     ask = Math.min(Math.max(ask ?? 0, average), top);
   }
