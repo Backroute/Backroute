@@ -42,7 +42,7 @@ A lane on screen is `<Lane from to />` (`components/ui/lane.tsx`): an arrow icon
 ## Load cards
 
 `components/shared/load-offer-card.tsx`, the same card for owners and drivers, in a row you swipe or step through with
-the arrows (`components/shared/offer-rail.tsx`: never moves on its own, the next card peeks in, "1 of 3" says how many).
+the round arrows on its left and right edges (`components/shared/offer-rail.tsx`): it never moves on its own, the next card peeks in, the dots underneath show which one is up (tap one to jump), and the arrows sit level with the trip line so they never cover a word.
 
 - The best load is first and the opposite colour of the page (`.theme-invert`: dark on a light page, light on a dark
   one), with a blue "Best fit" tag on its top edge.
