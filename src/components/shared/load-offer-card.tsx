@@ -14,6 +14,8 @@ import { LoadScoreBadge } from "./load-score";
 import { BrokerTrustBadge } from "./broker-trust-badge";
 import { TimeAgo } from "./time-ago";
 import { Lane } from "@/components/ui/lane";
+import { useMounted } from "@/lib/hooks";
+import { stopDates, type StopWhen } from "@/lib/load-dates";
 
 type AskState = "idle" | "composing" | "pending" | "replied";
 
@@ -23,7 +25,7 @@ const RELOAD = { strong: "Easy", fair: "Fair", weak: "Slow" } as const;
 function driveTime(miles: number) {
   const h = miles / 50;
   if (h < 1) return `about ${Math.max(5, Math.round((h * 60) / 5) * 5)} min`;
-  return `about ${Math.round(h)} h driving`;
+  return `about ${Math.round(h)} h`;
 }
 
 /**
@@ -55,6 +57,7 @@ export function LoadOfferCard({
   const [text, setText] = useState("");
   const [reply, setReply] = useState("");
   const owner = viewer === "owner";
+  const mounted = useMounted();
 
   function handleSend() {
     const trimmed = text.trim();
@@ -92,25 +95,19 @@ export function LoadOfferCard({
   const reason = load.homeTonight && !load.lane.moveKind ? "Home tonight" : load.homeTimeFit ? "Heads toward home" : highlight;
   const askLabel = real ? (load.listedRate > 0 ? `Backroute asks ${formatCurrency(load.targetRate)} (posted ${formatCurrency(load.listedRate)})` : `Backroute asks ${formatCurrency(load.targetRate)}`) : null;
 
-  const when = (w: string) => {
-    const [day, ...rest] = w.split(", ");
-    return { day: day.charAt(0).toUpperCase() + day.slice(1), time: rest.join(", ") };
-  };
-  const pickup = when(load.pickupWindow);
-  const delivery = when(load.deliveryWindow);
+  // Real dates once on the phone (the server doesn't know the viewer's day); the load's own words until then.
+  const dates = mounted ? stopDates(load) : null;
 
-  // What the rate turns into for the owner: what they keep, and where the rest goes.
+  // The rate first, then every cost that comes out of it, down to what's left: the whole sum, in the open.
   const costs = [
     { label: "Fuel", amount: load.fuelCost },
     { label: "Tolls", amount: load.tollCost },
-    { label: "Empty miles", amount: load.deadheadCost },
-    { label: "Fee", amount: load.commission },
+    { label: load.deadheadMiles > 0 ? `Empty miles (${load.deadheadMiles} mi)` : "Empty miles", amount: load.deadheadCost },
+    { label: "Backroute fee (2%)", amount: load.commission },
   ].filter((c) => c.amount > 0);
-  const keep = Math.max(0, load.netProfit ?? 0);
-  const keepShare = load.targetRate > 0 ? Math.min(100, Math.round((keep / load.targetRate) * 100)) : 0;
 
   const facts = [
-    { label: "Per mile", value: `$${(load.rpm ?? 0).toFixed(2)}` },
+    { label: "Drive", value: driveTime(load.lane.miles) },
     { label: "Empty miles", value: load.deadheadMiles > 0 ? `${load.deadheadMiles} mi` : "None" },
     load.reloadMarket && !load.lane.moveKind
       ? { label: "Reload", value: RELOAD[load.reloadMarket] }
@@ -143,7 +140,7 @@ export function LoadOfferCard({
       <h3 className="sr-only">
         <Lane from={load.lane.origin} to={load.lane.destination} />
       </h3>
-      <ol className="mt-5 grid grid-cols-[1.25rem_1fr_auto] gap-x-3">
+      <ol className="mt-5 grid grid-cols-[1.25rem_1fr] gap-x-3">
         <li className="contents">
           <span className="flex flex-col items-center pt-[7px]">
             <span className="h-3 w-3 shrink-0 rounded-full bg-ink-950" />
@@ -153,20 +150,15 @@ export function LoadOfferCard({
             <p className="truncate text-[22px] font-semibold leading-tight tracking-[-0.02em] text-ink-950">
               {load.lane.origin}, <span className="text-ink-400">{load.lane.originState}</span>
             </p>
-            <p className="text-sm text-ink-500">Pickup</p>
-          </div>
-          <div className="text-right">
-            <p className="pt-1 text-[15px] font-semibold text-ink-950">{pickup.day}</p>
-            <p className="text-sm tabular text-ink-500">{pickup.time}</p>
+            <StopDate stop="Pickup" when={dates?.pickup} raw={load.pickupWindow} />
           </div>
         </li>
         <li className="contents">
           <span className="flex justify-center">
             <span className="w-0.5 bg-ink-200" />
           </span>
-          <p className="col-span-2 py-3 text-sm font-medium tabular text-ink-500">
+          <p className="py-3 text-sm font-medium tabular text-ink-500">
             {load.lane.miles.toLocaleString()} mi
-            <span className="font-normal text-ink-400"> · {driveTime(load.lane.miles)}</span>
           </p>
         </li>
         <li className="contents">
@@ -177,11 +169,7 @@ export function LoadOfferCard({
             <p className="truncate text-[22px] font-semibold leading-tight tracking-[-0.02em] text-ink-950">
               {load.lane.destination}, <span className="text-ink-400">{load.lane.destState}</span>
             </p>
-            <p className="text-sm text-ink-500">Delivery</p>
-          </div>
-          <div className="text-right">
-            <p className="pt-1 text-[15px] font-semibold text-ink-950">{delivery.day}</p>
-            <p className="text-sm tabular text-ink-500">{delivery.time}</p>
+            <StopDate stop="Delivery" when={dates?.delivery} raw={load.deliveryWindow} />
           </div>
         </li>
       </ol>
@@ -196,23 +184,30 @@ export function LoadOfferCard({
         ))}
       </dl>
 
-      <div className="mt-4 flex items-end justify-between gap-3">
-        <div>
-          <p className="text-sm text-ink-500">{owner ? "You keep" : load.lane.moveKind ? "Flat per move" : "Load pays"}</p>
-          <p className="mt-1 text-[44px] font-semibold leading-none tracking-[-0.05em] tabular text-ink-950">
-            {formatCurrency(owner ? (load.netProfit ?? 0) : load.targetRate)}
+      <div className="mt-4 rounded-[20px] bg-ink-100 p-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-sm text-ink-500">{load.lane.moveKind ? "Pays per move" : "Load pays"}</p>
+          <p className="text-sm font-semibold tabular text-ink-950">
+            ${(load.rpm ?? 0).toFixed(2)}
+            <span className="font-normal text-ink-500">/mi</span>
           </p>
         </div>
-        {owner && <p className="pb-1 text-right text-sm tabular text-ink-500">of {formatCurrency(load.targetRate)}</p>}
+        <p className="mt-1 text-[44px] font-semibold leading-none tracking-[-0.05em] tabular text-ink-950">{formatCurrency(load.targetRate)}</p>
+        {costs.length > 0 && (
+          <dl className="mt-4 flex flex-col gap-1.5 border-t border-line-strong pt-3 text-sm tabular">
+            {costs.map((c) => (
+              <div key={c.label} className="flex justify-between gap-3">
+                <dt className="text-ink-600">{c.label}</dt>
+                <dd className="text-ink-600">−{formatCurrency(c.amount)}</dd>
+              </div>
+            ))}
+            <div className="mt-1 flex items-baseline justify-between gap-3 border-t border-line-strong pt-2.5">
+              <dt className="font-semibold text-ink-950">{owner ? "You keep" : "Left after costs"}</dt>
+              <dd className="text-[17px] font-semibold text-ink-950">{formatCurrency(load.netProfit ?? 0)}</dd>
+            </div>
+          </dl>
+        )}
       </div>
-      {owner && load.targetRate > 0 && (
-        <div className="mt-3">
-          <div className="flex h-1.5 overflow-hidden rounded-full bg-ink-150" role="img" aria-label={`You keep ${keepShare}% of the rate`}>
-            <span className="h-full rounded-full bg-ink-950" style={{ width: `${keepShare}%` }} />
-          </div>
-          <p className="mt-1.5 text-xs text-ink-500">{keepShare}% of the rate is yours after costs</p>
-        </div>
-      )}
 
       <p className="mt-4 inline-flex items-center gap-2 self-start rounded-full bg-ink-100 px-3 py-1.5 text-sm font-medium text-ink-800">
         {reason === highlight ? <Sparkles className="h-4 w-4 shrink-0 text-ink-500" /> : <Home className="h-4 w-4 shrink-0 text-ink-500" />}
@@ -232,24 +227,6 @@ export function LoadOfferCard({
               <span>Pays in about {broker.avgDaysToPay} days</span>
               {load.surchargePct ? <span>· +{load.surchargePct}% asked for slow pay</span> : null}
             </p>
-          )}
-          {owner && (
-            <dl className="mb-1 flex flex-col gap-1 tabular">
-              <div className="flex justify-between">
-                <dt>Rate</dt>
-                <dd className="text-ink-950">{formatCurrency(load.targetRate)}</dd>
-              </div>
-              {costs.map((c) => (
-                <div key={c.label} className="flex justify-between">
-                  <dt>{c.label}</dt>
-                  <dd>−{formatCurrency(c.amount)}</dd>
-                </div>
-              ))}
-              <div className="flex justify-between border-t border-line pt-1 font-medium text-ink-950">
-                <dt>You keep</dt>
-                <dd>{formatCurrency(load.netProfit ?? 0)}</dd>
-              </div>
-            </dl>
           )}
           {reason !== highlight && <p>{highlight}</p>}
           {real && load.market && (
@@ -333,5 +310,22 @@ export function LoadOfferCard({
       </div>
       </div>
     </article>
+  );
+}
+
+/** "Pickup · Sun, Oct 4 (today) · 9 am–6 pm": the date stands out; the load's own words if it has no date. */
+function StopDate({ stop, when, raw }: { stop: string; when: StopWhen | null | undefined; raw: string }) {
+  return (
+    <p className="mt-0.5 text-[15px] leading-snug text-ink-500">
+      {stop} ·{" "}
+      <span className="font-semibold text-ink-950">{when?.date ?? raw.charAt(0).toUpperCase() + raw.slice(1)}</span>
+      {when?.relative && ` (${when.relative.toLowerCase()})`}
+      {when?.time && (
+        <>
+          {" · "}
+          <span className="whitespace-nowrap tabular">{when.time}</span>
+        </>
+      )}
+    </p>
   );
 }

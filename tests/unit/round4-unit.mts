@@ -31,11 +31,11 @@ ok("negative values still pair (home-time priority in the millions)", JSON.strin
 const L = (id: string, stage: string, pickup: number, extra: any = {}) => ({ id, stage, truckId: "t1", pickupAt: iso(pickup), deliveryAt: iso(pickup + DAY), lane: { origin: "Dallas", originState: "TX", destination: "Memphis", destState: "TN" }, ...extra }) as any;
 const truck = { id: "t1", currentLoadId: "a", status: "on_load", currentCity: "Dallas", currentState: "TX" } as any;
 const loads = [L("c", "booked", now + 3 * DAY, { lane: { origin: "Atlanta", originState: "GA", destination: "Chicago", destState: "IL" } }), L("a", "in_transit", now - DAY), L("b", "rate_confirmed", now + DAY), L("x", "delivered", now - 5 * DAY)];
-ok("chain: current first, then by pickup, delivered left out", chainOf(loads, truck).map((l) => l.id).join() === "a,b,c");
-const free = freeAfter(loads, truck);
+ok("chain: current first, then by pickup, delivered left out", chainOf(loads, truck, now).map((l) => l.id).join() === "a,b,c");
+const free = freeAfter(loads, truck, now);
 ok("free after the last lined-up load, where it delivers", free.city === "Chicago" && free.lined === 3 && free.at === now + 4 * DAY + 2 * 3600_000);
 ok("lined-up cap is three", LINED_UP_MAX === 3);
-const after = slotsFor(loads.filter((l) => l.id !== "a"), { ...truck, currentLoadId: null });
+const after = slotsFor(loads.filter((l) => l.id !== "a"), { ...truck, currentLoadId: null }, now);
 ok("when the current one delivers, the next moves up", after.currentLoadId === "b" && after.nextLoadId === "c" && after.status === "on_load");
 ok("nothing lined up: available", slotsFor([], truck).status === "available" && slotsFor([], truck).currentLoadId === null);
 ok("in the shop stays in the shop", slotsFor(loads, { ...truck, status: "maintenance" }).status === "maintenance");

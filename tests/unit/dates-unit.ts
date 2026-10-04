@@ -1,0 +1,41 @@
+import { friendlyClock, stopDates } from "../../src/lib/load-dates";
+
+// Noon on Sunday, Oct 4 2026, local time; the load came in at 8 am the same day.
+const now = new Date(2026, 9, 4, 12).getTime();
+const createdAt = new Date(2026, 9, 4, 8).toISOString();
+let bad = 0;
+const eq = (name: string, got: unknown, want: unknown) => {
+  const ok = JSON.stringify(got) === JSON.stringify(want);
+  if (!ok) bad++;
+  console.log(ok ? "ok " : "BAD", name, "→", JSON.stringify(got));
+};
+
+eq("24-hour window", friendlyClock("9:00–17:00"), "9 am–5 pm");
+eq("AM/PM window", friendlyClock("appointment 9:00 AM–10:30 AM"), "appointment 9 am–10:30 am");
+eq("noon and midnight", friendlyClock("12:00–0:00"), "12 pm–12 am");
+
+const a = stopDates({ pickupWindow: "tomorrow, 9:00–17:00", deliveryWindow: "Next day", createdAt }, now);
+eq("tomorrow pickup", [a.pickup.date, a.pickup.relative, a.pickup.time], ["Mon, Oct 5", "Tomorrow", "9 am–5 pm"]);
+eq("next-day delivery counts from pickup", [a.delivery.date, a.delivery.relative, a.delivery.time], ["Tue, Oct 6", null, null]);
+
+const b = stopDates({ pickupWindow: "today, 6:00–15:00", deliveryWindow: "2 day transit", createdAt }, now);
+eq("today pickup", [b.pickup.date, b.pickup.relative], ["Sun, Oct 4", "Today"]);
+eq("2 day transit", b.delivery.date, "Tue, Oct 6");
+
+const c = stopDates({ pickupWindow: "today, appointment 2:00 PM–3:00 PM", deliveryWindow: "Same day, by appointment", createdAt }, now);
+eq("same day by appointment", [c.delivery.date, c.delivery.relative, c.delivery.time], ["Sun, Oct 4", "Today", "By appointment"]);
+
+const d = stopDates({ pickupWindow: "Tue, Oct 6, 2:00 PM CDT", deliveryWindow: "Thu, Oct 8, 8:00 AM EDT", createdAt }, now);
+eq("formatted stop times", [d.pickup.date, d.pickup.time, d.delivery.date, d.delivery.time], ["Tue, Oct 6", "2 pm CDT", "Thu, Oct 8", "8 am EDT"]);
+
+const e = stopDates({ pickupWindow: "2026-10-09", deliveryWindow: "2026-10-10", createdAt }, now);
+eq("ISO dates", [e.pickup.date, e.delivery.date], ["Fri, Oct 9", "Sat, Oct 10"]);
+
+const f = stopDates({ pickupWindow: "Ask the broker", deliveryWindow: "Ask the broker", createdAt }, now);
+eq("no date: keep the words", [f.pickup.date, f.pickup.raw], [null, "Ask the broker"]);
+
+// A load that came in yesterday saying "tomorrow" picks up today.
+const g = stopDates({ pickupWindow: "tomorrow, 8:00–12:00", deliveryWindow: "Same day", createdAt: new Date(2026, 9, 3, 9).toISOString() }, now);
+eq("words count from when the load came in", [g.pickup.date, g.pickup.relative], ["Sun, Oct 4", "Today"]);
+
+console.log(bad ? `${bad} BAD` : "all ok");

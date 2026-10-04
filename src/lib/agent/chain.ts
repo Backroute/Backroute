@@ -65,16 +65,16 @@ export function doneAt(l: Load): number | null {
 }
 
 /** Where the truck ends up after everything lined up, and when (null when the last load has no delivery time). */
-export function freeAfter(loads: Load[], truck: Truck): { city: string; state: string; at: number | null; lined: number } {
-  const last = chainEnd(loads, truck);
+export function freeAfter(loads: Load[], truck: Truck, now = Date.now()): { city: string; state: string; at: number | null; lined: number } {
+  const last = chainEnd(loads, truck, now);
   if (!last) return { city: truck.currentCity, state: truck.currentState, at: null, lined: 0 };
   const done = doneAt(last);
-  return { city: last.lane.destination, state: last.lane.destState, at: done ? done + 2 * HOUR : null, lined: linedUp(loads, truck) };
+  return { city: last.lane.destination, state: last.lane.destState, at: done ? done + 2 * HOUR : null, lined: linedUp(loads, truck, now) };
 }
 
 /** The truck's current and next load from its chain, after a load is booked, delivered or dropped. */
-export function slotsFor(loads: Load[], truck: Truck): Pick<Truck, "currentLoadId" | "nextLoadId" | "status" | "trip"> {
-  const chain = chainOf(loads, truck);
+export function slotsFor(loads: Load[], truck: Truck, now = Date.now()): Pick<Truck, "currentLoadId" | "nextLoadId" | "status" | "trip"> {
+  const chain = chainOf(loads, truck, now);
   const current = chain[0] ?? null;
   // A trip's other loads aren't "next": they're on the truck already. Next is what comes after the trip.
   const onTrip = truck.trip ? new Set(tripLoads(truck, loads).map((l) => l.id)) : new Set<string>();
