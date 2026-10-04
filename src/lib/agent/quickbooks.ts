@@ -213,12 +213,14 @@ export async function syncQuickbooks(ctx: CarrierContext, config: QuickbooksConf
   const customers = new Map<string, string>();
   let budget = 60;
   const n = { invoices: 0, payments: 0, costs: 0, updated: 0 };
-  const marks = await admin().from("agent_marks").select("load_id, kind, data").eq("carrier_id", ctx.carrier.id).in("kind", ["qbo_invoice", "qbo_payment"]);
+  // What went in is remembered per QuickBooks company: connecting a different one puts everything in there too.
+  const K = { invoice: `qbo_invoice:${config.realmId}`, payment: `qbo_payment:${config.realmId}`, cost: `qbo_cost:${config.realmId}` };
+  const marks = await admin().from("agent_marks").select("load_id, kind, data").eq("carrier_id", ctx.carrier.id).in("kind", [K.invoice, K.payment]);
   type InvoiceMark = { id?: string; amount?: number; voided?: boolean };
-  const invoiceMarks = new Map((marks.data ?? []).filter((m) => m.kind === "qbo_invoice").map((m) => [m.load_id as string, (m.data ?? {}) as InvoiceMark]));
+  const invoiceMarks = new Map((marks.data ?? []).filter((m) => m.kind === K.invoice).map((m) => [m.load_id as string, (m.data ?? {}) as InvoiceMark]));
   const invoiceIds = new Map([...invoiceMarks].map(([k, v]) => [k, v.id]));
-  const paidInBooks = new Set((marks.data ?? []).filter((m) => m.kind === "qbo_payment").map((m) => m.load_id as string));
-  const setMark = (loadId: string, data: InvoiceMark) => admin().from("agent_marks").update({ data }).eq("carrier_id", ctx.carrier.id).eq("load_id", loadId).eq("kind", "qbo_invoice");
+  const paidInBooks = new Set((marks.data ?? []).filter((m) => m.kind === K.payment).map((m) => m.load_id as string));
+  const setMark = (loadId: string, data: InvoiceMark) => admin().from("agent_marks").update({ data }).eq("carrier_id", ctx.carrier.id).eq("load_id", loadId).eq("kind", K.invoice);
   const invoiceLines = (l: Load) => (l.invoice!.lines?.length ? l.invoice!.lines : [{ label: "Line haul, all in", amount: l.invoice!.amount }]).map((x) => ({ DetailType: "SalesItemLineDetail", Amount: money(x.amount), Description: `${x.label} · ${l.referenceNumber} · ${lane(l)}`, SalesItemLineDetail: { ItemRef: { value: ids.item }, Qty: 1, UnitPrice: money(x.amount) } }));
   const syncToken = async (id: string) => ((await api(ctx.carrier.id, config, "GET", `/invoice/${encodeURIComponent(id)}`)) as { Invoice?: { SyncToken?: string } }).Invoice?.SyncToken ?? "0";
 
@@ -248,7 +250,7 @@ export async function syncQuickbooks(ctx: CarrierContext, config: QuickbooksConf
       const customer = await customerFor(ctx, config, l, customers);
       const date = inv.sentAt.slice(0, 10);
       const days = termsDays(l.rateConReading?.paymentTerms);
-      await once(ctx, l.id, "qbo_invoice", async () => {
+      await once(ctx, l.id, K.invoice, async () => {
         // Already in the books under that number (typed in by hand, or sent before): linked, not made twice.
         const there = await query<{ Id: string }>(ctx.carrier.id, config, `select Id from Invoice where DocNumber = '${quote(inv.number.slice(0, 21))}'`);
         if (there[0]) {
@@ -275,7 +277,7 @@ export async function syncQuickbooks(ctx: CarrierContext, config: QuickbooksConf
       const customer = await customerFor(ctx, config, l, customers);
       const paid = money(inv.paidAmount ?? inv.amount);
       if (
-        await once(ctx, l.id, "qbo_payment", async () => {
+        await once(ctx, l.id, K.payment, async () => {
           const made = (await api(ctx.carrier.id, config, "POST", "/payment", { CustomerRef: { value: customer }, TotalAmt: paid, TxnDate: inv.paidAt!.slice(0, 10), PrivateNote: `Load ${l.referenceNumber} · from Backroute`, Line: [{ Amount: paid, LinkedTxn: [{ TxnId: qboId, TxnType: "Invoice" }] }] })) as { Payment: { Id: string } };
           return { id: made.Payment.Id, amount: paid };
         })
@@ -289,7 +291,7 @@ export async function syncQuickbooks(ctx: CarrierContext, config: QuickbooksConf
   const sinceIso = new Date(since).toISOString();
   const cost = async (key: string, date: string, amount: number, accountId: string, what: string) => {
     if (budget <= 0 || amount <= 0) return;
-    const pushed = await once(ctx, key, "qbo_cost", async () => {
+    const pushed = await once(ctx, key, K.cost, async () => {
       // Already typed in by hand (same day, same amount): left alone, so it isn't in the books twice.
       const there = await query<{ Id: string }>(ctx.carrier.id, config, `select Id from Purchase where TxnDate = '${date}' and TotalAmt = '${money(amount)}'`);
       if (there[0]) return { id: there[0].Id, amount: money(amount), found: true };

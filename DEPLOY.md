@@ -353,6 +353,25 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
   - fuel, tolls, and the lumpers and scales drivers paid that the owner approved
 
   Each goes in once. The company's sign-in is stored encrypted (`20261013000000_quickbooks.sql`). The CSV downloads stay for anyone not on QuickBooks.
+  - When a load's charges change after its invoice went in (detention, a lumper added), the invoice in QuickBooks is brought up to date. A cancelled load's invoice is voided, not deleted (a TONU stays billed).
+  - A fuel or toll charge already typed into QuickBooks (same day, same amount) isn't put in again.
+  - When Intuit asks for the company to be connected again, the owner is told once.
+- **Several partial loads on one trip.** Drivers often haul 5, 6, 7 or more partial (LTL-sized) loads on one run, picking up and dropping along the way. Each load keeps its own broker, rate con and invoice. The AI:
+  - reads partials from broker emails, feeds and boards: the full/partial flag, pallets, or feet of trailer (a pallet is about 2 feet of a 53-foot trailer)
+  - plans the stops in order, up to 8 loads on a trip: every pickup before its drop, the trailer never over its feet or its weight (44,000 lbs unless the owner set the truck's own), each appointment made, and 10 hours off after 11 of driving
+  - keeps freight apart that can't share: hazmat with food, reefer loads set more than 2°F apart, a load the shipper wants the trailer to itself for
+  - picks the order with the fewest miles, and avoids making a load come off from behind another. When it can't, the driver is told which load to ask the shipper to put by the doors.
+  - asks for a partial only when it fits the truck's trip. It's priced by the share of the trailer it takes (never under about a third of a full load's price) and costed by the miles it adds, so a load on roads the truck drives anyway shows its real profit.
+  - books it onto the trip, and texts the driver which stop to pick it up and drop it at
+  - The driver's home screen shows **Your trip**: every stop in order, the next one marked, each opening its own load. The Fleet page shows "Trip: 4 loads · stop 3 of 8".
+  - Loaded or dropped (in the app, by text, or by texting the POD), the truck moves on to the next stop. A cancelled load's stops come off, and the rest keep their order.
+  - Late checks and check-call ETAs for a stop further down the trip count the stops before it.
+- **Late warnings for every fleet.** The truck's ETA is checked even when the carrier hasn't set up broker email. The owner is then told to call the broker. When it's tight, the driver gets a heads-up too, with why, and is told not to rush. The broker's late email says why (traffic, weather, the driver's hours).
+- **Parking that follows through.** The owner can book a spot for a truck from the Fleet page. A booked spot is on the books as a company-paid cost (not something to pay the driver back). The driver gets the spot again about an hour before getting there. A spot for a load that's cancelled is cancelled with it.
+- **Board results matched across the fleet**, like emailed loads: every truck's search is pooled, then trucks and loads are paired for the best total.
+- **The lineup, shown.** Under "Up next", the driver and the owner see what's booked after it ("Then …"). The phone keeps the next two loads' map areas for no signal, and the offline badge says how many answers are waiting to send.
+- **Dock hours by day.** A dock that keeps short Saturday hours (or other odd days) is checked against that day's hours.
+- **Lookups kept for every server.** Posted dock hours (a week) and weather warnings (15 minutes) are kept in the database, so a paid lookup isn't repeated on each server (`20261014000000_lookup_cache.sql`, server-only).
 
 ## What it doesn't do yet
 
@@ -385,7 +404,8 @@ The AI now does the day-to-day work of a dispatcher by email, text and phone. Wh
 - **Weather covers the US and Canada only.** Mexico isn't covered.
 - **Holidays are the US ones.** A dock's hours come from what drivers told the AI, else its posted hours on Google Places (a heads-up only). A dock with neither is assumed open.
 - **Parking needs a reservation partner** (step 23). The API Backroute expects is small and written down. Each network (Truck Parking Club, TA, Pilot) has its own partner terms. Without one, the AI finds lots nearby and the driver books in their truck stop app.
-- **QuickBooks Online needs Backroute's Intuit app approved** for production (step 24); until then it runs against Intuit's sandbox companies. It doesn't change an invoice already in QuickBooks when the load's charges change later (add the extra line there), and QuickBooks Desktop isn't supported.
+- **QuickBooks Online needs Backroute's Intuit app approved** for production (step 24); until then it runs against Intuit's sandbox companies. QuickBooks Desktop isn't supported, and a payment already in QuickBooks isn't changed when a load's charges change after it was paid.
+- **Partial trips are planned on rough miles.** The stop order uses straight-line miles times the usual detour, not truck routing, and trailer space in feet only (not pallet height or stacking). The AI adds partials to the trip a truck is on; it doesn't build a whole trip of partials ahead for a truck that's still on a full load. A load that has to come off from behind another is a heads-up to the driver, not something the AI arranges with the shipper.
 
 ## Setting it up
 
@@ -395,7 +415,7 @@ them in chat. `.env.example` lists every variable.
 ### 1. Supabase: accounts and the database
 
 1. Create a project at supabase.com (region near your drivers, e.g. US East).
-2. In **SQL Editor**, run every file in `supabase/migrations/` in order, oldest first (the names start with the date), through `20261012000000_owner_tools.sql`. With the CLI instead: `supabase link`, then `supabase db push`.
+2. In **SQL Editor**, run every file in `supabase/migrations/` in order, oldest first (the names start with the date), through `20261014000000_lookup_cache.sql`. With the CLI instead: `supabase link`, then `supabase db push`.
 3. From **Project Settings → API**, set:
    - `NEXT_PUBLIC_SUPABASE_URL`: the Project URL.
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: the anon (or publishable) key.
@@ -917,6 +937,26 @@ The code was run against local stand-ins that behave like the real services:
   - **Offline:**
     - A Yes tapped with no signal is kept on the phone and goes through once it's back online, then isn't sent again. This was tested on the built app.
     - The trip's map area is saved and served with no signal: Dallas to Waco is 119 pieces, from the whole-trip view to town level. This was tested on the worker itself, because the test browser's service workers can't reach the internet.
+- **Partials on one trip, and the round 5 fixes** (56 unit checks, 30 end-to-end checks in `ux5-e2e`, and the whole suite again: 809 checks, 34 suites, none failing):
+  - **The trip planner:**
+    - Pallets become feet (8 pallets is 17 ft), and an unknown partial is planned as half the trailer.
+    - Hazmat doesn't ride with food, reefer set points 34°F and 0°F don't share, and an exclusive-use load rides alone.
+    - Dallas, Waco and Houston partials run in one pass with no trip back: the Waco drop comes before the Waco pickup, and the Houston drops come off last-loaded first.
+    - 64 ft of freight doesn't fit 53 ft, and 50,000 lbs is over the limit. A drop due too soon can't be planned, the truck waits for an early appointment, and two hours left on the clock puts a 10-hour break in the ETA.
+    - Nine loads is too many for one trip.
+    - A Waco-to-Houston partial on a truck already headed to Houston adds far fewer miles than its own 185.
+  - **From the broker's email to the last drop (end to end):**
+    - Two partials and a full load come in by email. The partials go to the truck already carrying a partial to Houston; the full load doesn't.
+    - Riding along costs no empty miles and $18 of fuel. The Waco load is priced as a partial: $525, where a full truck's floor would have asked $550.
+    - The AI asks for both partials on the same truck. Booked, each joins the trip, and the driver's text says "Pick it up at stop 2 and drop it at stop 3 of 4."
+    - The trip has six stops in order, with nothing to restack. The owner's plan reads "Now: a trip of 3 loads, stop 2 of 6".
+    - The driver's home screen lists every stop in order, and the Fleet page shows "Trip: 3 loads · stop 2 of 6", with no page errors.
+    - Loaded in Dallas, the truck moves on to Waco. The broker cancels the Waco load: its stops come off, and the driver is told not to go. Both Houston drops end the trip and free the truck.
+  - **Parking follows through:** a booked spot is a company-paid cost, the driver gets it again an hour out (once), and cancelling the load cancels the spot and takes its cost off the books.
+  - **Tight on time:** the driver gets "traffic adds 2.1 h … Drive safe, no need to rush".
+  - **QuickBooks:** detention added after the invoice went in updates it ($1,000 + $150), and a cancelled load's invoice is voided once. What went in is remembered per QuickBooks company, so connecting a different company puts everything in there too.
+  - Feeds and boards read partials from a full/partial flag, feet or "8 pallets" in the notes. Per-day dock hours and the reason in the broker's late email are unit-checked too.
+  - The built app still opens and sends saved answers with no signal (6 checks), and the offline worker passes its 8.
 - **Access rules:** 125 checks.
   - A stale copy saving one field of a load changes only that field.
   - What carriers cost to run is server-only.
