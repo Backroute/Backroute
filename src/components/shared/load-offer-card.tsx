@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Home, MessageCircle, Repeat, Send, Sparkles, X } from "lucide-react";
+import { ChevronDown, Home, MessageCircle, Send, Sparkles, X } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useStore } from "@/lib/store";
 import { formatHours } from "@/lib/home";
@@ -16,6 +16,15 @@ import { TimeAgo } from "./time-ago";
 import { Lane } from "@/components/ui/lane";
 
 type AskState = "idle" | "composing" | "pending" | "replied";
+
+const RELOAD = { strong: "Easy", fair: "Fair", weak: "Slow" } as const;
+
+/** Rough wheels-turning time at a truck's average, for a sense of the run (not a plan: breaks aren't in it). */
+function driveTime(miles: number) {
+  const h = miles / 50;
+  if (h < 1) return `about ${Math.max(5, Math.round((h * 60) / 5) * 5)} min`;
+  return `about ${Math.round(h)} h driving`;
+}
 
 /**
  * One load to choose. Four things up front (where, the money, pickup, the one reason it's a good fit) and one button;
@@ -100,6 +109,14 @@ export function LoadOfferCard({
   const keep = Math.max(0, load.netProfit ?? 0);
   const keepShare = load.targetRate > 0 ? Math.min(100, Math.round((keep / load.targetRate) * 100)) : 0;
 
+  const facts = [
+    { label: "Per mile", value: `$${(load.rpm ?? 0).toFixed(2)}` },
+    { label: "Empty miles", value: load.deadheadMiles > 0 ? `${load.deadheadMiles} mi` : "None" },
+    load.reloadMarket && !load.lane.moveKind
+      ? { label: "Reload", value: RELOAD[load.reloadMarket] }
+      : { label: "Weight", value: load.weight ? `${Math.round(load.weight / 1000)}k lb` : "—" },
+  ];
+
   return (
     <article
       className={cn(
@@ -149,7 +166,7 @@ export function LoadOfferCard({
           </span>
           <p className="col-span-2 py-3 text-sm font-medium tabular text-ink-500">
             {load.lane.miles.toLocaleString()} mi
-            {load.deadheadMiles > 0 ? <span className="font-normal text-ink-400"> · {load.deadheadMiles} empty to pickup</span> : null}
+            <span className="font-normal text-ink-400"> · {driveTime(load.lane.miles)}</span>
           </p>
         </li>
         <li className="contents">
@@ -169,38 +186,33 @@ export function LoadOfferCard({
         </li>
       </ol>
 
-      <div className="mt-5 rounded-[20px] bg-ink-100 p-4">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <p className="text-sm text-ink-500">{owner ? "You keep" : load.lane.moveKind ? "Flat per move" : "Load pays"}</p>
-            <p className="mt-1 text-[40px] font-semibold leading-none tracking-[-0.045em] tabular text-ink-950">
-              {formatCurrency(owner ? (load.netProfit ?? 0) : load.targetRate)}
-            </p>
+      {/* Three facts in the same place on every card, so a row of cards reads across (like the fields on a boarding pass). */}
+      <dl className="mt-5 grid grid-cols-3 divide-x divide-line border-y border-line py-3">
+        {facts.map((f) => (
+          <div key={f.label} className="min-w-0 px-3 first:pl-0 last:pr-0">
+            <dt className="truncate text-xs text-ink-500">{f.label}</dt>
+            <dd className="mt-0.5 truncate text-[17px] font-semibold tabular tracking-[-0.01em] text-ink-950">{f.value}</dd>
           </div>
-          <div className="pb-0.5 text-right">
-            <p className="text-[15px] font-semibold tabular text-ink-950">
-              ${(load.rpm ?? 0).toFixed(2)}
-              <span className="font-normal text-ink-500">/mi</span>
-            </p>
-            {owner && <p className="text-sm tabular text-ink-500">of {formatCurrency(load.targetRate)}</p>}
-          </div>
+        ))}
+      </dl>
+
+      <div className="mt-4 flex items-end justify-between gap-3">
+        <div>
+          <p className="text-sm text-ink-500">{owner ? "You keep" : load.lane.moveKind ? "Flat per move" : "Load pays"}</p>
+          <p className="mt-1 text-[44px] font-semibold leading-none tracking-[-0.05em] tabular text-ink-950">
+            {formatCurrency(owner ? (load.netProfit ?? 0) : load.targetRate)}
+          </p>
         </div>
-        {owner && load.targetRate > 0 && (
-          <>
-            <div className="mt-4 flex h-2 overflow-hidden rounded-full bg-ink-300" role="img" aria-label={`You keep ${keepShare}% of the rate`}>
-              <span className="h-full rounded-full bg-ink-950" style={{ width: `${keepShare}%` }} />
-            </div>
-            <p className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-xs tabular text-ink-500">
-              <span className="font-medium text-ink-950">{keepShare}% yours</span>
-              {costs.map((c) => (
-                <span key={c.label}>
-                  {c.label} {formatCurrency(c.amount)}
-                </span>
-              ))}
-            </p>
-          </>
-        )}
+        {owner && <p className="pb-1 text-right text-sm tabular text-ink-500">of {formatCurrency(load.targetRate)}</p>}
       </div>
+      {owner && load.targetRate > 0 && (
+        <div className="mt-3">
+          <div className="flex h-1.5 overflow-hidden rounded-full bg-ink-150" role="img" aria-label={`You keep ${keepShare}% of the rate`}>
+            <span className="h-full rounded-full bg-ink-950" style={{ width: `${keepShare}%` }} />
+          </div>
+          <p className="mt-1.5 text-xs text-ink-500">{keepShare}% of the rate is yours after costs</p>
+        </div>
+      )}
 
       <p className="mt-4 inline-flex items-center gap-2 self-start rounded-full bg-ink-100 px-3 py-1.5 text-sm font-medium text-ink-800">
         {reason === highlight ? <Sparkles className="h-4 w-4 shrink-0 text-ink-500" /> : <Home className="h-4 w-4 shrink-0 text-ink-500" />}
@@ -221,7 +233,24 @@ export function LoadOfferCard({
               {load.surchargePct ? <span>· +{load.surchargePct}% asked for slow pay</span> : null}
             </p>
           )}
-          {owner && <p>Rate {formatCurrency(load.targetRate)} · ${(load.rpm ?? 0).toFixed(2)}/mi</p>}
+          {owner && (
+            <dl className="mb-1 flex flex-col gap-1 tabular">
+              <div className="flex justify-between">
+                <dt>Rate</dt>
+                <dd className="text-ink-950">{formatCurrency(load.targetRate)}</dd>
+              </div>
+              {costs.map((c) => (
+                <div key={c.label} className="flex justify-between">
+                  <dt>{c.label}</dt>
+                  <dd>−{formatCurrency(c.amount)}</dd>
+                </div>
+              ))}
+              <div className="flex justify-between border-t border-line pt-1 font-medium text-ink-950">
+                <dt>You keep</dt>
+                <dd>{formatCurrency(load.netProfit ?? 0)}</dd>
+              </div>
+            </dl>
+          )}
           {reason !== highlight && <p>{highlight}</p>}
           {real && load.market && (
             <p>
@@ -237,12 +266,6 @@ export function LoadOfferCard({
                 : load.hoursHomeAfter < 1
                   ? "Delivers near home"
                   : `Leaves the driver about ${formatHours(load.hoursHomeAfter)} from home`}
-            </p>
-          )}
-          {!load.lane.moveKind && load.reloadMarket && !load.homeTonight && (
-            <p className="flex items-center gap-1.5">
-              <Repeat className="h-3 w-3 shrink-0" />
-              {load.reloadMarket === "strong" ? "Easy to reload there" : load.reloadMarket === "fair" ? "Some loads out of there" : "Few loads out of there, so the next one may take longer"}
             </p>
           )}
           <p className="text-ink-400">

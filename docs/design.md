@@ -42,9 +42,11 @@ A lane on screen is `<Lane from to />` (`components/ui/lane.tsx`): an arrow icon
 ## Load cards
 
 `components/shared/load-offer-card.tsx`, the same card for owners and drivers: broker and the fit ring on top; the
-trip as a line from a dot to a ring with the cities big, pickup and delivery times on the right and the miles between;
-then the money (the owner sees what they keep and a bar of where the rest goes; a driver sees what the load pays); one
-reason; one blue button. "Best fit" sits on the card's top edge so the cards in a row line up.
+trip as a line from a dot to a ring with the cities big, pickup and delivery times on the right and the miles and
+drive time between; three facts in fixed places (per mile, empty miles, reload) so a row of cards reads across like the
+fields on a boarding pass; then the money (the owner sees what they keep and the share of the rate it is, with the
+costs as a receipt under Details; a driver sees what the load pays); one reason; one blue button. "Best fit" sits on
+the card's top edge so the cards in a row line up.
 
 ## Notifications
 
