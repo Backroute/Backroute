@@ -91,7 +91,9 @@ async function signIn(browser, sub, phone, width = 1280) {
   await d.getByRole("group", { name: "Quick replies to dispatch" }).waitFor({ timeout: 60000 }).catch(() => {});
   await d.waitForTimeout(1500);
   await d.screenshot({ path: `${S}/.out/ux-driver-messages.png` });
-  check("the driver can answer dispatch with one tap", (await d.getByRole("group", { name: "Quick replies to dispatch" }).getByRole("button").count()) >= 3);
+  // Which replies show depends on the trip's stage (a booked load has two, a dispatched one three), and the stage this
+  // suite finds depends on the time of day the earlier suites ran, so the check is "the replies are there", not a count.
+  check("the driver can answer dispatch with one tap", (await d.getByRole("group", { name: "Quick replies to dispatch" }).getByRole("button").count()) >= 2);
 
   check("no page errors", !d.errors.length && !p.errors.length, [...d.errors, ...p.errors].join(" | "));
   db(`delete from agent_marks where carrier_id = '${cid}' and kind = 'import_batch' and load_id = 'import:imp_qashot0001'`);

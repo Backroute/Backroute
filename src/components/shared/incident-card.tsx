@@ -68,7 +68,7 @@ export function IncidentCard({ incident, viewer, label, onApprove }: {
                 {step.status === "done" ? (
                   <Check className="h-3 w-3" strokeWidth={3} />
                 ) : isCurrent ? (
-                  <span className={cn("h-1.5 w-1.5 animate-pulse-dot rounded-full", step.owner === "human" ? "bg-[var(--accent-warn)]" : "bg-white")} />
+                  <span className={cn("h-1.5 w-1.5 animate-pulse-dot rounded-full", step.owner === "human" ? "bg-[var(--dot-warn)]" : "bg-white")} />
                 ) : null}
               </span>
               <div className="min-w-0 flex-1">

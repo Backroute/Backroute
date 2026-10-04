@@ -13,10 +13,10 @@ import { haptic } from "@/lib/feedback";
 export type AttentionTone = "urgent" | "waiting" | "info" | "done";
 
 const DOT: Record<AttentionTone, string> = {
-  urgent: "bg-[var(--accent-danger)]",
-  waiting: "bg-[var(--accent-warn)]",
+  urgent: "bg-[var(--dot-danger)]",
+  waiting: "bg-[var(--dot-warn)]",
   info: "bg-ink-300",
-  done: "bg-[var(--accent-live)]",
+  done: "bg-[var(--dot-live)]",
 };
 
 const TONE_LABEL: Record<AttentionTone, string> = {

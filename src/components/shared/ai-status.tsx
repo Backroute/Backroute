@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 type State = "paused" | "practice" | "running";
 
 const DOT: Record<State, string> = {
-  paused: "bg-[var(--accent-danger)]",
+  paused: "bg-[var(--dot-danger)]",
   practice: "bg-ink-400",
   running: "bg-ink-950",
 };

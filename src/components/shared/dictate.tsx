@@ -72,7 +72,7 @@ export function DictateButton({ lang = "en", onText, className, label = "Speak y
       aria-pressed={listening}
       className={cn(
         "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors",
-        listening ? "bg-[var(--accent-danger)] text-white" : "bg-ink-100 text-ink-700 hover:bg-ink-150",
+        listening ? "bg-[var(--dot-danger)] text-white" : "bg-ink-100 text-ink-700 hover:bg-ink-150",
         className,
       )}
     >

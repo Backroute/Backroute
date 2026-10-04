@@ -59,14 +59,12 @@ export function NextLoadOffers({
                   className="mb-2.5"
                 />
               )}
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {loads.map((load) => (
                   <LoadOfferCard
                     key={load.id}
                     load={load}
                     broker={brokers.get(load.brokerId)}
-                    truck={truck}
-                    driver={driver}
                     viewer={trucks ? "owner" : "driver"}
                     onSelect={() => onSelect(groupId, load.id)}
                     onAsk={real ? undefined : (text) => onAsk(load.id, text)}

@@ -18,13 +18,13 @@ export function LoadScoreBadge({
 }) {
   if (size === "xl") {
     const dim = 76;
-    const strokeWidth = 5;
+    const strokeWidth = 6;
     const radius = (dim - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
     const progress = Math.max(0.03, Math.min(1, score / 100));
     const dashOffset = circumference * (1 - progress);
     return (
-      <div className={cn("relative shrink-0", className)} style={{ width: dim, height: dim }} aria-label={`Fit ${score} out of 100`}>
+      <div className={cn("relative shrink-0", className)} style={{ width: dim, height: dim }} role="img" aria-label={`Fit ${score} out of 100`}>
         <svg width={dim} height={dim} viewBox={`0 0 ${dim} ${dim}`} className="-rotate-90" aria-hidden>
           <circle cx={dim / 2} cy={dim / 2} r={radius} fill="none" stroke={invert ? "rgb(255 255 255 / 0.16)" : "var(--ink-150)"} strokeWidth={strokeWidth} />
           <circle
@@ -40,8 +40,9 @@ export function LoadScoreBadge({
             style={{ transition: "stroke-dashoffset 700ms cubic-bezier(0.4, 0, 0.2, 1)" }}
           />
         </svg>
-        <span className={cn("absolute inset-0 flex items-center justify-center text-[26px] font-medium leading-none tracking-tight tabular", invert ? "text-white" : "text-ink-950")}>
-          {score}
+        <span className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className={cn("text-[28px] font-semibold leading-none tracking-[-0.04em] tabular", invert ? "text-white" : "text-ink-950")}>{score}</span>
+          <span className={cn("mt-0.5 text-xs font-medium", invert ? "text-white/55" : "text-ink-500")}>fit</span>
         </span>
       </div>
     );

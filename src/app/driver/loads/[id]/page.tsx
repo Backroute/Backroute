@@ -114,8 +114,8 @@ export default function DriverLoadDetailPage() {
         <div className="flex items-center justify-between">
           <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/70">
             <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--accent-live)] opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--accent-live)]" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--dot-live)] opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--dot-live)]" />
             </span>
             {aiDispatcherNote(load.stage)}
           </div>

@@ -362,7 +362,7 @@ export function DriverTripCompleteCard({
             showTruck
             compact
           >
-            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent-live)]">
+            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--dot-live)]">
               <Check className="h-2.5 w-2.5" strokeWidth={3} />
             </span>
             Load complete

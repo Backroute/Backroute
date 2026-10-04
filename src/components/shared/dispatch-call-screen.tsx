@@ -81,7 +81,7 @@ function Ringing({ call }: { call: DispatchCall }) {
           {t.laterText}
         </button>
         <button type="button" onClick={() => answerDispatchCall(call.id)} className="flex flex-col items-center gap-2 text-sm font-semibold">
-          <span className="flex h-18 w-18 items-center justify-center rounded-full bg-[var(--accent-live)] p-5">
+          <span className="flex h-18 w-18 items-center justify-center rounded-full bg-[var(--dot-live)] p-5">
             <Phone className="h-8 w-8" />
           </span>
           {t.answer}
@@ -223,7 +223,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
               onClick={() => replyDispatchCall(call.id, ch.reply)}
               className={cn(
                 "rounded-2xl py-4 text-lg font-semibold active:scale-[0.99]",
-                ch.reply === "cancel" ? "bg-[var(--accent-danger)]/90 text-white" : i === 0 && !bookedSomething ? "bg-white text-ink-950" : "bg-white/10",
+                ch.reply === "cancel" ? "bg-[var(--dot-danger)]/90 text-white" : i === 0 && !bookedSomething ? "bg-white text-ink-950" : "bg-white/10",
               )}
             >
               <span aria-hidden className="mr-2 text-sm font-medium opacity-50">{i + 1}</span>
@@ -249,7 +249,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
           </span>
           {t.sayAgain}
         </button>
-        <button type="button" onClick={() => hangUpDispatchCall(call.id)} aria-label={t.hangUp} className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--accent-danger)]">
+        <button type="button" onClick={() => hangUpDispatchCall(call.id)} aria-label={t.hangUp} className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--dot-danger)]">
           <PhoneOff className="h-7 w-7" />
         </button>
         {call.ownerTookOver ? (

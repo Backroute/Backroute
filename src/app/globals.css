@@ -43,6 +43,12 @@
   --action-strong: #0062c4;
   --action-ink: #ffffff;
 
+  /* Dots and solid fills use Apple's bright system colours, so orange and red are easy to tell apart at 6px; the
+     darker accents above are for small text, where they need the contrast. */
+  --dot-live: #34c759;
+  --dot-warn: #ff9500;
+  --dot-danger: #ff3b30;
+
   /* Where you are and what you picked (the active tab, a selected choice): the same ink as the text. */
   --brand: var(--ink-950);
   --brand-strong: var(--ink-800);
@@ -88,6 +94,9 @@
 
   --action: #0a84ff;
   --action-strong: #409cff;
+  --dot-live: #30d158;
+  --dot-warn: #ff9f0a;
+  --dot-danger: #ff453a;
 
   --surface-shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset;
   color-scheme: dark;
@@ -133,6 +142,12 @@
   --action: #0071e3;
   --action-strong: #0062c4;
   --action-ink: #ffffff;
+
+  /* Dots and solid fills use Apple's bright system colours, so orange and red are easy to tell apart at 6px; the
+     darker accents above are for small text, where they need the contrast. */
+  --dot-live: #34c759;
+  --dot-warn: #ff9500;
+  --dot-danger: #ff3b30;
   /* On a dark panel the status colours are the bright ones, as in iOS dark mode. */
   --accent-live: #30d158;
   --accent-warn: #ff9f0a;
@@ -140,6 +155,9 @@
   --accent-info: #409cff;
   --action: #0a84ff;
   --action-strong: #409cff;
+  --dot-live: #30d158;
+  --dot-warn: #ff9f0a;
+  --dot-danger: #ff453a;
   color-scheme: dark;
 }
 :root[data-theme="dark"] .theme-ink {
@@ -198,8 +216,14 @@
   --color-brand-ink: var(--brand-ink);
 }
 
-* {
-  border-color: var(--line);
+/* The default border colour, in the base layer so a border colour set on an element (border-ink-950, border-white/10)
+   still wins. */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--line);
+  }
 }
 
 /* A grid cell may be narrower than its longest line (a phone number, a long log line): without this one card can

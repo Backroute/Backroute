@@ -10,10 +10,10 @@ export type StatusKind = "done" | "moving" | "waiting" | "needs_you" | "off";
 export const STATUS_PILL = "bg-ink-100 text-ink-800";
 
 export const STATUS_DOT: Record<StatusKind, string> = {
-  done: "bg-[var(--accent-live)]",
+  done: "bg-[var(--dot-live)]",
   moving: "bg-ink-950",
-  waiting: "bg-[var(--accent-warn)]",
-  needs_you: "bg-[var(--accent-danger)]",
+  waiting: "bg-[var(--dot-warn)]",
+  needs_you: "bg-[var(--dot-danger)]",
   off: "bg-ink-300",
 };
 

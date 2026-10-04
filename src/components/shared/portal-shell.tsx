@@ -240,7 +240,7 @@ function BottomTabs({ navItems, pathname }: { navItems: NavItem[]; pathname: str
             </span>
             {item.label}
             {typeof item.badge === "number" && item.badge > 0 && (
-              <span className="absolute right-[calc(50%-1.6rem)] top-0.5 min-w-4 rounded-full bg-[var(--accent-danger)] px-1 text-center text-xs font-semibold leading-4 text-white">
+              <span className="absolute right-[calc(50%-1.6rem)] top-0.5 min-w-4 rounded-full bg-[var(--dot-danger)] px-1 text-center text-xs font-semibold leading-4 text-white">
                 {item.badge}
               </span>
             )}

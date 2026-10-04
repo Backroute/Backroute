@@ -32,7 +32,7 @@ export function WhyCard({ load }: { load: Load }) {
           </ul>
         )}
         {warnings.map((w, i) => (
-          <p key={i} className={`flex items-start gap-2 rounded-2xl px-3.5 py-2.5 text-sm ${w.hard ? "bg-[var(--accent-danger)]/10 text-ink-900" : "bg-ink-50 text-ink-700"}`}>
+          <p key={i} className={`flex items-start gap-2 rounded-2xl px-3.5 py-2.5 text-sm ${w.hard ? "bg-[var(--dot-danger)]/10 text-ink-900" : "bg-ink-50 text-ink-700"}`}>
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" /> {w.text}
           </p>
         ))}

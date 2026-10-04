@@ -299,7 +299,7 @@ export function BrokerCallRow({ load, brokerName, contactName, onCall, compact }
           className={cn("flex w-full items-center gap-3 rounded-2xl bg-white/10 text-left", compact ? "px-3 py-2" : "px-4 py-3")}
         >
           <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15">
-            <span className="absolute inset-0 animate-ping rounded-full bg-[var(--accent-live)]/30" />
+            <span className="absolute inset-0 animate-ping rounded-full bg-[var(--dot-live)]/30" />
             <Phone className="h-4 w-4 text-white" />
           </span>
           <span className="min-w-0 flex-1">

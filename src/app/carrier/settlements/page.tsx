@@ -198,7 +198,7 @@ function PaymentsList({ loads, now }: { loads: Load[]; now: number | null }) {
                   <span
                     className={cn(
                       "mt-1 h-2 w-2 shrink-0 rounded-full",
-                      step.state === "done" ? "bg-[var(--accent-live)]" : step.state === "problem" ? "bg-[var(--accent-danger)]" : step.state === "current" ? "bg-[var(--accent-warn)]" : "bg-ink-200",
+                      step.state === "done" ? "bg-[var(--dot-live)]" : step.state === "problem" ? "bg-[var(--dot-danger)]" : step.state === "current" ? "bg-[var(--dot-warn)]" : "bg-ink-200",
                     )}
                   />
                   <span>

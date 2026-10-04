@@ -15,6 +15,9 @@ Apple's palette: cool greys, near-black text (`#1D1D1F`), and one blue for the t
 | Orange (`--accent-warn`) | Waiting on the owner or driver. | A small dot |
 | Green (`--accent-live`) | Done or paid. | A small dot or check |
 
+- Two strengths of each status colour. Dots and solid fills use Apple's bright system colours (`--dot-live` #34C759,
+  `--dot-warn` #FF9500, `--dot-danger` #FF3B30), so orange and red are easy to tell apart even at 6px. Small text uses the
+  darker `--accent-*` versions, which keep the contrast.
 - Status never fills a block. Pills are grey with a dot (`lib/status.ts`, `components/ui/badge.tsx`); cards have no
   coloured stripes or borders. The `*-soft` tokens are grey on purpose.
 - One blue button per screen or card. Everything else is a grey button (`variant="secondary"`) or a plain link.

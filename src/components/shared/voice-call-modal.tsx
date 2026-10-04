@@ -345,7 +345,7 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
 
           <button
             onClick={hangUp}
-            className="mt-1 flex items-center justify-center gap-2 self-center rounded-full bg-[var(--accent-danger)] px-6 py-2.5 text-sm font-semibold text-white"
+            className="mt-1 flex items-center justify-center gap-2 self-center rounded-full bg-[var(--dot-danger)] px-6 py-2.5 text-sm font-semibold text-white"
           >
             <PhoneOff className="h-4 w-4" /> End call
           </button>
@@ -365,7 +365,7 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
         <div className="flex justify-center px-6 pb-10">
           <button
             onClick={onClose}
-            className="flex items-center justify-center gap-2 rounded-full bg-[var(--accent-danger)] px-6 py-2.5 text-sm font-semibold text-white"
+            className="flex items-center justify-center gap-2 rounded-full bg-[var(--dot-danger)] px-6 py-2.5 text-sm font-semibold text-white"
           >
             <PhoneOff className="h-4 w-4" /> Cancel
           </button>

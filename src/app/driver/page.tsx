@@ -171,7 +171,7 @@ export default function DriverHomePage() {
           )}
         </div>
         <p className="mt-1 flex items-center gap-2 text-sm text-ink-500">
-          <span className={cn("h-2 w-2 shrink-0 rounded-full", todoCount ? "bg-[var(--accent-warn)]" : "bg-[var(--accent-live)]")} />
+          <span className={cn("h-2 w-2 shrink-0 rounded-full", todoCount ? "bg-[var(--dot-warn)]" : "bg-[var(--dot-live)]")} />
           {completedLoad
             ? t.delivered
             : todoCount === 0

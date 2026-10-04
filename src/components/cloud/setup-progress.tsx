@@ -68,7 +68,7 @@ export function SetupProgress() {
         </button>
       </div>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-100" role="progressbar" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={doneCount} aria-label="Setup progress">
-        <div className="h-full rounded-full bg-[var(--accent-live)] transition-[width]" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
+        <div className="h-full rounded-full bg-[var(--dot-live)] transition-[width]" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
       </div>
       <ol className="mt-3 flex flex-col gap-1">
         {steps.map((s, i) => (

@@ -208,7 +208,7 @@ export function TripDetails({
           <ol className="flex flex-col gap-3">
             {activity.map((e) => (
               <li key={e.id} className="flex gap-3">
-                <span className={cn("mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full", e.severity === "success" ? "bg-[var(--accent-live)]" : e.severity === "warning" ? "bg-[var(--accent-warn)]" : "bg-white/40")} />
+                <span className={cn("mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full", e.severity === "success" ? "bg-[var(--dot-live)]" : e.severity === "warning" ? "bg-[var(--dot-warn)]" : "bg-white/40")} />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm">{e.message}</p>
                   <p className="text-xs text-white/50">{e.detail}</p>

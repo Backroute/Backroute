@@ -62,7 +62,7 @@ function DvirInspection() {
   if (submitted) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 px-5 py-24 text-center">
-        <div className={cn("flex h-14 w-14 items-center justify-center rounded-full text-white", submitted === "pass" ? "bg-ink-950" : "bg-[var(--accent-warn)]")}>
+        <div className={cn("flex h-14 w-14 items-center justify-center rounded-full text-white", submitted === "pass" ? "bg-ink-950" : "bg-[var(--dot-warn)]")}>
           {submitted === "pass" ? <CheckCircle2 className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
         </div>
         <p className="font-display text-xl text-ink-950">{submitted === "pass" ? "Inspection logged, no defects" : "Defect flagged"}</p>

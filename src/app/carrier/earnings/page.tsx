@@ -173,7 +173,7 @@ function BentoTile({ label, value, sub, tone }: { label: string; value: string; 
   return (
     <section className="flex min-h-[7.5rem] flex-col justify-between rounded-3xl border border-line bg-white p-4">
       <p className="t-label flex items-center gap-1.5 text-ink-500">
-        {tone && <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${tone === "live" ? "bg-[var(--accent-live)]" : "bg-[var(--accent-danger)]"}`} />}
+        {tone && <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${tone === "live" ? "bg-[var(--dot-live)]" : "bg-[var(--dot-danger)]"}`} />}
         {label}
       </p>
       <div className="mt-2">

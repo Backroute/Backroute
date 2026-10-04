@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Home, MessageCircle, Repeat, Send, Truck as TruckIcon, X } from "lucide-react";
+import { ChevronDown, Home, MessageCircle, Repeat, Send, Sparkles, X } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useStore } from "@/lib/store";
 import { formatHours } from "@/lib/home";
 import { MOVE_LABEL } from "@/lib/run-types";
 import { loadHighlight } from "@/lib/scoring";
 import type { OfferAskDraft } from "@/lib/engine";
-import type { Broker, Driver, Load, Truck } from "@/lib/types";
+import type { Broker, Load } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { LoadScoreBadge } from "./load-score";
 import { BrokerTrustBadge } from "./broker-trust-badge";
@@ -23,8 +23,6 @@ type AskState = "idle" | "composing" | "pending" | "replied";
 export function LoadOfferCard({
   load,
   broker,
-  truck,
-  driver,
   viewer = "owner",
   onSelect,
   onAsk,
@@ -32,9 +30,6 @@ export function LoadOfferCard({
 }: {
   load: Load;
   broker: Broker | undefined;
-  /** Which truck and driver it's for, when the owner is choosing for several. */
-  truck?: Truck;
-  driver?: Driver;
   viewer?: "owner" | "driver";
   onSelect: () => void;
   /** Ask the broker something before choosing (detention, schedule, payment terms). Logs the ask and returns what to show while waiting. */
@@ -85,56 +80,76 @@ export function LoadOfferCard({
   });
   // The one reason, in the driver's terms when home is what it's about.
   const reason = load.homeTonight && !load.lane.moveKind ? "Home tonight" : load.homeTimeFit ? "Heads toward home" : highlight;
-  const pickup = load.pickupWindow.split(",").slice(0, real ? 2 : 1).join(",");
   const askLabel = real ? (load.listedRate > 0 ? `Backroute asks ${formatCurrency(load.targetRate)} (posted ${formatCurrency(load.listedRate)})` : `Backroute asks ${formatCurrency(load.targetRate)}`) : null;
 
+  const [pickupDay, ...pickupRest] = load.pickupWindow.split(", ");
+  const [deliveryDay, ...deliveryRest] = load.deliveryWindow.split(", ");
+  const cap = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
+
   return (
-    <div className={cn("flex flex-col gap-3 rounded-2xl border bg-white p-4", load.recommended ? "border-ink-950" : "border-line")}>
-      <div className="flex items-start justify-between gap-3">
+    <article
+      className={cn(
+        "flex h-full flex-col gap-4 rounded-3xl border bg-white p-5 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_-18px_rgb(0_0_0/0.18)]",
+        load.recommended ? "border-ink-950" : "border-line",
+      )}
+    >
+      <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          {load.recommended && <p className="mb-1 text-xs font-semibold text-ink-950">Best fit</p>}
-          <p className="text-[17px] font-semibold leading-snug tracking-tight text-ink-950">
-            {load.lane.origin} <span className="text-ink-300">→</span> {load.lane.destination}
-          </p>
-          <p className="mt-0.5 text-sm text-ink-500">
-            {broker?.company ?? "Broker"} · {load.equipmentType} · {load.lane.miles} mi
+          {load.recommended && <span className="mb-2 inline-flex rounded-full bg-ink-950 px-2.5 py-0.5 text-xs font-semibold text-white">Best fit</span>}
+          <h3 className="text-xl font-semibold leading-tight tracking-[-0.02em] text-ink-950">
+            {load.lane.origin} <span className="font-normal text-ink-300">→</span> {load.lane.destination}
+          </h3>
+          <p className="mt-1 truncate text-sm text-ink-500">
+            {broker?.company ?? "Broker"} · {load.equipmentType}
           </p>
         </div>
-        <LoadScoreBadge score={load.score} />
+        <LoadScoreBadge score={load.score} size="xl" />
       </div>
 
-      <div className="flex items-end justify-between gap-3">
+      {/* The run itself: where it starts and ends, when, and how far. */}
+      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2.5 gap-y-1">
+        <span className="h-2.5 w-2.5 rounded-full bg-ink-950" />
+        <span className="relative flex h-px items-center bg-ink-200">
+          <span className="mx-auto bg-white px-2 text-xs font-medium tabular text-ink-500">{load.lane.miles} mi</span>
+        </span>
+        <span className="h-2.5 w-2.5 rounded-full border-2 border-ink-950 bg-white" />
+        <div className="col-span-3 mt-1 flex justify-between gap-4 text-sm">
+          <div className="min-w-0">
+            <p className="font-medium text-ink-950">{cap(pickupDay)}</p>
+            <p className="truncate text-xs text-ink-500">Pickup{pickupRest.length ? ` · ${pickupRest.join(", ")}` : ""}</p>
+          </div>
+          <div className="min-w-0 text-right">
+            <p className="font-medium text-ink-950">{cap(deliveryDay)}</p>
+            <p className="truncate text-xs text-ink-500">Delivery{deliveryRest.length ? ` · ${deliveryRest.join(", ")}` : ""}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-end justify-between gap-3 rounded-2xl bg-ink-50 px-4 py-3.5">
         <div>
-          <p className="text-3xl font-medium tabular tracking-tight text-ink-950">
+          <p className="text-[34px] font-semibold leading-none tracking-[-0.04em] tabular text-ink-950">
             {formatCurrency(owner ? (load.netProfit ?? 0) : load.targetRate)}
           </p>
-          <p className="text-xs text-ink-500">
-            {owner ? `You keep, of ${formatCurrency(load.targetRate)}` : load.lane.moveKind ? `Flat per move · ${MOVE_LABEL[load.lane.moveKind]}` : `Load pays · $${(load.rpm ?? 0).toFixed(2)}/mi`}
-          </p>
+          <p className="mt-1.5 text-xs text-ink-500">{owner ? "You keep, after fuel and costs" : load.lane.moveKind ? `Flat per move · ${MOVE_LABEL[load.lane.moveKind]}` : "Load pays"}</p>
         </div>
-        <div className="text-right">
-          <p className="text-sm font-medium text-ink-950">{pickup}</p>
-          <p className="text-xs text-ink-500">Pickup</p>
+        <div className="text-right text-sm">
+          <p className="font-semibold tabular text-ink-950">${(load.rpm ?? 0).toFixed(2)}<span className="font-normal text-ink-500">/mi</span></p>
+          {owner && <p className="mt-0.5 tabular text-ink-500">of {formatCurrency(load.targetRate)}</p>}
         </div>
       </div>
 
-      <p className="text-sm text-ink-600">{reason}</p>
+      <p className="flex items-center gap-2 text-sm font-medium text-ink-700">
+        {reason === highlight ? <Sparkles className="h-4 w-4 shrink-0 text-ink-400" /> : <Home className="h-4 w-4 shrink-0 text-ink-400" />}
+        {reason}
+      </p>
       {askLabel && (
-        <p className="text-xs text-ink-500">
+        <p className="-mt-2 text-xs text-ink-500">
           {askLabel} · {load.source}
         </p>
       )}
 
-      {(truck || driver) && (
-        <p className="flex items-center gap-1 text-xs text-ink-500">
-          <TruckIcon className="h-3 w-3 shrink-0" />
-          {truck?.unitNumber ?? "Unassigned"}
-          {driver && ` · ${driver.name}`}
-        </p>
-      )}
-
       {open && (
-        <div className="flex flex-col gap-1.5 border-t border-line pt-3 text-xs text-ink-600">
+        <div className="flex flex-col gap-1.5 border-t border-line pt-3 text-sm text-ink-600">
           {owner && broker && (
             <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <BrokerTrustBadge broker={broker} />
@@ -207,6 +222,7 @@ export function LoadOfferCard({
         </div>
       )}
 
+      <div className="mt-auto flex flex-col gap-3 pt-1">
       <Button
         size="lg"
         className="w-full"
@@ -228,6 +244,7 @@ export function LoadOfferCard({
           {open ? "Less" : "Details"} <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
         </button>
       </div>
-    </div>
+      </div>
+    </article>
   );
 }
