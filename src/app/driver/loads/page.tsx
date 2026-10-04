@@ -51,6 +51,7 @@ export default function DriverLoadsPage() {
                 legs={[offer, ...rest]}
                 broker={brokers.get(offer.brokerId)}
                 brokers={brokers}
+                crew={{ team: !!truck?.secondDriverId, driveLeft: driver.hoursRemaining }}
                 viewer="driver"
                 onSelect={() => offer.offerGroupId && selectLoadOffer(offer.offerGroupId, offer.id, "driver")}
                 onAsk={(text) => requestOfferDetail(offer.id, text)}

@@ -1,4 +1,5 @@
 import { citiesAlong, cityCoords, distanceMiles, nearestCity, roadMiles, type LatLng } from "./trip-geo";
+import { DOCK_HOURS, STOP_HOURS, simulateRun, type Crew, type RunStep } from "./hos-plan";
 import type { Load, TripStop } from "./types";
 
 /**
@@ -7,10 +8,6 @@ import type { Load, TripStop } from "./types";
  * runs that take days. The AI puts these together from every board at once and offers each as one choice, priced and
  * timed as a whole: what it all pays, what it all costs, how many days, where the driver sleeps.
  */
-
-/** Driving a day under the hours rules: 11 hours behind the wheel, then 10 off. At 50 mph, about 550 miles. */
-const DRIVE_HOURS_A_DAY = 11;
-const MPH = 50;
 
 /** One choice on the board: a single load, or every load of a plan in order. Best fit first, then by fit score. */
 export function offerOptions(loads: Load[]): Load[][] {
@@ -108,16 +105,29 @@ export interface PlanTotals {
   /** Empty: to the first pickup, and between loads. */
   emptyMiles: number;
   totalMiles: number;
+  /** Hours behind the wheel, all of it. */
   driveHours: number;
-  /** Days on the road, counting the 10 hours off after each 11 of driving. */
+  /** Days on the road from the first pickup to the last drop, the clocks run the way the rules say. */
   days: number;
-  /** Where the truck stops for the night, after which stop (index into the stops). */
+  /** Where the driver stops for the night, after which stop (index into the stops). A team truck never does. */
   rests: { afterStop: number; place: string }[];
   /** Ends here. */
   end: { city: string; state: string };
 }
 
-export function planTotals(legs: Load[]): PlanTotals {
+/** The run as the driver's clocks see it: the empty drive to the first pickup, then a dock and a drive per stop. */
+export function planSteps(legs: Load[], stops: PlanStop[] = planStops(legs), segments: Segment[] = planSegments(legs, stops)): RunStep[] {
+  const first = legs.find((l) => (l.plan?.leg ?? 1) === 1) ?? legs[0];
+  const steps: RunStep[] = [{ kind: "drive", miles: Math.max(0, first?.deadheadMiles ?? 0) }];
+  stops.forEach((stop, i) => {
+    const sameDock = i > 0 && segments[i - 1]?.miles === 0;
+    steps.push({ kind: "dock", hours: stop.extra || sameDock ? STOP_HOURS : DOCK_HOURS });
+    if (segments[i]) steps.push({ kind: "drive", miles: segments[i].miles });
+  });
+  return steps;
+}
+
+export function planTotals(legs: Load[], crew: Crew = {}): PlanTotals {
   const stops = planStops(legs);
   const segments = planSegments(legs, stops);
   const first = legs.find((l) => (l.plan?.leg ?? 1) === 1) ?? legs[0];
@@ -133,7 +143,13 @@ export function planTotals(legs: Load[]): PlanTotals {
     { label: `Empty miles${emptyNote}`, amount: sum((l) => l.deadheadCost) },
     { label: "Backroute fee (2%)", amount: sum((l) => l.commission) },
   ].filter((c) => c.amount > 0);
-  const driveHours = totalMiles / MPH;
+  // The whole run played forward from the start of the empty drive: days counted from getting to the first pickup to
+  // getting to the last drop, the way the card counts them from the docks' windows.
+  const steps = planSteps(legs, stops, segments);
+  const run = simulateRun(steps, 0, crew);
+  const atFirstPickup = run.doneAt[0] ?? 0;
+  const atLastDrop = run.doneAt[run.doneAt.length - 2] ?? run.end;
+  const days = Math.max(1, Math.ceil((atLastDrop - atFirstPickup) / 86_400_000 - 1e-9));
   const last = stops[stops.length - 1];
   return {
     pays: sum((l) => l.targetRate),
@@ -142,35 +158,36 @@ export function planTotals(legs: Load[]): PlanTotals {
     loadedMiles,
     emptyMiles,
     totalMiles,
-    driveHours,
-    days: Math.max(1, Math.ceil(driveHours / DRIVE_HOURS_A_DAY)),
-    rests: restStops(stops, segments, first?.deadheadMiles ?? 0),
+    driveHours: run.driveHours,
+    days,
+    rests: restStops(stops, segments, run.rests, Math.max(0, first?.deadheadMiles ?? 0)),
     end: last ? { city: last.city, state: last.state } : { city: "", state: "" },
   };
 }
 
 /**
- * Where the driver's 11 hours run out, day by day, along the plan's road: the nearest town to that point. The empty
- * run to the first pickup counts toward the first day.
+ * Each night's rest put on the road: which drive between stops it falls in, and the nearest town to that point. A rest
+ * on the empty drive to the first pickup isn't shown (the driver sleeps before the load starts).
  */
-export function restStops(stops: PlanStop[], segments: Segment[], startEmpty = 0): { afterStop: number; place: string }[] {
-  const perDay = DRIVE_HOURS_A_DAY * MPH;
+export function restStops(stops: PlanStop[], segments: Segment[], rests: { mile: number }[], startEmpty = 0): { afterStop: number; place: string }[] {
   const out: { afterStop: number; place: string }[] = [];
-  let driven = startEmpty;
-  let nextRest = perDay;
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i];
-    const a = at(stops[i]);
-    const b = at(stops[i + 1]);
-    while (seg.miles > 0 && driven + seg.miles > nextRest) {
-      const frac = (nextRest - driven) / seg.miles;
-      const point: LatLng | undefined = a && b ? [a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac] : undefined;
-      // Out West towns are far apart: anything within a couple of hours' drive names the stretch.
-      const town = point ? nearestCity(point, 160) : undefined;
-      out.push({ afterStop: i, place: town ? `${town.city}, ${town.state}` : "on the way" });
-      nextRest += perDay;
+  for (const r of rests) {
+    let from = startEmpty;
+    if (r.mile <= from) continue;
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      if (r.mile <= from + seg.miles + 1e-6) {
+        const frac = seg.miles ? (r.mile - from) / seg.miles : 0;
+        const a = at(stops[i]);
+        const b = at(stops[i + 1]);
+        const point: LatLng | undefined = a && b ? [a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac] : undefined;
+        // Out West towns are far apart: anything within a couple of hours' drive names the stretch.
+        const town = point ? nearestCity(point, 160) : undefined;
+        out.push({ afterStop: i, place: town ? `${town.city}, ${town.state}` : "on the way" });
+        break;
+      }
+      from += seg.miles;
     }
-    driven += seg.miles;
   }
   return out;
 }

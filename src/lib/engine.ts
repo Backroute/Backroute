@@ -4,6 +4,7 @@ import { cityCoords, distanceMiles, legHours, transitWindow } from "./trip-geo";
 import { homeTonight, hoursToHome, reloadMarket } from "./home";
 import { laneFits } from "./run-types";
 import { milesBetween, planTotals, sharedOrder, townOnTheWay } from "./plans";
+import { DOCK_HOURS, PLAN_MPH, STOP_HOURS, simulateRun, windowAround, windowOpens, type Crew, type RunStep } from "./hos-plan";
 import { partialShare } from "./trip-plan";
 import type {
   ActivityEvent,
@@ -164,6 +165,8 @@ interface OfferOptions {
   runType?: RunType;
   /** States the driver won't go into, from their call settings. */
   avoidStates?: string[];
+  /** Who's driving: a team truck rolls through the night; a solo driver's hours left today start the clock. */
+  crew?: Crew;
 }
 
 /** AI has scanned the boards and scored several candidates for one truck — driver/carrier picks one. */
@@ -195,7 +198,7 @@ export function createLoadOfferBatch(
 
   const candidates = Array.from({ length: count }, (_, i) => {
     const base = withExtraStop(createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType, placements?.[i], opts.surcharges));
-    return priceOffer(base, hoursHomeFrom, startHoursHome);
+    return priceOffer(timeLegs([base], opts.crew)[0], hoursHomeFrom, startHoursHome);
   });
 
   // Past single loads: what a dispatcher builds out of several. Each is one choice, booked whole.
@@ -276,12 +279,61 @@ function withExtraStop(load: Load): Load {
   };
 }
 
-/** Days from today a window's first word means: "tomorrow" is 1, anything else today. */
-const dayOf = (window: string) => (/^tomorrow/i.test(window) ? 1 : 0);
-/** Days a load is on the road, the way transitWindow words it: same day, next day, or a day per 500 miles. */
-const transitDays = (miles: number) => (miles <= 300 ? 0 : miles <= 600 ? 1 : Math.ceil(miles / 500));
-/** A calendar date a number of days from today, for a later load's pickup window. */
-const isoDay = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+/**
+ * When each load of a run happens, played forward on the driver's clocks (lib/hos-plan): the first pickup at its
+ * window, then the drive (a 10-hour rest whenever the 11 or the 14 run out, unless it's a team), the delivery when the
+ * truck gets there, and each next pickup when the truck can reach it from that delivery. Every window is set from
+ * that, so the dates on the card are dates the truck can make. In-town moves keep their appointments.
+ */
+function timeLegs(legs: Load[], crew: Crew = {}, now = Date.now()): Load[] {
+  if (!legs.length || legs[0].lane.moveKind) return legs;
+  const first = legs[0];
+  const start = windowOpens(first.pickupWindow, first.lane.originState, now) ?? now;
+  // The empty drive to the first pickup comes out of today's hours.
+  const clock: Crew = { ...crew, driveLeft: Math.max(0, (crew.driveLeft ?? 11) - first.deadheadMiles / PLAN_MPH) };
+  const steps: RunStep[] = [];
+  const out: Load[] = [];
+  for (const [i, leg] of legs.entries()) {
+    const timed = { ...leg };
+    if (i > 0) {
+      steps.push({ kind: "drive", miles: leg.deadheadMiles });
+      timed.pickupWindow = windowAround(simulateRun(steps, start, clock).end, leg.lane.originState);
+      steps.push({ kind: "until", at: windowOpens(timed.pickupWindow, leg.lane.originState, now) ?? start });
+    }
+    steps.push({ kind: "dock", hours: DOCK_HOURS });
+    let driven = 0;
+    for (const stop of [...(leg.stops ?? [])].sort((a, b) => a.sequence - b.sequence)) {
+      const miles = milesBetween({ city: leg.lane.origin, state: leg.lane.originState }, stop) ?? Math.round(leg.lane.miles / 2);
+      steps.push({ kind: "drive", miles: Math.max(0, miles - driven) }, { kind: "dock", hours: STOP_HOURS });
+      driven = miles;
+    }
+    steps.push({ kind: "drive", miles: Math.max(0, leg.lane.miles - driven) });
+    timed.deliveryWindow = windowAround(simulateRun(steps, start, clock).end, leg.lane.destState);
+    steps.push({ kind: "until", at: windowOpens(timed.deliveryWindow, leg.lane.destState, now) ?? start }, { kind: "dock", hours: DOCK_HOURS });
+    out.push(timed);
+  }
+  return out;
+}
+
+/** Partials sharing a trailer: every drop timed in the order the truck makes them. */
+function timeShared(legs: Load[], order: { loadId: string; kind: "pickup" | "delivery" }[], crew: Crew = {}, now = Date.now()): Load[] {
+  const first = legs[0];
+  const start = windowOpens(first.pickupWindow, first.lane.originState, now) ?? now;
+  const clock: Crew = { ...crew, driveLeft: Math.max(0, (crew.driveLeft ?? 11) - first.deadheadMiles / PLAN_MPH) };
+  const byId = new Map(legs.map((l) => [l.id, { ...l }]));
+  const steps: RunStep[] = [];
+  let at = { city: first.lane.origin, state: first.lane.originState };
+  for (const [i, s] of order.entries()) {
+    const l = byId.get(s.loadId)!;
+    const place = s.kind === "pickup" ? { city: l.lane.origin, state: l.lane.originState } : { city: l.lane.destination, state: l.lane.destState };
+    const miles = milesBetween(at, place) ?? 0;
+    if (miles > 0) steps.push({ kind: "drive", miles });
+    if (s.kind === "delivery") l.deliveryWindow = windowAround(simulateRun(steps, start, clock).end, place.state);
+    steps.push({ kind: "dock", hours: i > 0 && miles === 0 ? STOP_HOURS : DOCK_HOURS });
+    at = place;
+  }
+  return legs.map((l) => byId.get(l.id)!);
+}
 
 /**
  * Loads back to back, the way a dispatcher plans a truck's next few days: the first loading near where the truck
@@ -304,13 +356,9 @@ function buildBackToBack(
   const firstAt = near[Math.min(near.length - 1, randInt(0, 2))];
   const out: Load[] = [];
   let placement: LanePlacement | undefined = firstAt;
-  let day = 0;
   for (let i = 0; i < legs && placement; i++) {
     const base = createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType, placement, opts.surcharges);
-    if (i > 0) base.pickupWindow = `${isoDay(day)}, ${randInt(7, 11)}:00–${randInt(14, 18)}:00`;
-    else day = dayOf(base.pickupWindow);
-    out.push(priceOffer(base, hoursHomeFrom, startHoursHome));
-    day += transitDays(base.lane.miles) + (base.lane.miles > 300 ? 0 : 1);
+    out.push(base);
     // The reload: loading near this delivery, not straight back over the same road, best for its empty miles.
     const from = { city: base.lane.destination, state: base.lane.destState };
     const reloads = (lanesNear(from, fits) ?? [])
@@ -325,7 +373,8 @@ function buildBackToBack(
   }
   if (out.length < 2) return null;
   const id = uid("plan");
-  return out.map((l, i) => ({ ...l, plan: { id, kind: "back_to_back" as const, leg: i + 1, legs: out.length } }));
+  // Every pickup after the first is when the truck can get there, the clocks run the way the rules say.
+  return timeLegs(out, opts.crew).map((l, i) => ({ ...priceOffer(l, hoursHomeFrom, startHoursHome), plan: { id, kind: "back_to_back" as const, leg: i + 1, legs: out.length } }));
 }
 
 /**
@@ -390,7 +439,7 @@ function buildSharedTrailer(
           ...[...priced.slice(1)].sort((a, b) => a.lane.miles - b.lane.miles).map((l) => ({ loadId: l.id, kind: "delivery" as const })),
           { loadId: priced[0].id, kind: "delivery" as const },
         ];
-  return priced.map((l, i) => ({ ...l, plan: { id, kind: "shared_trailer" as const, leg: i + 1, legs: priced.length, order } }));
+  return timeShared(priced, order, opts.crew).map((l, i) => ({ ...l, plan: { id, kind: "shared_trailer" as const, leg: i + 1, legs: priced.length, order } }));
 }
 
 /**

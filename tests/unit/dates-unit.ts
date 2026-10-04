@@ -49,4 +49,10 @@ const late = Date.UTC(2026, 9, 5, 3);
 const i = stopDates({ pickupWindow: "today, 20:00–23:00", deliveryWindow: "Next day", createdAt: new Date(Date.UTC(2026, 9, 5, 2)).toISOString(), lane }, late);
 eq("the stop's own calendar day", [i.pickup.date, i.pickup.relative, i.pickup.time], ["Sun, Oct 4", "Today", "8–11 pm CDT"]);
 
+// When each window opens, as a moment: the hours between stops, across zones.
+const run = stopDates({ pickupWindow: "2026-10-04, 9:00–19:00", deliveryWindow: "2026-10-06, 5:00 AM–8:00 AM", createdAt: new Date(Date.UTC(2026, 9, 4)).toISOString(), lane: { originState: "IL", destState: "CA" } });
+eq("pickup opens 9 am CDT", new Date(run.pickup.at!).toISOString(), "2026-10-04T14:00:00.000Z");
+eq("delivery opens 5 am PDT", new Date(run.delivery.at!).toISOString(), "2026-10-06T12:00:00.000Z");
+eq("a window with no time has no moment", stopDates({ pickupWindow: "today", deliveryWindow: "Next day", createdAt: new Date(Date.UTC(2026, 9, 4)).toISOString(), lane }).pickup.at, undefined);
+
 console.log(bad ? `${bad} BAD` : "all ok");

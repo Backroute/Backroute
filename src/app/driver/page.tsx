@@ -303,6 +303,7 @@ export default function DriverHomePage() {
           </div>
           <NextLoadOffers
             bleed
+            crew={{ team: !!truck?.secondDriverId, driveLeft: driver.hoursRemaining }}
             offerGroups={offerGroups}
             brokers={brokers}
             onSelect={(groupId, loadId) => selectLoadOffer(groupId, loadId, "driver")}

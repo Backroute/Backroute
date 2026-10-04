@@ -17,6 +17,7 @@ import { Lane } from "@/components/ui/lane";
 import { useMounted } from "@/lib/hooks";
 import { stopDates, type StopWhen } from "@/lib/load-dates";
 import { optionScore, planLabel, planSegments, planStops, planTotals, type PlanStop } from "@/lib/plans";
+import type { Crew } from "@/lib/hos-plan";
 
 type AskState = "idle" | "composing" | "pending" | "replied";
 
@@ -40,6 +41,7 @@ export function LoadOfferCard({
   legs: givenLegs,
   broker,
   brokers,
+  crew,
   viewer = "owner",
   onSelect,
   onAsk,
@@ -51,6 +53,8 @@ export function LoadOfferCard({
   broker: Broker | undefined;
   /** Each load's broker, for a plan. */
   brokers?: Map<string, Broker>;
+  /** Who drives it: a team truck runs through the night, a solo driver stops for 10 hours after 11 of driving. */
+  crew?: Crew;
   viewer?: "owner" | "driver";
   onSelect: () => void;
   /** Ask the broker something before choosing (detention, schedule, payment terms). Logs the ask and returns what to show while waiting. */
@@ -112,10 +116,17 @@ export function LoadOfferCard({
   // Every stop in order, the drive between each, and the whole thing added up: pay, costs, miles, days, rests.
   const stops = planStops(legs);
   const segments = planSegments(legs, stops);
-  const totals = planTotals(legs);
-  const label = planLabel(legs, totals.days);
+  const totals = planTotals(legs, crew);
   // Real dates once on the phone (the server doesn't know the viewer's day); the load's own words until then.
   const datesOf = (l: Load) => (mounted ? stopDates(l) : null);
+  // Days out: the hours from the first pickup to the last drop as the docks booked them, so a drop the next morning is
+  // still a day's work, not two. The clocks alone (no dates on the loads) say how long when the windows don't.
+  const whenOf = (stop: PlanStop | undefined) => (stop && !stop.extra ? datesOf(stop.load)?.[stop.kind === "pickup" ? "pickup" : "delivery"] : undefined);
+  const firstWhen = whenOf(stops[0]);
+  const lastWhen = whenOf(stops[stops.length - 1]);
+  const span = firstWhen?.at !== undefined && lastWhen?.at !== undefined ? lastWhen.at - firstWhen.at : firstWhen?.day !== undefined && lastWhen?.day !== undefined ? lastWhen.day - firstWhen.day + 86_400_000 : -1;
+  const days = span > 0 ? Math.max(1, Math.ceil(span / 86_400_000 - 1e-9)) : totals.days;
+  const label = planLabel(legs, days);
 
   const planReason = isPlan
     ? load.plan?.kind === "shared_trailer"
@@ -123,12 +134,14 @@ export function LoadOfferCard({
       : last.hoursHomeAfter !== undefined && last.hoursHomeAfter < 3
         ? "Ends near home"
         : `Reloads within ${Math.max(...legs.slice(1).map((l) => l.deadheadMiles))} mi of each drop`
-    : null;
+    : crew?.team && totals.driveHours > 11
+      ? "Team: rolls straight through, no night stops"
+      : null;
   const shownReason = planReason ?? reason;
 
   const facts = [
     { label: "You drive", value: `${totals.totalMiles.toLocaleString()} mi` },
-    totals.days >= 2 ? { label: "Days out", value: `${totals.days} days` } : { label: "Drive time", value: driveTime(totals.totalMiles) },
+    days >= 2 ? { label: "Days out", value: `${days} days` } : { label: "Drive time", value: driveTime(totals.totalMiles) },
     last.reloadMarket && !last.lane.moveKind
       ? { label: isPlan ? "Reload at end" : "Reload", value: RELOAD[last.reloadMarket] }
       : { label: "Weight", value: load.weight ? `${Math.round(load.weight / 1000)}k lb` : "—" },
@@ -161,6 +174,7 @@ export function LoadOfferCard({
             {load.equipmentType}
             {!isPlan && load.weight ? ` · ${Math.round(load.weight / 1000)}k lb` : ""}
             {load.lane.moveKind ? ` · ${MOVE_LABEL[load.lane.moveKind]}` : ""}
+            {crew?.team ? " · Team" : ""}
           </p>
         </div>
         <LoadScoreBadge score={score} size="xl" dim={56} />

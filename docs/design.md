@@ -58,7 +58,8 @@ the round arrows on its left and right edges (`components/shared/offer-rail.tsx`
   ("3 loads back to back", "2 loads, one trailer"), every stop is listed in order with "load 1", "load 2", the drive
   between stops says loaded or empty (empty drawn dashed), and a moon marks each overnight rest on a long run. The money
   is the whole plan's; the button says "Book all 3 loads". Multi-stop loads list the extra drop; long single runs say
-  "Long run · 3 days".
+  "Long run · 3 days". Days and dates come from the driver's legal hours: a team truck says "Team" after the
+  equipment and gets there sooner, with no nights.
 - One reason, one blue button.
 
 ## Notifications

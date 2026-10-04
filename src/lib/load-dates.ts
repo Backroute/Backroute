@@ -14,6 +14,10 @@ export interface StopWhen {
   /** "9 am–5 pm CDT", "By appointment", or null. */
   time: string | null;
   raw: string;
+  /** The stop's calendar day as that date's UTC midnight, for counting days between stops. */
+  day?: number;
+  /** The moment the window opens, when it says a clock time: for counting the hours between stops. */
+  at?: number;
 }
 
 const DAY = 86_400_000;
@@ -61,8 +65,25 @@ function parseDay(window: string, baseDay: number, today: number): { day: number
   return null;
 }
 
+/** A clock time on a stop's day ("9:00", "2:00 PM", "7 am") as a moment, or undefined when the text has no time. */
+function opensAt(day: number, rest: string, zone: string): number | undefined {
+  const m = /\b(\d{1,2})(?::(\d{2}))?\s*([ap]m)?\b/i.exec(rest);
+  if (!m || (!m[2] && !m[3])) return undefined;
+  const hour = (Number(m[1]) % (m[3] ? 12 : 24)) + (m[3] && /p/i.test(m[3]) ? 12 : 0);
+  const wall = day + hour * 3_600_000 + Number(m[2] ?? 0) * 60_000;
+  // The zone's offset that day: how far its wall clock is from UTC.
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", { timeZone: zone, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric" })
+      .formatToParts(new Date(wall))
+      .map((x) => [x.type, x.value]),
+  );
+  const shown = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute));
+  return wall - (shown - wall);
+}
+
 function describe(day: number | null, rest: string, raw: string, zone: string, now: number): StopWhen {
   if (day === null) return { date: null, relative: null, time: null, raw };
+  const at = opensAt(day, rest, zone);
   let time = rest.trim() ? friendlyClock(rest.trim().replace(/^by appointment$/i, "By appointment").replace(/^appointment\s+/i, "")) : null;
   // "1 pm–6 pm" reads as "1–6 pm".
   if (time) time = time.replace(/\b(\d{1,2}(?::\d{2})?) (am|pm)–(\d{1,2}(?::\d{2})?) \2\b/, "$1–$3 $2");
@@ -71,7 +92,7 @@ function describe(day: number | null, rest: string, raw: string, zone: string, n
   const diff = Math.round((day - dayIn(now, zone)) / DAY);
   const relative = diff === 0 ? "Today" : diff === 1 ? "Tomorrow" : diff === -1 ? "Yesterday" : null;
   const date = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" }).format(new Date(day));
-  return { date, relative, time, raw };
+  return { date, relative, time, raw, day, at };
 }
 
 /** An exact appointment: its day and time at the stop. */
