@@ -265,7 +265,7 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
     };
     // A holiday, a dock that's closed then, or too little time to drive it: noted on the offer; a hard one keeps the
     // AI from asking for it on its own.
-    const warnings = await scheduleWarnings(load, fit.truck, ctx.carrier.id, ctx.drivers.find((d) => d.id === fit.truck.driverId)).catch(() => []);
+    const warnings = await scheduleWarnings(load, fit.truck, ctx.carrier.id, ctx.drivers.find((d) => d.id === fit.truck.driverId), undefined, ctx.loads).catch(() => []);
     if (warnings.length) load.scheduleWarnings = warnings;
     await save("loads", ctx.carrier.id, load as unknown as Item);
     ctx.loads.unshift(load);
@@ -479,7 +479,7 @@ export async function bookIt(ctx: CarrierContext, load: Load, rate?: number): Pr
   // A partial joins the truck's trip when it fits (pickups and drops in the best order), or starts one on a free truck.
   const joins = truck && !free && isPartial(load) ? tripFit({ ...ctx, loads: ctx.loads.filter((l) => l.id === load.id || l.stage !== "negotiating") }, truck, load) : null;
   // The rate con names the docks: their hours (from drivers' notes) and the holidays are checked again.
-  const warnings = await scheduleWarnings(load, truck, ctx.carrier.id, ctx.drivers.find((d) => d.id === truck?.driverId)).catch(() => load.scheduleWarnings ?? []);
+  const warnings = await scheduleWarnings(load, truck, ctx.carrier.id, ctx.drivers.find((d) => d.id === truck?.driverId), undefined, ctx.loads).catch(() => load.scheduleWarnings ?? []);
   const newlyHard = warnings.filter((w) => w.hard && !(load.scheduleWarnings ?? []).some((x) => x.text === w.text));
   const booked: Load = {
     ...load,

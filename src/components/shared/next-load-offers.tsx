@@ -3,7 +3,7 @@
 import { LoadOfferCard } from "./load-offer-card";
 import { OfferRail } from "./offer-rail";
 import { offerOptions } from "@/lib/plans";
-import type { Crew } from "@/lib/hos-plan";
+import { crewOf, type Crew } from "@/lib/hos-plan";
 import { TruckDriverChip } from "./truck-driver-chip";
 import type { OfferAskDraft } from "@/lib/engine";
 import { useStore } from "@/lib/store";
@@ -71,7 +71,7 @@ export function NextLoadOffers({
                     legs={[load, ...rest]}
                     broker={brokers.get(load.brokerId)}
                     brokers={brokers}
-                    crew={crew ?? (truck ? { team: !!truck.secondDriverId, driveLeft: driver?.hoursRemaining } : undefined)}
+                    crew={crew ?? (truck ? crewOf(truck, driver) : undefined)}
                     viewer={trucks ? "owner" : "driver"}
                     onSelect={() => onSelect(groupId, load.id)}
                     onAsk={real ? undefined : (text) => onAsk(load.id, text)}

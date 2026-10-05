@@ -153,6 +153,8 @@ export interface Driver {
   carrierId: string;
   hosStatus: HosStatus;
   hoursRemaining: number;
+  /** Hours left on the 70-hour, 8-day clock (the "recap"), when known. The ELD's `hos.cycle` wins when connected. */
+  cycleHoursLeft?: number;
   /** Real accounts with an ELD connected: the driver's hours clocks, and when they were read. */
   hos?: { drive: number; shift: number; cycle: number; at: string; source: "samsara" | "motive" };
   cdl: string;
@@ -590,6 +592,8 @@ export interface Load {
   stage: LoadStage;
   /** Who picked it from the offers. The driver who picked it themselves doesn't need a call to hear it's booked. */
   pickedBy?: "driver" | "carrier" | "ai";
+  /** Team freight: a long run priced for a team truck's faster delivery. */
+  teamRate?: boolean;
   source: string;
   /** Real accounts: a finished load from the carrier's own history (Settings, Bring your history), for pricing only. */
   imported?: boolean;

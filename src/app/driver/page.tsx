@@ -34,6 +34,7 @@ import { PRE_TRIP_STAGES } from "@/lib/trip-state";
 import { cn, formatCurrency } from "@/lib/utils";
 import { Lane } from "@/components/ui/lane";
 import { stopDates } from "@/lib/load-dates";
+import { crewOf } from "@/lib/hos-plan";
 
 
 export default function DriverHomePage() {
@@ -305,7 +306,7 @@ export default function DriverHomePage() {
           </div>
           <NextLoadOffers
             bleed
-            crew={{ team: !!truck?.secondDriverId, driveLeft: driver.hoursRemaining }}
+            crew={crewOf(truck, driver)}
             offerGroups={offerGroups}
             brokers={brokers}
             onSelect={(groupId, loadId) => selectLoadOffer(groupId, loadId, "driver")}

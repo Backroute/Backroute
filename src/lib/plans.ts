@@ -109,8 +109,11 @@ export interface PlanTotals {
   driveHours: number;
   /** Days on the road from the first pickup to the last drop, the clocks run the way the rules say. */
   days: number;
-  /** Where the driver stops for the night, after which stop (index into the stops). A team truck never does. */
-  rests: { afterStop: number; place: string }[];
+  /** Where the driver stops for the night, after which stop (index into the stops), and for how long (10 hours, 7
+   *  after a split, 34 for the week's restart). A team truck only stops for a restart. */
+  rests: { afterStop: number; place: string; hours: number }[];
+  /** Hours from leaving for the first pickup to getting to the last drop: the truck's time on this. */
+  hours: number;
   /** Ends here. */
   end: { city: string; state: string };
 }
@@ -161,6 +164,7 @@ export function planTotals(legs: Load[], crew: Crew = {}): PlanTotals {
     driveHours: run.driveHours,
     days,
     rests: restStops(stops, segments, run.rests, Math.max(0, first?.deadheadMiles ?? 0)),
+    hours: atLastDrop / 3_600_000,
     end: last ? { city: last.city, state: last.state } : { city: "", state: "" },
   };
 }
@@ -169,8 +173,8 @@ export function planTotals(legs: Load[], crew: Crew = {}): PlanTotals {
  * Each night's rest put on the road: which drive between stops it falls in, and the nearest town to that point. A rest
  * on the empty drive to the first pickup isn't shown (the driver sleeps before the load starts).
  */
-export function restStops(stops: PlanStop[], segments: Segment[], rests: { mile: number }[], startEmpty = 0): { afterStop: number; place: string }[] {
-  const out: { afterStop: number; place: string }[] = [];
+export function restStops(stops: PlanStop[], segments: Segment[], rests: { mile: number; hours?: number }[], startEmpty = 0): { afterStop: number; place: string; hours: number }[] {
+  const out: { afterStop: number; place: string; hours: number }[] = [];
   for (const r of rests) {
     let from = startEmpty;
     if (r.mile <= from) continue;
@@ -183,7 +187,7 @@ export function restStops(stops: PlanStop[], segments: Segment[], rests: { mile:
         const point: LatLng | undefined = a && b ? [a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac] : undefined;
         // Out West towns are far apart: anything within a couple of hours' drive names the stretch.
         const town = point ? nearestCity(point, 160) : undefined;
-        out.push({ afterStop: i, place: town ? `${town.city}, ${town.state}` : "on the way" });
+        out.push({ afterStop: i, place: town ? `${town.city}, ${town.state}` : "on the way", hours: r.hours ?? 10 });
         break;
       }
       from += seg.miles;

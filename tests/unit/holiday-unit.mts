@@ -1,4 +1,6 @@
 import { holidayOn } from "../../src/lib/holidays.ts";
+import { hoursNeeded } from "../../src/lib/agent/schedule.ts";
+import { dockHoursFor } from "../../src/lib/agent/facilities.ts";
 let ok = 0, bad = 0;
 const t = (label: string, cond: boolean, got?: unknown) => { cond ? ok++ : bad++; console.log(`${cond ? "PASS" : "FAIL"} ${label}${cond ? "" : ` (${JSON.stringify(got)})`}`); };
 t("Thanksgiving 2026 is Nov 26, closed", holidayOn("2026-11-26")?.closed === true && /Thanksgiving/.test(holidayOn("2026-11-26")!.name), holidayOn("2026-11-26"));
@@ -22,4 +24,13 @@ t("Quebec: no Saint-Jean in Ontario", holidayOn("2026-06-24", "ON") === null);
 t("Canada Day 2029 on a Sunday: observed Monday Jul 2", holidayOn("2029-07-02", "AB")?.name === "Canada Day (observed)", holidayOn("2029-07-02", "AB"));
 t("Good Friday 2027 is Mar 26", holidayOn("2027-03-26", "MB")?.name === "Good Friday", holidayOn("2027-03-26", "MB"));
 t("US stop on Canada's Thanksgiving: Columbus Day short day, not closed", holidayOn("2026-10-12", "NY")?.closed === false);
+// The legal-hours check before booking: the same clocks the app's offers are timed with.
+t("780 miles solo needs about 29 hours (a night's rest on the way)", Math.round(hoursNeeded(780)) === 29, hoursNeeded(780));
+t("…a team does it in about 19", Math.round(hoursNeeded(780, true)) === 19, hoursNeeded(780, true));
+t("…a driver with 3 hours left on the week needs a 34-hour restart first", hoursNeeded(780, false, undefined, { cycleLeft: 3 }) > hoursNeeded(780) + 30, hoursNeeded(780, false, undefined, { cycleLeft: 3 }));
+t("…and a shipper that keeps trucks 5 hours adds to it", hoursNeeded(400, false, undefined, { dwell: 5 }) > hoursNeeded(400) + 2.9, hoursNeeded(400, false, undefined, { dwell: 5 }));
+const visit = (id: string, mins: number) => ({ id, lane: { origin: "Dallas", destination: "Memphis" }, rateConReading: { shipper: "Slow Foods Inc", receiver: "Fast DC" }, tripChecklist: { arrivedPickupAt: "2026-10-01T08:00:00Z", loadedAt: new Date(Date.parse("2026-10-01T08:00:00Z") + mins * 60000).toISOString() } });
+const hist = [visit("a", 300), visit("b", 330)] as never[];
+t("a shipper seen twice at 5 and 5.5 hours: planned as 5.5 (to the half hour)", dockHoursFor(hist, visit("c", 0) as never).pickup === 5.5, dockHoursFor(hist, visit("c", 0) as never));
+t("one we've never been to: the usual", dockHoursFor([], visit("c", 0) as never).pickup === undefined);
 console.log(`\n${ok} passed, ${bad} failed`);

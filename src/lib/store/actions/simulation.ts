@@ -9,6 +9,7 @@ import type { ActivityEvent, Broker, Escalation, Load } from "../../types";
 import { CallDraft, draftFrom, runDispatchCalls } from "../calls";
 import { ESCALATION_TEMPLATES, autoPickOffer, fitsDriver, homeOptions, pick, promoteChainedLoad, randInt, runRateCons, scheduleCallEnds, uid, withLiveCall } from "../support";
 import type { Actions, GetState, SetState } from "../state";
+import { crewOf } from "../../hos-plan";
 
 export const simulationActions = (set: SetState, get: GetState): Pick<Actions, "tick" | "seedInitialOffers"> => ({
   tick: () => {
@@ -51,8 +52,8 @@ export const simulationActions = (set: SetState, get: GetState): Pick<Actions, "
           ...homeOptions(driver, { city: truck.currentCity, state: truck.currentState }),
           equipmentType: truck.equipmentType,
           from: { city: truck.currentCity, state: truck.currentState },
-          // A team truck rolls through the night; a solo driver starts from the hours they have left today.
-          crew: { team: !!truck.secondDriverId, driveLeft: driver?.hoursRemaining },
+          // A team truck rolls through the night; a solo driver starts from the hours they have left today and this week.
+          crew: crewOf(truck, driver),
         });
         loads = [...offers, ...loads];
         if (truck.autoChainNextLoad) {
@@ -84,7 +85,8 @@ export const simulationActions = (set: SetState, get: GetState): Pick<Actions, "
             ...homeOptions(driver, { city: currentLoad.lane.destination, state: currentLoad.lane.destState }),
             equipmentType: truck.equipmentType,
             from: { city: currentLoad.lane.destination, state: currentLoad.lane.destState },
-            crew: { team: !!truck.secondDriverId },
+            // Next load: the driver rests before it, so a fresh day, but the week's hours carry over.
+            crew: { ...crewOf(truck, driver), driveLeft: undefined },
           });
           loads = [...offers, ...loads];
           if (truck.autoChainNextLoad) {
@@ -322,7 +324,7 @@ export const simulationActions = (set: SetState, get: GetState): Pick<Actions, "
         ...homeOptions(driver, currentLoad ? { city: currentLoad.lane.destination, state: currentLoad.lane.destState } : undefined),
         equipmentType: truck.equipmentType,
         from: currentLoad ? { city: currentLoad.lane.destination, state: currentLoad.lane.destState } : undefined,
-        crew: { team: !!truck.secondDriverId },
+        crew: { ...crewOf(truck, driver), driveLeft: undefined },
       });
       return {
         loads: [...offers, ...state.loads],

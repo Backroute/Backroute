@@ -699,6 +699,7 @@ export function generateWorld(seed = 20260916): World {
       carrierId: PRIMARY_CARRIER_ID,
       hosStatus: rng.pick(["driving", "driving", "on_duty", "off_duty", "sleeper"]),
       hoursRemaining: pct(rng, 2.5, 10.5),
+      cycleHoursLeft: pct(rng, 14, 62),
       cdl: d.cdl,
       rating: pct(rng, 4.6, 5.0, 1),
       hireDate: iso(-rng.int(60, 900) * 1440),

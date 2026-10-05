@@ -1,6 +1,8 @@
 import "server-only";
 import { holidayOn } from "../holidays";
 import { zoneFor } from "../stop-time";
+import { simulateRun } from "../hos-plan";
+import { dockHoursFor } from "./facilities";
 import type { Driver, Load, ScheduleWarning, Truck } from "../types";
 import { postedHours } from "./dock-hours";
 import { facilitiesOf, formatHours, hoursAt, type FacilityHours } from "./facility-notes";
@@ -13,38 +15,19 @@ import { facilitiesOf, formatHours, hoursAt, type FacilityHours } from "./facili
  * soft one is mentioned to the owner and the driver.
  */
 
-/**
- * Average truck speed on a run, and the hours-of-service rules: 11 hours driving inside a 14-hour on-duty window, a
- * 30-minute break after 8 hours of driving, 10 hours off before the next day. Each day also costs about an hour on
- * duty that isn't driving (the pre-trip inspection, fuel, a scale), which comes out of the 14.
- */
-const MPH = 50;
+/** The usual time at a dock, when nobody's recorded how long this one keeps trucks. */
 const DWELL_HOURS = 2;
-const DAILY_HOURS = 1;
 
 /**
- * Hours from pickup to delivery a solo driver (or a team) needs to drive a run legally. `hoursLeft` is what the
- * driver has on their clock at pickup, when they can't rest before it (from the ELD); without it, a fresh day.
+ * Hours from pickup to delivery a solo driver (or a team) needs to run a load legally, played on the driver's clocks
+ * (lib/hos-plan, the same rules the app's offers are timed with): 11 hours driving in a 14-hour day, the 30-minute
+ * break, 10 hours off (or a split), the morning's hour for the pre-trip and fuel, and the week's 70 hours with a
+ * 34-hour restart. `hoursLeft` is what the driver has on their clock at pickup when they can't rest before it (from the
+ * ELD); without it, a fresh day. `dwell` is how long the pickup dock usually keeps a truck.
  */
-export function hoursNeeded(miles: number, team = false, hoursLeft?: number): number {
-  const drive = miles / MPH;
-  // Two drivers swap in the sleeper and keep rolling: breaks, fuel and the stop at the dock.
-  if (team) return drive + Math.floor(drive / 8) * 0.5 + Math.ceil(drive / 10) * 0.5 + DWELL_HOURS;
-  let left = drive;
-  let elapsed = DWELL_HOURS;
-  let first = true;
-  while (left > 0) {
-    const onDutyAlready = first ? DWELL_HOURS + DAILY_HOURS : DAILY_HOURS;
-    const window = 14 - onDutyAlready;
-    const clock = first && hoursLeft !== undefined ? Math.max(0, Math.min(11, hoursLeft)) : 11;
-    // The 30-minute break comes out of the window once they drive past 8.
-    const can = Math.max(0, Math.min(clock, left, window > 8.5 ? window - 0.5 : window));
-    elapsed += can + (can > 8 ? 0.5 : 0) + (first ? 0 : DAILY_HOURS);
-    left -= can;
-    if (left > 0) elapsed += 10;
-    first = false;
-  }
-  return elapsed;
+export function hoursNeeded(miles: number, team = false, hoursLeft?: number, opts: { dwell?: number; cycleLeft?: number } = {}): number {
+  const run = simulateRun([{ kind: "dock", hours: opts.dwell ?? DWELL_HOURS }, { kind: "drive", miles }], 0, { team, driveLeft: hoursLeft, cycleLeft: opts.cycleLeft });
+  return run.end / 3_600_000;
 }
 
 function local(iso: string, state: string) {
@@ -97,7 +80,7 @@ function dateFromText(text: string | undefined, now = Date.now()): string | null
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-export async function scheduleWarnings(load: Load, truck?: Pick<Truck, "secondDriverId"> | null, carrierId?: string, driver?: Pick<Driver, "hos" | "hoursRemaining"> | null, now = Date.now()): Promise<ScheduleWarning[]> {
+export async function scheduleWarnings(load: Load, truck?: Pick<Truck, "secondDriverId"> | null, carrierId?: string, driver?: Pick<Driver, "hos" | "hoursRemaining"> | null, now = Date.now(), history: Load[] = []): Promise<ScheduleWarning[]> {
   const out: ScheduleWarning[] = [];
   const stops = [
     { stop: "Pickup", iso: load.pickupAt, state: load.lane.originState, city: load.lane.origin },
@@ -135,9 +118,11 @@ export async function scheduleWarnings(load: Load, truck?: Pick<Truck, "secondDr
     const fresh = driver?.hos?.at && now - Date.parse(driver.hos.at) < 2 * 3600_000;
     const soon = Date.parse(load.pickupAt) - now < 10 * 3600_000;
     const left = !team && fresh && soon ? driver?.hoursRemaining : undefined;
-    const need = hoursNeeded(load.lane.miles, team, left);
+    // The week's hours from the ELD, and how long this shipper usually keeps trucks (the carrier's own visits).
+    const opts = { cycleLeft: fresh ? driver?.hos?.cycle : undefined, dwell: dockHoursFor(history, load).pickup };
+    const need = hoursNeeded(load.lane.miles, team, left, opts);
     if (window > 0 && window + 1 < need) {
-      const short = left !== undefined && hoursNeeded(load.lane.miles, team) + 1 <= window;
+      const short = left !== undefined && hoursNeeded(load.lane.miles, team, undefined, opts) + 1 <= window;
       out.push({ hard: true, text: `${Math.round(load.lane.miles)} miles needs about ${Math.round(need)} hours with ${team ? "a team" : "one driver's"} required breaks${short ? ` (the driver has ${Math.round((left ?? 0) * 10) / 10} hours left on their clock today)` : ""}, but pickup to delivery is only ${Math.round(window)} hours.` });
     }
   }

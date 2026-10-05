@@ -197,7 +197,7 @@ export function createLoadOfferBatch(
     : undefined;
 
   const candidates = Array.from({ length: count }, (_, i) => {
-    const base = withExtraStop(createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType, placements?.[i], opts.surcharges));
+    const base = withTeamRate(withExtraStop(createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType, placements?.[i], opts.surcharges)), opts.crew);
     return priceOffer(timeLegs([base], opts.crew)[0], hoursHomeFrom, startHoursHome);
   });
 
@@ -219,13 +219,14 @@ export function createLoadOfferBatch(
   // A dispatcher's call on each choice: what it nets per hour of the driver's time (a plan's empty miles between loads
   // and its docks counted), marked down when it ends somewhere nothing ships back out of. When it's time to head home,
   // getting closer to home comes first.
+  // The hours are the truck's real time on it, played on the driver's clocks: nights parked count against a solo
+  // driver's long run, and a team truck that rolls through them earns more of the long freight.
   const value = (o: Load[]) => {
     const last = o[o.length - 1];
-    const totals = planTotals(o);
+    const totals = planTotals(o, opts.crew);
     const net = totals.net;
     if (opts.headHome && last.hoursHomeAfter !== undefined) return -last.hoursHomeAfter * 1000 + net;
-    const docks = o.length * 2 + o.reduce((n, l) => n + (l.stops?.length ?? 0), 0);
-    const perHour = net / (totals.totalMiles / 50 + docks * 2);
+    const perHour = net / Math.max(1, totals.hours);
     return last.reloadMarket === "weak" ? perHour * 0.85 : perHour;
   };
   const top = (pool: Load[][]) => pool.reduce((a, b) => (value(b) > value(a) ? b : a));
@@ -265,6 +266,19 @@ const PARTIAL_PREMIUM = 1.25;
 
 /** What an extra drop pays on top of the line haul, about what brokers add per stop. */
 const STOP_PAY = 75;
+
+/**
+ * Team freight: a long run that has to get there fast (expedited, high-value, coast to coast) pays more, because only
+ * a team truck can deliver it days sooner. Expedited freight runs 30–100% over standard rates; 20% is the
+ * conservative end, on runs of 1,000 miles or more, for a team truck.
+ */
+const TEAM_PREMIUM = 1.2;
+const TEAM_MILES = 1000;
+
+function withTeamRate(load: Load, crew?: Crew): Load {
+  if (!crew?.team || load.lane.moveKind || load.lane.miles < TEAM_MILES) return load;
+  return { ...load, teamRate: true, listedRate: Math.round(load.listedRate * TEAM_PREMIUM), targetRate: Math.round(load.targetRate * TEAM_PREMIUM) };
+}
 
 /** Now and then a load has a second drop on the way (a multi-stop load): one more stop for the driver, paid for. */
 function withExtraStop(load: Load): Load {
@@ -357,7 +371,7 @@ function buildBackToBack(
   const out: Load[] = [];
   let placement: LanePlacement | undefined = firstAt;
   for (let i = 0; i < legs && placement; i++) {
-    const base = createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType, placement, opts.surcharges);
+    const base = withTeamRate(createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType, placement, opts.surcharges), opts.crew);
     out.push(base);
     // The reload: loading near this delivery, not straight back over the same road, best for its empty miles.
     const from = { city: base.lane.destination, state: base.lane.destState };

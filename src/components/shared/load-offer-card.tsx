@@ -36,6 +36,12 @@ function driveTime(miles: number) {
  * the one reason it's a good fit, and one button. Everything else is under Details. The driver never sees the broker's
  * credit or fraud checks: that's the owner's call.
  */
+/** "Overnight rest near Amarillo, TX", or the week's reset when the 70 hours run out. */
+function restWords(r: { place: string; hours: number }): string {
+  const what = r.hours >= 34 ? "34-hour reset" : r.hours < 10 ? `${Math.round(r.hours)}-hour rest (split sleeper)` : "Overnight rest";
+  return r.place === "on the way" ? `${what} on the way` : `${what} near ${r.place}`;
+}
+
 export function LoadOfferCard({
   load,
   legs: givenLegs,
@@ -134,9 +140,13 @@ export function LoadOfferCard({
       : last.hoursHomeAfter !== undefined && last.hoursHomeAfter < 3
         ? "Ends near home"
         : `Reloads within ${Math.max(...legs.slice(1).map((l) => l.deadheadMiles))} mi of each drop`
-    : crew?.team && totals.driveHours > 11
-      ? "Team: rolls straight through, no night stops"
-      : null;
+    : load.teamRate
+      ? "Team freight: pays 20% more to get there days sooner"
+      : crew?.team && totals.driveHours > 11
+        ? "Team: rolls straight through, no night stops"
+        : totals.rests.some((r) => r.hours >= 34)
+          ? "Includes the 34-hour reset the driver's week needs"
+          : null;
   const shownReason = planReason ?? reason;
 
   const facts = [
@@ -211,7 +221,7 @@ export function LoadOfferCard({
                     </p>
                     {rests.map((r, k) => (
                       <p key={k} className="mt-0.5 flex items-center gap-1.5">
-                        <Moon className="h-3.5 w-3.5 shrink-0" /> {r.place === "on the way" ? "Overnight rest on the way" : `Overnight rest near ${r.place}`}
+                        <Moon className="h-3.5 w-3.5 shrink-0" /> {restWords(r)}
                       </p>
                     ))}
                   </div>

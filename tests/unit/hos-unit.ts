@@ -42,7 +42,24 @@ ok("…and the run takes 11 hours longer (3 driving, 10 off, the pre-trip, 7 dri
 const waited = simulateRun([{ kind: "until", at: 12 * H }, { kind: "drive", miles: 500 }], 0, { driveLeft: 0 });
 ok("waiting 12 hours for the dock resets the clocks: no rest after", waited.rests.length === 0, waited.rests);
 const short = simulateRun([{ kind: "until", at: 5 * H }, { kind: "drive", miles: 500 }], 0);
-ok("waiting 5 hours uses up the 14: rests after 425 mi (8.5 hours of driving fit)", short.rests.length === 1 && Math.abs(short.rests[0].mile - 425) < 1, short.rests);
+ok("waiting 5 hours at the dock, in the sleeper, doesn't use the 14: 500 mi with no rest", short.rests.length === 0, short.rests);
+const hour = simulateRun([{ kind: "dock", hours: 4 }, { kind: "until", at: 5 * H }, { kind: "drive", miles: 1000 }], 0);
+ok("an hour's wait does use the 14 (too short to split): rests after 425 mi", Math.abs(hour.rests[0]?.mile - 425) < 1, hour.rests);
+const split = simulateRun([{ kind: "dock", hours: 4 }, { kind: "until", at: 7 * H }, { kind: "drive", miles: 1000 }], 0);
+ok("a 3-hour wait splits the 10: 475 mi before the rest (9.5 hours fit)", Math.abs(split.rests[0]?.mile - 475) < 1, split.rests);
+ok("…and that night's rest is 7 hours (7 + 3)", split.rests[0]?.hours === 7, split.rests);
+ok("a normal night is 10 hours", solo.rests[0].hours === 10);
+
+// The week: 70 hours on duty in 8 days, then a 34-hour restart.
+const recap = simulateRun([{ kind: "drive", miles: 500 }], 0, { cycleLeft: 5 });
+ok("5 hours left on the 70: a 34-hour restart after 250 mi", recap.rests[0]?.hours === 34 && Math.abs(recap.rests[0].mile - 250) < 1, recap.rests);
+ok("…which takes the run past a day and a half", hours(recap.end) > 34 + 10, hours(recap.end));
+const teamRecap = simulateRun([{ kind: "drive", miles: 800 }], 0, { team: true, cycleLeft: 5 });
+ok("a team shares the week: 5 hours left goes twice as far (500 mi) before a restart", Math.abs(teamRecap.rests[0]?.mile - 500) < 1 && teamRecap.rests[0].hours === 34, teamRecap.rests);
+const longWait = simulateRun([{ kind: "until", at: 36 * H }, { kind: "drive", miles: 500 }], 0, { cycleLeft: 0 });
+ok("a 36-hour wait is a restart: the week is full again", longWait.rests.length === 0, longWait.rests);
+const docks = simulateRun([{ kind: "dock", hours: 3 }, { kind: "drive", miles: 300 }], 0, { cycleLeft: 4 });
+ok("dock time counts toward the 70 too: 3 hours at the dock, then only 1 hour to drive", docks.rests[0]?.hours === 34 && Math.abs(docks.rests[0].mile - 50) < 1, docks.rests);
 ok("each step's time is kept in order", waited.doneAt.length === 2 && waited.doneAt[0] === 12 * H && waited.doneAt[1] > waited.doneAt[0]);
 
 // Plans: the same load, solo against a team.

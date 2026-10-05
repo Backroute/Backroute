@@ -54,6 +54,21 @@ ok("a 2,015-mile run is 4 days of driving", lt.days === 4, lt);
 ok("…with 3 nights' rest, each in a town on the road", lt.rests.length === 3 && lt.rests.every((r) => /, [A-Z]{2}$/.test(r.place)), lt.rests);
 ok("a 500-mile load is 1 day, no rest", planTotals([{ ...long, lane: { ...long.lane, destination: "Memphis", destState: "TN", miles: 530 } }]).days === 1);
 
+// The week: a driver near the end of their 70 hours gets the 34-hour reset in the plan.
+const tired = planTotals([long], { cycleLeft: 6 });
+ok("6 hours left on the week: the long run includes a 34-hour reset", tired.rests.some((r) => r.hours === 34), tired.rests);
+ok("…and takes longer than a fresh driver's", tired.days > lt.days, { tired: tired.days, fresh: lt.days });
+
+// Team freight: long runs pay more for a team truck.
+const teamOffers = Array.from({ length: 30 }, (_, i) => createLoadOfferBatch(brokers, truck.carrierId, truck.id, 700 + i * 10, false, 3, { from: { city: "Dallas", state: "TX" }, homeBase: "Dallas, TX", runType: "otr", equipmentType: truck.equipmentType, crew: { team: true } })).flat();
+const teamLong = teamOffers.filter((l) => l.lane.miles >= 1000 && !l.lane.moveKind && !l.partial);
+ok("team truck: long runs are team freight (partials are priced by trailer space instead)", teamLong.length > 0 && teamLong.every((l) => l.teamRate), teamLong.length);
+ok("…short ones aren't", teamOffers.filter((l) => l.lane.miles < 1000).every((l) => !l.teamRate));
+ok("solo trucks never get team freight", all.every((l) => !l.teamRate));
+const perMile = (ls: Load[]) => ls.reduce((n, l) => n + l.targetRate, 0) / ls.reduce((n, l) => n + l.lane.miles, 0);
+const soloLong = all.filter((l) => l.lane.miles >= 1000 && !l.lane.moveKind && !l.partial);
+ok("…and it pays more a mile than the same runs solo", perMile(teamLong) > perMile(soloLong) * 1.1, { team: perMile(teamLong), solo: perMile(soloLong) });
+
 // Booking a plan books every load in it, and lines them up on the truck.
 const batch = batches.find((b) => offerOptions(b).some((o) => o[0].plan?.kind === "back_to_back" && o.length === 3))!;
 const plan = offerOptions(batch).find((o) => o[0].plan?.kind === "back_to_back" && o.length === 3)!;

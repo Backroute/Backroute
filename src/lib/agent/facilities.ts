@@ -42,3 +42,16 @@ export function slowDocks(loads: Load[], load: Load): FacilityStats[] {
     (f): f is FacilityStats => !!f && f.visits >= 2 && f.avgMinutes >= 180,
   );
 }
+
+/**
+ * How long each dock on this load usually keeps a truck, in hours, from the carrier's own visits (two or more):
+ * what the trip planner counts for loading and unloading instead of the usual two hours.
+ */
+export function dockHoursFor(loads: Load[], load: Load): { pickup?: number; delivery?: number } {
+  const r = load.rateConReading;
+  const hours = (f: FacilityStats | null) => (f && f.visits >= 2 ? Math.round((f.avgMinutes / 60) * 2) / 2 : undefined);
+  return {
+    pickup: hours(facilityStats(loads, r?.shipper, load.lane.origin, load.id)),
+    delivery: hours(facilityStats(loads, r?.receiver, load.lane.destination, load.id)),
+  };
+}

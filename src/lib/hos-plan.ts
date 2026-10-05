@@ -7,6 +7,12 @@ import { stopLocalToIso, zoneFor } from "./stop-time";
  * but not the 11, and so does the hour each morning for the pre-trip inspection and fuel (as `agent/schedule.ts` counts
  * it). Waiting 10 hours or more for an appointment counts as the 10 off.
  *
+ * The week: no driving after 70 hours on duty in 8 days, until a 34-hour restart (on duty without driving is still
+ * allowed). Hours coming back as old days roll off aren't counted, so a long plan is planned on the safe side.
+ *
+ * The split sleeper: a wait of 2 hours or more at a dock, logged in the sleeper, doesn't use up the 14 (the 7/3 and
+ * 8/2 splits, 49 CFR 395.1(g)); the night's rest after it is then the rest of the 10, at least 7 hours.
+ *
  * A team truck (two drivers, one sleeping in the berth while the other drives) only stops to swap seats, fuel and eat:
  * it rolls about 1,000 to 1,100 miles a day against a solo driver's 450 to 550, and never parks for the night.
  *
@@ -24,6 +30,11 @@ const WINDOW = 14;
 const BREAK_AFTER = 8;
 const BREAK = 0.5;
 const REST = 10;
+const WEEK = 70;
+const RESTART = 34;
+/** The shortest piece of a split: 2 hours off (or in the sleeper) paired with at least 7 in the sleeper. */
+const SPLIT_SHORT = 2;
+const SPLIT_LONG = 7;
 /** On duty, not driving, at the start of each day after a rest: the pre-trip inspection, fuel, a scale. */
 const DAY_START = 1;
 /** A team's stop every 8 hours of driving: swap seats, fuel, eat. Two a day leaves 22 hours rolling, about 1,100 miles. */
@@ -35,6 +46,13 @@ export interface Crew {
   team?: boolean;
   /** Hours of driving the driver has left right now (their ELD clock); a full 11 when not known. */
   driveLeft?: number;
+  /** Hours left on the 70-hour, 8-day clock (their "recap"); a full 70 when not known. */
+  cycleLeft?: number;
+}
+
+/** The crew a truck has: its drivers, and the first driver's clocks. */
+export function crewOf(truck: { secondDriverId?: string | null } | undefined, driver: { hoursRemaining?: number; cycleHoursLeft?: number; hos?: { cycle: number } } | undefined): Crew {
+  return { team: !!truck?.secondDriverId, driveLeft: driver?.hoursRemaining, cycleLeft: driver?.hos?.cycle ?? driver?.cycleHoursLeft };
 }
 
 export type RunStep = { kind: "drive"; miles: number } | { kind: "dock"; hours: number } | { kind: "until"; at: number };
@@ -43,8 +61,9 @@ export interface RunResult {
   /** When each step is done, in step order. */
   doneAt: number[];
   end: number;
-  /** Where (miles driven so far) and when each 10-hour rest starts. Solo only: a team doesn't stop for the night. */
-  rests: { mile: number; at: number }[];
+  /** Where (miles driven so far) and when each rest starts, and how long: 10 hours, 7 after a split, or a 34-hour
+   *  restart when the week's 70 run out. A team only stops for a restart. */
+  rests: { mile: number; at: number; hours: number }[];
   driveHours: number;
 }
 
@@ -55,14 +74,30 @@ export function simulateRun(steps: RunStep[], start: number, crew: Crew = {}): R
   let drive = Math.max(0, Math.min(DRIVE_MAX, crew.driveLeft ?? DRIVE_MAX));
   let shift = WINDOW;
   let sinceBreak = 0;
+  let week = Math.max(0, Math.min(WEEK, crew.cycleLeft ?? WEEK));
+  // A qualifying short piece already taken (in hours): the night's rest only needs to make up the 10.
+  let splitShort = 0;
   let mile = 0;
   let driveHours = 0;
   const rests: RunResult["rests"] = [];
   const doneAt: number[] = [];
-  const reset = () => {
+  const newDay = () => {
     drive = DRIVE_MAX;
     shift = WINDOW;
     sinceBreak = 0;
+    splitShort = 0;
+  };
+  // On duty, not driving: uses the 14 and the week. Two drivers share a team's week.
+  const onDuty = (h: number) => {
+    if (!team) shift -= h;
+    week -= team ? h / 2 : h;
+  };
+  const rest = (hours: number) => {
+    rests.push({ mile, at: t, hours });
+    t += (hours + DAY_START) * H;
+    if (hours >= RESTART) week = WEEK;
+    newDay();
+    onDuty(DAY_START);
   };
 
   for (const step of steps) {
@@ -70,11 +105,12 @@ export function simulateRun(steps: RunStep[], start: number, crew: Crew = {}): R
       let left = step.miles;
       // Guard against a stuck loop on bad input: no run is longer than a few thousand miles.
       for (let guard = 0; left > 0.01 && guard < 500; guard++) {
+        if (week <= 0.01) {
+          rest(RESTART);
+          continue;
+        }
         if (!team && (drive <= 0.01 || shift <= 0.01)) {
-          rests.push({ mile, at: t });
-          t += (REST + DAY_START) * H;
-          reset();
-          shift -= DAY_START;
+          rest(splitShort >= SPLIT_SHORT ? Math.max(SPLIT_LONG, REST - splitShort) : REST);
           continue;
         }
         if (sinceBreak >= BREAK_AFTER - 1e-6) {
@@ -83,12 +119,14 @@ export function simulateRun(steps: RunStep[], start: number, crew: Crew = {}): R
           sinceBreak = 0;
           continue;
         }
-        const h = Math.min(left / PLAN_MPH, BREAK_AFTER - sinceBreak, team ? Infinity : Math.min(drive, shift));
+        const weekDrive = team ? week * 2 : week;
+        const h = Math.min(left / PLAN_MPH, BREAK_AFTER - sinceBreak, weekDrive, team ? Infinity : Math.min(drive, shift));
         t += h * H;
         if (!team) {
           drive -= h;
           shift -= h;
         }
+        week -= team ? h / 2 : h;
         sinceBreak += h;
         left -= h * PLAN_MPH;
         mile += h * PLAN_MPH;
@@ -96,11 +134,15 @@ export function simulateRun(steps: RunStep[], start: number, crew: Crew = {}): R
       }
     } else if (step.kind === "dock") {
       t += step.hours * H;
-      if (!team) shift -= step.hours;
+      onDuty(step.hours);
       if (step.hours >= BREAK) sinceBreak = 0;
     } else if (step.at > t) {
       const gap = (step.at - t) / H;
-      if (gap >= REST) reset();
+      if (gap >= RESTART) {
+        week = WEEK;
+        newDay();
+      } else if (gap >= REST) newDay();
+      else if (!team && gap >= SPLIT_SHORT) splitShort = Math.max(splitShort, gap); // In the sleeper: the 14 waits.
       else if (!team) shift -= gap;
       if (gap >= BREAK) sinceBreak = 0;
       t = step.at;
