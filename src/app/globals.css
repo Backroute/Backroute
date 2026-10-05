@@ -1,53 +1,55 @@
 @import "tailwindcss";
 
 /*
- * Apple's palette: cool greys, near-black text, one blue for the thing to tap. Colour means something or it isn't
- * used: red is wrong right now, orange is waiting on you, green is done or paid, and each shows as a small dot or
- * word, never a coloured block.
+ * After Uber's Base design system: black and white with true greys, high contrast so it reads in a truck cab at
+ * noon. The main button is black (white in dark mode): the thing to tap. Blue is only for links and what's picked.
+ * Colour means something or it isn't used: red is wrong right now, orange is waiting on you, green is done or paid,
+ * and each shows as a small dot or word, never a coloured block.
  */
 :root {
   --background: #ffffff;
-  --foreground: #1d1d1f;
+  --foreground: #000000;
 
   --ink-0: #ffffff;
-  --ink-50: #fafafc;
-  --ink-100: #f5f5f7;
-  --ink-150: #ececf0;
-  --ink-200: #e3e3e8;
-  --ink-300: #d2d2d7;
-  /* Helper text stays readable: 400 and 500 both pass 4.5:1 on white. */
-  --ink-400: #76767b;
-  --ink-500: #6e6e73;
-  --ink-600: #545458;
-  --ink-700: #3a3a3c;
-  --ink-800: #2c2c2e;
-  --ink-900: #242426;
-  --ink-950: #1d1d1f;
+  --ink-50: #f8f8f8;
+  --ink-100: #f3f3f3;
+  --ink-150: #eeeeee;
+  --ink-200: #e8e8e8;
+  --ink-300: #dddddd;
+  /* Helper text stays readable outdoors: 400 is 4.8:1 on white, 500 is 6.4:1. */
+  --ink-400: #727272;
+  --ink-500: #5e5e5e;
+  --ink-600: #4b4b4b;
+  --ink-700: #333333;
+  --ink-800: #282828;
+  --ink-900: #141414;
+  --ink-950: #000000;
 
-  --line: #e5e5ea;
-  --line-strong: #d2d2d7;
+  --line: #e8e8e8;
+  --line-strong: #dddddd;
 
-  /* Apple's system colours in their higher-contrast form, so small text stays readable outdoors. */
-  --accent-live: #248a3d;
-  --accent-warn: #c93400;
-  --accent-danger: #d70015;
-  --accent-info: #0066cc;
+  /* Status colours in their darker form, so small text stays readable in sun glare. */
+  --accent-live: #0e8345;
+  --accent-warn: #c54600;
+  --accent-danger: #de1135;
+  --accent-info: #276ef1;
   /* Status never fills a block: a panel about a problem is grey like any other, and the word or dot carries it. */
   --accent-live-soft: var(--ink-100);
   --accent-warn-soft: var(--ink-100);
   --accent-danger-soft: var(--ink-100);
   --accent-info-soft: var(--ink-100);
 
-  /* The one colour for "tap here": the main button on a screen, a switch that's on, keyboard focus. */
-  --action: #0071e3;
-  --action-strong: #0062c4;
-  --action-ink: #ffffff;
+  /* Dots and solid fills use the bright versions, so orange and red are easy to tell apart at 6px. */
+  --dot-live: #06c167;
+  --dot-warn: #fc823a;
+  --dot-danger: #f83446;
 
-  /* Dots and solid fills use Apple's bright system colours, so orange and red are easy to tell apart at 6px; the
-     darker accents above are for small text, where they need the contrast. */
-  --dot-live: #34c759;
-  --dot-warn: #ff9500;
-  --dot-danger: #ff3b30;
+  /* The thing to tap: the main button on a screen, a switch that's on. */
+  --action: #000000;
+  --action-strong: #282828;
+  --action-ink: #ffffff;
+  /* Text links and keyboard focus. */
+  --link: #276ef1;
 
   /* Where you are and what you picked (the active tab, a selected choice): the same ink as the text. */
   --brand: var(--ink-950);
@@ -63,40 +65,42 @@
  */
 :root[data-theme="dark"] {
   --background: #000000;
-  --foreground: #f5f5f7;
-  --color-white: #1c1c1e;
+  --foreground: #ffffff;
+  --color-white: #161616;
 
-  --ink-0: #1c1c1e;
-  --ink-50: #161618;
-  --ink-100: #242426;
-  --ink-150: #2c2c2e;
-  --ink-200: #38383a;
-  --ink-300: #48484a;
-  --ink-400: #8e8e93;
-  --ink-500: #98989d;
-  --ink-600: #aeaeb2;
-  --ink-700: #c7c7cc;
-  --ink-800: #e5e5ea;
-  --ink-900: #f2f2f7;
-  --ink-950: #f5f5f7;
+  --ink-0: #161616;
+  --ink-50: #111111;
+  --ink-100: #232323;
+  --ink-150: #2c2c2c;
+  --ink-200: #383838;
+  --ink-300: #484848;
+  --ink-400: #8c8c8c;
+  --ink-500: #ababab;
+  --ink-600: #c4c4c4;
+  --ink-700: #dedede;
+  --ink-800: #eeeeee;
+  --ink-900: #f6f6f6;
+  --ink-950: #ffffff;
 
-  --line: #2c2c2e;
-  --line-strong: #3a3a3c;
+  --line: #292929;
+  --line-strong: #383838;
 
-  --accent-live: #30d158;
-  --accent-warn: #ff9f0a;
-  --accent-danger: #ff453a;
-  --accent-info: #409cff;
+  --accent-live: #06c167;
+  --accent-warn: #fc823a;
+  --accent-danger: #fc7f79;
+  --accent-info: #6daafb;
   --accent-live-soft: var(--ink-100);
   --accent-warn-soft: var(--ink-100);
   --accent-danger-soft: var(--ink-100);
   --accent-info-soft: var(--ink-100);
+  --dot-live: #06c167;
+  --dot-warn: #fc823a;
+  --dot-danger: #f83446;
 
-  --action: #0a84ff;
-  --action-strong: #409cff;
-  --dot-live: #30d158;
-  --dot-warn: #ff9f0a;
-  --dot-danger: #ff453a;
+  --action: #ffffff;
+  --action-strong: #dedede;
+  --action-ink: #000000;
+  --link: #6daafb;
 
   --surface-shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset;
   color-scheme: dark;
@@ -104,113 +108,131 @@
 
 /*
  * Panels designed dark (the Today and money heroes, trip cards, call screens, driving mode) look the same in both
- * themes: inside them the light values come back. In dark mode they sit a step lighter than the page so they still
- * read as a panel.
+ * themes: inside them the light values come back, with the bright status colours. In dark mode they sit a step
+ * lighter than the page so they still read as a panel.
  */
 .theme-ink {
   --color-white: #ffffff;
   --ink-0: #ffffff;
-  --ink-50: #fafafc;
-  --ink-100: #f5f5f7;
-  --ink-150: #ececf0;
-  --ink-200: #e3e3e8;
-  --ink-300: #d2d2d7;
-  /* Helper text stays readable: 400 and 500 both pass 4.5:1 on white. */
-  --ink-400: #76767b;
-  --ink-500: #6e6e73;
-  --ink-600: #545458;
-  --ink-700: #3a3a3c;
-  --ink-800: #2c2c2e;
-  --ink-900: #242426;
-  --ink-950: #1d1d1f;
+  --ink-50: #f8f8f8;
+  --ink-100: #f3f3f3;
+  --ink-150: #eeeeee;
+  --ink-200: #e8e8e8;
+  --ink-300: #dddddd;
+  /* Helper text stays readable outdoors: 400 is 4.8:1 on white, 500 is 6.4:1. */
+  --ink-400: #727272;
+  --ink-500: #5e5e5e;
+  --ink-600: #4b4b4b;
+  --ink-700: #333333;
+  --ink-800: #282828;
+  --ink-900: #141414;
+  --ink-950: #000000;
 
-  --line: #e5e5ea;
-  --line-strong: #d2d2d7;
+  --line: #e8e8e8;
+  --line-strong: #dddddd;
 
-  /* Apple's system colours in their higher-contrast form, so small text stays readable outdoors. */
-  --accent-live: #248a3d;
-  --accent-warn: #c93400;
-  --accent-danger: #d70015;
-  --accent-info: #0066cc;
-  /* Status never fills a block: a panel about a problem is grey like any other, and the word or dot carries it. */
+  --accent-live: #06c167;
+  --accent-warn: #fc823a;
+  --accent-danger: #fc7f79;
+  --accent-info: #6daafb;
   --accent-live-soft: var(--ink-100);
   --accent-warn-soft: var(--ink-100);
   --accent-danger-soft: var(--ink-100);
   --accent-info-soft: var(--ink-100);
+  --dot-live: #06c167;
+  --dot-warn: #fc823a;
+  --dot-danger: #f83446;
 
-  /* The one colour for "tap here": the main button on a screen, a switch that's on, keyboard focus. */
-  --action: #0071e3;
-  --action-strong: #0062c4;
-  --action-ink: #ffffff;
-
-  /* Dots and solid fills use Apple's bright system colours, so orange and red are easy to tell apart at 6px; the
-     darker accents above are for small text, where they need the contrast. */
-  --dot-live: #34c759;
-  --dot-warn: #ff9500;
-  --dot-danger: #ff3b30;
-  /* On a dark panel the status colours are the bright ones, as in iOS dark mode. */
-  --accent-live: #30d158;
-  --accent-warn: #ff9f0a;
-  --accent-danger: #ff453a;
-  --accent-info: #409cff;
-  --action: #0a84ff;
-  --action-strong: #409cff;
-  --dot-live: #30d158;
-  --dot-warn: #ff9f0a;
-  --dot-danger: #ff453a;
+  /* On a dark panel the main button is white. */
+  --action: #ffffff;
+  --action-strong: #dedede;
+  --action-ink: #000000;
+  --link: #6daafb;
   color-scheme: dark;
 }
 :root[data-theme="dark"] .theme-ink {
-  --ink-950: #1c1c1e;
-  --ink-900: #2c2c2e;
+  --ink-950: #161616;
+  --ink-900: #232323;
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
 }
 
 /*
  * The opposite of the page, for the one thing to look at first among equals (the best load in a row of choices): a
- * dark card on a light page, a light card on a dark one. Everything inside follows, since it's the same token names.
+ * black card on a light page, a white card on a dark one. Everything inside follows, since it's the same token names.
  */
 .theme-invert {
-  --color-white: #1c1c1e;
-  --ink-0: #1c1c1e;
-  --ink-50: #161618;
-  --ink-100: #2c2c2e;
-  --ink-150: #3a3a3c;
-  --ink-200: #48484a;
-  --ink-300: #545458;
-  --ink-400: #8e8e93;
-  --ink-500: #a1a1a6;
-  --ink-600: #c7c7cc;
-  --ink-700: #d1d1d6;
-  --ink-800: #e5e5ea;
-  --ink-900: #f2f2f7;
+  --color-white: #000000;
+  --ink-0: #000000;
+  --ink-50: #111111;
+  --ink-100: #232323;
+  --ink-150: #2c2c2c;
+  --ink-200: #383838;
+  --ink-300: #484848;
+  --ink-400: #8c8c8c;
+  --ink-500: #ababab;
+  --ink-600: #c4c4c4;
+  --ink-700: #dedede;
+  --ink-800: #eeeeee;
+  --ink-900: #f6f6f6;
   --ink-950: #ffffff;
-  --line: #3a3a3c;
-  --line-strong: #48484a;
-  --action: #0a84ff;
-  --action-strong: #409cff;
+  --line: #2c2c2c;
+  --line-strong: #383838;
+  --accent-live: #06c167;
+  --accent-warn: #fc823a;
+  --accent-danger: #fc7f79;
+  --accent-info: #6daafb;
+  --accent-live-soft: var(--ink-100);
+  --accent-warn-soft: var(--ink-100);
+  --accent-danger-soft: var(--ink-100);
+  --accent-info-soft: var(--ink-100);
+  --dot-live: #06c167;
+  --dot-warn: #fc823a;
+  --dot-danger: #f83446;
+  --action: #ffffff;
+  --action-strong: #dedede;
+  --action-ink: #000000;
+  --link: #6daafb;
   color: var(--ink-950);
   color-scheme: dark;
 }
 :root[data-theme="dark"] .theme-invert {
   --color-white: #ffffff;
   --ink-0: #ffffff;
-  --ink-50: #fafafc;
-  --ink-100: #f2f2f7;
-  --ink-150: #e5e5ea;
-  --ink-200: #d1d1d6;
-  --ink-300: #c7c7cc;
-  --ink-400: #76767b;
-  --ink-500: #6e6e73;
-  --ink-600: #545458;
-  --ink-700: #3a3a3c;
-  --ink-800: #2c2c2e;
-  --ink-900: #242426;
-  --ink-950: #1d1d1f;
-  --line: #e5e5ea;
-  --line-strong: #d2d2d7;
-  --action: #0071e3;
-  --action-strong: #0062c4;
+  --ink-50: #f8f8f8;
+  --ink-100: #f3f3f3;
+  --ink-150: #eeeeee;
+  --ink-200: #e8e8e8;
+  --ink-300: #dddddd;
+  /* Helper text stays readable outdoors: 400 is 4.8:1 on white, 500 is 6.4:1. */
+  --ink-400: #727272;
+  --ink-500: #5e5e5e;
+  --ink-600: #4b4b4b;
+  --ink-700: #333333;
+  --ink-800: #282828;
+  --ink-900: #141414;
+  --ink-950: #000000;
+
+  --line: #e8e8e8;
+  --line-strong: #dddddd;
+  /* Status colours in their darker form, so small text stays readable in sun glare. */
+  --accent-live: #0e8345;
+  --accent-warn: #c54600;
+  --accent-danger: #de1135;
+  --accent-info: #276ef1;
+  /* Status never fills a block: a panel about a problem is grey like any other, and the word or dot carries it. */
+  --accent-live-soft: var(--ink-100);
+  --accent-warn-soft: var(--ink-100);
+  --accent-danger-soft: var(--ink-100);
+  --accent-info-soft: var(--ink-100);
+
+  /* Dots and solid fills use the bright versions, so orange and red are easy to tell apart at 6px. */
+  --dot-live: #06c167;
+  --dot-warn: #fc823a;
+  --dot-danger: #f83446;
+  --action: #000000;
+  --action-strong: #282828;
+  --action-ink: #ffffff;
+  --link: #276ef1;
   color-scheme: light;
 }
 
@@ -225,9 +247,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
-  --font-display: var(--font-geist-sans);
+  --font-display: var(--font-inter);
 
   --color-ink-0: var(--ink-0);
   --color-ink-50: var(--ink-50);
@@ -289,15 +311,19 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
-  font-feature-settings: "ss01" 1, "cv01" 1;
+  font-family: var(--font-inter), system-ui, "Helvetica Neue", Arial, sans-serif;
+  /* Inter's open digits and a straight-sided 1, easier to tell apart at a glance (cv01, cv05, tnum where set). */
+  font-feature-settings: "cv05" 1, "cv08" 1;
+  font-optical-sizing: auto;
+  /* Inter's own advice for text sizes: a hair tighter than its default spacing. */
+  letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
 }
 
 .font-display {
-  font-family: var(--font-display), Arial, Helvetica, sans-serif;
-  font-weight: 500;
-  letter-spacing: -0.03em;
+  font-family: var(--font-display), system-ui, Arial, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.025em;
 }
 
 .tabular {
@@ -305,43 +331,42 @@ body {
 }
 
 /*
- * One type scale for the whole app, after Apple's own: big money and counts are the loudest thing on a screen, set
- * large and medium-weight rather than heavy; then page titles, then card titles; small labels name what a number is.
- * Nothing smaller than 12px anywhere. Numbers always line up (tabular figures).
+ * One type scale for the whole app, after Uber's Base: headings bold and tight, body regular, labels medium. Big
+ * money and counts are the loudest thing on a screen. Nothing smaller than 12px anywhere. Numbers always line up
+ * (tabular figures).
  */
 @utility t-hero {
-  font-size: clamp(2.125rem, 1.7rem + 1.6vw, 2.875rem);
+  font-size: clamp(2.25rem, 1.8rem + 1.6vw, 3rem);
   line-height: 1;
-  font-weight: 500;
-  letter-spacing: -0.04em;
+  font-weight: 700;
+  letter-spacing: -0.035em;
   font-variant-numeric: tabular-nums;
 }
 @utility t-stat {
   font-size: 1.75rem;
   line-height: 1.1;
-  font-weight: 500;
-  letter-spacing: -0.03em;
+  font-weight: 700;
+  letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
 }
 @utility t-page {
   font-size: 1.875rem;
-  line-height: 1.12;
-  font-weight: 600;
-  letter-spacing: -0.028em;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.025em;
 }
 @utility t-section {
-  font-size: 0.9375rem;
+  font-size: 1rem;
   line-height: 1.3;
   font-weight: 600;
-  letter-spacing: -0.012em;
+  letter-spacing: -0.011em;
 }
 @utility t-label {
-  font-family: var(--font-geist-mono), ui-monospace, monospace;
   font-size: 12px;
   line-height: 1.3;
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
 }
 
 ::selection {
@@ -456,7 +481,7 @@ body {
 
 /* Keyboard and switch users always see where they are. */
 :where(a, button, input, select, textarea, [role="switch"], [role="radio"], [tabindex]):focus-visible {
-  outline: 2px solid var(--action);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 

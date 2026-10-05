@@ -5,36 +5,42 @@ The rules behind the website, the owner dashboard and the driver app. The colour
 
 ## Colour
 
-Apple's palette: cool greys, near-black text (`#1D1D1F`), and one blue for the thing to tap.
+After Uber's Base design system (its open-source tokens): black and white with true greys, high contrast so it
+reads in a truck cab at noon.
 
 | Colour | Means | Shows as |
 | --- | --- | --- |
-| Black and grey | Almost everything: text, numbers, icons, cards. Money is black, never green. | Text |
-| Blue (`--action`) | Something to tap: the main button on a screen, links, a switch that's on, keyboard focus. | Button or link |
+| Black and grey | Almost everything: text, numbers, icons, cards. Money is black, never green. Greys are Base's (#F3F3F3 panels, #E8E8E8 lines, #4B4B4B and #5E5E5E secondary text). | Text |
+| Black (`--action`, white in dark mode) | The thing to tap: the main button on a screen, a switch that's on. | Button |
+| Blue (`--link`, #276EF1) | Text links, keyboard focus, the "Best fit" tag and what kind of plan a card is. | Link or tag |
 | Red (`--accent-danger`) | Wrong right now: a breakdown, a missed pickup, a risky broker, a loss. | A small dot or the word |
 | Orange (`--accent-warn`) | Waiting on the owner or driver. | A small dot |
 | Green (`--accent-live`) | Done or paid. | A small dot or check |
 
-- Two strengths of each status colour. Dots and solid fills use Apple's bright system colours (`--dot-live` #34C759,
-  `--dot-warn` #FF9500, `--dot-danger` #FF3B30), so orange and red are easy to tell apart even at 6px. Small text uses the
-  darker `--accent-*` versions, which keep the contrast.
+- Two strengths of each status colour. Dots and solid fills use the bright ones (`--dot-live` #06C167,
+  `--dot-warn` #FC823A, `--dot-danger` #F83446). Small text uses the darker `--accent-*` versions, which keep the
+  contrast.
 - Status never fills a block. Pills are grey with a dot (`lib/status.ts`, `components/ui/badge.tsx`); cards have no
   coloured stripes or borders. The `*-soft` tokens are grey on purpose.
-- One blue button per screen or card. Everything else is a grey button (`variant="secondary"`) or a plain link.
-- Dark panels (`.theme-ink`) use the bright versions of the status colours, as iOS does in dark mode.
+- One black button per screen or card. Everything else is a grey button (`variant="secondary"`) or a plain link.
+- Dark panels (`.theme-ink`) and the best card (`.theme-invert`) flip the greys; inside them "white" is the panel's
+  colour, so a light shape inside one uses a literal (`bg-[#ffffff]`) or the action token.
+- Headers are solid, never see-through, so nothing scrolls visibly underneath them.
 - No "Live" labels and no pulsing dots for things that are simply on.
 
 ## Type
 
-Geist for everything; Geist Mono only for small labels (`t-label`), load IDs and number columns.
+Inter for everything, with its optical sizes (big headings get the display cut), the closest free match to Uber
+Move; Geist Mono only for load IDs and number columns. Body text is a hair tighter than Inter's default (-0.011em).
 
 | Where | Sizes |
 | --- | --- |
-| Website | Headline 104/48px weight 500, letters pulled in 4.5%; sections 56/34px weight 500; lead 22/19px; body 17px |
-| Owner dashboard | Page title 30px/600; big numbers 34px/500; row titles 15px/600; body 15px; smallest 13px |
-| Driver app | Large title 34px/700; key numbers 28px/600; body and buttons 17px; smallest 15px; buttons 56px tall |
+| Website | Headline 84/44px weight 700, letters pulled in 3%; sections 52/32px 700; lead 21/18px; body 17px |
+| Owner dashboard | Page title 30px/700; big numbers 28–48px/700; row titles 16px/600; body 15px; smallest 13px |
+| Driver app | Large title 34px/700; key numbers 28px/700; body and buttons 17px; smallest 15px; buttons 56px tall |
 
-Nothing smaller than 12px anywhere. Big text gets lighter and tighter, not bolder.
+Nothing smaller than 12px anywhere. Headings are bold and tight; small labels are 12px semibold capitals.
+Buttons are rounded rectangles (12px corners), not pills; chips and tags stay round.
 
 A lane on screen is `<Lane from to />` (`components/ui/lane.tsx`): an arrow icon as heavy as the text, never the thin
 "→" character. Plain strings (CSV, texts, emails) keep the character.
@@ -44,7 +50,7 @@ A lane on screen is `<Lane from to />` (`components/ui/lane.tsx`): an arrow icon
 `components/shared/load-offer-card.tsx`, the same card for owners and drivers, in a row you swipe or step through with
 the round arrows on its left and right edges (`components/shared/offer-rail.tsx`): it never moves on its own, the next card peeks in, the dots underneath show which one is up (tap one to jump), and the arrows sit level with the trip line so they never cover a word.
 
-- The best load is first and the opposite colour of the page (`.theme-invert`: dark on a light page, light on a dark
+- The best load is first and the opposite colour of the page (`.theme-invert`: black on a light page, white on a dark
   one), with a blue "Best fit" tag on its top edge.
 - Top: broker, equipment and weight; the fit score as a number in a ring, nothing else.
 - The trip: a dot, a line and a ring with the cities, and on the right each stop's date and the dock's hours in the

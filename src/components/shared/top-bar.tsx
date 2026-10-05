@@ -75,7 +75,7 @@ export function TopBar({
       className={cn(
         "flex items-center justify-between gap-2 border-b px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] transition-colors sm:gap-4 sm:px-8",
         // Frosted glass: the page shows through, blurred, as it scrolls underneath.
-        dark ? "theme-ink border-white/10 bg-ink-950/80 backdrop-blur-xl backdrop-saturate-150" : "border-line/70 bg-white/75 backdrop-blur-xl backdrop-saturate-150",
+        dark ? "theme-ink border-white/10 bg-ink-950" : "border-line bg-white",
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">

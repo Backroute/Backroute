@@ -1,14 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Inter } from "next/font/google";
 import { SimulationProvider } from "@/components/simulation-provider";
 import { MotionRoot } from "@/components/motion-root";
 import { InlineScript } from "@/components/inline-script";
 import { THEME_SCRIPT } from "@/lib/theme-script";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Inter with its optical sizes: big headings get the tighter display cut, small text the open text cut. The closest
+// free match to Uber Move, made for screens and numbers.
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  axes: ["opsz"],
 });
 
 const geistMono = Geist_Mono({
@@ -50,7 +53,7 @@ export const viewport: Viewport = {
   // The browser's bar matches the page, light or dark.
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0d0d0c" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
   ],
   viewportFit: "cover",
 };
@@ -61,7 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       data-theme="light"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
         {/* Light or dark before the first paint (lib/theme): no white flash on a dark-mode phone. */}

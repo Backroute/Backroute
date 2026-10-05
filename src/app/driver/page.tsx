@@ -142,7 +142,9 @@ export default function DriverHomePage() {
       : homeTime?.target
         ? homeTime.target.replace(/^Home (by |in )?/, "")
         : homeTime?.hoursHome != null
-          ? `${Math.round(homeTime.hoursHome)} h away`
+          ? Math.round(homeTime.hoursHome) < 1
+            ? "close by"
+            : `${Math.round(homeTime.hoursHome)} h away`
           : "—";
 
   // On a trip: the map comes first, the rest sits on a sheet over it (Uber-style).

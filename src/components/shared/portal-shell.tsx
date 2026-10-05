@@ -261,7 +261,7 @@ export function PageHeader({
   right?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line bg-white/70 px-4 py-6 sm:px-8 backdrop-blur-sm">
+    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line bg-white px-4 py-6 sm:px-8">
       <div>
         <LargeTitle>{title}</LargeTitle>
         {description && <p className="mt-1 text-sm text-ink-500">{description}</p>}

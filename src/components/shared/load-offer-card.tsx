@@ -159,12 +159,12 @@ export function LoadOfferCard({
       )}
     >
       {load.recommended && (
-        <span className="absolute -top-3 left-5 rounded-full bg-[var(--action)] px-3 py-1 text-xs font-semibold text-[var(--action-ink)] shadow-sm">Best fit</span>
+        <span className="absolute -top-3 left-5 rounded-full bg-[#276ef1] px-3 py-1 text-xs font-semibold text-[#ffffff] shadow-sm">Best fit</span>
       )}
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0 pt-0.5">
           {label && (
-            <p className="mb-1 inline-flex items-center gap-1 text-[13px] font-semibold text-[var(--action)]">
+            <p className="mb-1 inline-flex items-center gap-1 text-[13px] font-semibold text-[var(--link)]">
               {load.plan?.kind === "shared_trailer" ? <Layers className="h-3.5 w-3.5" /> : isPlan ? <Repeat className="h-3.5 w-3.5" /> : null}
               {label}
             </p>
@@ -211,7 +211,7 @@ export function LoadOfferCard({
                     </p>
                     {rests.map((r, k) => (
                       <p key={k} className="mt-0.5 flex items-center gap-1.5">
-                        <Moon className="h-3.5 w-3.5 shrink-0" /> Overnight rest near {r.place}
+                        <Moon className="h-3.5 w-3.5 shrink-0" /> {r.place === "on the way" ? "Overnight rest on the way" : `Overnight rest near ${r.place}`}
                       </p>
                     ))}
                   </div>
@@ -349,7 +349,7 @@ export function LoadOfferCard({
               <div className="min-w-0 flex-1">
                 <p className={cn("text-sm leading-relaxed text-ink-700", askState === "pending" && "animate-pulse")}>{reply}</p>
                 {askState === "replied" && (
-                  <button onClick={reset} className="mt-1.5 text-xs font-medium text-[var(--action)] hover:underline">
+                  <button onClick={reset} className="mt-1.5 text-xs font-medium text-[var(--link)] hover:underline">
                     Ask something else
                   </button>
                 )}
@@ -373,7 +373,7 @@ export function LoadOfferCard({
       </Button>
       <div className="flex items-center justify-center gap-5 text-sm">
         {onAsk && onAskResolve && askState === "idle" && !isPlan && (
-          <button type="button" onClick={() => setAskState("composing")} className="font-medium text-[var(--action)] hover:underline">
+          <button type="button" onClick={() => setAskState("composing")} className="font-medium text-[var(--link)] hover:underline">
             Ask a question
           </button>
         )}

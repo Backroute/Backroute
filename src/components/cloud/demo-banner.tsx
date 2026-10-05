@@ -21,7 +21,7 @@ export function DemoBanner() {
         <span>
           <span className="font-semibold text-ink-950">Sample fleet.</span> Made-up trucks and loads. Nothing is saved or sent.
         </span>
-        <button type="button" onClick={() => exitDemo("/carrier")} className="font-medium text-[var(--action)] hover:underline">
+        <button type="button" onClick={() => exitDemo("/carrier")} className="font-medium text-[var(--link)] hover:underline">
           Back to my fleet
         </button>
       </div>
@@ -48,7 +48,7 @@ export function DemoBanner() {
         ))}
       </span>
       {cloudEnabled && (
-        <button type="button" onClick={() => exitDemo()} className="font-medium text-[var(--action)] hover:underline">
+        <button type="button" onClick={() => exitDemo()} className="font-medium text-[var(--link)] hover:underline">
           Exit demo
         </button>
       )}
