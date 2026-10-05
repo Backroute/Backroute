@@ -110,6 +110,27 @@ export const en: CallPack = {
   saidAgain: "Say that again?",
   saidPerson: "Can I talk to a person?",
   ownerJoined: (name, owner) => `${name}, ${owner} from the office just joined. I'll let you two talk and keep notes.`,
+  update: {
+    open: (p) => {
+      const day = p.day === "tomorrow" ? "tomorrow" : "today";
+      return p.what === "booked"
+        ? `Hey ${p.name}, quick update: I booked your next load. ${p.origin} to ${p.dest}, ${p.miles} miles, picks up ${day}. The broker confirmed it and the details are in your texts. Does that work for you?`
+        : p.what === "cancelled"
+          ? `${p.name}, heads up: ${p.origin} to ${p.dest} is cancelled, so don't head to that pickup. ${p.tonu ? `I'm billing them a $${p.tonu} truck-ordered-not-used fee. ` : ""}I'm already looking for your next one and I'll call you as soon as I have it.`
+          : `${p.name}, change of plans: ${p.origin} to ${p.dest} fell through, the broker gave it to someone else. I booked ${p.newOrigin} to ${p.newDest} in its place, so the rest of your plan still runs. Details are in your texts.`;
+    },
+    meAgain: (name) => `Me again, ${name}, sorry to call twice.`,
+    noWork: "Understood. I'll tell the office now and call you back with something that works.",
+    doesntWork: "That doesn't work",
+    text: (p) => {
+      const day = p.day === "tomorrow" ? "tomorrow" : "today";
+      return p.what === "booked"
+        ? `Booked: ${p.origin} → ${p.dest}, ${p.miles} mi, picks up ${day}. Confirmed with the broker.`
+        : p.what === "cancelled"
+          ? `Cancelled: ${p.origin} → ${p.dest}. Don't go to that pickup. Looking for your next load now.${p.tonu ? ` TONU $${p.tonu} billed.` : ""}`
+          : `Plan changed: ${p.origin} → ${p.dest} fell through. In its place: ${p.newOrigin} → ${p.newDest}. Details in the app.`;
+    },
+  },
 
   ch: {
     bookIt: "Book it", bookThis: "Book this one", whatElse: "What else?", bookFirst: "Book the first one", notNow: "Not now", cancelThat: "Cancel that", thanksBye: "Thanks, bye",

@@ -588,6 +588,8 @@ export interface Load {
   id: string;
   referenceNumber: string;
   stage: LoadStage;
+  /** Who picked it from the offers. The driver who picked it themselves doesn't need a call to hear it's booked. */
+  pickedBy?: "driver" | "carrier" | "ai";
   source: string;
   /** Real accounts: a finished load from the carrier's own history (Settings, Bring your history), for pricing only. */
   imported?: boolean;
@@ -922,7 +924,7 @@ export interface Incident {
 }
 
 /** Why the AI dispatcher is calling a driver — the calls a human dispatcher makes all day. */
-export type DispatchCallKind = "next_load" | "pickup_brief" | "delivery_brief" | "late_eta" | "hours_parking" | "setup" | "inbound";
+export type DispatchCallKind = "next_load" | "pickup_brief" | "delivery_brief" | "late_eta" | "hours_parking" | "setup" | "inbound" | "update";
 
 export interface DispatchCallChoice {
   label: string;
@@ -1001,6 +1003,10 @@ export interface DispatchCall {
   heldReason?: string;
   /** Set once the text copy has gone to the driver's Messages. */
   textedAt?: string;
+  /** Which try this is: a missed call is called back (2), and once more (3), while it still matters. */
+  attempt?: number;
+  /** Don't ring before this: a call back waits a few minutes, the way a dispatcher tries again. */
+  notBefore?: string;
 }
 
 /** What the real AI read on an uploaded rate con, and where it differs from the agreed terms. */

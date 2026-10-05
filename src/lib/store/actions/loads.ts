@@ -6,6 +6,7 @@ import { formatDuration } from "../../utils";
 import type { ActivityEvent, Load, VoiceCall } from "../../types";
 import { formatCurrencyShort, scheduleCallEnds, uid, withLiveCall } from "../support";
 import type { Actions, GetState, SetState } from "../state";
+import { updateCall } from "../../dispatch-calls";
 
 export const loadsActions = (set: SetState, get: GetState): Pick<Actions, "selectLoadOffer" | "saveRateConReading" | "setUpRealFleet" | "addToFleet" | "addLoad" | "requestBetterRate" | "cancelLoad" | "declineLoad" | "reassignTruck" | "requestOfferDetail" | "resolveOfferDetail" | "sendNegotiationInstruction" | "startBrokerCall" | "finishBrokerCall" | "logLoadVoiceCall" | "setDockAddress" | "setAiPaused"> => ({
   selectLoadOffer: (offerGroupId, loadId, actor) => {
@@ -125,8 +126,12 @@ export const loadsActions = (set: SetState, get: GetState): Pick<Actions, "selec
       const tonuEligible = load.stage === "dispatched" || load.stage === "at_pickup";
       const tonuFee = tonuEligible ? 250 : 0;
       const now = new Date().toISOString();
+      // The driver hears it from dispatch before they roll up to a dock that isn't expecting them.
+      const driver = state.drivers.find((d) => d.id === state.trucks.find((t) => t.id === load.truckId)?.driverId);
+      const tell = driver && ["rate_confirmed", "booked", "dispatched", "at_pickup"].includes(load.stage) ? updateCall(driver, load, "cancelled", { tonu: tonuFee || undefined }) : null;
 
       return {
+        ...(tell ? { dispatchCalls: [tell, ...state.dispatchCalls] } : {}),
         loads: state.loads.map((l) =>
           l.id === loadId
             ? { ...l, stage: "cancelled" as const, cancellationReason: reason, tonuFee: tonuFee || undefined, updatedAt: now, progressPct: 100 }

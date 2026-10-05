@@ -3,10 +3,10 @@ import { PRIMARY_CARRIER_ID } from "../../mock-data";
 import { advanceIncident, advanceLoad, autoResolveStaleOffers, createLoadOfferBatch, createSourcedLoad, lineUpChoice, pickLaneNear, replacePlanLeg, shouldChainNextLoad } from "../../engine";
 import { dockClock } from "../../detention";
 import { bookableBrokers } from "../../broker-policy";
-import { autoBookedText, driverLang, type EmptyAt } from "../../dispatch-calls";
+import { type EmptyAt, updateCall } from "../../dispatch-calls";
 import { clamp } from "../../utils";
 import type { ActivityEvent, Broker, Escalation, Load } from "../../types";
-import { CallDraft, draftFrom, runDispatchCalls, textDriver } from "../calls";
+import { CallDraft, draftFrom, runDispatchCalls } from "../calls";
 import { ESCALATION_TEMPLATES, autoPickOffer, fitsDriver, homeOptions, pick, promoteChainedLoad, randInt, runRateCons, scheduleCallEnds, uid, withLiveCall } from "../support";
 import type { Actions, GetState, SetState } from "../state";
 
@@ -23,7 +23,7 @@ export const simulationActions = (set: SetState, get: GetState): Pick<Actions, "
       const { brokers: bookable, surcharges } = bookableBrokers(state.brokers, state.settings.brokerOverrides);
 
       const offerBatches: { truckId: string; offers: Load[]; emptyAt: EmptyAt }[] = [];
-      const autoBooked: { truckId: string; loadId?: string }[] = [];
+      const planNews: { dropped: Load; replacement: Load }[] = [];
 
       const activeLoads = loads.filter((l) => l.stage !== "delivered" && l.stage !== "declined" && l.stage !== "cancelled" && l.carrierId === PRIMARY_CARRIER_ID);
 
@@ -60,7 +60,6 @@ export const simulationActions = (set: SetState, get: GetState): Pick<Actions, "
           loads = picked.loads;
           trucks = picked.trucks;
           newEvents.push(...picked.events);
-          autoBooked.push({ truckId: truck.id, loadId: picked.events.find((e) => e.loadId)?.loadId });
         } else {
           offerBatches.push({ truckId: truck.id, offers, emptyAt: { kind: "in", city: truck.currentCity } });
           newEvents.push({
@@ -93,8 +92,7 @@ export const simulationActions = (set: SetState, get: GetState): Pick<Actions, "
             loads = picked.loads;
             trucks = picked.trucks;
             newEvents.push(...picked.events);
-            autoBooked.push({ truckId: truck.id, loadId: picked.events.find((e) => e.loadId)?.loadId });
-          } else {
+            } else {
             offerBatches.push({ truckId: truck.id, offers, emptyAt: { kind: "after", city: currentLoad.lane.destination } });
             newEvents.push({
               id: uid("act"), timestamp: new Date().toISOString(), type: "load_offered",
@@ -169,6 +167,7 @@ export const simulationActions = (set: SetState, get: GetState): Pick<Actions, "
             loads = replaced.loads;
             trucks = replaced.trucks;
             newEvents.push(replaced.event);
+            planNews.push({ dropped: result.load, replacement: replaced.loads[0] });
           }
         }
 
@@ -276,10 +275,11 @@ export const simulationActions = (set: SetState, get: GetState): Pick<Actions, "
 
       // The AI's phone calls to drivers: new ones it decides to make, then who's ringing, held or talking.
       const draft: CallDraft = { ...draftFrom(state), loads, trucks, escalations, events: [] };
-      for (const { truckId, loadId } of autoBooked) {
-        const booked = draft.loads.find((l) => l.id === loadId);
-        const driverId = trucks.find((t) => t.id === truckId)?.driverId;
-        if (booked && driverId) textDriver(draft, driverId, autoBookedText(driverLang(draft.drivers.find((x) => x.id === driverId)), booked));
+      // Booked for them (by the AI or the owner): the driver hears it on a call once the broker confirms (store/calls).
+      // A load in their plan fell through and another took its place: they hear that too.
+      for (const { dropped, replacement } of planNews) {
+        const driver = draft.drivers.find((x) => x.id === trucks.find((t) => t.id === (replacement.truckId ?? dropped.truckId))?.driverId);
+        if (driver) draft.dispatchCalls = [updateCall(driver, dropped, "replaced", { replacement }), ...draft.dispatchCalls];
       }
       runDispatchCalls(draft, offerBatches);
       newEvents.push(...draft.events);

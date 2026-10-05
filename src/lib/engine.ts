@@ -532,7 +532,7 @@ export function resolveLoadOffer(loads: Load[], offerGroupId: string, chosenId: 
   const updated = loads.map((l) => {
     if (l.offerGroupId !== offerGroupId) return l;
     if (picked.has(l.id)) {
-      return { ...l, stage: "scoring" as const, progressPct: 12, updatedAt: now, ticksInStage: 0 };
+      return { ...l, stage: "scoring" as const, progressPct: 12, updatedAt: now, ticksInStage: 0, pickedBy: actor };
     }
     return { ...l, stage: "declined" as const, progressPct: 100, updatedAt: now };
   });

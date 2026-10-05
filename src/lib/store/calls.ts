@@ -3,7 +3,7 @@ import { PRIMARY_CARRIER_ID, PRIMARY_DRIVER_ID } from "../mock-data";
 import { lineUpChoice, resolveLoadOffer } from "../engine";
 import { legMiles, legProgress } from "../trip-geo";
 import { pack } from "../lang";
-import { briefCall, CALL_GAP_MS, KIND_LABEL, lateCall, driverLang, lateOnThisLoad, type EmptyAt, type Turn, nextLoadCall, openCall, parkingCall, quietReason, respond, RING_MS, stillRelevant, textCopyFor } from "../dispatch-calls";
+import { briefCall, CALL_BACK_KINDS, CALL_GAP_MS, callBack, KIND_LABEL, lateCall, driverLang, lateOnThisLoad, type EmptyAt, type Turn, nextLoadCall, openCall, parkingCall, quietReason, respond, RING_MS, stillRelevant, textCopyFor, updateCall } from "../dispatch-calls";
 import type { ActivityEvent, Broker, DispatchCall, DispatchCallKind, Driver, DriverMessage, Lang, Translations, Escalation, Incident, Load, Truck, VoiceCall } from "../types";
 import { readLangOf } from "./settings";
 import type { StoreState } from "./state";
@@ -252,6 +252,21 @@ export function runDispatchCalls(d: CallDraft, newOfferBatches: { truckId: strin
     if (near("delivery") && !has(driver.id, "delivery_brief", load.id)) queue(briefCall(driver, load, "delivery", p));
   }
 
+  // A load booked for the truck by someone other than the driver (the owner, or the AI on its own): dispatch calls to
+  // say so, the way a human dispatcher would, instead of the driver finding out in the app. One call per plan.
+  for (const load of d.loads) {
+    if (!load.pickedBy || load.pickedBy === "driver" || (load.stage !== "rate_confirmed" && load.stage !== "booked") || !load.truckId) continue;
+    if (load.plan && (load.plan.leg ?? 1) !== 1) continue;
+    const truck = d.trucks.find((t) => t.id === load.truckId);
+    const driver = d.drivers.find((x) => x.id === truck?.driverId);
+    if (!driver || driver.carrierId !== PRIMARY_CARRIER_ID || has(driver.id, "update", load.id)) continue;
+    if (driver.prefs?.newLoads === "text") {
+      const call = updateCall(driver, load, "booked");
+      textDriver(d, driver.id, textCopyFor(call));
+      queue({ ...call, status: "done", endedAt: now.toISOString(), textedAt: now.toISOString(), outcome: "Texted, as the driver asked" });
+    } else queue(updateCall(driver, load, "booked"));
+  }
+
   // Calls that stopped mattering (the stop was reached, the load was picked in the app) never ring.
   for (const call of d.dispatchCalls) {
     if ((call.status === "queued" || call.status === "held" || call.status === "ringing") && !stillRelevant(call, d.loads)) {
@@ -269,9 +284,13 @@ export function runDispatchCalls(d: CallDraft, newOfferBatches: { truckId: strin
       // Other drivers in the demo pick up on their own, so the carrier sees calls play out across the fleet.
       if (!primary && ringingFor > 6000) answerCall(d, active);
       else if (ringingFor > RING_MS) {
-        patchCall(d, active.id, { status: "missed", endedAt: now.toISOString(), outcome: "No answer. Texted instead", choices: [] });
+        // Missed: the text goes now, and a call that still matters is tried again in a few minutes, then once more.
+        const again = CALL_BACK_KINDS.includes(active.kind) && (active.attempt ?? 1) < 3 && stillRelevant(active, d.loads);
+        patchCall(d, active.id, { status: "missed", endedAt: now.toISOString(), outcome: again ? "No answer. Texted, calling back in a few minutes" : "No answer. Texted instead", choices: [] });
         textInstead(d, active);
-        callEvent(d, active, `${driver.name.split(" ")[0]} missed an AI call`, `${KIND_LABEL[active.kind]} · sent by text instead`);
+        const texted = d.dispatchCalls.find((c) => c.id === active.id)?.textedAt;
+        if (again) queue({ ...callBack(active, nowMs), textedAt: texted });
+        callEvent(d, active, `${driver.name.split(" ")[0]} missed an AI call`, `${KIND_LABEL[active.kind]} · texted${again ? ", calling back in a few minutes" : " instead"}`);
       }
       continue;
     }
@@ -292,7 +311,9 @@ export function runDispatchCalls(d: CallDraft, newOfferBatches: { truckId: strin
       continue;
     }
 
-    const waiting = mine.filter((c) => c.status === "queued" || c.status === "held").sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+    const waiting = mine
+      .filter((c) => (c.status === "queued" || c.status === "held") && (!c.notBefore || Date.parse(c.notBefore) <= nowMs))
+      .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
     if (!waiting.length) continue;
     const lastEnded = Math.max(0, ...mine.filter((c) => c.endedAt && c.status !== "dropped").map((c) => Date.parse(c.endedAt!)));
     const quiet = quietReason(driver, now);

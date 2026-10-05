@@ -114,6 +114,27 @@ export const es: CallPack = {
   saidAgain: "¿Me lo repites?",
   saidPerson: "¿Puedo hablar con una persona?",
   ownerJoined: (name, owner) => `${name}, ${owner} de la oficina se acaba de unir. Los dejo hablar y yo tomo notas.`,
+  update: {
+    open: (p) => {
+      const day = p.day === "tomorrow" ? "mañana" : "hoy";
+      return p.what === "booked"
+        ? `Hola ${p.name}, una novedad: te reservé la próxima carga. ${p.origin} a ${p.dest}, ${p.miles} millas, se recoge ${day}. El bróker ya la confirmó y te mandé los detalles por texto. ¿Te funciona?`
+        : p.what === "cancelled"
+          ? `${p.name}, ojo: se canceló ${p.origin} a ${p.dest}, así que no vayas a esa recogida. ${p.tonu ? `Le estoy cobrando $${p.tonu} por camión no usado (TONU). ` : ""}Ya estoy buscando la próxima y te llamo en cuanto la tenga.`
+          : `${p.name}, cambio de planes: ${p.origin} a ${p.dest} se cayó, el bróker se la dio a otro. Reservé ${p.newOrigin} a ${p.newDest} en su lugar, así que el resto del plan sigue igual. Los detalles van por texto.`;
+    },
+    meAgain: (name) => `Soy yo otra vez, ${name}, perdón por llamar dos veces.`,
+    noWork: "Entendido. Le aviso a la oficina ahora y te llamo con algo que te sirva.",
+    doesntWork: "No me sirve",
+    text: (p) => {
+      const day = p.day === "tomorrow" ? "mañana" : "hoy";
+      return p.what === "booked"
+        ? `Reservada: ${p.origin} → ${p.dest}, ${p.miles} millas, se recoge ${day}. Confirmada con el bróker.`
+        : p.what === "cancelled"
+          ? `Cancelada: ${p.origin} → ${p.dest}. No vayas a esa recogida. Ya busco la próxima.${p.tonu ? ` TONU de $${p.tonu} cobrado.` : ""}`
+          : `Cambio de plan: ${p.origin} → ${p.dest} se cayó. En su lugar: ${p.newOrigin} → ${p.newDest}. Detalles en la app.`;
+    },
+  },
 
   ch: {
     bookIt: "Resérvala", bookThis: "Reserva esta", whatElse: "¿Qué más hay?", bookFirst: "Reserva la primera", notNow: "Ahora no", cancelThat: "Cancela eso", thanksBye: "Gracias, adiós",

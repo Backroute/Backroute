@@ -24,6 +24,20 @@ export const LANG_INFO = Object.fromEntries(LANGS.map((l) => [l.code, l])) as Re
 
 export type PrefKey = "early:6" | "early:8" | "early:any" | "avoid:NJ" | "avoid:CA" | "avoid:none" | "loads:call" | "loads:text";
 export type NumberKind = "pickup" | "delivery" | "container";
+export interface UpdateFacts {
+  name: string;
+  what: "booked" | "cancelled" | "replaced";
+  origin: string;
+  dest: string;
+  miles: number;
+  day: "today" | "tomorrow";
+  /** For a replaced load: the one booked in its place. */
+  newOrigin?: string;
+  newDest?: string;
+  /** For a cancelled load: the truck-ordered-not-used fee billed to the broker. */
+  tonu?: number;
+}
+
 export type QuickPhrase = "oneMore" | "callWhenParked" | "callBack" | "thanks";
 
 /** Every word the AI dispatcher says to a driver, in one language. Facts (cities, numbers, money) come in as values;
@@ -101,6 +115,17 @@ export interface CallPack {
   saidAgain: string;
   saidPerson: string;
   ownerJoined(name: string, owner: string): string;
+
+  /** A plan changed: the next load booked for them, a load the broker cancelled, or one swapped in a plan. */
+  update: {
+    open(p: UpdateFacts): string;
+    /** Said first on a call back. */
+    meAgain(name: string): string;
+    /** The driver says the booked load doesn't work for them. */
+    noWork: string;
+    doesntWork: string;
+    text(p: UpdateFacts): string;
+  };
 
   ch: {
     bookIt: string; bookThis: string; whatElse: string; bookFirst: string; notNow: string; cancelThat: string; thanksBye: string;

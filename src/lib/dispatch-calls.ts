@@ -34,6 +34,7 @@ export const KIND_LABEL: Record<DispatchCallKind, string> = {
   hours_parking: "Hours and parking",
   setup: "Call setup",
   inbound: "Driver called in",
+  update: "Plan changed",
 };
 
 /** The carrier's number the AI answers and calls from. Demo: not connected to a phone provider. */
@@ -43,6 +44,10 @@ export const OWNER_NAME = "Alicia";
 
 /** How long the phone rings before it counts as missed and the AI texts instead. */
 export const RING_MS = 25_000;
+/** A missed call that still matters is tried again after this, and once more after that, like a dispatcher would. */
+export const CALLBACK_MS = 3 * 60_000;
+/** Calls worth calling back about: a text alone isn't enough for these. */
+export const CALL_BACK_KINDS: DispatchCallKind[] = ["next_load", "pickup_brief", "delivery_brief", "late_eta", "hours_parking", "update"];
 /** Space between two calls to the same driver, so the phone isn't ringing back to back. */
 export const CALL_GAP_MS = 20_000;
 
@@ -271,6 +276,62 @@ export function inboundCall(
   });
 }
 
+/**
+ * Plans changed and the driver hears it from dispatch, not at the dock: the next load is booked (when someone other
+ * than the driver picked it), the broker cancelled a load, or a load in a plan fell through and another took its place.
+ */
+export function updateCall(driver: Driver, load: Load, what: "booked" | "cancelled" | "replaced", extra: { replacement?: Load; tonu?: number } = {}): DispatchCall {
+  return newDispatchCall({
+    kind: "update",
+    driver,
+    load: extra.replacement ?? load,
+    facts: {
+      what,
+      origin: load.lane.origin,
+      dest: load.lane.destination,
+      miles: String(load.lane.miles),
+      day: /^tomorrow/i.test(load.pickupWindow) ? "tomorrow" : "today",
+      ...(extra.replacement ? { newOrigin: extra.replacement.lane.origin, newDest: extra.replacement.lane.destination } : {}),
+      ...(extra.tonu ? { tonu: String(extra.tonu) } : {}),
+    },
+  });
+}
+
+function updateFacts(f: Record<string, string>) {
+  return {
+    name: f.name,
+    what: (f.what as "booked" | "cancelled" | "replaced") ?? "booked",
+    origin: f.origin,
+    dest: f.dest,
+    miles: Number(f.miles),
+    day: (f.day === "tomorrow" ? "tomorrow" : "today") as "today" | "tomorrow",
+    newOrigin: f.newOrigin,
+    newDest: f.newDest,
+    tonu: f.tonu ? Number(f.tonu) : undefined,
+  };
+}
+
+/** A call back opens by owning it: "Me again, sorry to call twice." */
+export function callBack(call: DispatchCall, now: number): DispatchCall {
+  return {
+    ...call,
+    id: `dcall-${Math.random().toString(36).slice(2, 10)}`,
+    status: "queued",
+    createdAt: new Date(now).toISOString(),
+    ringingAt: undefined,
+    answeredAt: undefined,
+    endedAt: undefined,
+    lines: [],
+    choices: [],
+    step: "start",
+    effects: [],
+    outcome: undefined,
+    heldReason: undefined,
+    attempt: (call.attempt ?? 1) + 1,
+    notBefore: new Date(now + CALLBACK_MS).toISOString(),
+  };
+}
+
 export function setupCall(driver: Driver): DispatchCall {
   return newDispatchCall({ kind: "setup", driver });
 }
@@ -342,6 +403,11 @@ const INBOUND_MENU = (L: CallPack): DispatchCallChoice[] => [
 
 /** What the AI says when the driver picks up, in `lang` (the driver's, unless it's being shown to the owner). */
 export function openCall(call: DispatchCall, lang: Lang = call.lang): Turn {
+  const turn = openTurn(call, lang);
+  return (call.attempt ?? 1) > 1 ? { ...turn, say: `${pack(lang).update.meAgain(call.facts.name)} ${turn.say}` } : turn;
+}
+
+function openTurn(call: DispatchCall, lang: Lang): Turn {
   const L = pack(lang);
   const f = call.facts;
   switch (call.kind) {
@@ -384,6 +450,14 @@ export function openCall(call: DispatchCall, lang: Lang = call.lang): Turn {
       };
     case "inbound":
       return { say: L.inOpen(f.name), choices: INBOUND_MENU(L), step: "menu" };
+    case "update": {
+      const booked = f.what === "booked";
+      return {
+        say: L.update.open(updateFacts(f)),
+        choices: [c(booked ? L.ch.soundsGood : L.ch.gotIt, "bye", "ok|okay|good|got it|thank|yes|yeah|sure|works"), ...(booked ? [c(L.update.doesntWork, "nowork", "doesn't work|does not work|no|can't|cannot|won't")] : [])],
+        step: "update",
+      };
+    }
     case "setup":
       return {
         say: L.setupOpen(f.name),
@@ -469,6 +543,23 @@ export function respond(call: DispatchCall, reply: string, lang: Lang = call.lan
     if (reply === "cancel") return { say: L.parkCancelled, choices: [], step: "end", end: true, effects: [], outcome: "Driver finding their own parking" };
     if (reply === "own") return { say: L.parkOwn, choices: [], step: "end", end: true, outcome: "Driver finding their own parking" };
     if (reply === "bye") return { say: L.restUp, choices: [], step: "end", end: true };
+  }
+
+  if (call.kind === "update") {
+    if (reply === "nowork") {
+      return {
+        say: L.update.noWork,
+        choices: [],
+        step: "end",
+        end: true,
+        report: { person: `${f.name} says ${f.origin} to ${f.dest} doesn't work for them` },
+        outcome: `${f.name} says the booked load doesn't work. Office told`,
+      };
+    }
+    if (reply === "bye") {
+      const en = { booked: "Driver knows the next load", cancelled: "Driver knows it's cancelled", replaced: "Driver knows the new load" } as Record<string, string>;
+      return { say: L.driveSafe, choices: [], step: "end", end: true, outcome: en[f.what] ?? "Driver told" };
+    }
   }
 
   if (call.kind === "setup") {
@@ -624,6 +715,8 @@ export function textCopyFor(call: DispatchCall): string {
       const p = { stop: cap(stopWords(L, f)), ahead: Number(f.ahead), cost: Number(f.cost) };
       return call.effects.some((e) => e.type === "reserve_parking") ? L.txt.parkReserved(p) : L.txt.parkNot(p);
     }
+    case "update":
+      return L.update.text(updateFacts(f));
     case "setup":
       return L.txt.setup;
     case "inbound":
@@ -633,11 +726,6 @@ export function textCopyFor(call: DispatchCall): string {
       if (f.topic === "late") return L.txt.inLate(L.lateAmount[Number(f.late) as 30 | 60 | 120] ?? "");
       return L.txt.inGeneric;
   }
-}
-
-/** The text a driver gets when the AI books their next load on its own. */
-export function autoBookedText(lang: Lang, load: Load): string {
-  return pack(lang).txt.autoBooked({ origin: load.lane.origin, dest: load.lane.destination, miles: load.lane.miles, pickup: load.pickupWindow });
 }
 
 /** Whether this call still matters: a brief for a stop already reached, or offers already picked, isn't worth a ring. */
@@ -652,6 +740,9 @@ export function stillRelevant(call: DispatchCall, loads: Load[]): boolean {
     case "late_eta":
     case "hours_parking":
       return load?.stage === "in_transit";
+    case "update":
+      // A booked or swapped-in load that's since been dropped isn't news anymore; a cancellation stays news.
+      return call.facts.what === "cancelled" || (!!load && load.stage !== "declined" && load.stage !== "cancelled");
     case "setup":
     case "inbound":
       return true;

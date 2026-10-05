@@ -112,6 +112,27 @@ export const fr: CallPack = {
   saidAgain: "Peux-tu répéter?",
   saidPerson: "Je peux parler à quelqu'un?",
   ownerJoined: (name, owner) => `${name}, ${owner} du bureau vient de se joindre à l'appel. Je vous laisse parler et je prends des notes.`,
+  update: {
+    open: (p) => {
+      const day = p.day === "tomorrow" ? "demain" : "aujourd'hui";
+      return p.what === "booked"
+        ? `Salut ${p.name}, une mise à jour : je t'ai réservé ton prochain voyage. ${p.origin} à ${p.dest}, ${p.miles} milles, ramassage ${day}. Le courtier l'a confirmé, les détails sont dans tes textos. Ça te va?`
+        : p.what === "cancelled"
+          ? `${p.name}, attention : ${p.origin} à ${p.dest} est annulé, donc ne va pas à ce ramassage. ${p.tonu ? `Je lui facture ${p.tonu} $ pour camion commandé non utilisé. ` : ""}Je cherche déjà ton prochain voyage et je te rappelle dès que je l'ai.`
+          : `${p.name}, changement de plan : ${p.origin} à ${p.dest} est tombé, le courtier l'a donné à quelqu'un d'autre. J'ai réservé ${p.newOrigin} à ${p.newDest} à la place, donc le reste du plan tient. Les détails sont dans tes textos.`;
+    },
+    meAgain: (name) => `C'est encore moi, ${name}, désolé de rappeler.`,
+    noWork: "Compris. J'avertis le bureau tout de suite et je te rappelle avec quelque chose qui marche.",
+    doesntWork: "Ça ne marche pas",
+    text: (p) => {
+      const day = p.day === "tomorrow" ? "demain" : "aujourd'hui";
+      return p.what === "booked"
+        ? `Réservé : ${p.origin} → ${p.dest}, ${p.miles} milles, ramassage ${day}. Confirmé avec le courtier.`
+        : p.what === "cancelled"
+          ? `Annulé : ${p.origin} → ${p.dest}. Ne va pas à ce ramassage. Je cherche le prochain.${p.tonu ? ` TONU de ${p.tonu} $ facturé.` : ""}`
+          : `Changement de plan : ${p.origin} → ${p.dest} est tombé. À la place : ${p.newOrigin} → ${p.newDest}. Détails dans l'appli.`;
+    },
+  },
 
   ch: {
     bookIt: "Réserve-le", bookThis: "Réserve celui-là", whatElse: "Quoi d'autre?", bookFirst: "Réserve le premier", notNow: "Pas maintenant", cancelThat: "Annule", thanksBye: "Merci, bye",
