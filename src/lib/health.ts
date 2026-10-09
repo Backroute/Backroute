@@ -10,7 +10,7 @@ import { spokenRepliesConfigured, transcriptionConfigured } from "./channels/voi
 
 /**
  * Is Backroute working? Each part of the system is checked: the database, the AI, texts, email, the dispatcher's
- * rounds, the voice server, the website worker, messages stuck waiting for a provider, and AI spending. Support sees
+ * rounds, the voice server, the website worker, messages stuck waiting for a provider, app errors, and AI spending. Support sees
  * the report in the console (System tab), uptime monitors can watch /api/health, and every round of the dispatcher
  * alerts whoever is on call (ALERT_PHONES, or the support phones; and SUPPORT_EMAIL) when something goes down: once per problem per hour, and
  * once more when it's fixed.
@@ -119,8 +119,29 @@ export async function healthReport(now = Date.now()): Promise<Check[]> {
     });
   } else checks.push({ key: "portal", label: "Website worker", level: "off", detail: "Not set up: support does broker websites" });
 
+  checks.push(await appErrors(hourAgo));
   checks.push(await spending(now));
   return checks;
+}
+
+/**
+ * Errors the app hit in the last hour, on the server or in someone's browser (app_errors, lib/error-log). Shown in
+ * the System tab whenever there are any; on call is alerted when one keeps happening (10 times today) or several
+ * different ones turn up in an hour.
+ */
+async function appErrors(hourAgo: string): Promise<Check> {
+  const { data, error } = await admin().from("app_errors").select("source, path, message, count").gte("last_at", hourAgo).order("count", { ascending: false }).limit(50);
+  if (error) return { key: "errors", label: "App errors", level: "warn", detail: `Couldn't read them: ${error.message}` };
+  const rows = data ?? [];
+  if (!rows.length) return { key: "errors", label: "App errors", level: "ok", detail: "None in the last hour" };
+  const top = rows[0];
+  const where = `${top.source === "browser" ? "in a browser" : "on the server"}${top.path ? ` at ${top.path}` : ""}`;
+  return {
+    key: "errors",
+    label: "App errors",
+    level: rows.length >= 5 || Number(top.count) >= 10 ? "down" : "warn",
+    detail: `${rows.length} kind${rows.length === 1 ? "" : "s"} in the last hour. Most: "${String(top.message).slice(0, 140)}" ${where}, ${top.count} time${Number(top.count) === 1 ? "" : "s"} today`,
+  };
 }
 
 /**

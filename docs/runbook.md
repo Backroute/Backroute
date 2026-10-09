@@ -36,6 +36,7 @@ and once more when it's fixed. The same list is the **System** tab in `/ops`.
 | **Messages waiting to send** | A provider was down and messages are queued to retry; "given up" means some never went. | The provider's status page. Given-up messages are in the outbox table: tell the owner which ones. |
 | **Voice server** | `VOICE_SERVER_URL` doesn't answer. Calls still work, taking turns instead of talking naturally. | Restart it on its host. Nothing else is affected. |
 | **Website worker** | The browser worker hasn't asked for work in 10+ minutes, or a job has waited 15+. | Restart it on its host. Broker-website jobs fall to Waiting on us meanwhile. |
+| **App errors** | The app hit errors, on the server or in people's browsers: the same one 10+ times today, or 5+ kinds in an hour (fewer show in the System tab without an alert). Lost connections in a truck aren't counted. | The System tab names the most common one and the page. If it came with a deploy, roll back (below). The rows are in `app_errors`, one per kind per day, with the stack. |
 | **AI spending** | A carrier is using 3x its usual AI spend today (and over $5): a loop, an email flood, or abuse. | `/ops` → Numbers for that carrier; look at its log. `pause <id>` if it's a loop. |
 
 ## Backups and restoring
@@ -82,6 +83,7 @@ every test run (`sandbox-e2e`); this is the real providers.
 | Set `POSTMARK_SERVER_TOKEN` wrong and email the test carrier a load | The broker reply waits in `outbound`; the same alert | The next run sends it |
 | Set `ANTHROPIC_API_KEY` wrong and text a question | Two messages the AI can't answer: the **AI** alert, and each message is in Waiting on us | Answer them by hand; nothing more is needed |
 | Pause the test Supabase project | `/api/health` fails, the uptime monitor and the **Database** alert fire | Messages that came in while it was down: Postmark retried the emails; Twilio didn't retry the texts (see above) |
+| Make the app crash: `curl -H "Authorization: Bearer $CRON_SECRET" https://YOUR-SITE/api/errors` | It answers 500, and the System tab's **App errors** shows "Test crash from /api/errors" within a minute | Nothing to put back; it's gone from the tab after an hour |
 | Turn off the scheduler for 30 minutes | The **Dispatcher's rounds** alert | One run by hand, then the scheduler back on |
 
 Write down when each alert arrived. If one doesn't come, that's the thing to fix before carriers are on it.

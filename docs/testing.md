@@ -299,6 +299,21 @@ The code was run against local stand-ins that behave like the real services:
     with a non-English file name and its date.
   - A driver's first day, walked through on a phone (sign in from the link, agree, pre-trip, pickup, BOL, delivery,
     POD): every step works and every screen is free of serious accessibility problems.
+- **Ready for real traffic:**
+  - Crash reporting (11 checks in `errors-e2e`, 7 unit checks): an error in a browser or on the server is counted by
+    kind (the same error on two loads is one kind), never with the page's query; a crashed page reports what it
+    caught; a dropped connection isn't reported; 31 reports from one address in ten minutes are cut off at 30; the
+    System tab lists them and calls on-call when one keeps happening. `GET /api/errors` with `CRON_SECRET` is the
+    drill's test crash.
+  - Load test, 200 carriers with 3 trucks each against the stand-ins: made in 90 s, 200 broker emails read in 13 s
+    (261 loads), and the dispatcher's rounds took 29 s for the first run (1,609 things done) and 7 to 10 s after,
+    inside the 220 s budget. The database's scan counts showed no table read whole; three indexes were added for the
+    queries that read across all carriers (`20261017000000_scale_indexes.sql`).
+  - The production build, on a phone on slow 4G (1.6 Mb/s, 150 ms) with a 4x slower CPU: the website 547 kB and
+    the sign-in page 460 kB, both painted within a second; the driver's home usable in 5.5 s the first time (720 kB)
+    and under a second after; the owner's Home 1.26 MB the first time, most of it the map (277 kB, loaded after the
+    page) and pages prefetched in the background. The built app still works offline (6 checks).
+  - Backups: a dump restored into an empty database with every access rule, function and trigger (runbook).
 - **Access rules:** 125 checks.
   - A stale copy saving one field of a load changes only that field.
   - What carriers cost to run is server-only.
