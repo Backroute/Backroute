@@ -15,6 +15,7 @@ import { judge, playPartner } from "@/lib/ai/sim";
 import { makeBroker, makeLoad, makeTruckAndDriver } from "@/lib/fleet";
 import type { AgentSettings } from "@/lib/store";
 import type { EquipmentType, RunType, Truck } from "@/lib/types";
+import { hasBearer } from "@/lib/bearer";
 
 export const maxDuration = 300;
 
@@ -75,8 +76,7 @@ const Body = z.discriminatedUnion("action", [
 const isSim = (id: string) => id.startsWith("sim-");
 
 export async function POST(request: Request) {
-  const secret = process.env.EVAL_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Not found", { status: 404 });
+  if (!hasBearer(request, process.env.EVAL_SECRET)) return new Response("Not found", { status: 404 });
   if (!dbConfigured()) return Response.json({ error: "not_set_up" }, { status: 503 });
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "bad_request", issues: parsed.error.issues.slice(0, 5) }, { status: 400 });

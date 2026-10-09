@@ -3,6 +3,7 @@ import { canText, textTo } from "@/lib/channels/out";
 import { pack } from "@/lib/lang";
 import { formatCurrency } from "@/lib/utils";
 import { syncTruckCounts } from "@/lib/billing";
+import { hasBearer } from "@/lib/bearer";
 
 export const maxDuration = 300;
 
@@ -11,8 +12,7 @@ export const maxDuration = 300;
  * rolling, and how many things need them. Run by Vercel Cron, which sends the CRON_SECRET as a bearer token.
  */
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
+  if (!hasBearer(request, process.env.CRON_SECRET)) return new Response("Unauthorized", { status: 401 });
   if (!dbConfigured()) return Response.json({ sent: 0, reason: "not_set_up" });
 
   const { data: carriers, error } = await admin().from("carriers").select("id").not("owner_phone", "is", null);

@@ -4,6 +4,7 @@ import type { OfferReading } from "./broker-mail";
 import { offersFromEmail } from "./booking";
 import type { CarrierContext } from "./db";
 import type { FeedConfig } from "./integrations";
+import { fetchOwnerUrl, UnsafeUrl } from "../owner-url";
 
 /**
  * Load feeds: any source that can publish loads as JSON or CSV at a web address (a broker's or shipper's load list,
@@ -85,9 +86,9 @@ export class FeedError extends Error {}
 export async function readFeed(cfg: FeedConfig): Promise<FeedRow[]> {
   let res: Response;
   try {
-    res = await fetch(cfg.url, { headers: cfg.headerName && cfg.headerValue ? { [cfg.headerName]: cfg.headerValue } : {}, signal: AbortSignal.timeout(15000), cache: "no-store" });
-  } catch {
-    throw new FeedError("Couldn't reach the feed.");
+    res = await fetchOwnerUrl(cfg.url, { headers: cfg.headerName && cfg.headerValue ? { [cfg.headerName]: cfg.headerValue } : {}, signal: AbortSignal.timeout(15000), cache: "no-store" });
+  } catch (e) {
+    throw new FeedError(e instanceof UnsafeUrl ? e.message : "Couldn't reach the feed.");
   }
   if (!res.ok) throw new FeedError(`The feed answered ${res.status}.`);
   const text = await res.text();

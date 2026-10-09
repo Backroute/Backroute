@@ -2,6 +2,7 @@ import "server-only";
 import type { CustomBoardConfig } from "../integrations";
 import { toRow } from "../feeds";
 import { BoardError, type Board, type BoardLoad, type BoardQuery } from "./types";
+import { fetchOwnerUrl, UnsafeUrl } from "../../owner-url";
 
 /**
  * Any other load board with an API (123Loadboard, Direct Freight, Trucker Path, a broker's own portal), described
@@ -38,15 +39,15 @@ export function customBoard(cfg: CustomBoardConfig): Board {
       const url = fill(cfg.searchUrl, q, encodeURIComponent);
       let res: Response;
       try {
-        res = await fetch(url, {
+        res = await fetchOwnerUrl(url, {
           method: cfg.method,
           headers: { accept: "application/json", ...(cfg.body ? { "content-type": "application/json" } : {}), ...Object.fromEntries(Object.entries(cfg.headers ?? {}).map(([k, v]) => [k, fill(v, q)])) },
           body: cfg.method === "POST" && cfg.body ? fill(cfg.body, q) : undefined,
           signal: AbortSignal.timeout(20000),
           cache: "no-store",
         });
-      } catch {
-        throw new BoardError(`Couldn't reach ${cfg.name}.`);
+      } catch (e) {
+        throw new BoardError(e instanceof UnsafeUrl ? `${cfg.name}: ${e.message}` : `Couldn't reach ${cfg.name}.`);
       }
       if (!res.ok) throw new BoardError(`${cfg.name} answered ${res.status}.`);
       const body = await res.json().catch(() => null);

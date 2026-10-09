@@ -2,6 +2,7 @@ import { z } from "zod";
 import { dbConfigured, loadContext } from "@/lib/agent/db";
 import { validVoiceToken } from "@/lib/channels/realtime";
 import { callTurn } from "@/lib/channels/turn";
+import { hasBearer } from "@/lib/bearer";
 
 export const maxDuration = 30;
 
@@ -21,8 +22,7 @@ const Body = z.object({
  */
 export async function POST(request: Request) {
   if (!dbConfigured()) return Response.json({ error: "not_set_up" }, { status: 503 });
-  const secret = process.env.VOICE_SERVER_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return Response.json({ error: "unauthorized" }, { status: 401 });
+  if (!hasBearer(request, process.env.VOICE_SERVER_SECRET)) return Response.json({ error: "unauthorized" }, { status: 401 });
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "bad_request" }, { status: 400 });
   const b = parsed.data;

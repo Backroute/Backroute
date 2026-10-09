@@ -3,6 +3,7 @@ import { admin, claimMark, type CarrierContext } from "./db";
 import { setStatus, type IntegrationRow, type StatementConfig } from "./integrations";
 import { matchToLoads, readFuelCsv, readTollCsv } from "../fuel-import";
 import { rowFor, type Item } from "../cloud/rows";
+import { fetchOwnerUrl, UnsafeUrl } from "../owner-url";
 
 /**
  * Fuel card and toll statements by themselves: the carrier gives the address where the card company (or their toll
@@ -17,9 +18,9 @@ const MAX_BYTES = 5_000_000;
 export async function readStatement(cfg: StatementConfig): Promise<string> {
   let res: Response;
   try {
-    res = await fetch(cfg.url, { headers: cfg.headerName && cfg.headerValue ? { [cfg.headerName]: cfg.headerValue } : {}, signal: AbortSignal.timeout(20000), cache: "no-store" });
-  } catch {
-    throw new StatementError("Couldn't reach the statement address.");
+    res = await fetchOwnerUrl(cfg.url, { headers: cfg.headerName && cfg.headerValue ? { [cfg.headerName]: cfg.headerValue } : {}, signal: AbortSignal.timeout(20000), cache: "no-store" });
+  } catch (e) {
+    throw new StatementError(e instanceof UnsafeUrl ? e.message : "Couldn't reach the statement address.");
   }
   if (!res.ok) throw new StatementError(`The statement address answered ${res.status}.`);
   const text = await res.text();

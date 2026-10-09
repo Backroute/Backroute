@@ -5,6 +5,7 @@ import { flagStuck } from "@/lib/agent/stuck";
 import { retryOutbound } from "@/lib/channels/out";
 import { publicUrl } from "@/lib/channels/twilio";
 import { alertOnHealth, beat } from "@/lib/health";
+import { hasBearer } from "@/lib/bearer";
 
 export const maxDuration = 300;
 
@@ -14,8 +15,7 @@ export const maxDuration = 300;
  * as a bearer token.
  */
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
+  if (!hasBearer(request, process.env.CRON_SECRET)) return new Response("Unauthorized", { status: 401 });
   if (!dbConfigured()) return Response.json({ done: [], reason: "not_set_up" });
 
   const now = Date.now();

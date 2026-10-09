@@ -7,6 +7,7 @@ import { driverTurn } from "@/lib/agent/dispatcher";
 import { generateWorld, PRIMARY_CARRIER_ID, PRIMARY_DRIVER_ID } from "@/lib/mock-data";
 import type { AgentSettings } from "@/lib/store";
 import type { Lang } from "@/lib/types";
+import { hasBearer } from "@/lib/bearer";
 
 export const maxDuration = 60;
 
@@ -23,8 +24,7 @@ const Body = z.object({
  * picked. Off unless EVAL_SECRET is set, and only with that secret.
  */
 export async function POST(request: Request) {
-  const secret = process.env.EVAL_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Not found", { status: 404 });
+  if (!hasBearer(request, process.env.EVAL_SECRET)) return new Response("Not found", { status: 404 });
   if (!aiConfigured()) return Response.json({ error: "ai_off" }, { status: 503 });
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "bad_request" }, { status: 400 });

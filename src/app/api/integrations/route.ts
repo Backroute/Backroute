@@ -13,7 +13,7 @@ import { quickbooksConfigured, type QuickbooksConfig } from "@/lib/agent/quickbo
 
 const Custom = z.object({
   name: z.string().trim().min(2).max(40),
-  searchUrl: z.string().url().max(2000),
+  searchUrl: z.string().url().max(2000).refine((u) => u.startsWith("https://") || process.env.NODE_ENV !== "production", "https only"),
   method: z.enum(["GET", "POST"]),
   headers: z.record(z.string(), z.string().max(2000)).optional(),
   body: z.string().max(5000).optional(),
