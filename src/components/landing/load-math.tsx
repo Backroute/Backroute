@@ -37,7 +37,7 @@ export function LoadMath() {
       <div className="theme-invert flex flex-col justify-between rounded-2xl bg-black p-6 text-white">
         <div>
           <p className="text-sm text-ink-500">What you keep</p>
-          <p className={`mt-1 text-[clamp(2.75rem,6vw,3.75rem)] font-bold leading-none tracking-[-0.04em] tabular ${keep < 0 ? "text-[#F83446]" : ""}`}>
+          <p className={`mt-1 text-[clamp(2.75rem,6vw,3.75rem)] font-semibold leading-none tracking-[-0.04em] tabular ${keep < 0 ? "text-[#F83446]" : ""}`}>
             <Count value={keep} money />
           </p>
           <p className="mt-2 text-sm text-ink-500">before driver pay, insurance and the truck note</p>
@@ -67,7 +67,7 @@ function Slider({ label, value, min, max, step, show, onChange }: { label: strin
         <label htmlFor={id} className="text-[15px] font-medium text-ink-700">
           {label}
         </label>
-        <span className="text-lg font-bold tabular">{show(value)}</span>
+        <span className="text-lg font-semibold tabular">{show(value)}</span>
       </div>
       <input
         id={id}
@@ -88,7 +88,7 @@ function Row({ label, value, money, cents }: { label: string; value: number; mon
   return (
     <div>
       <dt className="text-ink-500">{label}</dt>
-      <dd className="mt-0.5 text-base font-bold tabular">
+      <dd className="mt-0.5 text-base font-semibold tabular">
         <Count value={value} money={money} cents={cents} />
       </dd>
     </div>

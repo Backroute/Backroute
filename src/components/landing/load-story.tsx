@@ -80,7 +80,7 @@ function StepText({ i, active }: { i: number; active: boolean }) {
       <p className="flex items-center gap-2 text-sm font-semibold text-ink-500">
         <Icon className="h-4 w-4" /> Step {i + 1}
       </p>
-      <h3 className="mt-1 text-2xl font-bold tracking-[-0.02em] lg:text-[28px]">{s.title}</h3>
+      <h3 className="mt-1 text-2xl font-semibold tracking-[-0.02em] lg:text-[28px]">{s.title}</h3>
       <p className="mt-2 max-w-md text-[16px] leading-relaxed text-ink-600">{s.body}</p>
     </div>
   );
@@ -108,12 +108,12 @@ function Screen({ step }: { step: number }) {
             >
               <div>
                 {l.best && <p className="text-xs font-semibold text-[var(--link)]">Best fit</p>}
-                <p className="font-bold">{l.lane}</p>
+                <p className="font-semibold">{l.lane}</p>
                 <p className="text-sm text-ink-500">
                   {l.pay} · {l.keep}
                 </p>
               </div>
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-[3px] border-ink-950 text-sm font-bold tabular">{l.score}</span>
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-[3px] border-ink-950 text-sm font-semibold tabular">{l.score}</span>
             </motion.li>
           ))}
         </ul>
@@ -143,7 +143,7 @@ function Screen({ step }: { step: number }) {
           ))}
         </ul>
         <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }} className="mt-4 rounded-xl bg-ink-100 px-4 py-3 text-sm">
-          Booked at <span className="font-bold">$1,107</span>, $57 over your $1,050 floor.
+          Booked at <span className="font-semibold">$1,107</span>, $57 over your $1,050 floor.
         </motion.p>
       </div>
     );
@@ -151,7 +151,7 @@ function Screen({ step }: { step: number }) {
     return (
       <div className={card}>
         <p className="text-sm text-ink-500">Truck 14 · Marcus · sample</p>
-        <p className="mt-2 text-xl font-bold">Indianapolis → Kansas City</p>
+        <p className="mt-2 text-xl font-semibold">Indianapolis → Kansas City</p>
         <div className="mt-5 h-2 overflow-hidden rounded-full bg-ink-100">
           <motion.div className="h-full rounded-full bg-[var(--dot-live)]" initial={{ width: "8%" }} animate={{ width: "64%" }} transition={{ duration: 1.6, ease: "easeOut" }} />
         </div>
@@ -170,7 +170,7 @@ function Screen({ step }: { step: number }) {
       <div className="mt-4 flex items-end justify-between">
         <div>
           <p className="text-sm text-ink-500">Coastal Freight</p>
-          <p className="text-[40px] font-bold leading-none tracking-[-0.04em] tabular">$1,107</p>
+          <p className="text-[40px] font-semibold leading-none tracking-[-0.04em] tabular">$1,107</p>
         </div>
         <motion.span initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", delay: 0.4 }} className="rounded-full bg-[var(--dot-live)] px-3 py-1.5 text-sm font-semibold text-black">
           Paid

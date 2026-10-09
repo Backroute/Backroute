@@ -4,7 +4,6 @@ import { demoAllowed } from "@/lib/cloud/demo";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import { PhonePreview } from "@/components/landing/phone-preview";
-import { LiveFeed } from "@/components/landing/live-feed";
 import { LoadStory } from "@/components/landing/load-story";
 import { LoadMath } from "@/components/landing/load-math";
 import { Reveal } from "@/components/landing/motion";
@@ -44,7 +43,7 @@ const QUESTIONS = [
   { q: "Who can see my data?", a: "Only your company. Each carrier's data is walled off from every other, and logins to broker websites are encrypted." },
 ];
 
-const H2 = "text-[clamp(2rem,4.2vw,3.25rem)] font-bold leading-[1.05] tracking-[-0.025em] text-balance";
+const H2 = "text-[clamp(2rem,4.2vw,3.25rem)] font-medium leading-[1.06] tracking-[-0.035em] text-balance";
 
 export default function Home() {
   return (
@@ -73,10 +72,8 @@ export default function Home() {
       <section className="relative overflow-hidden">
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 pb-16 pt-12 sm:px-8 sm:pb-20 md:pt-20 lg:grid-cols-[1.35fr_1fr] lg:gap-10 lg:pb-28">
           <Reveal>
-            <p className="inline-flex items-center gap-2 rounded-full bg-ink-100 px-3 py-1.5 text-[13px] font-semibold text-ink-950">
-              <span className="h-2 w-2 rounded-full bg-[var(--dot-live)]" /> The AI dispatcher for small fleets
-            </p>
-            <h1 className="mt-6 text-[clamp(2.75rem,6.6vw,5.5rem)] font-bold leading-[0.96] tracking-[-0.035em] text-balance">
+            <p className="text-[15px] font-medium text-ink-500">The AI dispatcher for small fleets</p>
+            <h1 className="mt-5 text-[clamp(2.75rem,6.4vw,5.25rem)] font-medium leading-[1] tracking-[-0.04em] text-balance">
               Your next load
               <br />
               is already booked.
@@ -95,14 +92,11 @@ export default function Home() {
               )}
             </div>
             <p className="mt-10 text-sm text-ink-500">
-              Works with <span className="font-semibold text-ink-800">DAT</span>, <span className="font-semibold text-ink-800">Truckstop</span>, <span className="font-semibold text-ink-800">Samsara</span>, <span className="font-semibold text-ink-800">Motive</span> and <span className="font-semibold text-ink-800">QuickBooks Online</span>.
+              Works with DAT, Truckstop, Samsara, Motive and QuickBooks Online.
             </p>
           </Reveal>
-          <Reveal delay={0.12} className="relative">
+          <Reveal delay={0.12}>
             <PhonePreview />
-            <div className="mt-6 flex justify-center lg:absolute lg:-left-24 lg:bottom-16 lg:mt-0 lg:block">
-              <LiveFeed />
-            </div>
           </Reveal>
         </div>
       </section>
@@ -207,10 +201,10 @@ export default function Home() {
           {PLANS.map((p) => (
             <div key={p.name} className={`flex flex-col rounded-2xl p-6 transition-transform duration-300 hover:-translate-y-1 sm:p-7 ${p.featured ? "theme-invert bg-black" : "bg-ink-100"}`}>
               <div className="flex items-center justify-between">
-                <p className="text-lg font-bold">{p.name}</p>
+                <p className="text-lg font-semibold">{p.name}</p>
                 {p.featured && <span className="rounded-full bg-ink-950 px-2.5 py-1 text-xs font-semibold text-ink-0">Most fleets</span>}
               </div>
-              <p className="mt-6 text-5xl font-bold tracking-[-0.04em] tabular">
+              <p className="mt-6 text-5xl font-semibold tracking-[-0.04em] tabular">
                 {p.price}
                 <span className="text-base font-medium tracking-normal text-ink-500"> /month</span>
               </p>
@@ -222,7 +216,7 @@ export default function Home() {
           ))}
         </div>
         <div className="mt-10 rounded-2xl border border-line p-7">
-          <p className="text-lg font-bold">Every plan includes</p>
+          <p className="text-lg font-semibold">Every plan includes</p>
           <ul className="mt-5 grid gap-x-8 gap-y-3 text-[16px] sm:grid-cols-2 lg:grid-cols-3">
             {INCLUDED.map((t) => (
               <li key={t} className="flex gap-3">
@@ -252,7 +246,7 @@ export default function Home() {
       </section>
 
       <section className="mx-auto max-w-6xl px-5 py-16 text-center sm:px-8 sm:py-24 md:py-32">
-        <h2 className="mx-auto max-w-3xl text-[clamp(2.25rem,5vw,4rem)] font-bold leading-[1.02] tracking-[-0.03em] text-balance">
+        <h2 className="mx-auto max-w-3xl text-[clamp(2.25rem,5vw,4rem)] font-medium leading-[1.04] tracking-[-0.04em] text-balance">
           Spend tomorrow driving, not dialing brokers.
         </h2>
         <div className="mx-auto mt-9 flex max-w-sm flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center">
@@ -293,38 +287,38 @@ function SampleLoad() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[13px] font-semibold text-[var(--link)]">Long run · 4 days</p>
-          <p className="mt-1 text-lg font-bold">Sample broker</p>
+          <p className="mt-1 text-lg font-semibold">Sample broker</p>
           <p className="text-sm text-ink-500">Dry van · 38k lb</p>
         </div>
-        <span className="flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-ink-950 text-xl font-bold tabular">91</span>
+        <span className="flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-ink-950 text-xl font-semibold tabular">91</span>
       </div>
       <ol className="mt-6 flex flex-col gap-3 text-[15px]">
         <li className="flex justify-between gap-3">
-          <span><span className="font-bold">Chicago,</span> <span className="text-ink-500">IL</span></span>
+          <span><span className="font-semibold">Chicago,</span> <span className="text-ink-500">IL</span></span>
           <span className="text-right text-ink-500">Mon · 8–11 am CDT</span>
         </li>
         <li className="flex items-center gap-2 pl-1 text-[13px] text-ink-500">
           <Moon className="h-3.5 w-3.5" /> Rests near Lincoln, Colorado Springs, Phoenix
         </li>
         <li className="flex justify-between gap-3">
-          <span><span className="font-bold">Los Angeles,</span> <span className="text-ink-500">CA</span></span>
+          <span><span className="font-semibold">Los Angeles,</span> <span className="text-ink-500">CA</span></span>
           <span className="text-right text-ink-500">Thu · 6–9 am PDT</span>
         </li>
       </ol>
       <div className="mt-6 grid grid-cols-3 border-y border-line py-4 text-sm">
-        <div><p className="text-ink-500">You drive</p><p className="mt-0.5 text-base font-bold tabular">2,015 mi</p></div>
-        <div><p className="text-ink-500">Days out</p><p className="mt-0.5 text-base font-bold tabular">4 days</p></div>
-        <div><p className="text-ink-500">Reload</p><p className="mt-0.5 text-base font-bold">Easy</p></div>
+        <div><p className="text-ink-500">You drive</p><p className="mt-0.5 text-base font-semibold tabular">2,015 mi</p></div>
+        <div><p className="text-ink-500">Days out</p><p className="mt-0.5 text-base font-semibold tabular">4 days</p></div>
+        <div><p className="text-ink-500">Reload</p><p className="mt-0.5 text-base font-semibold">Easy</p></div>
       </div>
       <div className="mt-4 flex items-end justify-between rounded-2xl bg-ink-100 p-4">
         <div>
           <p className="text-sm text-ink-500">Load pays</p>
-          <p className="text-[34px] font-bold leading-none tracking-[-0.04em] tabular">$4,190</p>
+          <p className="text-[34px] font-semibold leading-none tracking-[-0.04em] tabular">$4,190</p>
         </div>
         <p className="text-right text-sm text-ink-500">
-          <span className="font-bold text-ink-950">$2.08</span>/mi
+          <span className="font-semibold text-ink-950">$2.08</span>/mi
           <br />
-          <span className="font-bold text-ink-950">$2,604</span> after costs
+          <span className="font-semibold text-ink-950">$2,604</span> after costs
         </p>
       </div>
       <p className="mt-4 rounded-xl bg-[var(--action)] py-3.5 text-center text-[15px] font-semibold text-[var(--action-ink)]">Book it</p>

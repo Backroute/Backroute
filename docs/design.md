@@ -30,16 +30,18 @@ reads in a truck cab at noon.
 
 ## Type
 
-Inter for everything, with its optical sizes (big headings get the display cut), the closest free match to Uber
-Move; Geist Mono only for load IDs and number columns. Body text is a hair tighter than Inter's default (-0.011em).
+Geist for everything (the owner picked it over Manrope, DM Sans and Plus Jakarta Sans); Geist Mono only for load IDs
+and number columns. Light and even: big headings at medium weight with the letters drawn in a little, app headings
+semibold, text regular at Geist's own spacing.
 
 | Where | Sizes |
 | --- | --- |
-| Website | Headline 84/44px weight 700, letters pulled in 3%; sections 52/32px 700; lead 21/18px; body 17px |
-| Owner dashboard | Page title 30px/700; big numbers 28–48px/700; row titles 16px/600; body 15px; smallest 13px |
-| Driver app | Large title 34px/700; key numbers 28px/700; body and buttons 17px; smallest 15px; buttons 56px tall |
+| Website | Headline 84/44px weight 500, letters pulled in 4%; sections 52/32px 500; lead 21/18px; body 17px; no bold |
+| Owner dashboard | Page title 30px/600; big numbers 28–48px/600; row titles 16px/600; body 15px; smallest 13px |
+| Driver app | Large title 34px/600; key numbers 28px/600; body and buttons 17px; smallest 15px; buttons 56px tall |
 
-Nothing smaller than 12px anywhere. Headings are bold and tight; small labels are 12px semibold capitals.
+Nothing smaller than 12px anywhere. Small labels are 12px semibold capitals. On the website, no little boxes or pills
+around words: a label is plain grey text.
 Buttons are rounded rectangles (12px corners), not pills; chips and tags stay round.
 
 A lane on screen is `<Lane from to />` (`components/ui/lane.tsx`): an arrow icon as heavy as the text, never the thin

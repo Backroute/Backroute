@@ -1,17 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Inter } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { SimulationProvider } from "@/components/simulation-provider";
 import { MotionRoot } from "@/components/motion-root";
 import { InlineScript } from "@/components/inline-script";
 import { THEME_SCRIPT } from "@/lib/theme-script";
 import "./globals.css";
 
-// Inter with its optical sizes: big headings get the tighter display cut, small text the open text cut. The closest
-// free match to Uber Move, made for screens and numbers.
-const inter = Inter({
-  variable: "--font-inter",
+// Geist: clean and even, light on the page. Headings at medium weight, text regular.
+const geist = Geist({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
-  axes: ["opsz"],
 });
 
 const geistMono = Geist_Mono({
@@ -69,7 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       data-theme="light"
       suppressHydrationWarning
-      className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geist.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
         {/* Light or dark before the first paint (lib/theme): no white flash on a dark-mode phone. */}

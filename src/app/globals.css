@@ -247,9 +247,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --font-display: var(--font-inter);
+  --font-display: var(--font-geist-sans);
 
   --color-ink-0: var(--ink-0);
   --color-ink-50: var(--ink-50);
@@ -311,19 +311,16 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-inter), system-ui, "Helvetica Neue", Arial, sans-serif;
-  /* Inter's open digits and a straight-sided 1, easier to tell apart at a glance (cv01, cv05, tnum where set). */
-  font-feature-settings: "cv05" 1, "cv08" 1;
-  font-optical-sizing: auto;
-  /* Inter's own advice for text sizes: a hair tighter than its default spacing. */
-  letter-spacing: -0.011em;
+  font-family: var(--font-geist-sans), system-ui, "Helvetica Neue", Arial, sans-serif;
+  /* Geist's own spacing at text sizes; only headings are drawn in a little. */
+  letter-spacing: -0.003em;
   -webkit-font-smoothing: antialiased;
 }
 
 .font-display {
   font-family: var(--font-display), system-ui, Arial, sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.025em;
+  font-weight: 600;
+  letter-spacing: -0.03em;
 }
 
 .tabular {
@@ -331,35 +328,35 @@ body {
 }
 
 /*
- * One type scale for the whole app, after Uber's Base: headings bold and tight, body regular, labels medium. Big
+ * One type scale for the whole app: headings semibold and drawn in a little, body regular, labels medium. Big
  * money and counts are the loudest thing on a screen. Nothing smaller than 12px anywhere. Numbers always line up
  * (tabular figures).
  */
 @utility t-hero {
   font-size: clamp(2.25rem, 1.8rem + 1.6vw, 3rem);
   line-height: 1;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.035em;
   font-variant-numeric: tabular-nums;
 }
 @utility t-stat {
   font-size: 1.75rem;
   line-height: 1.1;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
 }
 @utility t-page {
   font-size: 1.875rem;
   line-height: 1.15;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.025em;
 }
 @utility t-section {
   font-size: 1rem;
   line-height: 1.3;
   font-weight: 600;
-  letter-spacing: -0.011em;
+  letter-spacing: -0.006em;
 }
 @utility t-label {
   font-size: 12px;
