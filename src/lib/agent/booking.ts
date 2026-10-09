@@ -37,6 +37,7 @@ import { cantRun } from "../expiry";
 import { chainEnd, doneAt, LINED_UP_MAX, linedUp, reloadOutlook, reloadValue } from "./chain";
 import { isPartial, nextStop, type TripLoad } from "../trip-plan";
 import { newTrip, stopsLine, tripFit, tripWith, type TripFit } from "./trips";
+import { callDriverAbout } from "./driver-calls";
 import { bestAssignment } from "./match";
 import { learnedAsk } from "./ask-learning";
 
@@ -534,6 +535,8 @@ export async function bookIt(ctx: CarrierContext, load: Load, rate?: number): Pr
   const before = joins?.after ? ctx.loads.find((l) => l.id === joins.after) : undefined;
   const tripNote = joins && trip ? [`${before ? `After you drop ${before.referenceNumber}: ` : ""}${stopsLine(trip, load.id)}`, ...(trip.warnings ?? []).filter((w) => w.includes(load.referenceNumber))].join(" ") : undefined;
   await textNewLoad(ctx, booked, tripNote).catch((e) => console.error("[booking] new-load text failed", e));
+  // And a call, the way a dispatcher rings with the next load (one call for a plan booked together).
+  await callDriverAbout(ctx, booked, "next_load").catch((e) => console.error("[booking] new-load call failed", e));
   return { load: booked, truck: truckAfter };
 }
 

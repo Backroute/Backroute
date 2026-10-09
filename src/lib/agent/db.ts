@@ -250,6 +250,12 @@ export async function releaseMark(carrierId: string, loadId: string, kind: strin
   await admin().from("agent_marks").delete().eq("carrier_id", carrierId).eq("load_id", loadId).eq("kind", kind);
 }
 
+/** Changes what a mark remembers (how many calls were tried, whether one was answered). */
+export async function setMarkData(carrierId: string, loadId: string, kind: string, data: Record<string, unknown>) {
+  const { error } = await admin().from("agent_marks").update({ data }).eq("carrier_id", carrierId).eq("load_id", loadId).eq("kind", kind);
+  if (error) throw error;
+}
+
 /** The carrier's marks, as "loadId:kind" → when it was made. */
 export async function marksFor(carrierId: string): Promise<Map<string, { at: string; data: Record<string, unknown> }>> {
   const since = new Date(Date.now() - 30 * 86400_000).toISOString();

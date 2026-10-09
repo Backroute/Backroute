@@ -252,3 +252,58 @@ export const VOICE_UNHEARD: Record<Lang, string> = {
   uk: "Вибач, не розібрав голосове повідомлення. Можеш написати текстом або зателефонувати на цей номер?",
   fr: "Désolé, je n'ai pas compris ton message vocal. Tu peux l'écrire, ou appeler ce numéro ?",
 };
+
+/** The AI calls a driver because something changed: who's calling and why, before the news. */
+export const UPDATE_CALL: Record<Lang, (first: string, carrier: string) => string> = {
+  en: (f, c) => `Hi ${f}, this is the AI dispatcher for ${c} with an update.`,
+  es: (f, c) => `Hola ${f}, habla el despachador de inteligencia artificial de ${c} con una novedad.`,
+  pa: (f, c) => `ਸਤ ਸ੍ਰੀ ਅਕਾਲ ${f}, ਮੈਂ ${c} ਦਾ AI ਡਿਸਪੈਚਰ ਹਾਂ, ਇੱਕ ਨਵੀਂ ਖ਼ਬਰ ਦੱਸਣ ਲਈ ਫ਼ੋਨ ਕੀਤਾ ਹੈ।`,
+  hi: (f, c) => `नमस्ते ${f}, मैं ${c} का AI डिस्पैचर हूँ, एक नई जानकारी देने के लिए फ़ोन किया है।`,
+  ru: (f, c) => `Привет, ${f}, это AI-диспетчер компании ${c}, есть новости.`,
+  uk: (f, c) => `Привіт, ${f}, це AI-диспетчер компанії ${c}, є новини.`,
+  fr: (f, c) => `Bonjour ${f}, ici le répartiteur IA de ${c}, j'ai du nouveau.`,
+};
+
+/** A new load booked for the driver, said out loud (the text with every detail goes out too). */
+export const NEW_LOAD_SPOKEN: Record<Lang, (p: { ref: string; from: string; to: string; pickup: string; delivery: string }) => string> = {
+  en: (p) => `Your next load is booked: ${p.ref}, ${p.from} to ${p.to}. Pickup ${p.pickup}. Delivery ${p.delivery}. I texted you the details.`,
+  es: (p) => `Tu próxima carga está reservada: ${p.ref}, de ${p.from} a ${p.to}. Recogida ${p.pickup}. Entrega ${p.delivery}. Te mandé los detalles por mensaje.`,
+  pa: (p) => `ਤੁਹਾਡਾ ਅਗਲਾ ਲੋਡ ਬੁੱਕ ਹੋ ਗਿਆ ਹੈ: ${p.ref}, ${p.from} ਤੋਂ ${p.to}। ਪਿਕਅੱਪ ${p.pickup}। ਡਿਲੀਵਰੀ ${p.delivery}। ਪੂਰੀ ਜਾਣਕਾਰੀ ਮੈਸੇਜ ਕਰ ਦਿੱਤੀ ਹੈ।`,
+  hi: (p) => `आपका अगला लोड बुक हो गया है: ${p.ref}, ${p.from} से ${p.to}। पिकअप ${p.pickup}। डिलीवरी ${p.delivery}। पूरी जानकारी मैसेज कर दी है।`,
+  ru: (p) => `Следующий груз забронирован: ${p.ref}, из ${p.from} в ${p.to}. Загрузка ${p.pickup}. Выгрузка ${p.delivery}. Подробности отправил сообщением.`,
+  uk: (p) => `Наступний вантаж заброньовано: ${p.ref}, з ${p.from} до ${p.to}. Завантаження ${p.pickup}. Розвантаження ${p.delivery}. Деталі надіслав повідомленням.`,
+  fr: (p) => `Ton prochain voyage est réservé : ${p.ref}, de ${p.from} à ${p.to}. Chargement ${p.pickup}. Livraison ${p.delivery}. Je t'ai envoyé les détails par texto.`,
+};
+
+/** After the news on a call: the driver's say. */
+export const DOES_THAT_WORK: Record<Lang, string> = {
+  en: "Does that work for you?",
+  es: "¿Te queda bien?",
+  pa: "ਕੀ ਇਹ ਤੁਹਾਡੇ ਲਈ ਠੀਕ ਹੈ?",
+  hi: "क्या यह आपके लिए ठीक है?",
+  ru: "Тебе так подходит?",
+  uk: "Тобі так підходить?",
+  fr: "Ça te va ?",
+};
+
+/** Anything else on a call about a change. */
+export const ANY_QUESTIONS: Record<Lang, string> = {
+  en: "Any questions?",
+  es: "¿Alguna pregunta?",
+  pa: "ਕੋਈ ਸਵਾਲ ਹੈ?",
+  hi: "कोई सवाल है?",
+  ru: "Есть вопросы?",
+  uk: "Є питання?",
+  fr: "Des questions ?",
+};
+
+/** The call went to voicemail: short, and pointing to the text. */
+export const UPDATE_VOICEMAIL: Record<Lang, (first: string, carrier: string) => string> = {
+  en: (f, c) => `Hi ${f}, it's dispatch for ${c}. Something changed on your loads, and I texted you the details. Call or text back when you can.`,
+  es: (f, c) => `Hola ${f}, habla despacho de ${c}. Hubo un cambio en tus cargas y te mandé los detalles por mensaje. Llama o escribe cuando puedas.`,
+  pa: (f, c) => `ਸਤ ਸ੍ਰੀ ਅਕਾਲ ${f}, ਮੈਂ ${c} ਦਾ ਡਿਸਪੈਚ ਹਾਂ। ਤੁਹਾਡੇ ਲੋਡਾਂ ਵਿੱਚ ਕੁਝ ਬਦਲਿਆ ਹੈ, ਪੂਰੀ ਜਾਣਕਾਰੀ ਮੈਸੇਜ ਕਰ ਦਿੱਤੀ ਹੈ। ਜਦੋਂ ਹੋ ਸਕੇ ਫ਼ੋਨ ਜਾਂ ਮੈਸੇਜ ਕਰਨਾ।`,
+  hi: (f, c) => `नमस्ते ${f}, मैं ${c} का डिस्पैच हूँ। आपके लोड में कुछ बदला है, पूरी जानकारी मैसेज कर दी है। जब हो सके फ़ोन या मैसेज करें।`,
+  ru: (f, c) => `Привет, ${f}, это диспетчер ${c}. По твоим грузам есть изменения, подробности отправил сообщением. Перезвони или напиши, когда сможешь.`,
+  uk: (f, c) => `Привіт, ${f}, це диспетчер ${c}. У твоїх вантажах є зміни, деталі надіслав повідомленням. Передзвони або напиши, коли зможеш.`,
+  fr: (f, c) => `Bonjour ${f}, ici la répartition de ${c}. Il y a du changement sur tes voyages, je t'ai envoyé les détails par texto. Rappelle ou écris quand tu peux.`,
+};

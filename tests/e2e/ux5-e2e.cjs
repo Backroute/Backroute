@@ -6,6 +6,7 @@ const S = path.join(__dirname, "..");
 const ROOT = path.join(__dirname, "../..");
 const fs = require("fs");
 const { execSync } = require("child_process");
+const crypto = require("crypto");
 const { chromium } = require("playwright");
 const BASE = "http://localhost:3210";
 const ARGS = [`--proxy-server=${process.env.HTTPS_PROXY}`, "--proxy-bypass-list=localhost;127.0.0.1", "--enable-unsafe-swiftshader", "--use-angle=swiftshader", "--ignore-gpu-blocklist"];
@@ -21,6 +22,9 @@ const OWNER = token(OWNER_SUB, OWNER_PHONE);
 const DRV_SUB = "dddddddd-0000-0000-0000-000000000004", DRV_PHONE = "12145550194";
 const api = (path, { method = "GET", body, as = OWNER, redirect = "follow" } = {}) =>
   fetch(`${BASE}${path}`, { method, redirect, headers: { ...(as ? { authorization: `Bearer ${as}` } : {}), ...(body ? { "content-type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined }).then(async (r) => ({ status: r.status, location: r.headers.get("location"), body: await r.json().catch(() => ({})) }));
+// Twilio calling the app back (a call picked up), signed the way Twilio signs.
+const sign = (url, params) => crypto.createHmac("sha1", "twilio-secret").update(url + Object.keys(params).sort().map((k) => k + params[k]).join("")).digest("base64");
+const twilio = (pathAndQuery, params) => fetch(BASE + pathAndQuery, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", "x-twilio-signature": sign(BASE + pathAndQuery, params) }, body: new URLSearchParams(params) }).then((r) => r.text());
 function put(table, id, data, cols, kind) {
   db(`delete from ${table} where carrier_id = '${cid}' and id = '${id}'${kind ? ` and kind = '${kind}'` : ""}`);
   db(`insert into ${table} (id, carrier_id, ${kind ? "kind, " : ""}${Object.keys(cols).join(", ")}${Object.keys(cols).length ? ", " : ""}data) values ('${id}', '${cid}', ${kind ? `'${kind}', ` : ""}${Object.values(cols).map((v) => (v === null ? "null" : `'${v}'`)).join(", ")}${Object.keys(cols).length ? ", " : ""}'${JSON.stringify(data).replace(/'/g, "''")}'::jsonb)`);
@@ -217,14 +221,36 @@ async function waitFor(fn, ms = 20000) {
   check("a truck on a full load to Houston: the AI asks for both Houston partials for after the drop", h1?.truckId === "u5-t1" && h2?.truckId === "u5-t1" && byRef("PAH-1")?.stage === "negotiating" && byRef("PAH-2")?.stage === "negotiating", JSON.stringify([h1 && { t: h1.truckId, s: byRef("PAH-1").stage }, h2 && { t: h2.truckId, s: byRef("PAH-2").stage }]));
   r = await api("/api/agent/booked", { method: "POST", body: { loadId: h1.id } });
   t = truckData("u5-t1");
+  const callsTo = (from) => read("twilio").slice(from).filter((x) => x.path.endsWith("/Calls.json") && x.params?.To === "+12145550197");
+  const ring = callsTo(tw6);
+  check("booked: dispatch calls the driver about the next load (and texts the details)", ring.length === 1 && ring[0].params.Url.includes("/api/channels/voice/update?load=") && ring[0].params.Url.includes("kind=next_load") && ring[0].params.MachineDetection === "Enable", JSON.stringify(ring.map((x) => x.params.Url)));
   check("the first one booked waits behind the full load", r.status === 200 && byRef("PAH-1").stage === "booked" && t.currentLoadId === "u5-F1" && t.nextLoadId === h1.id && !t.trip, JSON.stringify({ stage: byRef("PAH-1").stage, cur: t.currentLoadId, next: t.nextLoadId, trip: t.trip }));
   r = await api("/api/agent/booked", { method: "POST", body: { loadId: h2.id } });
   t = truckData("u5-t1");
   const aheadIds = new Set((t.trip?.stops ?? []).map((x) => x.loadId));
   check("the second one makes a trip with it, planned for after the drop", r.status === 200 && t.trip?.stops?.length === 4 && aheadIds.has(h1.id) && aheadIds.has(h2.id) && !aheadIds.has("u5-F1") && loadData(h1.id).tripId === t.trip.id && loadData(h2.id).tripId === t.trip.id, JSON.stringify(t.trip));
   check("...the truck stays on the full load; the trip's first pickup is next", t.currentLoadId === "u5-F1" && t.nextLoadId === t.trip?.stops?.[0]?.loadId && byRef("PAH-2").stage === "booked", JSON.stringify({ cur: t.currentLoadId, next: t.nextLoadId, stage: byRef("PAH-2").stage }));
+  check("...one call for the two loads of the trip, not one each", callsTo(tw6).length === 1, callsTo(tw6).length);
   const toldAhead = read("twilio").slice(tw6).find((x) => x.params?.To === "+12145550197" && /PAH-2/.test(x.params.Body ?? ""));
   check("the driver's text says it's after the drop, and where it fits", !!toldAhead && /After you drop U5-F1: Pick it up at stop \d and drop it at stop \d of 4\./.test(toldAhead.params.Body), toldAhead?.params?.Body);
+  // Nobody picked up: three minutes later the AI calls again (the driver hasn't called or texted since).
+  db(`update channel_messages set created_at = created_at - interval '1 hour' where carrier_id = '${cid}' and driver_id = 'u5-d1'`);
+  db(`update driver_messages set created_at = created_at - interval '1 hour' where carrier_id = '${cid}' and driver_id = 'u5-d1'`);
+  db(`update agent_marks set data = data || jsonb_build_object('at', (now() - interval '4 minutes')::text) where carrier_id = '${cid}' and load_id = '${h1.id}' and kind = 'call_next_load'`);
+  const tw7 = read("twilio").length;
+  await cron();
+  check("unanswered: called back three minutes later", callsTo(tw7).length === 1 && callsTo(tw7)[0].params.Url.includes("kind=next_load"), callsTo(tw7).length);
+  await cron();
+  check("...and not again right away", callsTo(tw7).length === 1, callsTo(tw7).length);
+  const callUrl = new URL(ring[0].params.Url);
+  const vm = await twilio(callUrl.pathname + callUrl.search, { CallSid: "CA-u5-vm", From: "+14695550199", To: "+12145550197", Direction: "outbound-api", AnsweredBy: "machine_end_beep" });
+  check("voicemail: a short message that points to the text, then goodbye", /I texted you the details/.test(vm) && vm.includes("<Hangup") && !vm.includes("<Gather"), vm.slice(0, 300));
+  const picked = await twilio(callUrl.pathname + callUrl.search, { CallSid: "CA-u5-up", From: "+14695550199", To: "+12145550197", Direction: "outbound-api", AnsweredBy: "human" });
+  check("picked up: it says it's the AI dispatcher with an update, the load, and asks if it works", /AI dispatcher for .* with an update/.test(picked) && /Your next load is booked: PAH-1, Houston, TX to San Antonio, TX/.test(picked) && /Does that work for you\?/.test(picked) && picked.includes("<Gather"), picked.slice(0, 400));
+  db(`update agent_marks set data = data || jsonb_build_object('at', (now() - interval '4 minutes')::text) where carrier_id = '${cid}' and load_id = '${h1.id}' and kind = 'call_next_load'`);
+  const tw8 = read("twilio").length;
+  await cron();
+  check("answered: no more calls about it", callsTo(tw8).length === 0, callsTo(tw8).length);
   await cron();
   t = truckData("u5-t1");
   check("the owner's plan: on the full load now, the trip of 2 partials next", (t.plan?.lines ?? []).some((l) => /^Now: U5-F1 to Houston/.test(l)) && (t.plan?.lines ?? []).some((l) => /^Next: a trip of 2 partials \(PAH-/.test(l)), JSON.stringify(t.plan?.lines));

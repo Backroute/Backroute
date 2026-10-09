@@ -9,6 +9,7 @@ import type { Load, Truck } from "../types";
 import { addActivity, logChannel, save, saveDriverMessage, type CarrierContext } from "./db";
 import { event, uid } from "./dispatcher";
 import { requestBooking } from "./booking";
+import { callDriverAbout } from "./driver-calls";
 import { floorFor } from "./pricing";
 import { assessBroker } from "../broker-policy";
 import { sendOrQueue } from "./outbox";
@@ -88,6 +89,9 @@ export async function cancelLoad(ctx: CarrierContext, load: Load, reason: string
     await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: at, channel: "sms", ai: true });
     await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: to, body: text, data: { kind: "cancelled", loadId: load.id } });
   }
+  // A load the driver already had: they get a call too, so they don't drive to a pickup that isn't there.
+  if (driver && ["rate_confirmed", "booked", "dispatched", "at_pickup"].includes(load.stage))
+    await callDriverAbout(ctx, cancelled, "cancelled").catch((e) => console.error("[cancel] driver call failed", e));
 
   // TONU when the truck was already rolling to it.
   if (tonu)

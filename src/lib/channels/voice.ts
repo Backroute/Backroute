@@ -1,7 +1,8 @@
 import "server-only";
 import { forCarrier } from "../agent/scope";
 import { aiConfigured } from "../ai/server";
-import { brokerCallBack, carrierById, driverByPhone, loadContext, logChannel, ownerByPhone, threadWith, addActivity } from "../agent/db";
+import { brokerCallBack, carrierById, driverByPhone, loadContext, logChannel, marksFor, ownerByPhone, threadWith, addActivity } from "../agent/db";
+import { markAnswered, saidBefore, updateCallText, type UpdateKind } from "../agent/driver-calls";
 import { brokerCallBackOpening, brokerCallKey } from "../agent/broker-call";
 import { toE164 } from "../cloud/phone";
 import { deskOpening } from "./desk";
@@ -9,7 +10,7 @@ import { driverTurn, event, ownerTurn, passToOwner } from "../agent/dispatcher";
 import { checkinText } from "../agent/checkins";
 import type { CheckinKind, Driver, Lang } from "../types";
 import { streamTwiml, realtimeFor } from "./realtime";
-import { CHECKIN_CALL, DIDNT_HEAR, GOODBYE, GREETING, OWNER_GREETING, PASSED_ON_CALL } from "./phrases";
+import { ANY_QUESTIONS, CHECKIN_CALL, DIDNT_HEAR, DOES_THAT_WORK, GOODBYE, GREETING, OWNER_GREETING, PASSED_ON_CALL, UPDATE_CALL, UPDATE_VOICEMAIL } from "./phrases";
 import { publicUrl, say, sayAndListen, twiml } from "./twilio";
 
 /**
@@ -47,6 +48,35 @@ export async function checkinCall(request: Request, params: Record<string, strin
   const lang = driver.prefs?.language ?? "en";
   const opening = `${CHECKIN_CALL[lang](driver.name.split(" ")[0], ctx.carrier.name)} ${checkinText(kind, load, driver)}`;
   await logChannel({ carrierId, channel: "voice", direction: "out", providerId: `${params.CallSid}:greeting`, driverId: driver.id, counterparty: callKey(params.CallSid), body: opening, data: { kind: "checkin", checkin: kind, loadId } });
+  if (realtimeFor(lang)) return streamTwiml({ kind: "driver", carrier: carrierId, ref: driver.id, callSid: params.CallSid, lang, opening });
+  return twiml(sayAndListen(opening, lang, publicUrl(request, "/api/channels/voice/turn")));
+}
+
+/**
+ * A call about a change has been picked up (lib/agent/driver-calls): the news, then the driver's say, then the same
+ * conversation as any call. An answering machine gets a short message pointing to the text, and the call is tried
+ * again later.
+ */
+export async function updateCall(request: Request, params: Record<string, string>, loadId: string, kind: UpdateKind) {
+  const found = await driverByPhone(driverNumber(params));
+  if (!found) return twiml("<Hangup/>");
+  const { carrierId, driver } = found;
+  const ctx = await loadContext(carrierId);
+  const load = ctx?.loads.find((l) => l.id === loadId);
+  if (!ctx || !load) return twiml("<Hangup/>");
+  const lang = driver.prefs?.language ?? "en";
+  const first = driver.name.split(" ")[0];
+  if ((params.AnsweredBy ?? "").startsWith("machine") || params.AnsweredBy === "fax") {
+    const message = UPDATE_VOICEMAIL[lang](first, ctx.carrier.name);
+    await logChannel({ carrierId, channel: "voice", direction: "out", providerId: `${params.CallSid}:voicemail`, driverId: driver.id, counterparty: callKey(params.CallSid), body: message, data: { kind: "update_call", update: kind, loadId, voicemail: true } });
+    return twiml(`${say(message, lang)}<Hangup/>`);
+  }
+  const marks = await marksFor(carrierId);
+  await markAnswered(carrierId, loadId, kind, marks);
+  const news = updateCallText(kind, load, driver, saidBefore(marks, loadId, kind));
+  const opening = `${UPDATE_CALL[lang](first, ctx.carrier.name)} ${news} ${kind === "next_load" ? DOES_THAT_WORK[lang] : ANY_QUESTIONS[lang]}`;
+  await logChannel({ carrierId, channel: "voice", direction: "out", providerId: `${params.CallSid}:greeting`, driverId: driver.id, counterparty: callKey(params.CallSid), body: opening, data: { kind: "update_call", update: kind, loadId } });
+  await addActivity(carrierId, event({ type: "call_started", loadId, message: `AI called ${first}`, detail: `${load.referenceNumber}: ${kind === "next_load" ? "next load booked" : kind === "cancelled" ? "load cancelled" : "appointment changed"}`, severity: "info" }));
   if (realtimeFor(lang)) return streamTwiml({ kind: "driver", carrier: carrierId, ref: driver.id, callSid: params.CallSid, lang, opening });
   return twiml(sayAndListen(opening, lang, publicUrl(request, "/api/channels/voice/turn")));
 }

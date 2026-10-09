@@ -9,6 +9,7 @@ import { followUpByPhone } from "./broker-call";
 import { offerCapacity } from "./capacity";
 import { trackHomeTime, weeklyCare } from "./care";
 import { runCheckins } from "./checkins";
+import { callBacks } from "./driver-calls";
 import { complianceReminders } from "./compliance";
 import { pullStatements } from "./costs";
 import { quickbooksRound } from "./quickbooks";
@@ -45,7 +46,10 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   const url = (path: string) => `${base ?? ""}${path}`;
   const done: string[] = [];
   if (canText(ctx.carrier)) {
-    done.push(...(await runCheckins(ctx, await marksFor(id), now, (loadId, kind) => url(`/api/channels/voice/checkin?load=${encodeURIComponent(loadId)}&kind=${kind}`))));
+    const marks = await marksFor(id);
+    done.push(...(await runCheckins(ctx, marks, now, (loadId, kind) => url(`/api/channels/voice/checkin?load=${encodeURIComponent(loadId)}&kind=${kind}`))));
+    // Calls about a change that nobody picked up: tried again, three minutes apart (lib/agent/driver-calls).
+    done.push(...(await callBacks(ctx, marks, now)));
     done.push(...(await followUpByPhone(ctx, now, (loadId) => url(`/api/channels/voice/broker?carrier=${encodeURIComponent(id)}&load=${encodeURIComponent(loadId)}`))));
   }
   if (canEmail(ctx.carrier)) {

@@ -14,6 +14,8 @@ import { event, passToOwner, tellOwner, uid } from "./dispatcher";
 import { billTo } from "./paperwork";
 import { sendOrQueue } from "./outbox";
 import { forCarrier } from "./scope";
+import { callDriverAbout } from "./driver-calls";
+import { translateForDriver } from "../ai/translate";
 import * as mail from "./templates";
 
 /**
@@ -208,6 +210,11 @@ export async function setAppointment(ctx: CarrierContext, load: Load, stop: Stop
     const sid = await textTo(ctx.carrier, to, body);
     await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: body, timestamp: new Date().toISOString(), channel: "sms", ai: true });
     await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid, driverId: driver.id, counterparty: to, body, data: { kind: "appointment_set", loadId: load.id } });
+  }
+  // Moved (not just set): the driver hears it on a call, in their language.
+  if (driver && appt.purpose === "move") {
+    const said = await translateForDriver(`${saved.referenceNumber}: the ${stop} appointment moved to ${when} at ${nameOf(saved, stop)}${confirmation ? `, confirmation ${confirmation}` : ""}.`, driver.prefs?.language ?? "en");
+    await callDriverAbout(ctx, saved, "appointment", { said }).catch((e) => console.error("[appointments] driver call failed", e));
   }
   const broker = ctx.brokers.find((b) => b.id === saved.brokerId);
   const email = billTo(ctx, saved);
