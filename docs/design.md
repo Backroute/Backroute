@@ -88,20 +88,16 @@ the round arrows on its left and right edges (`components/shared/offer-rail.tsx`
 
 ## The website's motion
 
-Awwwards-style, held back to a few strong moments, and never at the cost of speed or of reading the page:
+Calm and classy: black and white, big type, the product itself as the picture, and motion only where it explains
+something. No 3D.
 
-- **The opening scene** (`components/landing/route-scene.tsx`): a dark map of US freight lanes in 3D (three.js through
-  React Three Fiber), one truck running a sample day (Memphis, Indianapolis, Kansas City, Dallas) with a green beam over
-  its next pickup. The camera leans with the mouse and lifts as the page scrolls. Shapes only, no model files. It loads
-  after the page, draws nothing while scrolled away, holds still for "reduce motion", and a flat drawing of the lanes
-  stands in where 3D can't run or the phone asked to save data. A line of what the dispatcher is doing changes under it
-  every few seconds, marked "Sample day".
+- **The top**: the headline beside the owner's phone (`components/landing/phone-preview.tsx`), with one quiet card
+  next to it that changes every few seconds to show what the dispatcher is doing for a truck (`live-feed.tsx`, marked
+  "Sample day"). The tools it works with are named underneath, in plain text.
 - **One load, start to paid** (`load-story.tsx`): the four steps stay pinned while the page scrolls, and the screen next
   to them changes with each (loads ranked, the broker call, the trip, the paid invoice). On a phone they simply stack.
 - **What does that load really pay?** (`load-math.tsx`): sliders for the rate, loaded and empty miles, diesel and mpg;
   what's kept and the rates per mile roll to their new numbers. Nothing leaves the page.
-- Cards lean toward the mouse (`TiltCard`), sections rise in as they scroll into view (`Reveal`), and the tools it works
-  with run past in a slow line (`Marquee`). All of it is off for "reduce motion" and on touch screens where it would get
-  in the way.
+- Sections rise in gently as they scroll into view (`Reveal`). All motion is off for "reduce motion".
 - Shared links show a card made by the site (`app/opengraph-image.tsx`); `sitemap.xml` and `robots.txt` list the public
   pages and keep the apps out of search. Contact: hello@backroute.pro.

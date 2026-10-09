@@ -80,7 +80,7 @@ const ARGS = [`--proxy-server=${process.env.HTTPS_PROXY}`, "--proxy-bypass-list=
   await ph.waitForTimeout(2500);
   check("the website fits a phone (no sideways scroll)", await ph.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
   check("…and leads with the new headline", /Your next load\s+is already booked\./.test(await ph.locator("h1").innerText()));
-  check("…with the lanes drawn behind it (the 3D scene, or the flat drawing where 3D can't run)", (await ph.locator("section canvas, section svg").count()) > 0);
+  check("…with no 3D scene, just the product beside it", (await ph.locator("canvas").count()) === 0 && (await ph.getByText("Good morning").count()) > 0);
   const kept = () => ph.getByText("What you keep", { exact: true }).locator("xpath=..").innerText();
   const keptBefore = await kept();
   await ph.getByLabel("The load pays").fill("4000");

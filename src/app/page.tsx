@@ -4,10 +4,10 @@ import { demoAllowed } from "@/lib/cloud/demo";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import { PhonePreview } from "@/components/landing/phone-preview";
-import { HeroVisual } from "@/components/landing/hero-visual";
+import { LiveFeed } from "@/components/landing/live-feed";
 import { LoadStory } from "@/components/landing/load-story";
 import { LoadMath } from "@/components/landing/load-math";
-import { Marquee, Reveal, TiltCard } from "@/components/landing/motion";
+import { Reveal } from "@/components/landing/motion";
 
 /** A sample day, labelled as one: what the product does, without made-up totals. */
 const DAY = [
@@ -70,19 +70,18 @@ export default function Home() {
         </div>
       </header>
 
-      <section className="theme-ink relative isolate overflow-hidden bg-black text-white">
-        <HeroVisual />
-        <div className="relative z-10 mx-auto flex min-h-[calc(100svh-4rem)] max-w-6xl flex-col justify-end px-5 pb-12 pt-[46svh] sm:px-8 lg:justify-center lg:pb-24 lg:pt-16">
-          <div className="max-w-2xl">
-            <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[13px] font-semibold text-white backdrop-blur">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--dot-live)]" /> The AI dispatcher for small fleets
+      <section className="relative overflow-hidden">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 pb-16 pt-12 sm:px-8 sm:pb-20 md:pt-20 lg:grid-cols-[1.35fr_1fr] lg:gap-10 lg:pb-28">
+          <Reveal>
+            <p className="inline-flex items-center gap-2 rounded-full bg-ink-100 px-3 py-1.5 text-[13px] font-semibold text-ink-950">
+              <span className="h-2 w-2 rounded-full bg-[var(--dot-live)]" /> The AI dispatcher for small fleets
             </p>
-            <h1 className="mt-6 text-[clamp(2.75rem,7vw,5.75rem)] font-bold leading-[0.95] tracking-[-0.035em] text-balance">
+            <h1 className="mt-6 text-[clamp(2.75rem,6.6vw,5.5rem)] font-bold leading-[0.96] tracking-[-0.035em] text-balance">
               Your next load
               <br />
               is already booked.
             </h1>
-            <p className="mt-6 max-w-xl text-[clamp(1.125rem,1.5vw,1.3125rem)] leading-[1.45] text-white/70">
+            <p className="mt-6 max-w-xl text-[clamp(1.125rem,1.5vw,1.3125rem)] leading-[1.45] text-ink-600">
               Backroute finds the load, calls the broker, books at your rate and keeps your drivers in the loop. You answer the few things that need you, from your phone.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
@@ -95,11 +94,16 @@ export default function Home() {
                 </Button>
               )}
             </div>
-          </div>
-        </div>
-        <div className="relative z-10 border-t border-white/10 py-7">
-          <p className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.14em] text-white/45">Works with</p>
-          <Marquee items={["DAT", "Truckstop", "Samsara", "Motive", "QuickBooks Online", "Your email"]} />
+            <p className="mt-10 text-sm text-ink-500">
+              Works with <span className="font-semibold text-ink-800">DAT</span>, <span className="font-semibold text-ink-800">Truckstop</span>, <span className="font-semibold text-ink-800">Samsara</span>, <span className="font-semibold text-ink-800">Motive</span> and <span className="font-semibold text-ink-800">QuickBooks Online</span>.
+            </p>
+          </Reveal>
+          <Reveal delay={0.12} className="relative">
+            <PhonePreview />
+            <div className="mt-6 flex justify-center lg:absolute lg:-left-24 lg:bottom-16 lg:mt-0 lg:block">
+              <LiveFeed />
+            </div>
+          </Reveal>
         </div>
       </section>
 
@@ -129,9 +133,9 @@ export default function Home() {
             ))}
           </ul>
         </Reveal>
-        <TiltCard className="mx-auto w-full max-w-md">
+        <div className="mx-auto w-full max-w-md">
           <SampleLoad />
-        </TiltCard>
+        </div>
       </section>
 
       <section className="border-t border-line">
@@ -167,31 +171,30 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="drivers" className="theme-ink scroll-mt-16 overflow-hidden bg-black text-white">
-        <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-14 sm:px-8 sm:py-20 md:py-28 lg:grid-cols-[1.2fr_1fr]">
+      <section id="drivers" className="theme-ink scroll-mt-16 bg-black text-white">
+        <div className="mx-auto grid max-w-6xl gap-12 px-5 py-14 sm:px-8 sm:py-20 md:py-28 lg:grid-cols-2">
           <Reveal>
             <p className="text-sm font-semibold text-white/60">For drivers</p>
             <h2 className={`${H2} mt-2`}>One dispatcher. In their language.</h2>
             <p className="mt-5 max-w-md text-lg leading-relaxed text-white/70">
               It calls when something changes, calls back when they miss it, and texts when they&apos;re off duty.
             </p>
-            <ul className="mt-10 grid gap-3 sm:grid-cols-2">
-              {[
-                { t: "Calls and texts in seven languages", b: "English, Spanish, Punjabi, Hindi, Russian, Ukrainian and French." },
-                { t: "Hands-free while driving", b: "Big buttons and voice: “I've arrived,” “running late,” “call dispatch.”" },
-                { t: "Told when plans change", b: "A moved appointment, a new load lined up, a delay: a call, not a surprise at the dock." },
-                { t: "Pay and home time on one screen", b: "No more calling the office to ask." },
-              ].map((x) => (
-                <li key={x.t} className="rounded-2xl bg-white/[0.08] p-5 transition-colors hover:bg-white/[0.12]">
+          </Reveal>
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {[
+              { t: "Calls and texts in seven languages", b: "English, Spanish, Punjabi, Hindi, Russian, Ukrainian and French." },
+              { t: "Hands-free while driving", b: "Big buttons and voice: “I've arrived,” “running late,” “call dispatch.”" },
+              { t: "Told when plans change", b: "A moved appointment, a new load lined up, a delay: a call, not a surprise at the dock." },
+              { t: "Pay and home time on one screen", b: "No more calling the office to ask." },
+            ].map((x, i) => (
+              <li key={x.t}>
+                <Reveal delay={i * 0.06} className="h-full rounded-2xl bg-white/[0.08] p-5">
                   <p className="text-[17px] font-semibold">{x.t}</p>
                   <p className="mt-1.5 text-[15px] leading-relaxed text-white/70">{x.b}</p>
-                </li>
-              ))}
-            </ul>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <PhonePreview />
-          </Reveal>
+                </Reveal>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
