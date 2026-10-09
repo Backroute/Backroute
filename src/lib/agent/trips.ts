@@ -1,9 +1,9 @@
 import "server-only";
 import { roughCoords } from "../trip-geo";
-import { insertLoad, isPartial, nextStop, restackNotes, runTrip, stopDone, TRIP_MAX, trailerOf, tripLoads, tripStops, type TripLoad, type TripRun, type TripStart } from "../trip-plan";
+import { insertLoad, isPartial, nextStop, restackNotes, runTrip, stopDone, TRIP_MAX, trailerOf, tripAhead, tripLoads, tripStops, type TripLoad, type TripRun, type TripStart } from "../trip-plan";
 import type { Item } from "../cloud/rows";
 import type { Load, Truck, TripStop } from "../types";
-import { chainOf, slotsFor } from "./chain";
+import { chainOf, doneAt, slotsFor } from "./chain";
 import { save, type CarrierContext } from "./db";
 
 /**
@@ -13,6 +13,7 @@ import { save, type CarrierContext } from "./db";
 
 const HOUR = 3600_000;
 const ON_THE_ROAD = new Set<Load["stage"]>(["dispatched", "at_pickup", "in_transit", "at_delivery"]);
+const WAITING = new Set<Load["stage"]>(["rate_confirmed", "booked"]);
 
 /** Where the truck starts from now: its ELD spot, else its city; its driving hours left when the ELD knows them. */
 function startOf(ctx: Pick<CarrierContext, "drivers">, truck: Truck, onboard: Load[], now: number): TripStart {
@@ -21,15 +22,34 @@ function startOf(ctx: Pick<CarrierContext, "drivers">, truck: Truck, onboard: Lo
   return { at, time: now, ...(truck.position && driver ? { driveLeft: Math.max(0, Math.min(11, driver.hoursRemaining)) } : {}), onboard };
 }
 
-/** The trip as it stands: the stops still to make, and the loads on it (a partial the truck is on counts as a trip of one). */
-function tripNow(ctx: Pick<CarrierContext, "loads">, truck: Truck): { order: TripStop[]; loads: Load[] } | null {
+/** Where a trip planned ahead starts: where the full load before it delivers, two hours after its delivery time. */
+function aheadStart(full: Load): TripStart | null {
+  const done = doneAt(full);
+  const at = roughCoords(full.lane.destination, full.lane.destState)?.at ?? null;
+  return done && at ? { at, time: done + 2 * HOUR, onboard: [] } : null;
+}
+
+/**
+ * The trip as it stands: the stops still to make, and the loads on it (a partial the truck is on counts as a trip of
+ * one). On a full load, the trip after it (`ahead`): one planned already, or a lone partial booked to follow it that
+ * the next partial can join.
+ */
+function tripNow(ctx: Pick<CarrierContext, "loads">, truck: Truck, now: number): { order: TripStop[]; loads: Load[]; ahead?: Load } | null {
+  const planned = tripAhead(truck, ctx.loads);
   if (truck.trip) {
     const left = tripStops(truck, ctx.loads).filter((s) => !s.done);
-    if (left.length) return { order: left.map((s) => s.stop), loads: tripLoads(truck, ctx.loads) };
+    if (left.length) return { order: left.map((s) => s.stop), loads: tripLoads(truck, ctx.loads), ...(planned ? { ahead: planned } : {}) };
   }
   const current = ctx.loads.find((l) => l.id === truck.currentLoadId && l.truckId === truck.id && ON_THE_ROAD.has(l.stage));
   if (!current) return { order: [], loads: [] };
-  if (!isPartial(current)) return null; // A full load fills the trailer.
+  if (!isPartial(current)) {
+    // A full load fills the trailer: a trip can only follow it, built on the one partial booked after it (or the
+    // partials the AI is asking for, with nothing booked after it).
+    const behind = chainOf(ctx.loads, truck, now).filter((l) => l.id !== current.id);
+    if (!behind.length) return { order: [], loads: [], ahead: current };
+    const lone = behind.length === 1 && WAITING.has(behind[0].stage) && isPartial(behind[0]) ? behind[0] : null;
+    return lone ? { order: [{ loadId: lone.id, kind: "pickup" }, { loadId: lone.id, kind: "delivery" }], loads: [lone], ahead: current } : null;
+  }
   const order: TripStop[] = [...(stopDone(current, "pickup") ? [] : [{ loadId: current.id, kind: "pickup" as const }]), { loadId: current.id, kind: "delivery" as const }];
   return { order, loads: [current] };
 }
@@ -41,6 +61,8 @@ export interface TripFit {
   extra: number;
   /** The miles the trip adds, all in, for its fuel. */
   added: number;
+  /** A trip planned ahead: the full load the truck is on, which it starts after. */
+  after?: string;
 }
 
 /**
@@ -50,14 +72,15 @@ export interface TripFit {
  */
 export function tripFit(ctx: Pick<CarrierContext, "loads" | "drivers">, truck: Truck, load: TripLoad, now = Date.now()): TripFit | null {
   if (!isPartial(load) || load.equipmentType !== truck.equipmentType) return null;
-  const trip = tripNow(ctx, truck);
+  const trip = tripNow(ctx, truck, now);
   if (!trip) return null;
   // Partials the AI is still asking for on this truck are planned in as if they'll come through.
   const asking = ctx.loads.filter((l) => l.truckId === truck.id && l.stage === "negotiating" && l.id !== load.id && isPartial(l) && !trip.loads.some((x) => x.id === l.id));
   const all = [...trip.loads.filter((l) => l.id !== load.id), ...asking];
   if (!all.length || all.length + 1 > TRIP_MAX) return null;
   const onboard = trip.loads.filter((l) => stopDone(l, "pickup") && !stopDone(l, "delivery"));
-  const start = startOf(ctx, truck, onboard, now);
+  const start = trip.ahead ? aheadStart(trip.ahead) : startOf(ctx, truck, onboard, now);
+  if (!start) return null;
   const trailer = trailerOf(truck);
   const byId = new Map<string, TripLoad>(all.map((l) => [l.id, l]));
   let order = trip.order.filter((s) => s.loadId !== load.id);
@@ -72,11 +95,11 @@ export function tripFit(ctx: Pick<CarrierContext, "loads" | "drivers">, truck: T
   if (!placed) return null;
   // What's lined up after the trip still has to be made: the last drop, plus two hours, before its pickup.
   const onTrip = new Set([...all.map((l) => l.id), load.id]);
-  const after = chainOf(ctx.loads, truck, now).find((l) => !onTrip.has(l.id));
+  const after = chainOf(ctx.loads, truck, now).find((l) => !onTrip.has(l.id) && l !== trip.ahead);
   const end = placed.run.etas[placed.run.etas.length - 1];
   if (after?.pickupAt && end && end + 3.5 * HOUR > Date.parse(after.pickupAt)) return null;
   const added = Math.round(placed.run.miles - (order.length ? before.miles : 0));
-  return { order: placed.order, run: placed.run, extra: added - load.lane.miles, added };
+  return { order: placed.order, run: placed.run, extra: added - load.lane.miles, added, ...(trip.ahead ? { after: trip.ahead.id } : {}) };
 }
 
 /** A partial booked onto a free truck starts a trip of one, so the next partial on the way can join it. */
@@ -87,8 +110,9 @@ export function newTrip(load: Load): Truck["trip"] {
 /** The trip once the load is on it: the stops already made stay at the front, so "stop 3 of 8" keeps meaning the same. */
 export function tripWith(ctx: Pick<CarrierContext, "loads">, truck: Truck, fit: TripFit): NonNullable<Truck["trip"]> {
   const made = truck.trip ? tripStops(truck, ctx.loads).filter((s) => s.done).map((s) => s.stop) : [];
-  // A trip of one made from a partial the truck was already on: its pickup is behind it.
-  const current = !truck.trip ? ctx.loads.find((l) => l.id === truck.currentLoadId) : undefined;
+  // A trip of one made from a partial the truck was already on: its pickup is behind it. (Not the full load before a
+  // trip planned ahead.)
+  const current = !truck.trip && !fit.after ? ctx.loads.find((l) => l.id === truck.currentLoadId) : undefined;
   const madeHere = current && stopDone(current, "pickup") ? [{ loadId: current.id, kind: "pickup" as const }] : [];
   const notes = restackNotes(fit.run);
   return { id: truck.trip?.id ?? `trip-${truck.id}-${Date.now().toString(36)}`, stops: [...made, ...madeHere, ...fit.order], at: new Date().toISOString(), ...(notes.length ? { warnings: notes } : {}) };
@@ -131,7 +155,8 @@ export async function followTrip(ctx: CarrierContext, truck: Truck): Promise<Tru
  * "loadId:delivery"). Null without a trip or a fresh ELD position: a guess from the city isn't enough to call a stop late.
  */
 export function tripEtas(ctx: Pick<CarrierContext, "loads" | "drivers">, truck: Truck, now: number): Map<string, number> | null {
-  if (!truck.trip || !truck.position || now - Date.parse(truck.position.at) > 30 * 60_000) return null;
+  // A trip planned ahead hasn't started: the truck is on the full load before it.
+  if (!truck.trip || !truck.position || now - Date.parse(truck.position.at) > 30 * 60_000 || tripAhead(truck, ctx.loads)) return null;
   const left = tripStops(truck, ctx.loads).filter((s) => !s.done);
   if (!left.length) return null;
   const onboard = tripLoads(truck, ctx.loads).filter((l) => stopDone(l, "pickup"));

@@ -71,6 +71,12 @@ function brokerMail(text) {
       offer({ loadNumber: "PRT-2", originCity: "Dallas", originState: "TX", destinationCity: "Houston", destinationState: "TX", pickupLocal: day(2, "07:00"), deliveryLocal: day(2, "21:00"), equipment: "Dry van", rate: 600, miles: 240, weight: 9000, partial: true, pallets: null, lengthFeet: 14 }),
       offer({ loadNumber: "FULL-9", originCity: "Dallas", originState: "TX", destinationCity: "Houston", destinationState: "TX", pickupLocal: day(2, "08:00"), deliveryLocal: day(2, "16:00"), equipment: "Dry van", rate: 1200, miles: 240, weight: 40000, partial: false }),
     ] };
+  // Partials out of Houston for a truck still on its way there with a full load.
+  if (/partials out of houston/i.test(text))
+    return { ...base, kind: "load_offers", offers: [
+      offer({ loadNumber: "PAH-1", originCity: "Houston", originState: "TX", destinationCity: "San Antonio", destinationState: "TX", pickupLocal: day(2, "08:00"), deliveryLocal: day(2, "18:00"), equipment: "Dry van", rate: 700, miles: 200, weight: 7000, partial: true, pallets: 10, lengthFeet: null }),
+      offer({ loadNumber: "PAH-2", originCity: "Houston", originState: "TX", destinationCity: "Austin", destinationState: "TX", pickupLocal: day(2, "10:00"), deliveryLocal: day(2, "22:00"), equipment: "Dry van", rate: 650, miles: 165, weight: 8000, partial: true, pallets: null, lengthFeet: 12 }),
+    ] };
   // Two loads that chain: drop in Houston, reload there the same evening.
   if (/back to back loads/i.test(text))
     return { ...base, kind: "load_offers", offers: [

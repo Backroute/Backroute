@@ -480,18 +480,20 @@ export async function bookIt(ctx: CarrierContext, load: Load, rate?: number): Pr
   const agreed = rate ?? load.rateConReading?.totalRate ?? load.bookRequest?.brokerOffer ?? load.bookRequest?.ask ?? load.targetRate;
   const free = truck && !truck.currentLoadId;
   // A partial joins the truck's trip when it fits (pickups and drops in the best order), or starts one on a free truck.
+  // On a full load, partials can make a trip planned ahead: it waits behind that load.
   const joins = truck && !free && isPartial(load) ? tripFit({ ...ctx, loads: ctx.loads.filter((l) => l.id === load.id || l.stage !== "negotiating") }, truck, load) : null;
+  const rolling = joins && !joins.after;
   // The rate con names the docks: their hours (from drivers' notes) and the holidays are checked again.
   const warnings = await scheduleWarnings(load, truck, ctx.carrier.id, ctx.drivers.find((d) => d.id === truck?.driverId), undefined, ctx.loads).catch(() => load.scheduleWarnings ?? []);
   const newlyHard = warnings.filter((w) => w.hard && !(load.scheduleWarnings ?? []).some((x) => x.text === w.text));
   const booked: Load = {
     ...load,
     ...(warnings.length ? { scheduleWarnings: warnings } : {}),
-    stage: free || joins ? "dispatched" : "booked",
+    stage: free || rolling ? "dispatched" : "booked",
     bookedRate: agreed,
     targetRate: agreed,
-    isChained: !free && !joins,
-    progressPct: free || joins ? 5 : 0,
+    isChained: !free && !rolling,
+    progressPct: free || rolling ? 5 : 0,
     updatedAt: at,
     bookRequest: load.bookRequest ? { ...load.bookRequest, status: "accepted" } : undefined,
   };
@@ -510,8 +512,11 @@ export async function bookIt(ctx: CarrierContext, load: Load, rate?: number): Pr
   let truckAfter: Truck | undefined;
   if (truck) {
     // On a load: this one is next, unless one is already next (then it waits behind it in the lineup, lib/agent/chain).
-    // On a trip: the truck works the load at its next stop.
-    truckAfter = trip
+    // On a trip: the truck works the load at its next stop. A trip planned ahead waits behind the load the truck is on,
+    // its first pickup next.
+    truckAfter = trip && joins?.after
+      ? { ...truck, trip, nextLoadId: nextStop({ trip }, ctx.loads)?.load.id ?? load.id }
+      : trip
       ? { ...truck, trip, currentLoadId: nextStop({ trip }, ctx.loads)?.load.id ?? load.id, status: "on_load" }
       : free
         ? { ...truck, currentLoadId: load.id, status: "on_load" }
@@ -526,7 +531,8 @@ export async function bookIt(ctx: CarrierContext, load: Load, rate?: number): Pr
   await addActivity(ctx.carrier.id, event({ type: "booked", loadId: load.id, message: `Booked: ${load.lane.origin} → ${load.lane.destination}`, detail: `${truck?.unitNumber ?? ""} · $${agreed.toLocaleString()}`, severity: "success" }));
   if (newlyHard.length) await passToOwner(ctx, { reason: `Heads-up on ${load.referenceNumber}: ${newlyHard.map((w) => w.text).join(" ")}`, loadId: load.id, label: "Checked", source: "email", to: "owner" });
   // Riding along: the driver hears where it fits in the trip, and about any freight that has to be moved to get it out.
-  const tripNote = joins && trip ? [`${stopsLine(trip, load.id)}`, ...(trip.warnings ?? []).filter((w) => w.includes(load.referenceNumber))].join(" ") : undefined;
+  const before = joins?.after ? ctx.loads.find((l) => l.id === joins.after) : undefined;
+  const tripNote = joins && trip ? [`${before ? `After you drop ${before.referenceNumber}: ` : ""}${stopsLine(trip, load.id)}`, ...(trip.warnings ?? []).filter((w) => w.includes(load.referenceNumber))].join(" ") : undefined;
   await textNewLoad(ctx, booked, tripNote).catch((e) => console.error("[booking] new-load text failed", e));
   return { load: booked, truck: truckAfter };
 }

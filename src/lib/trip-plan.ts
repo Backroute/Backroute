@@ -112,6 +112,18 @@ export function nextStop(truck: Pick<Truck, "trip">, loads: Load[]): { stop: Tri
   return i < 0 ? null : { stop: stops[i].stop, load: stops[i].load, index: i + 1, total: stops.length };
 }
 
+const BOOKED_OR_ROLLING = new Set<LoadStage>(["rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery"]);
+
+/**
+ * A trip planned ahead: partials booked to share the trailer after the full load the truck is on now. Its stops start
+ * when that load drops. Returns the load the truck is on, or null when the trip (if any) is the run the truck is on.
+ */
+export function tripAhead(truck: Pick<Truck, "trip" | "currentLoadId">, loads: Load[]): Load | null {
+  if (!truck.trip || !truck.currentLoadId || truck.trip.stops.some((s) => s.loadId === truck.currentLoadId)) return null;
+  const on = loads.find((l) => l.id === truck.currentLoadId);
+  return on && BOOKED_OR_ROLLING.has(on.stage) ? on : null;
+}
+
 /** The loads on the truck's trip that still have a stop to make. */
 export function tripLoads(truck: Pick<Truck, "trip">, loads: Load[]): Load[] {
   const seen = new Set<string>();

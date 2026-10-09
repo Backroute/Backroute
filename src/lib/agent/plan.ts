@@ -6,7 +6,7 @@ import type { Load, Truck } from "../types";
 import { save, type CarrierContext } from "./db";
 import { when } from "./templates";
 import { chainOf, chainEnd, slotsFor } from "./chain";
-import { nextStop, tripLoads } from "../trip-plan";
+import { nextStop, tripAhead, tripLoads } from "../trip-plan";
 
 /**
  * The plan a dispatcher keeps in their head for each truck, written down: what it's on, what's lined up next (or
@@ -20,9 +20,12 @@ function planFor(ctx: Pick<CarrierContext, "loads" | "drivers">, truck: Truck, n
   const lines: string[] = [];
   const current = ctx.loads.find((l) => l.id === truck.currentLoadId && ROLLING.has(l.stage));
   // What's lined up after it, in pickup order (lib/agent/chain): up to three loads ahead.
-  const stop = nextStop(truck, ctx.loads);
+  // A trip planned ahead (partials after the full load it's on) is what's next, not what it's on.
+  const ahead = tripAhead(truck, ctx.loads);
+  const stop = ahead ? null : nextStop(truck, ctx.loads);
   const onTrip = new Set(stop ? tripLoads(truck, ctx.loads).map((l) => l.id) : []);
-  const lined = chainOf(ctx.loads, truck).filter((l) => l !== current && l.id !== truck.currentLoadId && !onTrip.has(l.id));
+  const aheadLoads = ahead ? tripLoads(truck, ctx.loads) : [];
+  const lined = chainOf(ctx.loads, truck).filter((l) => l !== current && l.id !== truck.currentLoadId && !onTrip.has(l.id) && !aheadLoads.includes(l));
   const next = lined[0];
   const chasing = ctx.loads.find((l) => l.truckId === truck.id && l.stage === "negotiating");
   const offered = ctx.loads.filter((l) => l.truckId === truck.id && l.stage === "offered").length;
@@ -36,9 +39,11 @@ function planFor(ctx: Pick<CarrierContext, "loads" | "drivers">, truck: Truck, n
   } else if (current) lines.push(`Now: ${current.referenceNumber} to ${current.lane.destination}, ${current.lane.destState}, delivering ${at(current.deliveryAt, current.lane.destState, current.deliveryWindow)}.`);
   else if (truck.status !== "maintenance")
     lines.push(truck.repositionTo && Date.parse(truck.repositionTo.at) > now - 86400_000 ? `Empty, heading to ${truck.repositionTo.city}, ${truck.repositionTo.state} where the freight is.` : `Empty in ${truck.currentCity}, ${truck.currentState}.`);
-  if (next) lines.push(`Next: ${next.referenceNumber}, ${next.lane.origin} → ${next.lane.destination}, picks up ${at(next.pickupAt, next.lane.originState, next.pickupWindow)}.`);
+  const firstUp = ahead ? nextStop(truck, ctx.loads)?.load : undefined;
+  if (firstUp) lines.push(`Next: a trip of ${aheadLoads.length} partial${aheadLoads.length === 1 ? "" : "s"} (${aheadLoads.map((l) => l.referenceNumber).join(", ")}), first pickup ${firstUp.referenceNumber} in ${firstUp.lane.origin}, ${firstUp.lane.originState}, ${at(firstUp.pickupAt, firstUp.lane.originState, firstUp.pickupWindow)}.`);
+  if (next) lines.push(`${firstUp ? "Then" : "Next"}: ${next.referenceNumber}, ${next.lane.origin} → ${next.lane.destination}, picks up ${at(next.pickupAt, next.lane.originState, next.pickupWindow)}.`);
   for (const then of lined.slice(1)) lines.push(`Then: ${then.referenceNumber}, ${then.lane.origin} → ${then.lane.destination}, picks up ${at(then.pickupAt, then.lane.originState, then.pickupWindow)}.`);
-  if (next && chasing) lines.push(`Also asking for ${chasing.lane.origin} → ${chasing.lane.destination} at $${(chasing.bookRequest?.ask ?? chasing.targetRate).toLocaleString()}, after that.`);
+  if ((next || firstUp) && chasing) lines.push(`Also asking for ${chasing.lane.origin} → ${chasing.lane.destination} at $${(chasing.bookRequest?.ask ?? chasing.targetRate).toLocaleString()}, after that.`);
   else if (chasing) lines.push(`Next: asking ${chasing.lane.origin} → ${chasing.lane.destination} at $${(chasing.bookRequest?.ask ?? chasing.targetRate).toLocaleString()}, waiting on the broker.`);
   else if (truck.status !== "maintenance") {
     const end = chainEnd(ctx.loads, truck);

@@ -133,6 +133,36 @@ const etas = tripEtas({ loads: tl({ a: "in_transit" }), drivers: [] } as any, { 
 ok("trip ETAs: the last drop comes after the Waco stops", !!etas && etas.get("a:delivery")! > etas.get("c:pickup")! && etas.get("c:pickup")! > now, etas && [...etas.entries()].map(([k, v]) => [k, iso(v)]));
 ok("no fresh ELD position: no trip ETAs (a guess isn't enough)", tripEtas({ loads: tl({}), drivers: [] } as any, truck, now) === null);
 
+// Partials planned ahead: a trip that waits behind the full load the truck is on
+const F = { ...P("f1", lane("Dallas", "TX", "Houston", "TX", 240), { partial: undefined }), stage: "in_transit", deliveryAt: iso(now + 5 * H) };
+const W = P("w1", lane("Houston", "TX", "San Antonio", "TX", 200), { stage: "booked", pickupAt: iso(now + 9 * H) });
+const X = P("x1", lane("Houston", "TX", "Austin", "TX", 165), { stage: "offered", pickupAt: iso(now + 10.5 * H) });
+const onFull = { ...truck, trip: undefined, currentLoadId: "f1", nextLoadId: "w1" };
+const ctxF = { loads: [F, W], drivers: [{ id: "d1", hoursRemaining: 11 }] } as any;
+const fitX = tripFit(ctxF, onFull, X, now);
+ok("ahead: on a full load with a partial booked after it, the next partial joins that one (a trip after the drop)", !!fitX && fitX.after === "f1" && fitX.order.length === 4, fitX && { after: fitX.after, order: fitX.order });
+ok("...planned from Houston, after the full load delivers", !!fitX && fitX.run.etas[0] >= now + 5 * H, fitX && fitX.run.etas.map(iso));
+const tripX = fitX ? tripWith(ctxF, onFull, fitX) : null;
+ok("...the trip's stops are the partials only (the full load isn't on it)", !!tripX && tripX.stops.length === 4 && !tripX.stops.some((x) => x.loadId === "f1"), tripX?.stops);
+ok("ahead: no trip with nothing booked behind the full load (a single partial chains the usual way)", tripFit({ ...ctxF, loads: [F] }, { ...onFull, nextLoadId: null }, X, now) === null);
+const askingW = tripFit({ ...ctxF, loads: [F, { ...W, stage: "negotiating" }] }, { ...onFull, nextLoadId: null }, X, now);
+ok("ahead: two partials asked for at once behind a full load can make the trip", !!askingW && askingW.after === "f1" && askingW.order.length === 4, askingW && askingW.order);
+ok("ahead: not with a full load lined up behind it too", tripFit({ ...ctxF, loads: [F, W, { ...P("g2", lane("Austin", "TX", "Dallas", "TX", 195), { partial: undefined }), stage: "booked", pickupAt: iso(now + 40 * H) }] }, onFull, X, now) === null);
+const tAhead = { ...onFull, trip: tripX };
+const aheadLoads: any[] = [F, { ...W, tripId: tripX?.id }, { ...X, stage: "booked", tripId: tripX?.id }];
+const firstPick = tripX?.stops[0].loadId;
+ok("ahead: the truck stays on the full load; the trip's first pickup is next", chainOf(aheadLoads, tAhead, now)[0].id === "f1" && slotsFor(aheadLoads, tAhead, now).currentLoadId === "f1" && slotsFor(aheadLoads, tAhead, now).nextLoadId === firstPick && !!slotsFor(aheadLoads, tAhead, now).trip, slotsFor(aheadLoads, tAhead, now));
+ok("ahead: the full load and the trip count as two lined up", linedUp(aheadLoads, tAhead, now) === 2, linedUp(aheadLoads, tAhead, now));
+const lastDrop = tripX?.stops[tripX.stops.length - 1].loadId;
+ok("ahead: the truck ends at the trip's last drop", chainEnd(aheadLoads, tAhead, now)?.id === lastDrop, chainEnd(aheadLoads, tAhead, now)?.id);
+ok("ahead: no trip ETAs from where the truck is now", tripEtas({ loads: aheadLoads, drivers: [] } as any, { ...tAhead, position: { lat: DALLAS[0], lon: DALLAS[1], at: iso(now), source: "samsara" } }, now) === null);
+const Y = P("y1", lane("Houston", "TX", "San Antonio", "TX", 200), { stage: "offered", pickupAt: iso(now + 12 * H), partial: { feet: 8 } });
+const fitY = tripFit({ ...ctxF, loads: aheadLoads }, tAhead, Y, now);
+ok("ahead: a third partial joins the planned trip", !!fitY && fitY.after === "f1" && fitY.order.length === 6, fitY && fitY.order);
+const dropped = aheadLoads.map((l) => (l.id === "f1" ? { ...l, stage: "delivered" } : l));
+const moved = slotsFor(dropped, { ...tAhead, currentLoadId: null }, now);
+ok("the full load delivered: the trip starts, the truck on its first pickup", moved.currentLoadId === firstPick && !!moved.trip && moved.status === "on_load", moved);
+
 // Pricing a partial
 const fl = floorFor({ lane: { miles: 400 } as any, partial: { feet: 13 } }, { minRpm: 3 } as any);
 ok("floor for a quarter of the trailer: 35% of a full load's (the least a partial goes for)", fl === 425, fl);

@@ -205,6 +205,36 @@ async function waitFor(fn, ms = 20000) {
   check("...once", !read("qbo").slice(q2).some((x) => x.kind === "void" || x.kind === "update"));
   await api("/api/integrations/quickbooks", { method: "DELETE" });
 
+  // ── Partials planned ahead: a trip after the full load the truck is on ───────
+  put("loads", "u5-L3", { ...loadData("u5-L3"), stage: "delivered" }, { truck_id: "u5-t1", stage: "delivered" });
+  put("loads", "u5-F1", load("u5-F1", "U5-F1", "u5-t1", { origin: "Dallas", originState: "TX", destination: "Houston", destState: "TX", miles: 240 }, { deliveryAt: iso(12), weight: 40000 }), { truck_id: "u5-t1", stage: "in_transit" });
+  put("trucks", "u5-t1", { ...truckData("u5-t1"), status: "on_load", currentLoadId: "u5-F1", nextLoadId: null, trip: undefined, parking: undefined, position: { lat: 32.7767, lon: -96.797, at: iso(0), source: "samsara", description: "I-45, Dallas, TX" } }, { unit_number: "U51", driver_id: "u5-d1" });
+  db(`delete from loads where carrier_id = '${cid}' and data->>'referenceNumber' in ('PAH-1','PAH-2')`);
+  const tw6 = read("twilio").length;
+  await email("Partials out of Houston", "Partials out of Houston: 10 pallets to San Antonio $700, 12 ft to Austin $650.");
+  const h1 = await waitFor(() => byRef("PAH-1"));
+  const h2 = await waitFor(() => byRef("PAH-2"));
+  check("a truck on a full load to Houston: the AI asks for both Houston partials for after the drop", h1?.truckId === "u5-t1" && h2?.truckId === "u5-t1" && byRef("PAH-1")?.stage === "negotiating" && byRef("PAH-2")?.stage === "negotiating", JSON.stringify([h1 && { t: h1.truckId, s: byRef("PAH-1").stage }, h2 && { t: h2.truckId, s: byRef("PAH-2").stage }]));
+  r = await api("/api/agent/booked", { method: "POST", body: { loadId: h1.id } });
+  t = truckData("u5-t1");
+  check("the first one booked waits behind the full load", r.status === 200 && byRef("PAH-1").stage === "booked" && t.currentLoadId === "u5-F1" && t.nextLoadId === h1.id && !t.trip, JSON.stringify({ stage: byRef("PAH-1").stage, cur: t.currentLoadId, next: t.nextLoadId, trip: t.trip }));
+  r = await api("/api/agent/booked", { method: "POST", body: { loadId: h2.id } });
+  t = truckData("u5-t1");
+  const aheadIds = new Set((t.trip?.stops ?? []).map((x) => x.loadId));
+  check("the second one makes a trip with it, planned for after the drop", r.status === 200 && t.trip?.stops?.length === 4 && aheadIds.has(h1.id) && aheadIds.has(h2.id) && !aheadIds.has("u5-F1") && loadData(h1.id).tripId === t.trip.id && loadData(h2.id).tripId === t.trip.id, JSON.stringify(t.trip));
+  check("...the truck stays on the full load; the trip's first pickup is next", t.currentLoadId === "u5-F1" && t.nextLoadId === t.trip?.stops?.[0]?.loadId && byRef("PAH-2").stage === "booked", JSON.stringify({ cur: t.currentLoadId, next: t.nextLoadId, stage: byRef("PAH-2").stage }));
+  const toldAhead = read("twilio").slice(tw6).find((x) => x.params?.To === "+12145550197" && /PAH-2/.test(x.params.Body ?? ""));
+  check("the driver's text says it's after the drop, and where it fits", !!toldAhead && /After you drop U5-F1: Pick it up at stop \d and drop it at stop \d of 4\./.test(toldAhead.params.Body), toldAhead?.params?.Body);
+  await cron();
+  t = truckData("u5-t1");
+  check("the owner's plan: on the full load now, the trip of 2 partials next", (t.plan?.lines ?? []).some((l) => /^Now: U5-F1 to Houston/.test(l)) && (t.plan?.lines ?? []).some((l) => /^Next: a trip of 2 partials \(PAH-/.test(l)), JSON.stringify(t.plan?.lines));
+  // Dropped in Houston: the trip starts.
+  put("loads", "u5-F1", { ...loadData("u5-F1"), stage: "delivered" }, { truck_id: "u5-t1", stage: "delivered" });
+  await cron();
+  t = truckData("u5-t1");
+  check("the full load delivered: the truck is on the trip's first pickup", !!t.trip && t.currentLoadId === t.trip.stops[0].loadId && t.status === "on_load", JSON.stringify({ cur: t.currentLoadId, trip: t.trip?.stops }));
+  db(`delete from loads where carrier_id = '${cid}' and data->>'referenceNumber' in ('PAH-1','PAH-2')`);
+
   // ── Two emailed loads booked back to back ────────────────────────────────────
   // The owner approves each booking (ask), so both wait as offers for the empty truck in Dallas.
   db(`update carriers set settings = settings || '{"autonomy":"ask"}'::jsonb where id = '${cid}'`);

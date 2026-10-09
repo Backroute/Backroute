@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Check } from "lucide-react";
-import { tripLoads, tripStops } from "@/lib/trip-plan";
+import { tripAhead, tripLoads, tripStops } from "@/lib/trip-plan";
 import type { Load, Truck } from "@/lib/types";
 import { useMounted } from "@/lib/hooks";
 import { stopDates, type StopWhen } from "@/lib/load-dates";
@@ -13,19 +13,21 @@ const whenText = (w: StopWhen | undefined, raw: string) => (w?.date ? [w.date, w
 /**
  * A multi-load trip on the driver's screen: every pickup and drop in the order the AI planned them, the one they're
  * heading to marked, each opening its own load (paperwork, times, directions). Restacks to plan for are said up top.
+ * A trip planned for after the full load they're on shows as their next trip, nothing marked yet.
  */
 export function TripStops({ truck, loads, hrefFor }: { truck: Truck; loads: Load[]; hrefFor: (loadId: string) => string }) {
   const stops = tripStops(truck, loads);
   const mounted = useMounted();
   const on = tripLoads(truck, loads);
   if (stops.length < 3 || !on.length) return null;
-  const nextAt = stops.findIndex((s) => !s.done);
+  const before = tripAhead(truck, loads);
+  const nextAt = before ? -1 : stops.findIndex((s) => !s.done);
   return (
-    <section className="rounded-3xl border border-line p-5" aria-label="Your trip">
+    <section className="rounded-3xl border border-line p-5" aria-label={before ? "Your next trip" : "Your trip"}>
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-xs font-medium uppercase tracking-wider text-ink-400">Your trip</h2>
+        <h2 className="text-xs font-medium uppercase tracking-wider text-ink-400">{before ? "Your next trip" : "Your trip"}</h2>
         <span className="text-xs text-ink-500">
-          {new Set(stops.map((s) => s.load.id)).size} loads · stop {nextAt + 1} of {stops.length}
+          {new Set(stops.map((s) => s.load.id)).size} loads · {before ? `after you drop ${before.referenceNumber}` : `stop ${nextAt + 1} of ${stops.length}`}
         </span>
       </div>
       {truck.trip?.warnings?.map((w) => (

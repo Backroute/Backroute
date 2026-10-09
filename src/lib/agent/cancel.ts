@@ -42,14 +42,21 @@ export async function cancelLoad(ctx: CarrierContext, load: Load, reason: string
   // Off the truck: its next load (if any) moves up.
   const truck = ctx.trucks.find((t) => t.id === load.truckId);
   let freed: Truck | undefined;
-  if (truck?.trip && truck.trip.stops.some((s) => s.loadId === load.id)) {
+  if (truck?.trip && (truck.trip.stops.some((s) => s.loadId === load.id) || truck.currentLoadId === load.id)) {
     // Off a multi-load trip: its stops come out, the rest of the trip keeps its order, and the truck heads to the
-    // next stop (lib/trip-plan). A trip with nothing left is over.
+    // next stop (lib/trip-plan). A trip with nothing left is over. The full load before a trip planned ahead: the trip
+    // starts now.
     const trip = { ...truck.trip, stops: truck.trip.stops.filter((s) => s.loadId !== load.id), warnings: truck.trip.warnings?.filter((w) => !w.includes(load.referenceNumber)) };
     freed = { ...truck, trip, ...slotsFor(ctx.loads, { ...truck, trip }) };
     if (!freed.trip) delete freed.trip;
     await save("trucks", ctx.carrier.id, freed as unknown as Item);
     ctx.trucks = ctx.trucks.map((t) => (t.id === truck.id ? freed! : t));
+    const first = truck.currentLoadId === load.id ? ctx.loads.find((l) => l.id === freed!.currentLoadId && l.stage === "booked") : undefined;
+    if (first) {
+      const p: Load = { ...first, stage: "dispatched", isChained: false, updatedAt: at };
+      await save("loads", ctx.carrier.id, p as unknown as Item);
+      ctx.loads = ctx.loads.map((l) => (l.id === p.id ? p : l));
+    }
   } else if (truck && (truck.currentLoadId === load.id || truck.nextLoadId === load.id)) {
     // Whatever's lined up behind it moves up (lib/agent/chain): the next load becomes current, the one after it next.
     const behind = chainOf(ctx.loads, { ...truck, currentLoadId: null }).filter((l) => l.id !== truck.currentLoadId);
