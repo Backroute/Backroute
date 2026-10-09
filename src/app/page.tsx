@@ -4,14 +4,10 @@ import { demoAllowed } from "@/lib/cloud/demo";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import { PhonePreview } from "@/components/landing/phone-preview";
-
-/** What it does, in the order a load goes: found, priced, moved, and the owner's say over all of it. */
-const STEPS = [
-  { title: "Finds the load", body: "Every board and every broker email, checked all day. Ranked by what you keep after fuel, tolls and empty miles." },
-  { title: "Gets your rate", body: "It calls and emails brokers the way a good dispatcher does, and never goes below the floor you set." },
-  { title: "Keeps the truck moving", body: "Check calls, appointments, paperwork and invoices, with the next load lined up before this one delivers." },
-  { title: "You stay in charge", body: "Choose how much it decides alone. Everything else waits for one tap on your phone." },
-];
+import { HeroVisual } from "@/components/landing/hero-visual";
+import { LoadStory } from "@/components/landing/load-story";
+import { LoadMath } from "@/components/landing/load-math";
+import { Marquee, Reveal, TiltCard } from "@/components/landing/motion";
 
 /** A sample day, labelled as one: what the product does, without made-up totals. */
 const DAY = [
@@ -74,52 +70,52 @@ export default function Home() {
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-6xl items-center gap-10 px-5 pb-14 pt-10 sm:gap-14 sm:px-8 sm:pb-20 md:pt-20 lg:grid-cols-[1.5fr_1fr] lg:gap-12 lg:pb-24">
-        <div>
-          <p className="inline-flex items-center gap-2 rounded-full bg-ink-100 px-3 py-1.5 text-[13px] font-semibold text-ink-950">
-            <span className="h-2 w-2 rounded-full bg-[var(--dot-live)]" /> The AI dispatcher for small fleets
-          </p>
-          <h1 className="mt-6 text-[clamp(2.6rem,6.4vw,5.25rem)] font-bold leading-[0.98] tracking-[-0.032em] text-balance">
-            Your next load
-            <br />
-            is already booked.
-          </h1>
-          <p className="mt-6 max-w-xl text-[clamp(1.125rem,1.5vw,1.3125rem)] leading-[1.45] text-ink-600">
-            Backroute finds the load, calls the broker, books at your rate and keeps your drivers in the loop. You answer the few things that need you, from your phone.
-          </p>
-          <div className="mt-9 flex flex-wrap items-center gap-3">
-            <Button href="/signup" size="lg" className="w-full !px-7 sm:w-auto">
-              Get started <ArrowRight className="h-4 w-4" />
-            </Button>
-            {demoAllowed && (
-              <Button href="/demo" size="lg" variant="secondary" className="w-full !px-7 sm:w-auto">
-                See a sample fleet
+      <section className="theme-ink relative isolate overflow-hidden bg-black text-white">
+        <HeroVisual />
+        <div className="relative z-10 mx-auto flex min-h-[calc(100svh-4rem)] max-w-6xl flex-col justify-end px-5 pb-12 pt-[46svh] sm:px-8 lg:justify-center lg:pb-24 lg:pt-16">
+          <div className="max-w-2xl">
+            <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[13px] font-semibold text-white backdrop-blur">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--dot-live)]" /> The AI dispatcher for small fleets
+            </p>
+            <h1 className="mt-6 text-[clamp(2.75rem,7vw,5.75rem)] font-bold leading-[0.95] tracking-[-0.035em] text-balance">
+              Your next load
+              <br />
+              is already booked.
+            </h1>
+            <p className="mt-6 max-w-xl text-[clamp(1.125rem,1.5vw,1.3125rem)] leading-[1.45] text-white/70">
+              Backroute finds the load, calls the broker, books at your rate and keeps your drivers in the loop. You answer the few things that need you, from your phone.
+            </p>
+            <div className="mt-9 flex flex-wrap items-center gap-3">
+              <Button href="/signup" size="lg" className="w-full !px-7 sm:w-auto">
+                Get started <ArrowRight className="h-4 w-4" />
               </Button>
-            )}
+              {demoAllowed && (
+                <Button href="/demo" size="lg" variant="secondary" className="w-full !px-7 sm:w-auto">
+                  See a sample fleet
+                </Button>
+              )}
+            </div>
           </div>
-          <p className="mt-8 text-sm text-ink-500">Connects to DAT, Truckstop, Samsara, Motive and QuickBooks Online.</p>
         </div>
-        <PhonePreview />
+        <div className="relative z-10 border-t border-white/10 py-7">
+          <p className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.14em] text-white/45">Works with</p>
+          <Marquee items={["DAT", "Truckstop", "Samsara", "Motive", "QuickBooks Online", "Your email"]} />
+        </div>
       </section>
 
       <section id="product" className="scroll-mt-16 bg-ink-100">
-        <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20 md:py-28">
-          <h2 className={`${H2} max-w-3xl`}>From load board to paid invoice.</h2>
-          <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink-600">The whole job a dispatcher does, every day, for every truck.</p>
-          <ol className="mt-8 grid gap-3 sm:mt-12 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
-            {STEPS.map((s, i) => (
-              <li key={s.title} className="grid grid-cols-[2.25rem_1fr] gap-x-3 rounded-2xl bg-white p-5 sm:flex sm:flex-col sm:p-6">
-                <span className="row-span-2 flex h-9 w-9 items-center justify-center rounded-full bg-black text-sm font-bold text-white tabular">{i + 1}</span>
-                <h3 className="pt-1 text-lg font-bold tracking-[-0.015em] sm:mt-6 sm:pt-0 sm:text-xl">{s.title}</h3>
-                <p className="mt-2 text-[15px] leading-relaxed text-ink-600">{s.body}</p>
-              </li>
-            ))}
-          </ol>
+        <div className="mx-auto max-w-6xl px-5 pt-14 sm:px-8 sm:pt-20 md:pt-28">
+          <Reveal>
+            <h2 className={`${H2} max-w-3xl`}>From load board to paid invoice.</h2>
+            <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink-600">The whole job a dispatcher does, every day, for every truck. Scroll through one load.</p>
+          </Reveal>
+          <LoadStory />
+          <div className="h-14 sm:h-20 md:h-16" />
         </div>
       </section>
 
       <section className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-14 sm:px-8 sm:py-20 md:py-28 lg:grid-cols-2 lg:gap-16">
-        <div>
+        <Reveal>
           <h2 className={H2}>Every load, the real numbers.</h2>
           <p className="mt-5 max-w-lg text-lg leading-relaxed text-ink-600">
             What the load pays, every cost, what&apos;s left, and how long it really takes. Drive time is planned on the hours-of-service rules: 11 hours a day solo, around the clock for a team truck.
@@ -132,8 +128,23 @@ export default function Home() {
               </li>
             ))}
           </ul>
+        </Reveal>
+        <TiltCard className="mx-auto w-full max-w-md">
+          <SampleLoad />
+        </TiltCard>
+      </section>
+
+      <section className="border-t border-line">
+        <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20 md:py-28">
+          <Reveal>
+            <p className="text-sm font-semibold text-ink-500">Try it</p>
+            <h2 className={`${H2} mt-2 max-w-3xl`}>What does that load really pay?</h2>
+            <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink-600">The math Backroute does on every load before it calls a broker. Move the sliders.</p>
+          </Reveal>
+          <div className="mt-10">
+            <LoadMath />
+          </div>
         </div>
-        <SampleLoad />
       </section>
 
       <section className="border-t border-line">
@@ -144,47 +155,54 @@ export default function Home() {
             <p className="mt-5 max-w-sm text-lg leading-relaxed text-ink-600">One truck, one morning. The owner&apos;s part is a single text.</p>
           </div>
           <ol className="flex flex-col">
-            {DAY.map((d) => (
-              <li key={d.time} className={`grid gap-1 rounded-xl px-4 py-3.5 sm:grid-cols-[4.25rem_1fr] sm:gap-4 sm:py-4 ${d.you ? "bg-black text-white" : ""}`}>
-                <span className={`pt-0.5 text-sm font-semibold tabular ${d.you ? "text-white" : "text-ink-500"}`}>{d.time}</span>
-                <p className={`text-[17px] leading-relaxed ${d.you ? "font-semibold" : "text-ink-700"}`}>{d.text}</p>
+            {DAY.map((d, i) => (
+              <li key={d.time}>
+                <Reveal delay={i * 0.05} className={`grid gap-1 rounded-xl px-4 py-3.5 sm:grid-cols-[4.25rem_1fr] sm:gap-4 sm:py-4 ${d.you ? "bg-black text-white" : ""}`}>
+                  <span className={`pt-0.5 text-sm font-semibold tabular ${d.you ? "text-white" : "text-ink-500"}`}>{d.time}</span>
+                  <p className={`text-[17px] leading-relaxed ${d.you ? "font-semibold" : "text-ink-700"}`}>{d.text}</p>
+                </Reveal>
               </li>
             ))}
           </ol>
         </div>
       </section>
 
-      <section id="drivers" className="theme-ink scroll-mt-16 bg-black text-white">
-        <div className="mx-auto grid max-w-6xl gap-12 px-5 py-14 sm:px-8 sm:py-20 md:py-28 lg:grid-cols-2">
-          <div>
+      <section id="drivers" className="theme-ink scroll-mt-16 overflow-hidden bg-black text-white">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-14 sm:px-8 sm:py-20 md:py-28 lg:grid-cols-[1.2fr_1fr]">
+          <Reveal>
             <p className="text-sm font-semibold text-white/60">For drivers</p>
             <h2 className={`${H2} mt-2`}>One dispatcher. In their language.</h2>
             <p className="mt-5 max-w-md text-lg leading-relaxed text-white/70">
               It calls when something changes, calls back when they miss it, and texts when they&apos;re off duty.
             </p>
-          </div>
-          <ul className="grid gap-3 sm:grid-cols-2">
-            {[
-              { t: "Calls and texts in seven languages", b: "English, Spanish, Punjabi, Hindi, Russian, Ukrainian and French." },
-              { t: "Hands-free while driving", b: "Big buttons and voice: “I've arrived,” “running late,” “call dispatch.”" },
-              { t: "Told when plans change", b: "A moved appointment, a new load lined up, a delay: a call, not a surprise at the dock." },
-              { t: "Pay and home time on one screen", b: "No more calling the office to ask." },
-            ].map((x) => (
-              <li key={x.t} className="rounded-2xl bg-white/[0.08] p-5">
-                <p className="text-[17px] font-semibold">{x.t}</p>
-                <p className="mt-1.5 text-[15px] leading-relaxed text-white/70">{x.b}</p>
-              </li>
-            ))}
-          </ul>
+            <ul className="mt-10 grid gap-3 sm:grid-cols-2">
+              {[
+                { t: "Calls and texts in seven languages", b: "English, Spanish, Punjabi, Hindi, Russian, Ukrainian and French." },
+                { t: "Hands-free while driving", b: "Big buttons and voice: “I've arrived,” “running late,” “call dispatch.”" },
+                { t: "Told when plans change", b: "A moved appointment, a new load lined up, a delay: a call, not a surprise at the dock." },
+                { t: "Pay and home time on one screen", b: "No more calling the office to ask." },
+              ].map((x) => (
+                <li key={x.t} className="rounded-2xl bg-white/[0.08] p-5 transition-colors hover:bg-white/[0.12]">
+                  <p className="text-[17px] font-semibold">{x.t}</p>
+                  <p className="mt-1.5 text-[15px] leading-relaxed text-white/70">{x.b}</p>
+                </li>
+              ))}
+            </ul>
+          </Reveal>
+          <Reveal delay={0.1}>
+            <PhonePreview />
+          </Reveal>
         </div>
       </section>
 
       <section id="pricing" className="scroll-mt-16 mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20 md:py-28">
-        <h2 className={H2}>Simple pricing.</h2>
-        <p className="mt-4 max-w-xl text-lg leading-relaxed text-ink-600">A monthly plan for your fleet size, plus 2% of booked freight.</p>
+        <Reveal>
+          <h2 className={H2}>Simple pricing.</h2>
+          <p className="mt-4 max-w-xl text-lg leading-relaxed text-ink-600">A monthly plan for your fleet size, plus 2% of booked freight.</p>
+        </Reveal>
         <div className="mt-12 grid gap-4 md:grid-cols-3">
           {PLANS.map((p) => (
-            <div key={p.name} className={`flex flex-col rounded-2xl p-6 sm:p-7 ${p.featured ? "theme-invert bg-black" : "bg-ink-100"}`}>
+            <div key={p.name} className={`flex flex-col rounded-2xl p-6 transition-transform duration-300 hover:-translate-y-1 sm:p-7 ${p.featured ? "theme-invert bg-black" : "bg-ink-100"}`}>
               <div className="flex items-center justify-between">
                 <p className="text-lg font-bold">{p.name}</p>
                 {p.featured && <span className="rounded-full bg-ink-950 px-2.5 py-1 text-xs font-semibold text-ink-0">Most fleets</span>}
@@ -256,7 +274,7 @@ export default function Home() {
             <a href="#product" className="hover:text-white">Product</a>
             <a href="#pricing" className="hover:text-white">Pricing</a>
             <Link href="/login" className="hover:text-white">Log in</Link>
-            <span className="select-all">hello@backroute.com</span>
+            <a href="mailto:hello@backroute.pro" className="hover:text-white">hello@backroute.pro</a>
           </nav>
         </div>
         <p className="mx-auto max-w-6xl px-5 pb-10 text-sm text-white/50 sm:px-8">© 2026 Backroute, Inc.</p>
@@ -268,7 +286,7 @@ export default function Home() {
 /** A load card as the app shows it, drawn with sample numbers (labelled as a sample). */
 function SampleLoad() {
   return (
-    <div aria-label="A sample load card" className="theme-invert mx-auto w-full max-w-md rounded-3xl bg-black p-6 text-white shadow-[0_30px_60px_-30px_rgb(0_0_0/0.5)]">
+    <div aria-label="A sample load card" className="theme-invert w-full rounded-3xl bg-black p-6 text-white shadow-[0_30px_60px_-30px_rgb(0_0_0/0.5)]">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[13px] font-semibold text-[var(--link)]">Long run · 4 days</p>

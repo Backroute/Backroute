@@ -563,3 +563,56 @@ body {
     animation-delay: 0s !important;
   }
 }
+
+/* The website's sliders: a black track filled up to the thumb (--pct), a round thumb you can grab with a thumb. */
+.range-ink {
+  appearance: none;
+  height: 28px;
+  background: transparent;
+  cursor: pointer;
+}
+.range-ink::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--ink-950) var(--pct), var(--ink-200) var(--pct));
+}
+.range-ink::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--ink-950) var(--pct), var(--ink-200) var(--pct));
+}
+.range-ink::-webkit-slider-thumb {
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  margin-top: -9px;
+  border-radius: 999px;
+  background: var(--ink-950);
+  border: 3px solid var(--background);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
+  transition: transform 0.15s;
+}
+.range-ink::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--ink-950);
+  border: 3px solid var(--background);
+}
+.range-ink:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+.range-ink:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}

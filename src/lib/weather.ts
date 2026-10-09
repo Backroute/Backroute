@@ -32,7 +32,7 @@ async function usAlerts(lat: number, lon: number): Promise<WeatherAlert[]> {
   const base = (process.env.WEATHER_API_BASE ?? "https://api.weather.gov").replace(/\/$/, "");
   try {
     const res = await fetch(`${base}/alerts/active?point=${lat.toFixed(4)},${lon.toFixed(4)}`, {
-      headers: { accept: "application/geo+json", "user-agent": `Backroute dispatch (${process.env.SUPPORT_EMAIL ?? "support@backroute.app"})` },
+      headers: { accept: "application/geo+json", "user-agent": `Backroute dispatch (${process.env.SUPPORT_EMAIL ?? "hello@backroute.pro"})` },
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return [];

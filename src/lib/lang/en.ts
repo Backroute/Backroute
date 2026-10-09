@@ -190,6 +190,6 @@ export const en: CallPack = {
       `${p.carrier}, ${WEEKDAY[p.weekday]}: ${p.delivered} load${s(p.delivered)} delivered, ${p.profit} profit.`,
       p.rolling ? `${p.rolling} truck${s(p.rolling)} still rolling tonight.` : "All trucks parked for the night.",
       p.asks ? `${p.asks} thing${p.asks === 1 ? " needs" : "s need"} you${p.firstAsk ? `, first: ${p.firstAsk}` : ""}.` : "Nothing needs you.",
-      "Details: backroute.app/today",
+      "Details: backroute.pro/today",
     ].join(" "),
 };

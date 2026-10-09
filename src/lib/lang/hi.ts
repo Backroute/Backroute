@@ -194,6 +194,6 @@ export const hi: CallPack = {
       `${p.carrier}, ${WEEKDAY[p.weekday]}: ${p.delivered} लोड डिलीवर, ${p.profit} मुनाफ़ा।`,
       p.rolling ? `आज रात ${p.rolling} ट्रक अभी चल रहे हैं।` : "सारे ट्रक रात के लिए पार्क हैं।",
       p.asks ? `${p.asks} काम आपका इंतज़ार कर रहे हैं। जानकारी ऐप में।` : "कुछ भी आपका इंतज़ार नहीं कर रहा।",
-      "विवरण: backroute.app/today",
+      "विवरण: backroute.pro/today",
     ].join(" "),
 };

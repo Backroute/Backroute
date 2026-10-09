@@ -199,6 +199,6 @@ export const ru: CallPack = {
       `${p.carrier}, ${WEEKDAY[p.weekday]}: доставлено ${p.delivered} ${plural(p.delivered, "груз", "груза", "грузов")}, прибыль ${p.profit}.`,
       p.rolling ? `${p.rolling} ${plural(p.rolling, "трак ещё в пути", "трака ещё в пути", "траков ещё в пути")} этой ночью.` : "Все траки стоят на ночь.",
       p.asks ? `${p.asks} ${plural(p.asks, "вопрос ждёт", "вопроса ждут", "вопросов ждут")} тебя. Подробности в приложении.` : "Ничего не требует твоего внимания.",
-      "Подробно: backroute.app/today",
+      "Подробно: backroute.pro/today",
     ].join(" "),
 };

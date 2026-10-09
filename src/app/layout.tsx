@@ -19,10 +19,15 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const DESCRIPTION = "The dispatcher for owner-operators and small fleets. Backroute finds the load, calls the broker, books at your rate and gets you paid.";
+
 export const metadata: Metadata = {
-  title: "Backroute",
-  description:
-    "The dispatcher for owner-operators and small fleets. Backroute finds the load, calls the broker, books at your rate and gets you paid.",
+  // Shared links and the sitemap need full addresses: the site's own, or backroute.pro.
+  metadataBase: new URL(process.env.PUBLIC_BASE_URL ?? "https://backroute.pro"),
+  title: { default: "Backroute: the AI dispatcher for small fleets", template: "%s · Backroute" },
+  description: DESCRIPTION,
+  openGraph: { type: "website", siteName: "Backroute", title: "Backroute: the AI dispatcher for small fleets", description: DESCRIPTION, url: "/" },
+  twitter: { card: "summary_large_image", title: "Backroute: the AI dispatcher for small fleets", description: DESCRIPTION },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

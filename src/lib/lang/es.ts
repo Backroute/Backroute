@@ -194,6 +194,6 @@ export const es: CallPack = {
       `${p.carrier}, ${WEEKDAY[p.weekday]}: ${p.delivered} ${pl(p.delivered, "carga entregada", "cargas entregadas")}, ${p.profit} de ganancia.`,
       p.rolling ? `${p.rolling} ${pl(p.rolling, "camión sigue", "camiones siguen")} en ruta esta noche.` : "Todos los camiones estacionados por la noche.",
       p.asks ? `${p.asks} ${pl(p.asks, "cosa te necesita", "cosas te necesitan")}. Detalles en la app.` : "Nada te necesita.",
-      "Detalles: backroute.app/today",
+      "Detalles: backroute.pro/today",
     ].join(" "),
 };
