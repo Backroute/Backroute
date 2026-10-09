@@ -125,7 +125,7 @@ export default function CarrierLoadsPage() {
                 brokers={brokers}
                 trucks={trucks}
                 drivers={drivers}
-                onSelect={(groupId, loadId) => selectLoadOffer(groupId, loadId, "carrier")}
+                onSelect={(groupId, loadId, also) => selectLoadOffer(groupId, loadId, "carrier", also)}
                 onAsk={(loadId, text) => requestOfferDetail(loadId, text)}
                 onAskResolve={(loadId, draft) => resolveOfferDetail(loadId, draft)}
               />

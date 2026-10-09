@@ -9,11 +9,11 @@ import type { Actions, GetState, SetState } from "../state";
 import { updateCall } from "../../dispatch-calls";
 
 export const loadsActions = (set: SetState, get: GetState): Pick<Actions, "selectLoadOffer" | "saveRateConReading" | "setUpRealFleet" | "addToFleet" | "addLoad" | "requestBetterRate" | "cancelLoad" | "declineLoad" | "reassignTruck" | "requestOfferDetail" | "resolveOfferDetail" | "sendNegotiationInstruction" | "startBrokerCall" | "finishBrokerCall" | "logLoadVoiceCall" | "setDockAddress" | "setAiPaused"> => ({
-  selectLoadOffer: (offerGroupId, loadId, actor) => {
+  selectLoadOffer: (offerGroupId, loadId, actor, also) => {
     // A real account: the AI emails the broker to book it (lib/cloud/agent), and the load changes when that's done.
     if (get().session.mode !== "demo") {
       // Loaded when needed: it reaches back into the store through the sync.
-      void import("../../cloud/agent").then((m) => m.askToBook(loadId)).then((problem) => problem && window.alert(problem));
+      void import("../../cloud/agent").then((m) => m.askToBook(loadId, also)).then((problem) => problem && window.alert(problem));
       return;
     }
     set((state) => {

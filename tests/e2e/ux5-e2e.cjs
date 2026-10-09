@@ -205,6 +205,30 @@ async function waitFor(fn, ms = 20000) {
   check("...once", !read("qbo").slice(q2).some((x) => x.kind === "void" || x.kind === "update"));
   await api("/api/integrations/quickbooks", { method: "DELETE" });
 
+  // ── Two emailed loads booked back to back ────────────────────────────────────
+  // The owner approves each booking (ask), so both wait as offers for the empty truck in Dallas.
+  db(`update carriers set settings = settings || '{"autonomy":"ask"}'::jsonb where id = '${cid}'`);
+  put("trucks", "u5-t1", { ...truckData("u5-t1"), status: "available", currentLoadId: null, nextLoadId: null, trip: undefined, parking: undefined, currentCity: "Dallas", currentState: "TX", position: { lat: 32.7767, lon: -96.797, at: iso(0), source: "samsara", description: "Dallas, TX" } }, { unit_number: "U51", driver_id: "u5-d1" });
+  put("loads", "u5-L3", { ...loadData("u5-L3"), stage: "delivered" }, { truck_id: "u5-t1", stage: "delivered" });
+  db(`delete from loads where carrier_id = '${cid}' and data->>'referenceNumber' in ('BTB-1','BTB-2')`);
+  await email("Back to back loads", "Back to back loads: Dallas to Houston $1,000 delivering at noon, then Houston to San Antonio $800 picking up at 5.");
+  const k1 = await waitFor(() => byRef("BTB-1"));
+  const k2 = await waitFor(() => byRef("BTB-2"));
+  check("both loads come in as offers for the same truck, waiting on the owner", k1?.truckId === "u5-t1" && k2?.truckId === "u5-t1" && k1.stage === "offered" && k2.stage === "offered", JSON.stringify([k1 && { t: k1.truckId, s: k1.stage }, k2 && { t: k2.truckId, s: k2.stage }]));
+  const pm5 = read("postmark").length;
+  r = await api("/api/agent/book", { method: "POST", body: { loadId: k1.id, with: [k2.id] } });
+  const both = read("postmark").slice(pm5).filter((x) => x.body?.To === "partials@pb.test");
+  check("the owner books them together: the broker is asked for both", r.status === 200 && byRef("BTB-1")?.stage === "negotiating" && byRef("BTB-2")?.stage === "negotiating" && both.some((x) => /BTB-1/.test(x.body.Subject + x.body.TextBody)) && both.some((x) => /BTB-2/.test(x.body.Subject + x.body.TextBody)), JSON.stringify({ status: r.status, stages: [byRef("BTB-1")?.stage, byRef("BTB-2")?.stage], mail: both.map((x) => x.body.Subject) }));
+  check("...each at its own price, and neither set aside for the other", byRef("BTB-1")?.targetRate >= 1000 && byRef("BTB-2")?.targetRate >= 800 && !/declin/i.test(both.map((x) => x.body.TextBody).join(" ")), JSON.stringify([byRef("BTB-1")?.targetRate, byRef("BTB-2")?.targetRate]));
+  // Picked alone, the first one still sets the other aside.
+  db(`delete from loads where carrier_id = '${cid}' and data->>'referenceNumber' in ('BTB-1','BTB-2')`);
+  await email("Back to back loads again", "Back to back loads: Dallas to Houston $1,000 delivering at noon, then Houston to San Antonio $800 picking up at 5.");
+  const j1 = await waitFor(() => byRef("BTB-1"));
+  const j2 = await waitFor(() => byRef("BTB-2"));
+  r = await api("/api/agent/book", { method: "POST", body: { loadId: j1.id } });
+  check("picked on its own, the other offer for the truck is set aside", r.status === 200 && byRef("BTB-1")?.stage === "negotiating" && byRef("BTB-2")?.stage !== "negotiating" && byRef("BTB-2")?.stage !== "offered", JSON.stringify([byRef("BTB-1")?.stage, j2 && byRef("BTB-2")?.stage]));
+  db(`delete from loads where carrier_id = '${cid}' and data->>'referenceNumber' in ('BTB-1','BTB-2')`);
+
   // Put things back for the next suite.
   for (const id of others) db(`update trucks set data = data || '{"status":"available"}'::jsonb where carrier_id = '${cid}' and id = '${id}'`);
   db(`update carriers set settings = '${JSON.stringify(before).replace(/'/g, "''")}'::jsonb where id = '${cid}'`);

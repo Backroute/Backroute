@@ -309,7 +309,7 @@ export default function DriverHomePage() {
             crew={crewOf(truck, driver)}
             offerGroups={offerGroups}
             brokers={brokers}
-            onSelect={(groupId, loadId) => selectLoadOffer(groupId, loadId, "driver")}
+            onSelect={(groupId, loadId, also) => selectLoadOffer(groupId, loadId, "driver", also)}
             onAsk={(loadId, text) => requestOfferDetail(loadId, text)}
             onAskResolve={(loadId, draft) => resolveOfferDetail(loadId, draft)}
           />

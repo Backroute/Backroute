@@ -1,5 +1,5 @@
 import { citiesAlong, cityCoords, distanceMiles, nearestCity, roadMiles, type LatLng } from "./trip-geo";
-import { DOCK_HOURS, STOP_HOURS, simulateRun, type Crew, type RunStep } from "./hos-plan";
+import { DOCK_HOURS, PLAN_MPH, STOP_HOURS, simulateRun, type Crew, type RunStep } from "./hos-plan";
 import type { Load, TripStop } from "./types";
 
 /**
@@ -236,4 +236,43 @@ export function sharedOrder(a: Load, b: Load): TripStop[] {
     { loadId: near.id, kind: "delivery" },
     { loadId: far.id, kind: "delivery" },
   ];
+}
+
+/** How far apart a drop and the next pickup can be for two loads to run back to back. */
+const PAIR_EMPTY_MILES = 150;
+/** Most docks give about an hour's grace on an appointment. */
+const PAIR_GRACE_HOURS = 1;
+
+/**
+ * Real accounts: two loads brokers emailed for the same truck that chain, offered as one plan next to the singles,
+ * the way a dispatcher sees a reload while booking the first: the second picks up within 150 miles of the first's
+ * drop, and the truck can get there after unloading (two hours at the dock, the empty miles at plan speed). Built from
+ * the loads already offered, so each still books on its own; booking the plan asks both brokers. Best pair first, at
+ * most two, no load in two of them. The second load's empty miles and costs are counted from the first's drop.
+ */
+export function emailedPairs(loads: Load[]): Load[][] {
+  const singles = loads.filter((l) => !l.plan && l.stage === "offered" && !l.partial && !l.lane.moveKind && l.pickupAt && l.deliveryAt);
+  const pairs: { legs: Load[]; net: number }[] = [];
+  for (const a of singles)
+    for (const b of singles) {
+      if (a === b || a.truckId !== b.truckId) continue;
+      const empty = milesBetween({ city: a.lane.destination, state: a.lane.destState }, { city: b.lane.origin, state: b.lane.originState });
+      if (empty === undefined || empty > PAIR_EMPTY_MILES) continue;
+      const there = Date.parse(a.deliveryAt!) + (DOCK_HOURS + empty / PLAN_MPH) * 3_600_000;
+      if (there > Date.parse(b.pickupAt!) + PAIR_GRACE_HOURS * 3_600_000) continue;
+      const id = `pair-${a.id}-${b.id}`;
+      const perMile = b.deadheadMiles > 0 ? b.deadheadCost / b.deadheadMiles : 0.61;
+      const deadheadCost = Math.round(empty * perMile);
+      const second: Load = { ...b, deadheadMiles: empty, deadheadCost, netProfit: (b.netProfit ?? 0) + b.deadheadCost - deadheadCost, plan: { id, kind: "back_to_back", leg: 2, legs: 2 } };
+      const first: Load = { ...a, plan: { id, kind: "back_to_back", leg: 1, legs: 2 } };
+      pairs.push({ legs: [first, second], net: (first.netProfit ?? 0) + (second.netProfit ?? 0) });
+    }
+  const used = new Set<string>();
+  const out: Load[][] = [];
+  for (const p of pairs.sort((x, y) => y.net - x.net)) {
+    if (out.length >= 2 || p.legs.some((l) => used.has(l.id))) continue;
+    p.legs.forEach((l) => used.add(l.id));
+    out.push(p.legs.map((l) => ({ ...l, recommended: false })));
+  }
+  return out;
 }

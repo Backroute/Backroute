@@ -80,8 +80,9 @@ async function brokerFor(ctx: CarrierContext, email: string, name: string, compa
  * Going for one of a truck's offers passes on the others (so the next free truck can have them). Going for a partial
  * keeps the other partials: they may ride along on the same trip (lib/agent/trips).
  */
-async function setAsideOthers(ctx: CarrierContext, chosen: Load, at: string) {
-  const keep = (l: Load) => isPartial(chosen) && isPartial(l);
+async function setAsideOthers(ctx: CarrierContext, chosen: Load, at: string, together: string[] = []) {
+  // Partials may ride along; loads booked together as a plan (back to back) are kept for each other.
+  const keep = (l: Load) => (isPartial(chosen) && isPartial(l)) || together.includes(l.id);
   ctx.loads = ctx.loads.map((l) => (l.id === chosen.id ? chosen : l.offerGroupId && l.offerGroupId === chosen.offerGroupId && l.stage === "offered" && !keep(l) ? { ...l, stage: "declined" as const, updatedAt: at } : l));
   for (const l of ctx.loads) if (l.offerGroupId === chosen.offerGroupId && l.id !== chosen.id && l.stage === "declined" && l.updatedAt === at) await save("loads", ctx.carrier.id, l as unknown as Item);
 }
@@ -321,7 +322,7 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
  * Ask the broker to book a load at a price: from the owner's tap (they chose it) or from the rules. The others offered
  * to that truck are set aside, the way picking one load passes on the rest.
  */
-export async function requestBooking(ctx: CarrierContext, load: Load, ask: number, how: { byRules?: boolean; byOwner?: boolean; callFirst?: boolean }) {
+export async function requestBooking(ctx: CarrierContext, load: Load, ask: number, how: { byRules?: boolean; byOwner?: boolean; callFirst?: boolean; together?: string[] }) {
   // An account whose trial ended unpaid (with billing required) books nothing new; what's booked keeps running.
   if (await holdForBilling(ctx, load.id)) return "queued" as const;
   let broker = ctx.brokers.find((b) => b.id === load.brokerId);
@@ -350,7 +351,7 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
       const at = new Date().toISOString();
       const asking: Load = { ...load, stage: "negotiating", targetRate: ask, updatedAt: at, bookRequest: { ask, askedAt: at, status: "sent", ...(how.byOwner ? { byOwner: true } : {}) } };
       await save("loads", ctx.carrier.id, asking as unknown as Item);
-      await setAsideOthers(ctx, asking, at);
+      await setAsideOthers(ctx, asking, at, how.together);
       const url = absoluteUrl(`/api/channels/voice/broker?carrier=${encodeURIComponent(ctx.carrier.id)}&load=${encodeURIComponent(load.id)}`);
       if (await callBroker(ctx, asking, url)) return "sent" as const;
       load = asking;
@@ -382,7 +383,7 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
   const at = new Date().toISOString();
   const updated: Load = { ...load, stage: "negotiating", targetRate: ask, updatedAt: at, bookRequest: { ask, askedAt: at, status: "drafted", ...(how.byOwner ? { byOwner: true } : {}) } };
   await save("loads", ctx.carrier.id, updated as unknown as Item);
-  await setAsideOthers(ctx, updated, at);
+  await setAsideOthers(ctx, updated, at, how.together);
 
   const floor = floorFor(load, ctx.settings);
   const subject = load.offerEmail ? (/^re:/i.test(load.offerEmail.subject) ? load.offerEmail.subject : `Re: ${load.offerEmail.subject}`) : mail.subjectFor(load);

@@ -1,6 +1,6 @@
 import { advanceLoad, createLoadOfferBatch, lineUpChoice, replacePlanLeg, resolveLoadOffer } from "../../src/lib/engine";
 import { generateWorld } from "../../src/lib/mock-data";
-import { offerOptions, planStops, planTotals } from "../../src/lib/plans";
+import { emailedPairs, offerOptions, planStops, planTotals } from "../../src/lib/plans";
 import { promoteChainedLoad } from "../../src/lib/store/support";
 import type { Load, Truck } from "../../src/lib/types";
 
@@ -114,5 +114,26 @@ const mate = sl.loads.find((l) => l.id === sPlan[1].id)!;
 const mateGo = advanceLoad(booked(mate), undefined, sl.trucks[0]);
 ok("…a load riding along goes out without taking the truck from the first", mateGo.load.stage === "dispatched" && mateGo.truckUpdates?.currentLoadId === undefined);
 ok("the stops read in order on the card", planStops(sPlan).map((s) => s.kind).join() === sPlan[0].plan!.order!.map((s) => s.kind).join());
+
+// Real accounts: emailed loads that chain are offered as one plan too.
+const T0 = Date.parse("2026-10-12T15:00:00Z");
+const H = 3_600_000;
+const mail = (id: string, from: [string, string], to: [string, string], miles: number, pickup: number, delivery: number, extra: Partial<Load> = {}): Load => ({
+  ...all[0], id, plan: undefined, stops: undefined, partial: undefined, stage: "offered", truckId: "truck-x", offerGroupId: "offers-truck-x", recommended: false,
+  lane: { origin: from[0], originState: from[1], destination: to[0], destState: to[1], miles, marketRpm: 2.1 },
+  pickupAt: new Date(pickup).toISOString(), deliveryAt: new Date(delivery).toISOString(), deadheadMiles: 60, deadheadCost: 37, netProfit: 800, ...extra,
+});
+const A = mail("A", ["Dallas", "TX"], ["Memphis", "TN"], 452, T0, T0 + 12 * H);
+const B = mail("B", ["Memphis", "TN"], ["Chicago", "IL"], 530, T0 + 16 * H, T0 + 30 * H);
+const tooSoon = mail("S", ["Memphis", "TN"], ["Atlanta", "GA"], 390, T0 + 12.5 * H, T0 + 24 * H);
+const far = mail("F", ["Seattle", "WA"], ["Portland", "OR"], 175, T0 + 20 * H, T0 + 26 * H);
+const pairs = emailedPairs([A, B, tooSoon, far]);
+ok("emailed loads that chain show as one plan: Dallas→Memphis, then Memphis→Chicago", pairs.length === 1 && pairs[0].map((l) => l.id).join() === "A,B" && pairs[0][0].plan?.kind === "back_to_back", pairs.map((p) => p.map((l) => l.id)));
+ok("…the second's empty miles are from the first's drop, not the truck", pairs[0]?.[1].deadheadMiles < 20, pairs[0]?.[1].deadheadMiles);
+ok("…a pickup the truck can't reach after unloading isn't paired", !pairs.some((p) => p.some((l) => l.id === "S")));
+ok("…nor one 2,000 miles away", !pairs.some((p) => p.some((l) => l.id === "F")));
+ok("…the singles stay as they were (the plan is copies)", !A.plan && !B.plan);
+ok("…another truck's load isn't paired", emailedPairs([A, { ...B, truckId: "truck-y" }]).length === 0);
+ok("…nor a partial", emailedPairs([A, { ...B, partial: { pallets: 6 } }]).length === 0);
 
 console.log(`${pass} passed, ${fail} failed`);

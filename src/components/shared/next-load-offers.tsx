@@ -2,7 +2,7 @@
 
 import { LoadOfferCard } from "./load-offer-card";
 import { OfferRail } from "./offer-rail";
-import { offerOptions } from "@/lib/plans";
+import { emailedPairs, offerOptions } from "@/lib/plans";
 import { crewOf, type Crew } from "@/lib/hos-plan";
 import { TruckDriverChip } from "./truck-driver-chip";
 import type { OfferAskDraft } from "@/lib/engine";
@@ -26,7 +26,8 @@ export function NextLoadOffers({
   /** Pass when a single view can span multiple trucks (carrier) to label each group — omit for a single-truck context (driver). */
   trucks?: Map<string, Truck>;
   drivers?: Map<string, Driver>;
-  onSelect: (groupId: string, loadId: string) => void;
+  /** `also`: the other loads of a plan put together from a real account's emailed loads, booked with it. */
+  onSelect: (groupId: string, loadId: string, also?: string[]) => void;
   onAsk: (loadId: string, text: string) => { draft: OfferAskDraft; pendingReply: string; resolved: boolean };
   onAskResolve: (loadId: string, draft: OfferAskDraft) => string;
   /** The driver's phone: let the row of cards run to the screen edges. */
@@ -57,7 +58,8 @@ export function NextLoadOffers({
         {offerGroups.map(([groupId, groupLoads]) => {
           // Each choice is a load or a plan of several. The best fit leads: it can beat a higher score once home time,
           // the next reload and the empty miles between loads are counted.
-          const options = offerOptions(groupLoads);
+          // A real account's emailed loads that chain also show as one plan, next to the singles.
+          const options = real ? [...offerOptions(groupLoads), ...emailedPairs(groupLoads)] : offerOptions(groupLoads);
           const loads = options.map((o) => o[0]);
           const truck = trucks && loads[0].truckId ? trucks.get(loads[0].truckId) : undefined;
           const driver = drivers && truck?.driverId ? drivers.get(truck.driverId) : undefined;
@@ -66,14 +68,14 @@ export function NextLoadOffers({
               <OfferRail bleed={bleed} header={trucks ? <TruckDriverChip truck={truck} driver={driver} /> : undefined}>
                 {options.map(([load, ...rest]) => (
                   <LoadOfferCard
-                    key={load.id}
+                    key={load.plan?.id ?? load.id}
                     load={load}
                     legs={[load, ...rest]}
                     broker={brokers.get(load.brokerId)}
                     brokers={brokers}
                     crew={crew ?? (truck ? crewOf(truck, driver) : undefined)}
                     viewer={trucks ? "owner" : "driver"}
-                    onSelect={() => onSelect(groupId, load.id)}
+                    onSelect={() => onSelect(groupId, load.id, real && rest.length ? rest.map((l) => l.id) : undefined)}
                     onAsk={real ? undefined : (text) => onAsk(load.id, text)}
                     onAskResolve={real ? undefined : (draft) => onAskResolve(load.id, draft)}
                   />

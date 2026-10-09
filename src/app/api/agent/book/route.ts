@@ -5,7 +5,12 @@ import { askFor, floorFor } from "@/lib/agent/pricing";
 import { caller } from "@/lib/agent/user";
 import { canEmail } from "@/lib/channels/out";
 
-const Body = z.object({ loadId: z.string().min(1), ask: z.number().positive().max(100000).optional() });
+const Body = z.object({
+  loadId: z.string().min(1),
+  ask: z.number().positive().max(100000).optional(),
+  /** The other loads of a plan (back to back), asked for at the same time and kept for each other. */
+  with: z.array(z.string().min(1)).max(2).optional(),
+});
 
 /**
  * The owner picked a load offered by email: the AI asks the broker to book it, at the price the rules give or the
@@ -27,7 +32,16 @@ export async function POST(request: Request) {
   const ask = parsed.data.ask ?? (load.targetRate > 0 ? Math.max(load.targetRate, floor) : askFor(load, ctx.settings));
   if (!ask) return Response.json({ error: "need_price" }, { status: 422 });
 
-  await requestBooking(ctx, load, ask, { byOwner: true });
-  const changed = ctx.loads.filter((l) => l.offerGroupId === load.offerGroupId || l.id === load.id);
+  // A plan: every load of it still on offer, each at its own price, none setting the others aside.
+  const partners = (parsed.data.with ?? []).map((id) => ctx.loads.find((l) => l.id === id)).filter((l): l is NonNullable<typeof l> => !!l && l.stage === "offered" && l.truckId === load.truckId);
+  const together = [load.id, ...partners.map((l) => l.id)];
+  await requestBooking(ctx, load, ask, { byOwner: true, together });
+  for (const p of partners) {
+    const cur = ctx.loads.find((l) => l.id === p.id) ?? p;
+    if (cur.stage !== "offered") continue;
+    const partnerAsk = cur.targetRate > 0 ? Math.max(cur.targetRate, floorFor(cur, ctx.settings) ?? 0) : askFor(cur, ctx.settings);
+    if (partnerAsk) await requestBooking(ctx, cur, partnerAsk, { byOwner: true, together });
+  }
+  const changed = ctx.loads.filter((l) => l.offerGroupId === load.offerGroupId || together.includes(l.id));
   return Response.json({ loads: changed });
 }

@@ -79,7 +79,8 @@ export interface StoreState {
      *  (and for a lumper receipt, files the reimbursement itself). Re-uploading replaces the previous one. */
     uploadLoadDocument: (loadId: string, type: DriverDocType, file: { name: string; previewUrl?: string; file?: File }) => void;
     recaptureDocument: (loadId: string, type: "bol" | "pod") => void;
-    selectLoadOffer: (offerGroupId: string, loadId: string, actor: "driver" | "carrier") => void;
+    /** `also`: a real account's plan of several emailed loads, booked together. */
+    selectLoadOffer: (offerGroupId: string, loadId: string, actor: "driver" | "carrier", also?: string[]) => void;
     reportIncident: (driverId: string, truckId: string, type: IncidentType, note: string) => void;
     /** Kicks off the formal insurance claim for an accident — separate from the automated incident-
      *  response steps, which just handle getting everyone safe and the load moving again. */

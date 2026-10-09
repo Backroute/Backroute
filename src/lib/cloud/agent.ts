@@ -26,13 +26,14 @@ async function call(path: string, body: unknown): Promise<{ ok: true } | { ok: f
  * The owner picked an offer a broker emailed: the AI asks the broker to book it. When the rules can't price it (no
  * posted rate and no lowest rate per mile set), the owner types the price.
  */
-export async function askToBook(loadId: string): Promise<string | null> {
-  let r = await call("/api/agent/book", { loadId });
+export async function askToBook(loadId: string, also: string[] = []): Promise<string | null> {
+  const plan = also.length ? { with: also } : {};
+  let r = await call("/api/agent/book", { loadId, ...plan });
   if (!r.ok && r.error === "need_price") {
     const typed = window.prompt("The broker didn't post a rate, and no lowest rate per mile is set. What should the AI ask, all in ($)?");
     const ask = Number((typed ?? "").replace(/[$,\s]/g, ""));
     if (!(ask > 0)) return null;
-    r = await call("/api/agent/book", { loadId, ask });
+    r = await call("/api/agent/book", { loadId, ask, ...plan });
   }
   return r.ok ? null : (REASON[r.error] ?? "Couldn't do that. Check your connection and try again.");
 }
