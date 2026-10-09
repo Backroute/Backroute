@@ -1,6 +1,7 @@
 import { admin, dbConfigured, loadContext } from "@/lib/agent/db";
 import { releaseDue } from "@/lib/agent/held";
 import { runRounds } from "@/lib/agent/rounds";
+import { BUDGET_MS, inPool, markServed, POOL, servedOrder } from "@/lib/agent/rounds-order";
 import { flagStuck } from "@/lib/agent/stuck";
 import { retryOutbound } from "@/lib/channels/out";
 import { publicUrl } from "@/lib/channels/twilio";
@@ -36,15 +37,16 @@ export async function GET(request: Request) {
   const { data: carriers, error } = await admin().from("carriers").select("id");
   if (error) return Response.json({ error: error.message, done }, { status: 500 });
   const base = publicUrl(request, "");
-  for (const { id } of carriers ?? []) {
-    try {
-      const ctx = await loadContext(id);
-      if (ctx) done.push(...(await runRounds(ctx, now, ctx.settings.sandbox ? null : base)));
-    } catch (e) {
-      console.error("[cron] dispatch rounds failed for", id, e);
-    }
-  }
+  // A few carriers at a time, the ones served longest ago first, none started once the budget is spent: with many
+  // carriers, a run that can't reach them all leaves the rest to go first next time (lib/agent/rounds-order).
+  const order = await servedOrder((carriers ?? []).map((c) => c.id as string));
+  const skipped = await inPool(order, POOL, Date.now() + BUDGET_MS, async (id) => {
+    const ctx = await loadContext(id);
+    if (ctx) done.push(...(await runRounds(ctx, now, ctx.settings.sandbox ? null : base)));
+    await markServed(id);
+  });
+  if (skipped) console.warn(`[cron] ${skipped} carrier${skipped === 1 ? "" : "s"} left for the next run (time budget)`);
   // Anything down (or AI spending running away) goes to support's phones.
   done.push(...(await alertOnHealth(now).catch((e) => (console.error("[cron] health check failed", e), []))));
-  return Response.json({ done });
+  return Response.json({ done, ...(skipped ? { skipped } : {}) });
 }
