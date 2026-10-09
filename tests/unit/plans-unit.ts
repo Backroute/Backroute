@@ -137,7 +137,7 @@ ok("…another truck's load isn't paired", emailedPairs([A, { ...B, truckId: "tr
 ok("…nor a partial", emailedPairs([A, { ...B, partial: { pallets: 6 } }]).length === 0);
 
 // …and emailed partials that can share the trailer.
-const P1 = mail("P1", ["Dallas", "TX"], ["Houston", "TX"], 240, T0, T0 + 24 * H, { partial: { pallets: 6 }, targetRate: 600, weight: 6000 });
+const P1 = mail("P1", ["Dallas", "TX"], ["Houston", "TX"], 240, T0, T0 + 36 * H, { partial: { pallets: 6 }, targetRate: 600, weight: 6000 });
 const P2 = mail("P2", ["Fort Worth", "TX"], ["Waco", "TX"], 90, T0 + 2 * H, T0 + 14 * H, { partial: { feet: 12 }, targetRate: 450, weight: 7000 });
 const P3 = mail("P3", ["Seattle", "WA"], ["Portland", "OR"], 175, T0, T0 + 8 * H, { partial: { pallets: 4 }, targetRate: 500, weight: 4000 });
 const big = mail("PB", ["Dallas", "TX"], ["Houston", "TX"], 240, T0 + H, T0 + 12 * H, { partial: { feet: 48 }, targetRate: 1100, weight: 20000 });
@@ -148,5 +148,15 @@ ok("…with the stops in an order that works: both pickups first, Waco dropped o
 ok("…not with a full load, nor one picking up 2,000 miles away", !tripsOut.flat().some((l) => l.id === "A" || l.id === "P3"));
 ok("…not when they don't fit the trailer together", emailedTrips([P1, { ...big, partial: { feet: 50 } }]).length === 0);
 ok("…another truck's partial isn't put with it", emailedTrips([P1, { ...P2, truckId: "truck-y" }]).length === 0);
+
+// Three in a row, and three partials in one trailer.
+const C3 = mail("C3", ["Chicago", "IL"], ["Indianapolis", "IN"], 180, T0 + 34 * H, T0 + 40 * H);
+const chain3 = emailedPairs([A, B, C3]);
+ok("three emailed loads that chain show as one plan of three: Dallas→Memphis→Chicago→Indianapolis", chain3.length === 1 && chain3[0].map((l) => l.id).join() === "A,B,C3" && chain3[0].every((l) => l.plan?.legs === 3), chain3.map((p) => p.map((l) => l.id)));
+ok("…each later load's empty miles from the drop before it", (chain3[0]?.[2].deadheadMiles ?? 99) < 20, chain3[0]?.[2].deadheadMiles);
+const P4 = mail("P4", ["Garland", "TX"], ["Austin", "TX"], 210, T0 + 5 * H, T0 + 30 * H, { partial: { pallets: 4 }, targetRate: 520, weight: 5000 });
+const trip3 = emailedTrips([P1, P2, P4]);
+ok("three partials picked up near each other: one trailer, three loads", trip3.length === 1 && trip3[0].length === 3 && trip3[0].every((l) => l.plan?.kind === "shared_trailer" && l.plan.legs === 3), trip3.map((t) => t.map((l) => l.id)));
+ok("…every pickup before its drop in the planned order", (trip3[0]?.[0].plan?.order ?? []).length === 6 && ["P1", "P2", "P4"].every((id) => { const o = trip3[0][0].plan!.order!; return o.findIndex((x) => x.loadId === id && x.kind === "pickup") < o.findIndex((x) => x.loadId === id && x.kind === "delivery"); }));
 
 console.log(`${pass} passed, ${fail} failed`);

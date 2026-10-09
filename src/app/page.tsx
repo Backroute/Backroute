@@ -202,7 +202,7 @@ export default function Home() {
             <div key={p.name} className={`flex flex-col rounded-2xl p-6 transition-transform duration-300 hover:-translate-y-1 sm:p-7 ${p.featured ? "theme-invert bg-black" : "bg-ink-100"}`}>
               <div className="flex items-center justify-between">
                 <p className="text-lg font-semibold">{p.name}</p>
-                {p.featured && <span className="rounded-full bg-ink-950 px-2.5 py-1 text-xs font-semibold text-ink-0">Most fleets</span>}
+                {p.featured && <span className="text-sm font-medium text-ink-500">Most fleets</span>}
               </div>
               <p className="mt-6 text-5xl font-semibold tracking-[-0.04em] tabular">
                 {p.price}

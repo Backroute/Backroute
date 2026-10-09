@@ -512,7 +512,7 @@ function CardHeading({ kicker, reference, title, sub, aside }: { kicker: string;
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-white/50">
+        <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-white/50">
           {kicker} · {reference}
         </p>
         {aside && <p className="shrink-0 text-sm font-semibold tabular">{aside}</p>}

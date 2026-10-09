@@ -172,8 +172,8 @@ function Screen({ step }: { step: number }) {
           <p className="text-sm text-ink-500">Coastal Freight</p>
           <p className="text-[40px] font-semibold leading-none tracking-[-0.04em] tabular">$1,107</p>
         </div>
-        <motion.span initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", delay: 0.4 }} className="rounded-full bg-[var(--dot-live)] px-3 py-1.5 text-sm font-semibold text-black">
-          Paid
+        <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="flex items-center gap-2 text-sm font-medium">
+          <span className="h-2 w-2 rounded-full bg-[var(--dot-live)]" /> Paid
         </motion.span>
       </div>
       <ul className="mt-5 flex flex-col gap-3 border-t border-line pt-5 text-[15px]">

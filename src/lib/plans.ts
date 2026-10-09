@@ -244,74 +244,94 @@ const PAIR_EMPTY_MILES = 150;
 /** Most docks give about an hour's grace on an appointment. */
 const PAIR_GRACE_HOURS = 1;
 
+/** Empty miles from one load's drop to the next one's pickup, when the truck can make it after unloading. */
+function chainsTo(a: Load, b: Load): number | null {
+  if (a.truckId !== b.truckId) return null;
+  const empty = milesBetween({ city: a.lane.destination, state: a.lane.destState }, { city: b.lane.origin, state: b.lane.originState });
+  if (empty === undefined || empty > PAIR_EMPTY_MILES) return null;
+  const there = Date.parse(a.deliveryAt!) + (DOCK_HOURS + empty / PLAN_MPH) * 3_600_000;
+  return there > Date.parse(b.pickupAt!) + PAIR_GRACE_HOURS * 3_600_000 ? null : empty;
+}
+
+/** The best plans first, at most two, no load in two of them. */
+function bestPlans(plans: { legs: Load[]; score: number }[]): Load[][] {
+  const used = new Set<string>();
+  const out: Load[][] = [];
+  for (const p of plans.sort((x, y) => y.score - x.score)) {
+    if (out.length >= 2 || p.legs.some((l) => used.has(l.id))) continue;
+    p.legs.forEach((l) => used.add(l.id));
+    out.push(p.legs);
+  }
+  return out;
+}
+
 /**
- * Real accounts: two loads brokers emailed for the same truck that chain, offered as one plan next to the singles,
- * the way a dispatcher sees a reload while booking the first: the second picks up within 150 miles of the first's
- * drop, and the truck can get there after unloading (two hours at the dock, the empty miles at plan speed). Built from
- * the loads already offered, so each still books on its own; booking the plan asks both brokers. Best pair first, at
- * most two, no load in two of them. The second load's empty miles and costs are counted from the first's drop.
+ * Real accounts: loads brokers emailed for the same truck that chain, two or three in a row, offered as one plan next
+ * to the singles, the way a dispatcher sees a reload while booking the first: each picks up within 150 miles of the
+ * one before's drop, and the truck can get there after unloading (two hours at the dock, the empty miles at plan
+ * speed). Built from the loads already offered, so each still books on its own; booking the plan asks every broker.
+ * Best first (what the plan nets), at most two, no load in two of them. Each later load's empty miles and costs are
+ * counted from the drop before it.
  */
 export function emailedPairs(loads: Load[]): Load[][] {
   const singles = loads.filter((l) => !l.plan && l.stage === "offered" && !l.partial && !l.lane.moveKind && l.pickupAt && l.deliveryAt);
-  const pairs: { legs: Load[]; net: number }[] = [];
+  const chains: Load[][] = [];
   for (const a of singles)
     for (const b of singles) {
-      if (a === b || a.truckId !== b.truckId) continue;
-      const empty = milesBetween({ city: a.lane.destination, state: a.lane.destState }, { city: b.lane.origin, state: b.lane.originState });
-      if (empty === undefined || empty > PAIR_EMPTY_MILES) continue;
-      const there = Date.parse(a.deliveryAt!) + (DOCK_HOURS + empty / PLAN_MPH) * 3_600_000;
-      if (there > Date.parse(b.pickupAt!) + PAIR_GRACE_HOURS * 3_600_000) continue;
-      const id = `pair-${a.id}-${b.id}`;
-      const perMile = b.deadheadMiles > 0 ? b.deadheadCost / b.deadheadMiles : 0.61;
-      const deadheadCost = Math.round(empty * perMile);
-      const second: Load = { ...b, deadheadMiles: empty, deadheadCost, netProfit: (b.netProfit ?? 0) + b.deadheadCost - deadheadCost, plan: { id, kind: "back_to_back", leg: 2, legs: 2 } };
-      const first: Load = { ...a, plan: { id, kind: "back_to_back", leg: 1, legs: 2 } };
-      pairs.push({ legs: [first, second], net: (first.netProfit ?? 0) + (second.netProfit ?? 0) });
+      if (a === b || chainsTo(a, b) === null) continue;
+      chains.push([a, b]);
+      for (const c of singles) if (c !== a && c !== b && chainsTo(b, c) !== null) chains.push([a, b, c]);
     }
-  const used = new Set<string>();
-  const out: Load[][] = [];
-  for (const p of pairs.sort((x, y) => y.net - x.net)) {
-    if (out.length >= 2 || p.legs.some((l) => used.has(l.id))) continue;
-    p.legs.forEach((l) => used.add(l.id));
-    out.push(p.legs.map((l) => ({ ...l, recommended: false })));
-  }
-  return out;
+  const plans = chains.map((legs) => {
+    const id = `${legs.length === 2 ? "pair" : "chain"}-${legs.map((l) => l.id).join("-")}`;
+    const out = legs.map((l, k) => {
+      const plan = { id, kind: "back_to_back" as const, leg: k + 1, legs: legs.length };
+      if (k === 0) return { ...l, recommended: false, plan };
+      const empty = chainsTo(legs[k - 1], l)!;
+      const perMile = l.deadheadMiles > 0 ? l.deadheadCost / l.deadheadMiles : 0.61;
+      const deadheadCost = Math.round(empty * perMile);
+      return { ...l, recommended: false, deadheadMiles: empty, deadheadCost, netProfit: (l.netProfit ?? 0) + l.deadheadCost - deadheadCost, plan };
+    });
+    return { legs: out, score: out.reduce((sum, l) => sum + (l.netProfit ?? 0), 0) };
+  });
+  return bestPlans(plans);
 }
 
 /** How far apart two partials' pickups can be and still go on together (the way a dispatcher builds a run). */
 const TRIP_PICKUPS_MILES = 60;
 
 /**
- * A real account's emailed partials that can share the trailer, put together as one choice: two partials for the
- * same truck picking up within 60 miles of each other, with room for both and every appointment made in the order
- * the stops are planned (lib/trip-plan). Each load keeps its own broker and price; booking the choice asks for both.
- * At most two, the best paying first, no load in two of them.
+ * A real account's emailed partials that can share the trailer, put together as one choice: two or three partials
+ * for the same truck picking up within 60 miles of each other, with room for all of them and every appointment made
+ * in the order the stops are planned (lib/trip-plan). Each load keeps its own broker and price; booking the choice
+ * asks for each. At most two, the best paying first, no load in two of them.
  */
 export function emailedTrips(loads: Load[]): Load[][] {
   const partials = loads.filter((l) => !l.plan && l.stage === "offered" && isPartial(l) && l.pickupAt);
-  const trips: { legs: Load[]; pay: number }[] = [];
+  const near = (a: Load, b: Load) => {
+    if (a.truckId !== b.truckId || a.equipmentType !== b.equipmentType) return false;
+    const apart = milesBetween({ city: a.lane.origin, state: a.lane.originState }, { city: b.lane.origin, state: b.lane.originState });
+    return apart !== undefined && apart <= TRIP_PICKUPS_MILES;
+  };
+  const groups: Load[][] = [];
   for (let i = 0; i < partials.length; i++)
     for (let j = i + 1; j < partials.length; j++) {
-      const [a, b] = [partials[i], partials[j]];
-      if (a.truckId !== b.truckId || a.equipmentType !== b.equipmentType) continue;
-      const apart = milesBetween({ city: a.lane.origin, state: a.lane.originState }, { city: b.lane.origin, state: b.lane.originState });
-      if (apart === undefined || apart > TRIP_PICKUPS_MILES) continue;
-      const first = Date.parse(a.pickupAt!) <= Date.parse(b.pickupAt!) ? a : b;
-      const at = roughCoords(first.lane.origin, first.lane.originState)?.at ?? null;
-      const planned = planTrip([a, b] as TripLoad[], { at, time: Date.parse(first.pickupAt!) - 3_600_000, onboard: [] }, { feet: 53, lbs: 44000 });
-      if (!planned) continue;
-      const id = `trip-${a.id}-${b.id}`;
-      const order = planned.order;
-      // Legs in the order they're picked up.
-      const legs = [a, b].sort((x, y) => order.findIndex((st) => st.loadId === x.id && st.kind === "pickup") - order.findIndex((st) => st.loadId === y.id && st.kind === "pickup"));
-      trips.push({ legs: legs.map((l, k) => ({ ...l, recommended: false, plan: { id, kind: "shared_trailer" as const, leg: k + 1, legs: 2, order } })), pay: a.targetRate + b.targetRate });
+      if (!near(partials[i], partials[j])) continue;
+      groups.push([partials[i], partials[j]]);
+      for (let k = j + 1; k < partials.length; k++) if (near(partials[i], partials[k]) && near(partials[j], partials[k])) groups.push([partials[i], partials[j], partials[k]]);
     }
-  const used = new Set<string>();
-  const out: Load[][] = [];
-  for (const t of trips.sort((x, y) => y.pay - x.pay)) {
-    if (out.length >= 2 || t.legs.some((l) => used.has(l.id))) continue;
-    t.legs.forEach((l) => used.add(l.id));
-    out.push(t.legs);
+  const plans: { legs: Load[]; score: number }[] = [];
+  for (const group of groups) {
+    const first = group.reduce((x, y) => (Date.parse(x.pickupAt!) <= Date.parse(y.pickupAt!) ? x : y));
+    const at = roughCoords(first.lane.origin, first.lane.originState)?.at ?? null;
+    const planned = planTrip(group as TripLoad[], { at, time: Date.parse(first.pickupAt!) - 3_600_000, onboard: [] }, { feet: 53, lbs: 44000 });
+    if (!planned) continue;
+    const id = `trip-${group.map((l) => l.id).join("-")}`;
+    const order = planned.order;
+    // Legs in the order they're picked up.
+    const pickedAt = (l: Load) => order.findIndex((st) => st.loadId === l.id && st.kind === "pickup");
+    const legs = [...group].sort((x, y) => pickedAt(x) - pickedAt(y));
+    plans.push({ legs: legs.map((l, k) => ({ ...l, recommended: false, plan: { id, kind: "shared_trailer" as const, leg: k + 1, legs: legs.length, order } })), score: legs.reduce((sum, l) => sum + l.targetRate, 0) });
   }
-  return out;
+  return bestPlans(plans);
 }
