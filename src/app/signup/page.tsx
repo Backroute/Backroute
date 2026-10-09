@@ -381,7 +381,9 @@ function Signup() {
               <h1 className="mt-4 font-display text-2xl text-ink-950">You&apos;re set up</h1>
               <p className="mt-1 text-sm text-ink-500">
                 {real
-                  ? `Next: add your ${solo ? "" : "drivers' "}loads on the Loads page, or send the rate con to your Backroute email. Backroute keeps ${solo ? "you" : "your drivers"} updated by text and answers the dispatch line.`
+                  ? solo
+                    ? "Next: add your first load, or send the rate con to your Backroute email (in Settings). Backroute keeps you updated by text and answers the dispatch line. Your loads, pay and paperwork are in your app."
+                    : "Next: add your drivers' loads on the Loads page, or send the rate con to your Backroute email. Backroute keeps your drivers updated by text and answers the dispatch line."
                   : solo
                     ? "Backroute is already looking for your next load. Everything is in one app on your phone."
                     : `Backroute is already looking for loads for your ${trucks.length} trucks.`}
@@ -389,6 +391,11 @@ function Signup() {
               <Button href={solo ? "/driver" : "/carrier"} className="mt-6 w-full">
                 {solo ? "Open your app" : "Go to your dashboard"} <ArrowRight className="h-4 w-4" />
               </Button>
+              {real && solo && (
+                <Button href="/carrier/loads" variant="outline" className="mt-2 w-full">
+                  Add your first load
+                </Button>
+              )}
             </div>
           )}
         </section>

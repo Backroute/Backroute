@@ -87,8 +87,8 @@ export function FleetForm({ solo, submitLabel, onSubmit, busy }: { solo: boolean
         <fieldset key={i} className={unsure.has(i) ? "rounded-2xl border border-line p-3" : "rounded-2xl border border-line p-3"}>
           <legend className="px-1 text-xs font-medium text-ink-500">{solo ? "You and your truck" : `Truck ${i + 1}`}</legend>
           <div className="grid grid-cols-2 gap-2">
-            <input className={input} placeholder={solo ? "Your name" : "Driver's name"} aria-label="Driver's name" value={row.driverName} onChange={(e) => set(i, { driverName: e.target.value })} />
-            <input className={input} placeholder="Cell number" aria-label="Driver's cell number" type="tel" inputMode="tel" value={row.phone} onChange={(e) => set(i, { phone: e.target.value })} />
+            <input className={input} placeholder={solo ? "Your name" : "Driver's name"} aria-label={solo ? "Your name" : "Driver's name"} value={row.driverName} onChange={(e) => set(i, { driverName: e.target.value })} />
+            <input className={input} placeholder="Cell number" aria-label={solo ? "Your cell number" : "Driver's cell number"} type="tel" inputMode="tel" value={row.phone} onChange={(e) => set(i, { phone: e.target.value })} />
             <input className={input} placeholder="Truck unit #" aria-label="Truck unit number" value={row.unitNumber} onChange={(e) => set(i, { unitNumber: e.target.value })} />
             <select className={input} aria-label="Equipment" value={row.equipment} onChange={(e) => set(i, { equipment: e.target.value as EquipmentType })}>
               {EQUIPMENT.map((q) => (
@@ -98,7 +98,7 @@ export function FleetForm({ solo, submitLabel, onSubmit, busy }: { solo: boolean
             <div className="col-span-2 grid grid-cols-[1fr_4.5rem_auto] gap-2">
               <input className={input} placeholder="Home base city" aria-label="Home base city" value={row.homeCity} onChange={(e) => set(i, { homeCity: e.target.value })} />
               <input className={input} placeholder="State" aria-label="Home base state" maxLength={2} value={row.homeState} onChange={(e) => set(i, { homeState: e.target.value.toUpperCase() })} />
-              <select className={input} aria-label="How they run" value={row.runType} onChange={(e) => set(i, { runType: e.target.value as FleetEntry["runType"] })}>
+              <select className={input} aria-label={solo ? "How you run" : "How they run"} value={row.runType} onChange={(e) => set(i, { runType: e.target.value as FleetEntry["runType"] })}>
                 {RUN_TYPES.map((t) => (
                   <option key={t} value={t}>
                     {RUN_TYPE_LABEL[t]}
