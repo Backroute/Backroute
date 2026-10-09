@@ -21,8 +21,8 @@ export const preferencesActions = (set: SetState): Pick<Actions, "updateSettings
         activity: [
           {
             id: uid("act"), timestamp: new Date().toISOString(), type: "time_off" as const,
-            message: on ? `AI will get ${driver?.name.split(" ")[0] ?? "the driver"} home first` : `AI is back to best-paying loads for ${driver?.name.split(" ")[0] ?? "the driver"}`,
-            detail: on ? "The AI only books loads that bring them closer to home, even at a lower rate." : "Home time is still checked before every load.",
+            message: on ? `Backroute will get ${driver?.name.split(" ")[0] ?? "the driver"} home first` : `Backroute is back to best-paying loads for ${driver?.name.split(" ")[0] ?? "the driver"}`,
+            detail: on ? "Backroute only books loads that bring them closer to home, even at a lower rate." : "Home time is still checked before every load.",
             carrierId: PRIMARY_CARRIER_ID, severity: "info" as const,
           },
           ...state.activity,
@@ -50,7 +50,7 @@ export const preferencesActions = (set: SetState): Pick<Actions, "updateSettings
         activity: [
           {
             id: uid("act"), timestamp: now, type: "escalation" as const,
-            message: policy === "block" ? `AI won't book ${broker?.company ?? "this broker"} anymore` : policy === "surcharge" ? `AI will ask ${broker?.company ?? "this broker"} for a slow-pay premium` : `AI is back to its own call on ${broker?.company ?? "this broker"}`,
+            message: policy === "block" ? `Backroute won't book ${broker?.company ?? "this broker"} anymore` : policy === "surcharge" ? `Backroute will ask ${broker?.company ?? "this broker"} for a slow-pay premium` : `Backroute is back to its own call on ${broker?.company ?? "this broker"}`,
             detail: dropped.length ? `Stopped ${dropped.length} open negotiation${dropped.length === 1 ? "" : "s"}. Booked loads stay booked.` : "Applies to new loads from now on.",
             carrierId: PRIMARY_CARRIER_ID, severity: "info" as const,
           },

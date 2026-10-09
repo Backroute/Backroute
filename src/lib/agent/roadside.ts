@@ -215,7 +215,7 @@ export async function handleBreakdown(ctx: CarrierContext, driver: Driver, detai
   // the repair bill is the owner's.
   const noHelp = !shops.length;
   await raise(ctx, {
-    reason: `${driver.name} (breakdown): truck ${truck.unitNumber} broke down near ${where.text}${load ? ` on ${load.referenceNumber}` : ""}: ${details}.${done.length ? ` The AI ${done.join(", ")}.` : ""}${noHelp ? " It couldn't find a repair shop or tow: find help for the driver." : " The repair bill needs your OK before the shop starts."}`,
+    reason: `${driver.name} (breakdown): truck ${truck.unitNumber} broke down near ${where.text}${load ? ` on ${load.referenceNumber}` : ""}: ${details}.${done.length ? ` Backroute ${done.join(", ")}.` : ""}${noHelp ? " It couldn't find a repair shop or tow: find help for the driver." : " The repair bill needs your OK before the shop starts."}`,
     loadId: load?.id,
     label: "Sorted",
     source,
@@ -298,7 +298,7 @@ export async function nextShop(ctx: CarrierContext, truck: Truck): Promise<boole
     }
   }
   await saveRoadside(ctx, truck, { ...r, exhausted: true });
-  await raise(ctx, { reason: `None of the repair shops or tow companies the AI called could help truck ${truck.unitNumber} near ${r.where}. Find help for the driver.`, loadId: r.loadId, critical: true, label: "Sorted", source: "voice", to: "support" });
+  await raise(ctx, { reason: `None of the repair shops or tow companies Backroute called could help truck ${truck.unitNumber} near ${r.where}. Find help for the driver.`, loadId: r.loadId, critical: true, label: "Sorted", source: "voice", to: "support" });
   return false;
 }
 

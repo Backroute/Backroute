@@ -12,6 +12,8 @@ What the real version does today, and what it doesn't do yet. How to switch each
   - **Owner-operator:** an owner who drives.
 - **Your own fleet, no sample data.**
   - At sign-up the owner types in each truck and its driver, with the driver's cell number.
+  - Each driver is let in to the driver app and texted the link once, after the first-text notice of who's texting
+    (never a driver who texted STOP; in practice mode it waits until the carrier is live). They sign in with their phone.
   - More trucks can be added on the Fleet page.
   - In a real account, nothing is simulated.
 - **Loads the owner booked.**
@@ -357,6 +359,10 @@ What the real version does today, and what it doesn't do yet. How to switch each
 - **The lineup, shown.** Under "Up next", the driver and the owner see what's booked after it ("Then …"). The phone keeps the next two loads' map areas for no signal, and the offline badge says how many answers are waiting to send.
 - **Dock hours by day.** A dock that keeps short Saturday hours (or other odd days) is checked against that day's hours.
 - **Lookups kept for every server.** Posted dock hours (a week) and weather warnings (15 minutes) are kept in the database, so a paid lookup isn't repeated on each server (`20261014000000_lookup_cache.sql`, server-only).
+- **Leaving:** the owner downloads everything (Settings → Billing & Team → Your data: a .zip with the loads as a
+  spreadsheet, every file, and the rest as JSON; never saved passwords or keys) and can delete the account. Deleting
+  cancels the subscription first, removes everything of theirs, and keeps only that the account existed and drivers'
+  consent records. Support can do the same with `scripts/pilot-carrier.mjs export` and `delete`.
 
 ## What it doesn't do yet
 

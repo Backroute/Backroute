@@ -131,7 +131,7 @@ async function intake(ctx: CarrierContext, from: string, callSid: string, said: 
         await save("loads", ctx.carrier.id, next as unknown as Item);
         ctx.loads = ctx.loads.map((l) => (l.id === next.id ? next : l));
         taken = next;
-        await addActivity(ctx.carrier.id, event({ type: "load_offered", loadId: next.id, message: `${o.company} called with a load`, detail: `${next.lane.origin} → ${next.lane.destination} · AI on the phone with them`, severity: "info" }));
+        await addActivity(ctx.carrier.id, event({ type: "load_offered", loadId: next.id, message: `${o.company} called with a load`, detail: `${next.lane.origin} → ${next.lane.destination} · Backroute on the phone with them`, severity: "info" }));
         return `It fits truck ${ctx.trucks.find((t) => t.id === next.truckId)?.unitNumber ?? ""}. Now ask what they're paying on it.`;
       },
     }),

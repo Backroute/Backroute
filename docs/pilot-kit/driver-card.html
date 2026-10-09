@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Backroute: driver card</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  @page { size: Letter; margin: 0.5in 0.6in; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Geist, "Helvetica Neue", Arial, sans-serif; color: #111; font-size: 9.8pt; line-height: 1.42; }
+  .top { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1.5pt solid #111; padding-bottom: 6pt; }
+  .brand { font-weight: 600; font-size: 13pt; }
+  .for { color: #555; }
+  h1 { font-size: 18pt; font-weight: 600; letter-spacing: -0.02em; margin: 10pt 0 2pt; }
+  .lead { color: #333; margin: 0 0 8pt; }
+  ol { margin: 0; padding-left: 15pt; }
+  ol li { margin: 0 0 3.5pt; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 22pt; }
+  h2 { font-size: 10.5pt; font-weight: 600; margin: 10pt 0 4pt; }
+  ul { margin: 0; padding-left: 13pt; }
+  li { margin: 0 0 2.5pt; }
+  q { font-weight: 500; quotes: "“" "”"; }
+  .cut { margin-top: 14pt; border-top: 1pt dashed #999; padding-top: 4pt; color: #777; font-size: 7.6pt; text-align: center; }
+  .cards { display: grid; grid-template-columns: 3.5in 3.5in; gap: 0.2in; justify-content: center; margin-top: 8pt; }
+  .card { width: 3.5in; height: 2in; border: 0.8pt solid #111; border-radius: 8pt; padding: 8pt 10pt; font-size: 7.6pt; line-height: 1.32; display: flex; flex-direction: column; }
+  .card .name { font-weight: 600; font-size: 9.6pt; }
+  .card .num { font-weight: 600; font-size: 12pt; letter-spacing: 0.01em; margin: 1pt 0 3pt; }
+  .card ul { padding-left: 10pt; }
+  .card li { margin: 0 0 1pt; }
+  .card .sos { margin-top: auto; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="top"><span class="brand">Backroute</span><span class="for">{{carrier}} dispatch</span></div>
+
+  <h1>Your dispatch line</h1>
+  <p class="lead">{{carrier}} runs dispatch through Backroute. Your loads, check-ins and paperwork come by text and in the
+  app. Text or call the dispatch line any time: <b>{{dispatch}}</b>. It answers in your language.</p>
+
+  <div class="two">
+    <div>
+      <h2>Your first day</h2>
+      <ol>
+        <li>Open the link in the text from dispatch, or go to <b>{{site}}/login</b>. Sign in with your phone number (you get a code by text).</li>
+        <li>Tap <b>I agree</b> to get texts and calls from dispatch.</li>
+        <li>Turn on notifications in <b>Profile</b>. On an iPhone, add the app to your home screen first.</li>
+        <li>Before your first load, do the pre-trip inspection in the app.</li>
+      </ol>
+    </div>
+    <div>
+      <h2>On a load</h2>
+      <ul>
+        <li>At each stop, swipe when you arrive, then tap <b>I'm loaded</b> or <b>I'm unloaded</b>.</li>
+        <li>Take a photo of the BOL at pickup and the signed POD at delivery.</li>
+        <li>No time for the app? Just text: <q>loaded</q>, <q>unloaded</q>, <q>running 1 hr late</q>, or send the photo.</li>
+        <li>Broke down? Text or call. Dispatch finds a shop or a tow and tells the broker.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Good to know</h2>
+  <ul>
+    <li><b>Crash or injury: call 911 first</b>, then dispatch.</li>
+    <li>Reply STOP to stop texts, HELP for help. You can switch to app notifications instead of texts in Profile.</li>
+    <li>Questions about pay or home time? Ask on the same line. Anything only {{carrier}} can decide goes to them.</li>
+  </ul>
+
+  <div class="cut">✂ cut out a card for the cab</div>
+  <div class="cards">
+    <div class="card">
+      <div class="name">{{carrier}} dispatch</div>
+      <div class="num">{{dispatch}}</div>
+      <ul>
+        <li>App: {{site}}/login, sign in with your phone</li>
+        <li>Text <q>loaded</q>, <q>unloaded</q>, <q>running late</q> or a photo of the BOL or POD</li>
+        <li>Broke down? Text or call</li>
+        <li>STOP to stop texts · HELP for help</li>
+      </ul>
+      <div class="sos">Crash or injury: call 911 first.</div>
+    </div>
+    <div class="card" lang="es">
+      <div class="name">Despacho de {{carrier}}</div>
+      <div class="num">{{dispatch}}</div>
+      <ul>
+        <li>App: {{site}}/login, entra con tu número de teléfono</li>
+        <li>Escribe <q>cargado</q>, <q>descargado</q>, <q>voy tarde</q> o manda foto del BOL o POD</li>
+        <li>¿Te descompusiste? Escribe o llama</li>
+        <li>STOP para no recibir mensajes · HELP para ayuda</li>
+      </ul>
+      <div class="sos">Choque o lesión: llama primero al 911.</div>
+    </div>
+    <div class="card">
+      <div class="name">{{carrier}} dispatch</div>
+      <div class="num">{{dispatch}}</div>
+      <ul>
+        <li>App: {{site}}/login, sign in with your phone</li>
+        <li>Text <q>loaded</q>, <q>unloaded</q>, <q>running late</q> or a photo of the BOL or POD</li>
+        <li>Broke down? Text or call</li>
+        <li>STOP to stop texts · HELP for help</li>
+      </ul>
+      <div class="sos">Crash or injury: call 911 first.</div>
+    </div>
+    <div class="card" lang="es">
+      <div class="name">Despacho de {{carrier}}</div>
+      <div class="num">{{dispatch}}</div>
+      <ul>
+        <li>App: {{site}}/login, entra con tu número de teléfono</li>
+        <li>Escribe <q>cargado</q>, <q>descargado</q>, <q>voy tarde</q> o manda foto del BOL o POD</li>
+        <li>¿Te descompusiste? Escribe o llama</li>
+        <li>STOP para no recibir mensajes · HELP para ayuda</li>
+      </ul>
+      <div class="sos">Choque o lesión: llama primero al 911.</div>
+    </div>
+  </div>
+</body>
+</html>

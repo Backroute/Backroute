@@ -53,7 +53,7 @@ export async function recordPayments(ctx: CarrierContext, payments: { reference:
           withinRules: true,
           why: `${from} paid $${gap.toLocaleString()} short on ${load.invoice.number}. Ask them why and for the balance?`,
         });
-      await tellOwner(ctx, { reason: `${from} paid $${p.amount!.toLocaleString()} on invoice ${load.invoice.number} (${load.referenceNumber}), $${gap.toLocaleString()} short. The AI asked them what it's for and for the balance.`, loadId: load.id, source: "email", severity: "warning" });
+      await tellOwner(ctx, { reason: `${from} paid $${p.amount!.toLocaleString()} on invoice ${load.invoice.number} (${load.referenceNumber}), $${gap.toLocaleString()} short. Backroute asked them what it's for and for the balance.`, loadId: load.id, source: "email", severity: "warning" });
     }
   }
   return paid;
@@ -85,7 +85,7 @@ export async function chasePayments(ctx: CarrierContext, now: number): Promise<s
         withinRules: true,
         why: `Invoice ${inv.number} is ${late} days late after two reminders. Send a final notice?`,
       });
-      await passToOwner(ctx, { reason: `Invoice ${inv.number} for ${load.referenceNumber} ($${inv.amount.toLocaleString()}) is ${late} days late. The AI sent two reminders and a final notice to ${inv.sentTo}. If it isn't paid in a week, you can file a claim on ${broker?.company ?? "the broker"}'s bond (FMCSA lists their surety), or send it to collections.`, loadId: load.id, label: "Decided", source: "email", to: "owner" });
+      await passToOwner(ctx, { reason: `Invoice ${inv.number} for ${load.referenceNumber} ($${inv.amount.toLocaleString()}) is ${late} days late. Backroute sent two reminders and a final notice to ${inv.sentTo}. If it isn't paid in a week, you can file a claim on ${broker?.company ?? "the broker"}'s bond (FMCSA lists their surety), or send it to collections.`, loadId: load.id, label: "Decided", source: "email", to: "owner" });
       done.push(`${load.referenceNumber}: final payment notice`);
       continue;
     }

@@ -214,7 +214,7 @@ export function TripDetails({
                   <p className="text-sm">{e.message}</p>
                   <p className="text-xs text-white/50">{e.detail}</p>
                 </div>
-                <span className="shrink-0 text-xs text-white/40">{now ? timeAgo(e.timestamp, now) : ""}</span>
+                <span className="shrink-0 text-xs text-white/60">{now ? timeAgo(e.timestamp, now) : ""}</span>
               </li>
             ))}
           </ol>

@@ -39,7 +39,7 @@ export const INTEGRATION_CATEGORIES: IntegrationCategory[] = [
   {
     name: "Rate intelligence",
     items: [
-      { id: "greenscreens", name: "Greenscreens.ai", connected: true, detail: "AI-powered lane rate benchmarking" },
+      { id: "greenscreens", name: "Greenscreens.ai", connected: true, detail: "Lane rate benchmarking" },
       { id: "dat-rateview", name: "DAT RateView", connected: false, detail: "Historical rate benchmarking" },
     ],
   },

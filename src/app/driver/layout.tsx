@@ -83,7 +83,7 @@ function DriverShell({ children }: { children: React.ReactNode }) {
 
         <div className="flex-1 pb-20">{children}</div>
 
-        <nav className="sticky bottom-0 z-30 flex items-center justify-between gap-1 border-t border-line bg-white/80 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl backdrop-saturate-150 sm:rounded-b-[2.5rem]">
+        <nav className="sticky bottom-0 z-30 flex items-center justify-between gap-1 border-t border-line bg-white/95 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl backdrop-saturate-150 sm:rounded-b-[2.5rem]">
           {TABS.map((tab) => {
             const active = pathname === tab.href;
             const Icon = tab.icon;
@@ -94,7 +94,7 @@ function DriverShell({ children }: { children: React.ReactNode }) {
                 transitionTypes={slideTypes(TAB_ORDER, currentTab, tab.href)}
                 className={cn(
                   "flex flex-1 flex-col items-center gap-1 rounded-2xl py-2 text-xs font-medium transition-colors",
-                  active ? "bg-ink-950 text-white" : "text-ink-400 hover:text-ink-700",
+                  active ? "bg-ink-950 text-white" : "text-ink-500 hover:text-ink-800",
                 )}
               >
                 <Icon className="h-5 w-5" strokeWidth={2} />

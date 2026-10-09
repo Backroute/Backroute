@@ -361,6 +361,10 @@ http.createServer(async (req, res) => {
     if (p === "billing_portal/sessions") return reply(res, { id: "bps_test", url: `https://billing.stripe.test/p/${form.customer}` });
     if (p === "invoices") return reply(res, { data: [{ id: "in_1", number: "BR-0001", amount_due: 29900, status: "paid", created: Math.floor(Date.now() / 1000) - 86400, hosted_invoice_url: "https://invoice.stripe.test/in_1", invoice_pdf: "https://invoice.stripe.test/in_1.pdf" }] });
     if (p.startsWith("subscription_items/")) return reply(res, { id: p.split("/")[1], quantity: Number(form.quantity) });
+    if (p.startsWith("subscriptions/") && req.method === "DELETE") {
+      if (p.endsWith("sub_fail")) { res.writeHead(500, { "content-type": "application/json" }); return res.end(JSON.stringify({ error: { message: "stand-in failure" } })); }
+      return reply(res, { id: p.split("/")[1], object: "subscription", status: "canceled" });
+    }
     res.writeHead(404, { "content-type": "application/json" });
     return res.end(JSON.stringify({ error: { message: "not faked" } }));
   }

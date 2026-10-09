@@ -126,7 +126,7 @@ export async function holdForBilling(ctx: CarrierContext, loadId: string, now = 
   const why = await billingHold(ctx.carrier.id, now).catch(() => null);
   if (!why) return false;
   if (await claimMark(ctx.carrier.id, `carrier:${ctx.carrier.id}`, `billing_hold:${new Date(now).toISOString().slice(0, 10)}`))
-    await tellOwner(ctx, { reason: `The AI isn't booking new loads because ${why}. Loads already booked keep running. Open Settings → Billing & Team to start or fix the subscription.`, loadId, label: "Got it", source: "app", severity: "warning" });
+    await tellOwner(ctx, { reason: `Backroute isn't booking new loads because ${why}. Loads already booked keep running. Open Settings → Billing & Team to start or fix the subscription.`, loadId, label: "Got it", source: "app", severity: "warning" });
   return true;
 }
 
@@ -161,6 +161,19 @@ export async function startCheckout(carrier: { id: string; name: string; email?:
     cancel_url: `${returnUrl}?billing=cancelled`,
   });
   return session.url;
+}
+
+/** Ends the subscription now, for an account being deleted. Nothing to do without one, or once it's cancelled. */
+export async function cancelSubscription(carrierId: string) {
+  const b = await billingFor(carrierId);
+  if (!b?.subscription_id || b.status === "canceled") return;
+  if (!process.env.STRIPE_SECRET_KEY) throw new Error("Stripe isn't set up, so the subscription can't be cancelled");
+  try {
+    await stripe("DELETE", `subscriptions/${b.subscription_id}`);
+  } catch (e) {
+    // Already gone at Stripe: nothing left to cancel.
+    if (!/Stripe 404/.test(String(e))) throw e;
+  }
 }
 
 /** Stripe's billing page, where the owner changes the card, sees invoices, or cancels. */
@@ -244,7 +257,7 @@ export async function applyStripeEvent(event: { id: string; type: string; data: 
       // The owner hears the card failed, the first time.
       const ctx = await loadContext(carrierId);
       if (ctx && (await claimMark(carrierId, `carrier:${carrierId}`, `card_failed:${String(o.id)}`)))
-        await tellOwner(ctx, { reason: `Backroute couldn't charge your card for this month. Update it in Settings → Billing & Team; the AI keeps working for ${graceDays()} days while you do.`, label: "Got it", source: "app", severity: "warning" });
+        await tellOwner(ctx, { reason: `Backroute couldn't charge your card for this month. Update it in Settings → Billing & Team; Backroute keeps working for ${graceDays()} days while you do.`, label: "Got it", source: "app", severity: "warning" });
     }
     return `${carrierId}: ${event.type}`;
   }

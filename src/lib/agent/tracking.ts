@@ -125,7 +125,7 @@ export async function trackingRounds(ctx: CarrierContext, now: number): Promise<
           why: `Ask ${broker?.company ?? "the broker"} to resend the tracking request for ${load.referenceNumber}?`,
         });
       if (driver) await text(ctx, driver, `${driver.name.split(" ")[0]}, the broker is sending the ${t.app ?? "tracking"} request for ${load.referenceNumber} again. Accept it when it comes and reply YES.`, "tracking_resend", load.id);
-      await tellOwner(ctx, { reason: `${load.referenceNumber} needs ${t.app ?? "tracking"} and the driver hasn't confirmed it's on. The AI asked the broker to resend it and told the driver. Brokers can hold pay on untracked loads.`, loadId: load.id, source: "sms", severity: "warning" });
+      await tellOwner(ctx, { reason: `${load.referenceNumber} needs ${t.app ?? "tracking"} and the driver hasn't confirmed it's on. Backroute asked the broker to resend it and told the driver. Brokers can hold pay on untracked loads.`, loadId: load.id, source: "sms", severity: "warning" });
       done.push(`${load.referenceNumber}: tracking not confirmed, broker asked to resend`);
     }
   }

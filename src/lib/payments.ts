@@ -84,7 +84,7 @@ export function paymentStatus(load: Load, broker: Broker | undefined, factoringO
   const missing = missingDocs(load);
   const brokerName = broker?.company ?? "the broker";
   const packetStep: PaymentStep = missing.length
-    ? { label: "Invoice packet", detail: `Missing: ${missing.join(", ")}. The AI asked the driver for it.`, state: "problem" }
+    ? { label: "Invoice packet", detail: `Missing: ${missing.join(", ")}. Backroute asked the driver for it.`, state: "problem" }
     : { label: "Invoice packet checked", detail: "Rate con, BOL and signed POD match; amounts agree", state: "done" };
 
   // The factor runs its own credit check on the broker and won't advance against one it doesn't trust.
@@ -117,7 +117,7 @@ export function paymentStatus(load: Load, broker: Broker | undefined, factoringO
             : `Business days only, before the 11 AM cutoff pays the same day. Expected ${whenLabel(fundsAt, now)} by 5 PM.`,
           state: funded ? "done" : "current",
         },
-        { label: `${brokerName} pays the factor`, detail: `Recourse: if they haven't paid in ${RECOURSE_DAYS} days, the advance comes back to you. The AI watches it.`, state: "todo" },
+        { label: `${brokerName} pays the factor`, detail: `Recourse: if they haven't paid in ${RECOURSE_DAYS} days, the advance comes back to you. Backroute watches it.`, state: "todo" },
       ],
     };
   }
@@ -141,8 +141,8 @@ export function paymentStatus(load: Load, broker: Broker | undefined, factoringO
       paid
         ? { label: "Paid", detail: shortDate(expected), state: "done" }
         : daysLate > 0
-          ? { label: "Overdue", detail: `The AI ${followUps.join(", ")}.`, state: "problem" }
-          : { label: "Waiting on payment", detail: "The AI sends a reminder the day after it's due.", state: "current" },
+          ? { label: "Overdue", detail: `Backroute ${followUps.join(", ")}.`, state: "problem" }
+          : { label: "Waiting on payment", detail: "Backroute sends a reminder the day after it's due.", state: "current" },
     ],
   };
 }

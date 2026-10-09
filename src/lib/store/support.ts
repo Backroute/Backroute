@@ -59,13 +59,13 @@ export function aiMilestoneEvent(load: Load, brokerName: string): ActivityEvent 
   const base = { id: uid("act"), timestamp: new Date().toISOString(), loadId: load.id, carrierId: load.carrierId };
   switch (load.stage) {
     case "at_pickup":
-      return { ...base, type: "check_call", channel: "email", message: `AI told ${brokerName} the driver checked in`, detail: `${load.referenceNumber} · detention clock running, 2 hrs free`, severity: "info" };
+      return { ...base, type: "check_call", channel: "email", message: `Backroute told ${brokerName} the driver checked in`, detail: `${load.referenceNumber} · detention clock running, 2 hrs free`, severity: "info" };
     case "in_transit":
-      return { ...base, type: "document_captured", channel: "email", message: `AI sent the BOL to ${brokerName}`, detail: `${load.referenceNumber} · live tracking shared, ETA updates go out automatically`, severity: "success" };
+      return { ...base, type: "document_captured", channel: "email", message: `Backroute sent the BOL to ${brokerName}`, detail: `${load.referenceNumber} · live tracking shared, ETA updates go out automatically`, severity: "success" };
     case "at_delivery":
-      return { ...base, type: "check_call", channel: "email", message: `AI told ${brokerName} the driver is at the receiver`, detail: `${load.referenceNumber} · detention clock running, 2 hrs free`, severity: "info" };
+      return { ...base, type: "check_call", channel: "email", message: `Backroute told ${brokerName} the driver is at the receiver`, detail: `${load.referenceNumber} · detention clock running, 2 hrs free`, severity: "info" };
     case "delivered":
-      return { ...base, type: "document_captured", channel: "email", message: `AI emailed the POD and invoice to ${brokerName}`, detail: `${load.referenceNumber} · payment tracked until it lands`, severity: "success" };
+      return { ...base, type: "document_captured", channel: "email", message: `Backroute emailed the POD and invoice to ${brokerName}`, detail: `${load.referenceNumber} · payment tracked until it lands`, severity: "success" };
     default:
       return null;
   }
@@ -78,7 +78,7 @@ export function withLiveCall(load: Load, broker: Broker | undefined): { load: Lo
     load: { ...load, liveCall },
     event: {
       id: uid("act"), timestamp: liveCall.startedAt, type: "call_started", channel: "voice",
-      message: `AI is on the phone with ${broker?.company ?? "the broker"}`, detail: `${load.lane.origin} → ${load.lane.destination} · asking $${liveCall.lines[2].offer?.toLocaleString()}`,
+      message: `Backroute is on the phone with ${broker?.company ?? "the broker"}`, detail: `${load.lane.origin} → ${load.lane.destination} · asking $${liveCall.lines[2].offer?.toLocaleString()}`,
       loadId: load.id, carrierId: load.carrierId, severity: "info",
     },
   };
@@ -170,12 +170,12 @@ export function runRateCons(loads: Load[], brokers: Broker[], escalations: Escal
       const mc = review.issues.find((i) => i.field === "mc");
       if (!review.issues.length) {
         review = { ...review, status: "signed", signedAt: iso };
-        events.push({ ...base, id: uid("act"), type: "document_captured", message: `AI checked the rate con from ${name}: matches what was agreed`, detail: `${load.referenceNumber} · rate, detention, pickup and terms all match. Signed.`, severity: "success" });
+        events.push({ ...base, id: uid("act"), type: "document_captured", message: `Backroute checked the rate con from ${name}: matches what was agreed`, detail: `${load.referenceNumber} · rate, detention, pickup and terms all match. Signed.`, severity: "success" });
       } else if (mc) {
         // Not a typo to fix: someone other than the broker the AI negotiated with sent this. Nothing moves until a person looks.
         const esc: Escalation = {
           id: uid("esc"), loadId: load.id, carrierId: load.carrierId, rateConLoadId: load.id, createdAt: iso, status: "open", complexity: "routine",
-          reason: `Possible double-brokering on ${load.lane.origin} → ${load.lane.destination}: the rate con came from ${mc.onDoc}, not ${name}. The AI hasn't signed it. Approve only if you've confirmed it with ${name} by phone.`,
+          reason: `Possible double-brokering on ${load.lane.origin} → ${load.lane.destination}: the rate con came from ${mc.onDoc}, not ${name}. Backroute hasn't signed it. Approve only if you've confirmed it with ${name} by phone.`,
           recommendedAction: "reject", recommendedLabel: "Walk away from this load",
         };
         escalations.unshift(esc);
@@ -185,7 +185,7 @@ export function runRateCons(loads: Load[], brokers: Broker[], escalations: Escal
         review = { ...review, status: "fixing", askedAt: iso };
         events.push({
           ...base, id: uid("act"), type: "negotiation_email", channel: "email",
-          message: `AI found ${review.issues.length} problem${review.issues.length === 1 ? "" : "s"} on the rate con from ${name}`,
+          message: `Backroute found ${review.issues.length} problem${review.issues.length === 1 ? "" : "s"} on the rate con from ${name}`,
           detail: `${review.issues.map((i) => `${i.label}: says ${i.onDoc}, agreed ${i.agreed}`).join("; ")}. Asked for a corrected rate con.`,
           severity: "warning",
         });
@@ -195,7 +195,7 @@ export function runRateCons(loads: Load[], brokers: Broker[], escalations: Escal
       const saved = savedBy(review);
       if (review.issues.every((i) => i.status === "fixed")) {
         review = { ...review, status: "signed", signedAt: iso };
-        events.push({ ...base, id: uid("act"), type: "document_captured", message: `${name} sent a corrected rate con. AI signed it`, detail: `${load.referenceNumber}${saved ? ` · kept $${saved.toLocaleString()} that would have been lost` : " · terms now match what was agreed"}`, severity: "success" });
+        events.push({ ...base, id: uid("act"), type: "document_captured", message: `${name} sent a corrected rate con. Backroute signed it`, detail: `${load.referenceNumber}${saved ? ` · kept $${saved.toLocaleString()} that would have been lost` : " · terms now match what was agreed"}`, severity: "success" });
       } else {
         const esc: Escalation = {
           id: uid("esc"), loadId: load.id, carrierId: load.carrierId, rateConLoadId: load.id, createdAt: iso, status: "open", complexity: "routine",
@@ -226,7 +226,7 @@ export function rateConDecision(state: StoreState, escalationId: string, approve
     return {
       loads: state.loads.map((l) => (l.id === load.id ? { ...l, rateCon } : l)),
       trucks: state.trucks,
-      events: [{ ...base, type: "document_captured" as const, message: `Rate con from ${name} accepted as is. AI signed it`, detail: load.referenceNumber, severity: "info" as const }],
+      events: [{ ...base, type: "document_captured" as const, message: `Rate con from ${name} accepted as is. Backroute signed it`, detail: load.referenceNumber, severity: "info" as const }],
     };
   }
   return {
@@ -237,7 +237,7 @@ export function rateConDecision(state: StoreState, escalationId: string, approve
     trucks: state.trucks.map((t) =>
       t.nextLoadId === load.id ? { ...t, nextLoadId: null } : t.currentLoadId === load.id ? { ...t, currentLoadId: null, status: "available" as const } : t,
     ),
-    events: [{ ...base, type: "load_cancelled" as const, message: `Walked away from ${name}'s load over the rate con`, detail: `${load.lane.origin} → ${load.lane.destination} · nothing dispatched, the AI is finding another load`, severity: "info" as const }],
+    events: [{ ...base, type: "load_cancelled" as const, message: `Walked away from ${name}'s load over the rate con`, detail: `${load.lane.origin} → ${load.lane.destination} · nothing dispatched, Backroute is finding another load`, severity: "info" as const }],
   };
 }
 
@@ -270,7 +270,7 @@ export const ESCALATION_TEMPLATES: EscalationTemplate[] = [
     recommendedLabel: "Approve, send detention invoice",
   },
   {
-    reason: "Broker unresponsive after 45 minutes. AI recommends re-sourcing this lane.",
+    reason: "Broker unresponsive after 45 minutes. Backroute recommends re-sourcing this lane.",
     complexity: "routine",
     recommendedAction: "approve",
     recommendedLabel: "Approve, re-source the lane",

@@ -10,6 +10,10 @@
 //   node scripts/pilot-carrier.mjs list                      (every carrier, its stage, live or practice)
 //   node scripts/pilot-carrier.mjs pause-all                 (the stop button: every live carrier to practice mode)
 //   node scripts/pilot-carrier.mjs resume-all                (each carrier back to where pause-all found it)
+//   node scripts/pilot-carrier.mjs export <carrier-id> [--out dir]   (everything of theirs: JSON per table, and the files)
+//   node scripts/pilot-carrier.mjs delete <carrier-id> --confirm "<exact company name>"
+//                                   (on the owner's written request: cancels the subscription, deletes the carrier and
+//                                    everything of theirs, and removes sign-ins that were only for them. Can't be undone.)
 //
 // --drivers-agreed records that the owner has each driver's written OK to texts and calls (docs/legal); without it,
 // each driver's first text asks them to confirm.
@@ -194,6 +198,86 @@ async function status(id) {
   last 7 days:  sent ${by(sent, "channel")}; held in practice ${by(held, "channel")}`);
 }
 
+// ─── A carrier leaving (the same as Settings → Your data; lib/account.ts has the app's copy of this list) ──────────
+const EXPORT_TABLES = {
+  drivers: ["id,name,phone,data,updated_at", "id"],
+  trucks: ["id,unit_number,driver_id,second_driver_id,data,updated_at", "id"],
+  loads: ["id,truck_id,stage,data,updated_at", "id"],
+  escalations: ["id,load_id,status,data,updated_at", "id"],
+  records: ["id,kind,driver_id,data,updated_at", "id"],
+  activity: ["id,load_id,data,created_at", "id"],
+  channel_messages: ["id,channel,direction,driver_id,counterparty,body,data,created_at", "id"],
+  driver_messages: ["id,driver_id,data,created_at", "id"],
+  dispatch_calls: ["id,driver_id,status,data,updated_at", "id"],
+  driver_consents: ["id,driver_id,phone,granted,via,wording,version,at", "id"],
+  held_sends: ["id,load_id,purpose,summary,draft,send_at,status,created_at", "id"],
+  facility_notes: ["id,name_key,city,state,zip,note,hours,created_at", "id"],
+  facility_visits: ["load_id,stop,name_key,city,state,minutes,at", "at"],
+  weekly_reviews: ["week,data,created_at", "week"],
+  audit_log: ["id,at,who,action,target", "id"],
+  portal_tasks: ["id,kind,status,url,load_id,created_at,updated_at", "id"],
+  portal_logins: ["id,kind,site,label,username,created_at", "id"],
+  carrier_integrations: ["kind,status,checked_at", "kind"],
+  carrier_files: ["id,kind,load_id,name,content_type,size,expires_on,note,created_at", "created_at"],
+};
+
+async function exportCarrier(id, out) {
+  const c = await carrier(id);
+  const dir = out ?? `export-${id}`;
+  fs.mkdirSync(`${dir}/data`, { recursive: true });
+  const [billing] = await rest_("GET", `carrier_billing?carrier_id=eq.${id}&select=status,trucks,current_period_end,trial_end`);
+  fs.writeFileSync(`${dir}/data/carrier.json`, JSON.stringify({ ...c, inbound_key: undefined, billing: billing ?? null }, null, 1));
+  for (const [table, [columns, order]] of Object.entries(EXPORT_TABLES)) {
+    const rows = [];
+    for (let page = 0; ; page++) {
+      const got = await rest_("GET", `${table}?carrier_id=eq.${id}&select=${columns}&order=${order}&limit=1000&offset=${page * 1000}`);
+      rows.push(...got);
+      if (got.length < 1000) break;
+    }
+    fs.writeFileSync(`${dir}/data/${table}.json`, JSON.stringify(rows, null, 1));
+    console.log(`  ${table.padEnd(22)} ${rows.length}`);
+  }
+  let files = 0;
+  for (let page = 0; ; page++) {
+    const got = await rest_("GET", `carrier_files?carrier_id=eq.${id}&select=id,kind,name,created_at,data&order=created_at&limit=20&offset=${page * 20}`);
+    for (const f of got) {
+      const safe = (x) => String(x).replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "_").slice(0, 120) || "file";
+      fs.mkdirSync(`${dir}/files/${safe(f.kind)}`, { recursive: true });
+      const name = `${dir}/files/${safe(f.kind)}/${f.created_at.slice(0, 10)} ${f.id.slice(0, 8)} ${safe(f.name)}`;
+      fs.writeFileSync(name, Buffer.from(f.data, "base64"));
+      files++;
+    }
+    if (got.length < 20) break;
+  }
+  console.log(`${c.name}: exported to ${dir} (${files} files). Saved website passwords and connection keys aren't included.`);
+}
+
+async function deleteCarrier(id, confirm) {
+  const c = await carrier(id);
+  const norm = (x) => String(x ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+  if (norm(confirm) !== norm(c.name)) throw new Error(`To delete ${id}, add --confirm "${c.name}" (the exact company name).`);
+  const [billing] = await rest_("GET", `carrier_billing?carrier_id=eq.${id}&select=subscription_id,status`);
+  if (billing?.subscription_id && billing.status !== "canceled") {
+    if (!process.env.STRIPE_SECRET_KEY) throw new Error("They have a subscription: set STRIPE_SECRET_KEY so it's cancelled first (or cancel it in Stripe and run this again).");
+    const res = await fetch(`${(process.env.STRIPE_API_BASE ?? "https://api.stripe.com").replace(/\/$/, "")}/v1/subscriptions/${billing.subscription_id}`, { method: "DELETE", headers: { authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` } });
+    if (!res.ok && res.status !== 404) throw new Error(`Stripe wouldn't cancel the subscription (${res.status}); nothing was deleted.`);
+    console.log("  subscription cancelled");
+  }
+  const members = await rest_("GET", `members?carrier_id=eq.${id}&select=user_id`);
+  await rest_("POST", "closed_accounts?on_conflict=carrier_id", { carrier_id: id, name: c.name, mc: c.mc, closed_by: `support (${process.env.USER ?? "script"})` }, "resolution=merge-duplicates,return=minimal");
+  await rest_("DELETE", `carriers?id=eq.${encodeURIComponent(id)}`, null, "return=minimal");
+  await rest_("DELETE", `service_heartbeats?name=eq.${encodeURIComponent(`rounds:${id}`)}`, null, "return=minimal");
+  let removed = 0;
+  for (const { user_id } of members) {
+    const other = await rest_("GET", `members?user_id=eq.${user_id}&select=carrier_id&limit=1`);
+    if (other.length) continue;
+    const res = await fetch(`${URL_}/auth/v1/admin/users/${user_id}`, { method: "DELETE", headers: { apikey: KEY, authorization: `Bearer ${KEY}` } });
+    if (res.ok) removed++;
+    else console.log(`  couldn't remove sign-in ${user_id} (${res.status}); remove it in Supabase → Authentication`);
+  }
+  console.log(`${c.name} (${id}) deleted, with everything of theirs. ${removed} sign-in${removed === 1 ? "" : "s"} removed. Drivers' consent records were archived.`);
+}
+
 try {
   if (!URL_ || !KEY) throw new Error("Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
   if (cmd === "create") await create();
@@ -204,7 +288,9 @@ try {
   else if (cmd === "list") await list();
   else if (cmd === "pause-all") await pauseAll();
   else if (cmd === "resume-all") await resumeAll();
-  else console.log("Usage: create | stage <id> shadow|ask|rules|full | status <id> | pause <id> | resume <id> | list | pause-all | resume-all   (see the top of this file)");
+  else if (cmd === "export") await exportCarrier(positional[0], args.out);
+  else if (cmd === "delete") await deleteCarrier(positional[0], args.confirm);
+  else console.log("Usage: create | stage <id> shadow|ask|rules|full | status <id> | pause <id> | resume <id> | list | pause-all | resume-all | export <id> | delete <id> --confirm <name>   (see the top of this file)");
 } catch (e) {
   console.error(e.message ?? e);
   process.exit(1);

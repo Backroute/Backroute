@@ -121,7 +121,7 @@ export async function stop(carrierId: string, id: string, by: string | null): Pr
     const offer = load.bookRequest?.brokerOffer;
     await save("loads", carrierId, addWhy(load, `You stopped the AI's ${row.purpose === "accept" ? "acceptance" : "counter"} before it went.`) as unknown as Item);
     const e: Escalation | null = await passToOwner(ctx, {
-      reason: `You stopped the AI's ${row.purpose === "accept" ? `acceptance of $${(draft.amount ?? 0).toLocaleString()}` : `counter at $${(draft.amount ?? 0).toLocaleString()}`} on ${load.referenceNumber}.${offer ? ` The broker's offer of $${offer.toLocaleString()} is still waiting for an answer.` : ""} Tell the AI what to do from the load.`,
+      reason: `You stopped Backroute's ${row.purpose === "accept" ? `acceptance of $${(draft.amount ?? 0).toLocaleString()}` : `counter at $${(draft.amount ?? 0).toLocaleString()}`} on ${load.referenceNumber}.${offer ? ` The broker's offer of $${offer.toLocaleString()} is still waiting for an answer.` : ""} Tell Backroute what to do from the load.`,
       loadId: load.id,
       label: "I'll answer",
       source: "email",

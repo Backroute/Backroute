@@ -162,9 +162,10 @@ const loadData = (id) => JSON.parse(db(`select data from loads where carrier_id 
   p.on("pageerror", (e) => errors.push(e.message));
   await p.goto(`${BASE}/carrier/settings?tab=general&quickbooks=connected`, { waitUntil: "domcontentloaded" });
   await p.getByText("QuickBooks Online", { exact: true }).waitFor({ timeout: 120000 }).catch(() => {});
-  await p.getByText(/Connected to Lone Star Freight LLC/).first().waitFor({ timeout: 30000 }).catch(() => {});
+  // Late in a full run the dev server can take a while to compile the settings APIs the first time.
+  await p.getByText(/Connected to Lone Star Freight LLC/).first().waitFor({ timeout: 90000 }).catch(() => {});
   const text = await p.locator("body").innerText();
-  check("Settings shows QuickBooks connected, with what went in, and the note from Intuit's return", /Connected to Lone Star Freight LLC/.test(text) && /QuickBooks is connected/.test(text) && /Put in what.s new now/.test(text), text.match(/QuickBooks[\s\S]{0,300}/)?.[0]);
+  check("Settings shows QuickBooks connected, with what went in, and the note from Intuit's return", /Connected to Lone Star Freight LLC/.test(text) && /QuickBooks is connected/.test(text) && /Put in what.s new now/.test(text), text.match(/QuickBooks Online\n[\s\S]{0,400}/)?.[0]);
   await p.screenshot({ path: `${S}/.out/ux4-quickbooks.png` });
   check("no page errors", errors.length === 0, errors.join(" | "));
   await browser.close();

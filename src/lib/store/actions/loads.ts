@@ -36,7 +36,7 @@ export const loadsActions = (set: SetState, get: GetState): Pick<Actions, "selec
       const event: ActivityEvent = {
         id: uid("act"), timestamp: reading.readAt, type: "document_captured", loadId, carrierId: load.carrierId,
         message: !reading.isRateCon ? "Uploaded file isn't a rate con" : serious ? `Rate con doesn't match: ${serious} thing${serious === 1 ? "" : "s"} to fix` : "Rate con matches what was agreed",
-        detail: `${reading.fileName} · read by AI`,
+        detail: `${reading.fileName} · read by Backroute`,
         severity: !reading.isRateCon || serious ? "warning" : "success",
       };
       return {
@@ -75,6 +75,7 @@ export const loadsActions = (set: SetState, get: GetState): Pick<Actions, "selec
   addToFleet: (entries) => {
     const made = entries.map(makeTruckAndDriver);
     set((state) => ({ trucks: [...state.trucks, ...made.map((m) => m.truck)], drivers: [...state.drivers, ...made.map((m) => m.driver)] }));
+    return made.map((m) => m.driver);
   },
 
   addLoad: ({ brokerName, brokerEmail, rateConReading, ...input }) => {
@@ -226,7 +227,7 @@ export const loadsActions = (set: SetState, get: GetState): Pick<Actions, "selec
         activity: [
           {
             id: uid("act"), timestamp: new Date().toISOString(), type: "negotiation_email" as const,
-            message: "Asked AI about this offer before committing",
+            message: "Asked Backroute about this offer before committing",
             detail: `${broker?.company ?? load.source} · "${text}"`,
             loadId: updated.id, carrierId: updated.carrierId, severity: "info" as const, channel: "email" as const,
           },
@@ -307,7 +308,7 @@ export const loadsActions = (set: SetState, get: GetState): Pick<Actions, "selec
         activity: [
           {
             id: uid("act"), timestamp: new Date().toISOString(), type: "call_completed" as const,
-            message: callerIsDriver ? "Driver called the AI dispatcher" : "Carrier called the AI dispatcher",
+            message: callerIsDriver ? "Driver called Backroute" : "Carrier called Backroute",
             detail: `${load.lane.origin} → ${load.lane.destination} · ${formatDuration(call.durationSec)}${call.outcome ? " · " + call.outcome : ""}`,
             loadId, carrierId: load.carrierId, severity: "info" as ActivityEvent["severity"],
           },
@@ -337,7 +338,7 @@ export const loadsActions = (set: SetState, get: GetState): Pick<Actions, "selec
         activity: [
           {
             id: uid("act"), timestamp: new Date().toISOString(), type: "escalation" as const,
-            message: paused ? "Ops paused the AI on this load" : "Ops resumed the AI on this load",
+            message: paused ? "Ops paused Backroute on this load" : "Ops resumed Backroute on this load",
             detail: `${load.lane.origin} → ${load.lane.destination} · ${load.referenceNumber}`,
             loadId, carrierId: load.carrierId, severity: (paused ? "warning" : "info") as ActivityEvent["severity"],
           },

@@ -93,7 +93,7 @@ export const tripActions = (set: SetState, get: GetState): Pick<Actions, "driver
         const broker = state.brokers.find((b) => b.id === load.brokerId)?.company ?? "the broker";
         events.unshift({
           id: uid("act"), timestamp: now, type: "negotiation_email", channel: "email",
-          message: `AI billed ${broker} $${amount} detention`, detail: `${load.referenceNumber} · ${formatDockTime(minutes)} at ${where}, 2h free · check-in and out times attached`,
+          message: `Backroute billed ${broker} $${amount} detention`, detail: `${load.referenceNumber} · ${formatDockTime(minutes)} at ${where}, 2h free · check-in and out times attached`,
           loadId, carrierId: load.carrierId, severity: "success",
         });
       }
@@ -152,7 +152,7 @@ export const tripActions = (set: SetState, get: GetState): Pick<Actions, "driver
         activity: [
           {
             id: uid("act"), timestamp: now, type: "document_captured" as const,
-            message: `Driver uploaded the ${DRIVER_DOC_LABEL[type]}`, detail: `${load.referenceNumber} · AI is reading it`,
+            message: `Driver uploaded the ${DRIVER_DOC_LABEL[type]}`, detail: `${load.referenceNumber} · Backroute is reading it`,
             loadId, carrierId: load.carrierId, severity: "info" as const,
           },
           ...state.activity,
@@ -200,7 +200,7 @@ export const tripActions = (set: SetState, get: GetState): Pick<Actions, "driver
         const driverId = state.trucks.find((t) => t.id === load.truckId)?.driverId;
         const expense: Expense | null =
           lumperAmount && driverId
-            ? { id: uid("exp"), driverId, carrierId: load.carrierId, loadId, category: "lumper", amount: lumperAmount, note: "Lumper receipt, read by AI", status: "pending", createdAt: now }
+            ? { id: uid("exp"), driverId, carrierId: load.carrierId, loadId, category: "lumper", amount: lumperAmount, note: "Lumper receipt, read by Backroute", status: "pending", createdAt: now }
             : null;
         return {
           loads: state.loads.map((l) =>
@@ -210,7 +210,7 @@ export const tripActions = (set: SetState, get: GetState): Pick<Actions, "driver
           activity: [
             {
               id: uid("act"), timestamp: now, type: "document_captured" as const,
-              message: `AI checked the ${DRIVER_DOC_LABEL[type]}`, detail: `${load.referenceNumber} · ${note}`,
+              message: `Backroute checked the ${DRIVER_DOC_LABEL[type]}`, detail: `${load.referenceNumber} · ${note}`,
               loadId, carrierId: load.carrierId, severity: "success" as const,
             },
             ...state.activity,
@@ -285,7 +285,7 @@ export const tripActions = (set: SetState, get: GetState): Pick<Actions, "driver
           {
             id: uid("act"), timestamp: now, type: "incident" as const,
             message: "Insurance claim started",
-            detail: "Claim assist AI is preparing the filing with your policy details.",
+            detail: "Backroute is preparing the filing with your policy details.",
             carrierId: incident.carrierId, severity: "info" as const,
           },
           ...state.activity,
@@ -308,7 +308,7 @@ export const tripActions = (set: SetState, get: GetState): Pick<Actions, "driver
           {
             id: uid("act"), timestamp: new Date().toISOString(), type: "maintenance" as const,
             message: `${truck.unitNumber} scheduled at ${shopName}`,
-            detail: `${serviceType}. AI will hold this truck out of the offer pool until service completes.`,
+            detail: `${serviceType}. Backroute will hold this truck out of the offer pool until service completes.`,
             carrierId: PRIMARY_CARRIER_ID, severity: "info" as const,
           },
           ...state.activity,

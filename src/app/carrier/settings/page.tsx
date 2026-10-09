@@ -31,6 +31,7 @@ import { PortalCard } from "@/components/cloud/portal-card";
 import { BillingCard } from "@/components/cloud/billing-card";
 import { PhoneAlerts } from "@/components/cloud/phone-alerts";
 import { ExportsCard } from "@/components/cloud/exports-card";
+import { LeaveCard } from "@/components/cloud/leave-card";
 import { QuickbooksCard } from "@/components/cloud/quickbooks-card";
 import { ConnectionsCard } from "@/components/cloud/connections-card";
 import { SecurityCard } from "@/components/cloud/security-card";
@@ -359,7 +360,10 @@ function Settings() {
           {tab === "billing" && (
             <>
               {signedIn ? (
-                <BillingCard />
+                <>
+                  <BillingCard />
+                  <LeaveCard />
+                </>
               ) : (
               <Card>
                 <CardHeader>

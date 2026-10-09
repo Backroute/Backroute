@@ -568,12 +568,12 @@ function Step({
         {state === "current" && <span className="h-2 w-2 animate-pulse-dot rounded-full bg-white" />}
       </span>
       <div className="min-w-0 flex-1">
-        <p className={cn("text-sm font-medium", state === "todo" && "text-white/45")}>
+        <p className={cn("text-sm font-medium", state === "todo" && "text-white/60")}>
           {title}
-          {optional && <span className="ml-1.5 text-xs font-normal text-white/40">Optional</span>}
+          {optional && <span className="ml-1.5 text-xs font-normal text-white/60">Optional</span>}
           <span className="sr-only">{state === "done" ? ", done" : state === "current" ? ", in progress" : ", not started"}</span>
         </p>
-        {detail && <div className="mt-0.5 text-xs text-white/55">{detail}</div>}
+        {detail && <div className="mt-0.5 text-xs text-white/70">{detail}</div>}
         {children && <div className="mt-2">{children}</div>}
       </div>
     </li>

@@ -645,7 +645,7 @@ function inboundTurn(L: CallPack, call: DispatchCall, reply: string): Turn | nul
         step: "end",
         end: true,
         report: { incident: { type: "breakdown", note: `${f.name} called in a breakdown. Off the road and safe` } },
-        outcome: "Breakdown reported. AI finding a shop",
+        outcome: "Breakdown reported. Backroute finding a shop",
         facts: { topic: "breakdown" },
       };
     case "danger":
@@ -671,7 +671,7 @@ function inboundTurn(L: CallPack, call: DispatchCall, reply: string): Turn | nul
         step: "end",
         end: true,
         report: { incident: { type: "delay", note: `${f.name} called in running ${saidEn} late` } },
-        outcome: `Running ${saidEn} late. AI moving the appointment`,
+        outcome: `Running ${saidEn} late. Backroute moving the appointment`,
         facts: { topic: "late", late: String(mins) },
       };
     }

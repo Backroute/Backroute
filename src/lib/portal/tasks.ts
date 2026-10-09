@@ -109,7 +109,7 @@ export async function queuePortalTask(ctx: CarrierContext, t: { kind: PortalKind
   const { error } = await admin().from("portal_tasks").insert(task);
   if (error) throw error;
   const load = ctx.loads.find((l) => l.id === t.loadId);
-  await addActivity(ctx.carrier.id, event({ type: "document_captured", loadId: load?.id, message: `${PORTAL_KIND_LABEL[t.kind]}${load ? ` for ${load.referenceNumber}` : ""} on ${site}: the AI is doing it on their website`, detail: t.url.slice(0, 200), severity: "info" }));
+  await addActivity(ctx.carrier.id, event({ type: "document_captured", loadId: load?.id, message: `${PORTAL_KIND_LABEL[t.kind]}${load ? ` for ${load.referenceNumber}` : ""} on ${site}: Backroute is doing it on their website`, detail: t.url.slice(0, 200), severity: "info" }));
   return task;
 }
 
@@ -183,7 +183,7 @@ export async function mismatch(task: PortalTask, what: string, screenshotId?: st
     const load = loadOf(ctx, task);
     if (load && task.data.from && (await claimMark(ctx.carrier.id, load.id, "portal_mismatch")))
       await sendOrQueue(ctx, { purpose: "ack", to: task.data.from, toName: task.data.fromName, subject: `Re: ${task.data.subject ?? load.referenceNumber}`, body: mail.rateConFix(ctx.carrier, ctx.settings, load, [what], task.data.fromName), loadId: load.id, withinRules: true, why: `Ask ${task.data.fromName ?? "the broker"} to fix the rate con in their portal for ${load.referenceNumber}?` });
-    await passToOwner(ctx, { reason: `The AI didn't sign the rate con for ${load?.referenceNumber ?? "a load"} on ${hostOf(task)}: ${what}. It asked the broker to correct it.`, loadId: load?.id, label: "Got it", source: "email", to: "decider", portalTaskId: task.id });
+    await passToOwner(ctx, { reason: `Backroute didn't sign the rate con for ${load?.referenceNumber ?? "a load"} on ${hostOf(task)}: ${what}. It asked the broker to correct it.`, loadId: load?.id, label: "Got it", source: "email", to: "decider", portalTaskId: task.id });
     return stopped;
   });
 }
@@ -213,7 +213,7 @@ export async function giveUpOn(task: PortalTask, why: string, screenshotId?: str
     }
     const did = (task.data.steps ?? []).filter((s) => s.ok !== false && s.action !== "wait").length;
     await passToOwner(ctx, {
-      reason: `${PORTAL_KIND_LABEL[task.kind]}${load ? ` for ${load.referenceNumber}` : ""} on ${hostOf(task)}: the AI couldn't finish it (${why}). ${did ? `It got ${did} step${did === 1 ? "" : "s"} in; ` : ""}open ${task.url} and finish it with the carrier's details and papers in Settings.`,
+      reason: `${PORTAL_KIND_LABEL[task.kind]}${load ? ` for ${load.referenceNumber}` : ""} on ${hostOf(task)}: Backroute couldn't finish it (${why}). ${did ? `It got ${did} step${did === 1 ? "" : "s"} in; ` : ""}open ${task.url} and finish it with the carrier's details and papers in Settings.`,
       loadId: load?.id,
       label: "Done",
       source: "email",
@@ -254,7 +254,7 @@ export async function askOwner(task: PortalTask, question: string, key: string, 
     const ctx = await loadContext(task.carrier_id);
     if (!ctx) return waiting;
     const load = loadOf(ctx, task);
-    const e = await passToOwner(ctx, { reason: `${hostOf(task)} asks: ${question} Answer here and the AI finishes ${PORTAL_KIND_LABEL[task.kind].toLowerCase()}${load ? ` for ${load.referenceNumber}` : ""}; it keeps the answer for next time.`, loadId: load?.id, label: "Answer", source: "email", to: "owner", portalTaskId: task.id });
+    const e = await passToOwner(ctx, { reason: `${hostOf(task)} asks: ${question} Answer here and Backroute finishes ${PORTAL_KIND_LABEL[task.kind].toLowerCase()}${load ? ` for ${load.referenceNumber}` : ""}; it keeps the answer for next time.`, loadId: load?.id, label: "Answer", source: "email", to: "owner", portalTaskId: task.id });
     return updateTask(waiting, {}, { escalationId: e.id });
   });
 }

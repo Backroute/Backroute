@@ -96,7 +96,7 @@ export async function openClaim(ctx: CarrierContext, load: Load, o: { source: Ca
   if (!had) {
     await addActivity(ctx.carrier.id, event({ type: "incident", loadId: saved.id, message: `Cargo claim opened on ${saved.referenceNumber}`, detail: `${claim.kind}${claim.amount ? ` · $${claim.amount.toLocaleString("en-US")}` : ""} · ${claim.source === "broker" ? "filed by the broker" : "from the POD"}`, severity: "warning" }));
     await passToOwner(ctx, {
-      reason: `Cargo claim on ${saved.referenceNumber} (${claim.kind}${claim.amount ? `, $${claim.amount.toLocaleString("en-US")}` : ""}): ${claim.details.slice(0, 200)}. The AI ${done.length ? done.join(" and ") : "opened a file"} and is putting the claim file together for your insurer. You decide whether to pay it yourself or file it with insurance.`,
+      reason: `Cargo claim on ${saved.referenceNumber} (${claim.kind}${claim.amount ? `, $${claim.amount.toLocaleString("en-US")}` : ""}): ${claim.details.slice(0, 200)}. Backroute ${done.length ? done.join(" and ") : "opened a file"} and is putting the claim file together for your insurer. You decide whether to pay it yourself or file it with insurance.`,
       loadId: saved.id,
       label: "Got it",
       source: o.source === "broker" ? "email" : "sms",
@@ -190,7 +190,7 @@ export async function claimRounds(ctx: CarrierContext, now: number): Promise<str
       });
       done.push(`${saved.referenceNumber}: claim file ready for the insurer`);
     } else {
-      await passToOwner(ctx, { reason: `The cargo claim file for ${saved.referenceNumber} is ready (in Files, with the BOL, POD and photos). Add your cargo insurer's claims email in Settings and the AI will send it, or send it yourself.`, loadId: saved.id, label: "Got it", source: "email", to: "owner" });
+      await passToOwner(ctx, { reason: `The cargo claim file for ${saved.referenceNumber} is ready (in Files, with the BOL, POD and photos). Add your cargo insurer's claims email in Settings and Backroute will send it, or send it yourself.`, loadId: saved.id, label: "Got it", source: "email", to: "owner" });
       done.push(`${saved.referenceNumber}: claim file ready, owner told`);
     }
   }

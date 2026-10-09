@@ -65,7 +65,7 @@ export async function trackHomeTime(ctx: CarrierContext, now: number): Promise<s
     const away = driver.lastHomeAt ? Math.floor((now - Date.parse(driver.lastHomeAt)) / DAY) : null;
     if (away !== null && away >= LONG_AWAY_DAYS && (await claimMark(ctx.carrier.id, `driver:${driver.id}`, `long_away:${isoWeek(now)}`))) {
       await passToOwner(ctx, {
-        reason: `${driver.name} hasn't been home in ${away} days (going by the ELD). Drivers who stay out this long start looking elsewhere. Want the AI to route ${driver.name.split(" ")[0]} home? Turn on "Get ${driver.name.split(" ")[0]} home first" on the Fleet page.`,
+        reason: `${driver.name} hasn't been home in ${away} days (going by the ELD). Drivers who stay out this long start looking elsewhere. Want Backroute to route ${driver.name.split(" ")[0]} home? Turn on "Get ${driver.name.split(" ")[0]} home first" on the Fleet page.`,
         label: "Got it",
         source: "app",
         to: "owner",

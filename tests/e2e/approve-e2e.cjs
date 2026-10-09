@@ -29,7 +29,7 @@ const sub = "aaaaaaaa-0000-0000-0000-000000000001", phone = "12145550100";
   const idx = await drafts.evaluateAll((els) => els.findIndex((e) => e.value.includes("thanks for the rate con")));
   const box = drafts.nth(idx);
   const home = await p.locator("main").innerText();
-  check("draft shows in Needs you, marked as email", home.includes("The AI wrote a reply for you to check") && /By email/i.test(home));
+  check("draft shows in Needs you, marked as email", home.includes("Backroute wrote a reply for you to check") && /By email/i.test(home));
   check("breakdown from the call shows, marked as a call", /On a call/i.test(home) && home.includes("Marcus Bell (breakdown)"));
   await p.screenshot({ path: `${S}/.out/approve-before.png` });
   await box.fill("Hi Dana, got the rate con for CFP-88213. Truck 101 will be there Tuesday at 8. Thanks, Titan Freight");

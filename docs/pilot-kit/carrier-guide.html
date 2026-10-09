@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Backroute: your first weeks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  @page { size: Letter; margin: 0.55in 0.6in; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Geist, "Helvetica Neue", Arial, sans-serif; color: #111; font-size: 9.1pt; line-height: 1.36; }
+  .top { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1.5pt solid #111; padding-bottom: 6pt; }
+  .brand { font-weight: 600; font-size: 13pt; letter-spacing: -0.01em; }
+  .for { color: #555; }
+  h1 { font-size: 18pt; font-weight: 600; letter-spacing: -0.02em; margin: 10pt 0 2pt; }
+  .lead { color: #333; font-size: 10pt; margin: 0 0 6pt; }
+  h2 { font-size: 10.2pt; font-weight: 600; margin: 9pt 0 3pt; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 22pt; }
+  ul { margin: 0; padding-left: 13pt; }
+  li { margin: 0 0 2pt; }
+  table { width: 100%; border-collapse: collapse; margin-top: 2pt; }
+  th, td { text-align: left; vertical-align: top; padding: 3pt 6pt 3pt 0; border-top: 0.6pt solid #ccc; }
+  th { font-weight: 600; width: 22%; }
+  td.len { color: #555; width: 16%; white-space: nowrap; }
+  .box { border: 0.8pt solid #111; border-radius: 6pt; padding: 6pt 9pt; margin-top: 8pt; }
+  .fill { display: inline-block; min-width: 2.2in; border-bottom: 0.6pt solid #111; font-weight: 500; }
+  .check li { list-style: none; margin-left: -13pt; }
+  .check li::before { content: "☐ "; }
+  .foot { margin-top: 8pt; color: #555; font-size: 8.4pt; border-top: 0.6pt solid #ccc; padding-top: 5pt; }
+</style>
+</head>
+<body>
+  <div class="top"><span class="brand">Backroute</span><span class="for">For {{carrier}}</span></div>
+
+  <h1>Your first weeks with Backroute</h1>
+  <p class="lead">Backroute is your dispatcher. It reads broker emails, works the rate, sends your drivers the load,
+  keeps up with them on the road, and gets the paperwork and the invoice out. You decide how much it does on its own,
+  and you can stop it any time.</p>
+
+  <div class="grid">
+    <div>
+      <h2>What it does for you</h2>
+      <ul>
+        <li>Reads the broker emails sent to your Backroute address and answers each one.</li>
+        <li>Asks for a rate at or above your lowest rate per mile, never under it.</li>
+        <li>Sends the driver the load, and checks in before each pickup and delivery.</li>
+        <li>Gets the BOL and the signed POD from the driver (a photo in the app or by text).</li>
+        <li>Sends the invoice with the POD, claims detention, and follows up on late payments.</li>
+        <li>Texts and calls drivers in their own language.</li>
+        <li>Asks you whenever a decision is yours. It shows up in <b>Needs you</b> on Home.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>How the pilot runs</h2>
+      <table>
+        <tr><th>Practice</th><td>Reads everything and decides, but sends nothing. You see what it would have sent.</td><td class="len">5–7 days</td></tr>
+        <tr><th>Ask</th><td>Live. Every email to a broker waits for your <b>Send</b>. Driver check-ins go out.</td><td class="len">1–2 weeks</td></tr>
+        <tr><th>Your rules</th><td>Books at or over your lowest rate, sends invoices and detention on its own.</td><td class="len">2 weeks</td></tr>
+        <tr><th>Full</th><td>Its own replies to brokers go too.</td><td class="len">from then on</td></tr>
+      </table>
+      <p style="margin:5pt 0 0;color:#555">We move up one step at a time, together, and only when you agree with what it's doing.</p>
+    </div>
+  </div>
+
+  <h2>Day one (about 30 minutes, on a call with us)</h2>
+  <div class="grid">
+    <ul class="check">
+      <li>Sign in with your phone number and check your trucks and drivers.</li>
+      <li>Set your lowest rate per mile, billing email and factoring (Settings).</li>
+      <li>Upload your W-9 and certificate of insurance (Settings → General → Your papers).</li>
+      <li>Name who signs rate cons (Settings → Your rules).</li>
+    </ul>
+    <ul class="check">
+      <li>Turn on phone alerts (Settings → Notifications). On an iPhone, add Backroute to your home screen first.</li>
+      <li>Forward broker load emails to your Backroute address, or CC it on threads.</li>
+      <li>Forward or upload a few months of old rate cons (Settings → Bring your history).</li>
+      <li>Your drivers get a text with the app link. Ask them to sign in and tap I agree.</li>
+    </ul>
+  </div>
+
+  <div class="box">
+    Your Backroute address: <span class="fill">{{inbound}}</span>
+    &nbsp;&nbsp; Dispatch line for drivers: <span class="fill" style="min-width:1.5in">{{dispatch}}</span>
+  </div>
+
+  <div class="grid">
+    <div>
+      <h2>Every day</h2>
+      <ul>
+        <li>Check <b>Needs you</b> on Home. Most answers are one tap.</li>
+        <li>A text at 6 PM sums up your day (turn it off in Settings).</li>
+        <li>Mondays: <b>Your week</b> on Home, with one thing to change.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>Stop it any time</h2>
+      <ul>
+        <li>Tap the status pill at the top of the app, then <b>Pause everything</b>. Nothing goes to brokers or drivers until you tap <b>Resume</b>.</li>
+        <li>Or call or text us and we'll pause it for you.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="box">
+    <b>Reach us:</b> {{support}} &nbsp;·&nbsp; hello@backroute.pro &nbsp;·&nbsp; A driver in a crash or hurt calls 911 first.
+  </div>
+
+  <p class="foot">Backroute isn't an emergency service. Brokers, rates and loads are your decisions; Backroute works
+  inside the rules you set and asks you about the rest.</p>
+</body>
+</html>

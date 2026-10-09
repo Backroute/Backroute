@@ -65,7 +65,7 @@ export const simulationActions = (set: SetState, get: GetState): Pick<Actions, "
           offerBatches.push({ truckId: truck.id, offers, emptyAt: { kind: "in", city: truck.currentCity } });
           newEvents.push({
           id: uid("act"), timestamp: new Date().toISOString(), type: "load_offered",
-          message: `AI found ${offers.length} ${truck.equipmentType.toLowerCase()} loads for ${truck.unitNumber}`, detail: `Scanned every connected board, awaiting ${driver ? driver.name.split(" ")[0] : "driver"}'s pick`,
+          message: `Backroute found ${offers.length} ${truck.equipmentType.toLowerCase()} loads for ${truck.unitNumber}`, detail: `Scanned every connected board, awaiting ${driver ? driver.name.split(" ")[0] : "driver"}'s pick`,
           loadId: offers[0]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info",
           });
         }
@@ -244,7 +244,7 @@ export const simulationActions = (set: SetState, get: GetState): Pick<Actions, "
         );
         newEvents.push({
           id: uid("act"), timestamp: new Date().toISOString(), type: "check_call", channel: "email",
-          message: `AI told ${broker} detention has started`, detail: `${l.referenceNumber} · 2h free time used at the ${clock.stop === "pickup" ? "shipper" : "receiver"}, $75/hr from here`,
+          message: `Backroute told ${broker} detention has started`, detail: `${l.referenceNumber} · 2h free time used at the ${clock.stop === "pickup" ? "shipper" : "receiver"}, $75/hr from here`,
           loadId: l.id, carrierId: l.carrierId, severity: "warning",
         });
       }
@@ -264,7 +264,7 @@ export const simulationActions = (set: SetState, get: GetState): Pick<Actions, "
           incidents = incidents.map((i) => (i.id === incident.id ? { ...i, escalationId: esc.id } : i));
           newEvents.push({
             id: uid("act"), timestamp: esc.createdAt, type: "escalation",
-            message: "AI needs your OK on a repair", detail: esc.reason, loadId: incident.loadId ?? undefined, carrierId: incident.carrierId, severity: "warning",
+            message: "Backroute needs your OK on a repair", detail: esc.reason, loadId: incident.loadId ?? undefined, carrierId: incident.carrierId, severity: "warning",
           });
           continue;
         }

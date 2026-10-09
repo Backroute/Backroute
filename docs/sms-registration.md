@@ -47,7 +47,8 @@ suggests a single use case, pick **Customer care**.
 
 > Backroute is a dispatch service for trucking companies. It texts the company's truck drivers, and the company's owner,
 > about the loads the drivers are hauling: new load assignments with pickup and delivery times, appointment changes,
-> check-ins before each pickup and delivery, requests for delivery paperwork, and replies to the driver's own questions.
+> check-ins before each pickup and delivery, requests for delivery paperwork, a one-time link to the driver app, and
+> replies to the driver's own questions.
 > The owner gets a daily summary and questions that need their decision. Drivers are added by the trucking company they
 > work for, who confirms each driver agreed in writing. Drivers can also agree in the driver app or by replying YES to
 > the first text. No marketing is sent.
@@ -81,7 +82,8 @@ app's consent card (Settings → Billing & Team shows each driver's answer).
 
 **Opt-out message:** Twilio sends its standard confirmation; the app records the STOP and sends nothing more.
 
-**Sample messages** (paste five; they're the app's real wording with sample details filled in):
+**Sample messages** (paste five; they're the app's real wording with sample details filled in). If the form takes a
+sixth, add the app link: `Titan Freight dispatch: your loads, paperwork and pay are in the Backroute app. Open https://backroute.pro/login and sign in with this phone number. Add it to your home screen to keep it handy.`
 
 1. `Titan Freight dispatch: this is your dispatch line, run by Backroute (an AI dispatcher, with people for emergencies). You'll get texts and calls about your loads. Msg frequency varies. Msg & data rates may apply. Reply YES to confirm, HELP for help, STOP to stop texts.`
 2. `New load TF-4821: Memphis, TN → Nashville, TN. Pickup Fri, Oct 9, 8:00 AM CDT. Delivery Fri, Oct 9, 3:00 PM CDT. Details in the Backroute app. Text back here with any questions.`
@@ -93,7 +95,7 @@ app's consent card (Settings → Billing & Team shows each driver's answer).
 
 | Question | Answer |
 |---|---|
-| Embedded links | **Yes**: when a broker requires tracking, the driver is texted the broker's tracking link (MacroPoint, Trucker Tools, FourKites and the like) to accept. No shortened links. |
+| Embedded links | **Yes**: once, the link to sign in to the Backroute driver app (on Backroute's own domain), and, when a broker requires tracking, the broker's tracking link (MacroPoint, Trucker Tools, FourKites and the like) to accept. No shortened links. |
 | Embedded phone numbers | **Yes** (a repair shop's or facility's number during a breakdown or appointment) |
 | Age-gated content | No |
 | Direct lending / loans | No |

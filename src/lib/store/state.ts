@@ -114,7 +114,7 @@ export interface StoreState {
     /** A real account's sign-up: the fleet the owner typed in replaces the sample fleet, and everything else starts empty. */
     setUpRealFleet: (entries: FleetEntry[]) => Driver[];
     /** Adds trucks and drivers to a real fleet (Fleet page). */
-    addToFleet: (entries: FleetEntry[]) => void;
+    addToFleet: (entries: FleetEntry[]) => Driver[];
     /** A load the owner booked themselves: typed in or read off its rate con. The broker is added if new. */
     addLoad: (input: Omit<NewLoad, "brokerId"> & { brokerName: string; brokerEmail?: string | null; rateConReading?: RateConPdfReading }) => Load;
     /** Cancels a booked load that's fallen through (broker pulled it, detention refused, etc.). A truck

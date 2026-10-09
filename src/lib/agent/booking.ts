@@ -333,7 +333,7 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
     broker = credit.broker;
     if (credit.blocked) {
       if (await claimMark(ctx.carrier.id, load.id, "credit_hold"))
-        await tellOwner(ctx, { reason: `The AI didn't ask to book ${load.referenceNumber}: ${credit.why}. Brokers like that pay late or not at all. Book it yourself from the load if you still want it.`, loadId: load.id, label: "Got it", source: "email", brokerId: broker.id, severity: "warning" });
+        await tellOwner(ctx, { reason: `Backroute didn't ask to book ${load.referenceNumber}: ${credit.why}. Brokers like that pay late or not at all. Book it yourself from the load if you still want it.`, loadId: load.id, label: "Got it", source: "email", brokerId: broker.id, severity: "warning" });
       return "queued" as const;
     }
     if (credit.surchargePct && !load.surchargePct) {
@@ -372,7 +372,7 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
     // No way to reach them: the owner asked for this one, so it's theirs to reach; otherwise the AI lets it go and
     // the truck stays free for the next load.
     if (how.byOwner) {
-      await passToOwner(ctx, { reason: `No email for ${broker?.company ?? "the broker"} on ${load.referenceNumber}${broker?.phone ? " and the AI couldn't get through by phone" : " and no phone"}. Reach them to book it at $${ask.toLocaleString()}.`, loadId: load.id, label: "Reached them", source: "email", to: "owner" });
+      await passToOwner(ctx, { reason: `No email for ${broker?.company ?? "the broker"} on ${load.referenceNumber}${broker?.phone ? " and Backroute couldn't get through by phone" : " and no phone"}. Reach them to book it at $${ask.toLocaleString()}.`, loadId: load.id, label: "Reached them", source: "email", to: "owner" });
       return "queued" as const;
     }
     const gone: Load = { ...load, stage: "declined", updatedAt: new Date().toISOString() };

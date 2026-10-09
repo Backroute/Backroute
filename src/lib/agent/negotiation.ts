@@ -78,7 +78,7 @@ function reasonFor(load: ReasonLoad, amount: number, round = 1, now = Date.now()
 export function respond(offer: number, load: ReasonLoad & Pick<Load, "targetRate" | "bookRequest">, settings: Pick<AgentSettings, "minRpm">, now = Date.now(), broker?: { movePct: number | null } | null): Move {
   const req = load.bookRequest;
   const floor = floorFor(load, settings);
-  if (!floor) return { action: "owner", why: `No lowest rate per mile is set, so the AI won't agree to ${money(offer)} on its own.` };
+  if (!floor) return { action: "owner", why: `No lowest rate per mile is set, so Backroute won't agree to ${money(offer)} on its own.` };
   const ours = req?.ask ?? load.targetRate;
   const opening = Math.max(req?.opening ?? ours, ours);
   const rounds = roundsOf(req);

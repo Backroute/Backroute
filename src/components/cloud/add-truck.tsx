@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authHeader } from "@/lib/ai/client";
+import { letDriversIn } from "@/lib/cloud/account";
 import { OWNER_ATTESTS } from "@/lib/consent-words";
 import { usePrimaryCarrier } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
@@ -23,7 +24,7 @@ export function AddTruckButton() {
       <Button size="sm" variant="primary" onClick={() => setOpen(true)}>
         <Plus className="h-3.5 w-3.5" /> Add a truck
       </Button>
-      <Sheet open={open} onClose={() => setOpen(false)} title="Add a truck" description="Then let the driver sign in from Settings → Billing & Team." size="lg">
+      <Sheet open={open} onClose={() => setOpen(false)} title="Add a truck" description="Each driver gets a text with the app link and signs in with their phone number." size="lg">
           <div>
             <label className="mb-3 flex items-start gap-2 rounded-2xl bg-ink-50 p-3 text-xs text-ink-700">
               <input type="checkbox" className="mt-0.5" checked={agreed} onChange={(e) => (setAgreed(e.target.checked), setNeedAgree(false))} />
@@ -35,9 +36,13 @@ export function AddTruckButton() {
               submitLabel="Add to my fleet"
               onSubmit={(entries) => {
                 if (!agreed) return setNeedAgree(true);
-                addToFleet(entries);
+                const added = addToFleet(entries);
                 const phones = entries.map((e) => e.phone);
-                void authHeader().then((h) => fetch("/api/consent", { method: "POST", headers: { "content-type": "application/json", ...h }, body: JSON.stringify({ op: "attest", phones }) }).catch(() => null));
+                // Their consent on record first, then each is let into the driver app and texted the link.
+                void authHeader()
+                  .then((h) => fetch("/api/consent", { method: "POST", headers: { "content-type": "application/json", ...h }, body: JSON.stringify({ op: "attest", phones }) }))
+                  .catch(() => null)
+                  .then(() => letDriversIn(added.map((d) => d.id)));
                 setOpen(false);
                 setAgreed(false);
               }}

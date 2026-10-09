@@ -55,3 +55,4 @@ eval/report-*.md
 /tests/fakes/*.log
 /tests/fakes/carrier.txt
 /tests/fakes/outage-*
+/pilot-kit/

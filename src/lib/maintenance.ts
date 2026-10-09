@@ -62,7 +62,7 @@ export function faultSeverity(f: { code: string; description: string; lamp?: "re
 
 /** What the owner sees about a fault, in plain words. */
 export function faultAdvice(severity: "info" | "warn" | "critical"): string {
-  if (severity === "critical") return "Have the driver pull over somewhere safe and call it in. The AI won't book the truck until it's checked.";
+  if (severity === "critical") return "Have the driver pull over somewhere safe and call it in. Backroute won't book the truck until it's checked.";
   if (severity === "warn") return "Book it in at the next stop near a shop. It can run meanwhile.";
   return "Nothing to do now; it's watched.";
 }

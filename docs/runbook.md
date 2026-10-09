@@ -38,6 +38,72 @@ and once more when it's fixed. The same list is the **System** tab in `/ops`.
 | **Website worker** | The browser worker hasn't asked for work in 10+ minutes, or a job has waited 15+. | Restart it on its host. Broker-website jobs fall to Waiting on us meanwhile. |
 | **AI spending** | A carrier is using 3x its usual AI spend today (and over $5): a loop, an email flood, or abuse. | `/ops` → Numbers for that carrier; look at its log. `pause <id>` if it's a loop. |
 
+## Backups and restoring
+
+Everything a carrier has is in the database, files included (W-9s, COIs, BOL and POD photos are stored in
+`carrier_files`), so a database backup is a full backup.
+
+- **Supabase's own backups:** daily on the Pro plan, kept for 7 days; turn on Point-in-Time Recovery for restores to the
+  minute. Restore from Supabase → Database → Backups. A restore replaces the whole database and the app is down while it
+  runs: pause everyone first (`pause-all`), restore, check, then `resume-all`.
+- **Our own copy, nightly**, off Supabase (so a deleted project or a lost account isn't the end):
+
+  ```sh
+  pg_dump "$SUPABASE_DB_URL" -Fc --no-owner -f backroute-$(date +%F).dump
+  ```
+
+  `SUPABASE_DB_URL` is the connection string in Supabase → Project Settings → Database (the direct one). The dump has
+  drivers' phone numbers and carriers' papers in it: keep it encrypted, somewhere only the team can read, for 30 days.
+- **Restoring one carrier's data** (someone deleted the wrong thing): restore the dump into a new database, copy that
+  carrier's rows across by `carrier_id`, and drop the new database. Never restore over production for one carrier.
+
+**The drill, every quarter** (about 20 minutes): restore last night's dump into an empty database and check it holds
+what production does.
+
+```sh
+createdb restore_drill && pg_restore --no-owner -d restore_drill backroute-YYYY-MM-DD.dump
+psql -d restore_drill -c "select (select count(*) from carriers) carriers, (select count(*) from loads) loads,
+  (select count(*) from carrier_files) files, (select count(*) from pg_policies where schemaname = 'public') access_rules"
+```
+
+The counts should match production as of the dump, and `access_rules` should match too: a restore without them would
+let any signed-in user read every carrier. Last run on the test database (2026-10-09): restored with no errors, the same
+61 access rules on 34 tables, 20 functions and 14 triggers.
+
+## The outage drill
+
+Once before the pilot and then every quarter, on the test setup (never production), break one thing at a time and check
+that the alert comes, nothing is lost, and it recovers on its own. The stand-ins in `tests/` check the same things on
+every test run (`sandbox-e2e`); this is the real providers.
+
+| Break it | What should happen | Put it back, then |
+|---|---|---|
+| Set `TWILIO_AUTH_TOKEN` to something wrong and text the dispatch number from a test driver's phone | The answer is kept in `outbound` and retried; after a few failed runs, the **Messages waiting to send** alert | The next run sends it. A text more than an hour old is given up on, and support is asked to reach the driver another way |
+| Set `POSTMARK_SERVER_TOKEN` wrong and email the test carrier a load | The broker reply waits in `outbound`; the same alert | The next run sends it |
+| Set `ANTHROPIC_API_KEY` wrong and text a question | Two messages the AI can't answer: the **AI** alert, and each message is in Waiting on us | Answer them by hand; nothing more is needed |
+| Pause the test Supabase project | `/api/health` fails, the uptime monitor and the **Database** alert fire | Messages that came in while it was down: Postmark retried the emails; Twilio didn't retry the texts (see above) |
+| Turn off the scheduler for 30 minutes | The **Dispatcher's rounds** alert | One run by hand, then the scheduler back on |
+
+Write down when each alert arrived. If one doesn't come, that's the thing to fix before carriers are on it.
+
+## A carrier leaving
+
+The owner can do both themselves in Settings → Billing & Team → Your data: **Download everything** (a .zip with every
+load as a spreadsheet, every file, and everything else as JSON) and **Delete account**. If they ask us instead, in
+writing (an email from the owner's address on file, or a text from the owner's phone):
+
+```sh
+node scripts/pilot-carrier.mjs export <id> --out export-<id>     # send them the folder, zipped, then delete it
+node scripts/pilot-carrier.mjs delete <id> --confirm "<exact company name>"
+```
+
+Deleting cancels the Stripe subscription first (with `STRIPE_SECRET_KEY` set; if Stripe refuses, nothing is deleted),
+then removes the carrier and every table of theirs, and the sign-ins that belonged only to them. Two things stay, both
+server-only: `closed_accounts` (that the account existed, and when) and `consent_archive` (each driver's yes or no to
+texts and calls, the proof the texts were sent under; how long to keep it is for counsel). Our nightly dumps still
+hold their data until those dumps age out (30 days). Loads on the road are the owner's to finish: tell them before
+deleting. Neither the download nor the script includes saved website passwords or connection keys.
+
 ## A driver emergency
 
 The AI tells a driver who reports a crash or injury to call 911, texts the support phones, and puts it first in

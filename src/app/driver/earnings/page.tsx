@@ -63,7 +63,7 @@ export default function DriverEarningsPage() {
                     title={formatCurrency(d.pay)}
                   />
                 </div>
-                <span className={cn("text-xs", i === today ? "font-semibold text-white" : "text-white/45")}>{d.day}</span>
+                <span className={cn("text-xs", i === today ? "font-semibold text-white" : "text-white/70")}>{d.day}</span>
               </div>
             ))}
           </div>

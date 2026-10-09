@@ -62,7 +62,7 @@ export async function importRateCons(ctx: CarrierContext, files: DocFile[], opts
   const now = opts.now ?? Date.now();
   const batchId = opts.batch ?? newBatchId();
   const skipped: DocsResult["skipped"] = [];
-  if (!aiConfigured()) return { read: 0, loads: 0, brokers: 0, skipped: files.map((f) => ({ file: f.name, why: "the AI isn't switched on" })) };
+  if (!aiConfigured()) return { read: 0, loads: 0, brokers: 0, skipped: files.map((f) => ({ file: f.name, why: "Backroute isn't switched on" })) };
   // The same file twice (sent again, or in two emails) is read once: no second load, and no second AI read.
   const known = new Set(ctx.loads.map((l) => l.importHash).filter(Boolean));
   const fresh: (DocFile & { hash: string })[] = [];

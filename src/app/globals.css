@@ -31,7 +31,7 @@
   /* Status colours in their darker form, so small text stays readable in sun glare. */
   --accent-live: #0e8345;
   --accent-warn: #c54600;
-  --accent-danger: #de1135;
+  --accent-danger: #d40f32;
   --accent-info: #276ef1;
   /* Status never fills a block: a panel about a problem is grey like any other, and the word or dot carries it. */
   --accent-live-soft: var(--ink-100);
@@ -217,7 +217,7 @@
   /* Status colours in their darker form, so small text stays readable in sun glare. */
   --accent-live: #0e8345;
   --accent-warn: #c54600;
-  --accent-danger: #de1135;
+  --accent-danger: #d40f32;
   --accent-info: #276ef1;
   /* Status never fills a block: a panel about a problem is grey like any other, and the word or dot carries it. */
   --accent-live-soft: var(--ink-100);

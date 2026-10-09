@@ -60,6 +60,17 @@ export const PASSED_ON_TEXT: Record<Lang, string> = {
 export const UNKNOWN_NUMBER =
   "This is Backroute's AI dispatch line. We don't have this number on file: ask your carrier to add it in Backroute. / Esta es la línea de despacho de Backroute. No tenemos este número: pide a tu transportista que lo agregue.";
 
+/** The driver app, once per driver when the owner lets them sign in: where it is and which number to sign in with. */
+export const APP_LINK: Record<Lang, (carrier: string, url: string) => string> = {
+  en: (c, u) => `${c} dispatch: your loads, paperwork and pay are in the Backroute app. Open ${u} and sign in with this phone number. Add it to your home screen to keep it handy.`,
+  es: (c, u) => `Despacho de ${c}: tus cargas, papeles y pago están en la app de Backroute. Abre ${u} e inicia sesión con este número. Agrégala a tu pantalla de inicio para tenerla a la mano.`,
+  pa: (c, u) => `${c} ਡਿਸਪੈਚ: ਤੁਹਾਡੇ ਲੋਡ, ਕਾਗਜ਼ ਅਤੇ ਤਨਖਾਹ Backroute ਐਪ ਵਿੱਚ ਹਨ। ${u} ਖੋਲ੍ਹੋ ਅਤੇ ਇਸ ਫ਼ੋਨ ਨੰਬਰ ਨਾਲ ਸਾਈਨ ਇਨ ਕਰੋ। ਆਸਾਨੀ ਲਈ ਇਸਨੂੰ ਹੋਮ ਸਕ੍ਰੀਨ 'ਤੇ ਜੋੜੋ।`,
+  hi: (c, u) => `${c} डिस्पैच: आपके लोड, कागज़ और पेमेंट Backroute ऐप में हैं। ${u} खोलें और इसी फ़ोन नंबर से साइन इन करें। आसानी के लिए इसे होम स्क्रीन पर जोड़ें।`,
+  ru: (c, u) => `Диспетчерская ${c}: ваши грузы, документы и оплата — в приложении Backroute. Откройте ${u} и войдите с этим номером телефона. Добавьте его на главный экран, чтобы было под рукой.`,
+  uk: (c, u) => `Диспетчерська ${c}: ваші вантажі, документи й оплата — у застосунку Backroute. Відкрийте ${u} і увійдіть з цим номером телефону. Додайте його на головний екран, щоб був під рукою.`,
+  fr: (c, u) => `Répartition ${c} : tes voyages, papiers et paie sont dans l'app Backroute. Ouvre ${u} et connecte-toi avec ce numéro. Ajoute-la à ton écran d'accueil pour l'avoir sous la main.`,
+};
+
 export const SMS_HELP = (carrier: string) =>
   `Backroute AI dispatcher for ${carrier}. Text here about your loads. Reply STOP to stop texts. In an emergency call 911.`;
 

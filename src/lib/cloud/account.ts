@@ -106,3 +106,18 @@ export async function team(carrierId: string) {
   if (invites.error) throw invites.error;
   return { members: members.data ?? [], invites: invites.data ?? [] };
 }
+
+/**
+ * Lets these drivers sign in to the driver app and texts each one the link, once (api/agent/driver-access). Owners
+ * only. Null when it couldn't be asked; otherwise what happened for each driver.
+ */
+export async function letDriversIn(driverIds: string[]): Promise<{ driverId: string; invited: boolean; texted: boolean; reason?: string }[] | null> {
+  if (!driverIds.length) return [];
+  const { authHeader } = await import("../ai/client");
+  try {
+    const res = await fetch("/api/agent/driver-access", { method: "POST", headers: { "content-type": "application/json", ...(await authHeader()) }, body: JSON.stringify({ driverIds }) });
+    return res.ok ? ((await res.json()) as { results: { driverId: string; invited: boolean; texted: boolean; reason?: string }[] }).results : null;
+  } catch {
+    return null;
+  }
+}

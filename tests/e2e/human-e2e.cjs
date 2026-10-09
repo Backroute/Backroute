@@ -167,7 +167,7 @@ const RC = (patch) => ({ isRateCon: true, broker: "Hexa Logistics", brokerMc: nu
   check("the credit service is asked about the broker's MC", read("boards").slice(b0).some((x) => x.board === "credit" && x.mc === "777013" && x.auth === "credit-key"));
   check("the broker's score is recorded", lc.credit?.score === 41 && lc.credit.daysToPay === 52 && /TestCredit/.test(lc.credit.source), JSON.stringify(lc.credit));
   check("under the owner's lowest score: no book request goes out", !sent(p0).some((m) => m.To === "ops@lowcredit.test" && /SIM-7101/.test(m.Subject + m.TextBody)), sent(p0).map((m) => m.To + ":" + m.Subject).join(" / "));
-  check("...and the owner is told why", /credit score is 41\/100, under your lowest \(70\)/.test(esc("The AI didn't ask to book SIM-7101%")), esc("The AI didn't ask to book SIM-7101%"));
+  check("...and the owner is told why", /credit score is 41\/100, under your lowest \(70\)/.test(esc("Backroute didn't ask to book SIM-7101%")), esc("Backroute didn't ask to book SIM-7101%"));
   freeTrucks();
   p0 = read("postmark").length;
   await email("ops@slowpay.test", "Slowpay Brokerage", "Load SIM-7102", `Load SIM-7102${equip}: Dallas, TX to Houston, TX, 240 miles, $1,300. Pickup tomorrow.`);

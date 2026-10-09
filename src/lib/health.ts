@@ -62,7 +62,7 @@ export async function healthReport(now = Date.now()): Promise<Check[]> {
   const hourAgo = new Date(now - 60 * MIN).toISOString();
   const { data: failures } = await db.from("escalations").select("data").eq("status", "with_support").gte("updated_at", hourAgo).limit(200);
   // The same wording the support console files under "our own systems failing" (lib/support-playbooks).
-  const aiFails = (failures ?? []).filter((r) => /The AI couldn't answer|couldn't write a reply/i.test(String((r.data as { reason?: string }).reason ?? ""))).length;
+  const aiFails = (failures ?? []).filter((r) => /(The AI|Backroute) couldn't answer|couldn't write a reply/i.test(String((r.data as { reason?: string }).reason ?? ""))).length;
   checks.push({
     key: "ai",
     label: "AI",

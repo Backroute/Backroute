@@ -374,7 +374,7 @@ async function stoppedCheck(ctx: CarrierContext, load: Load, truck: Truck, drive
   const where = truck.position?.description ?? `${truck.currentCity}, ${truck.currentState}`;
   const hours = odd.minutes >= 120 ? `${Math.round(odd.minutes / 30) / 2} hours` : `${odd.minutes} minutes`;
   if (driver) await textDriver(ctx, driver, `Checking in: the truck's been stopped about ${hours} near ${where}. Everything OK? Reply if you need anything (a shop, parking, more time at the dock).`, { kind: "stopped_check", loadId: load.id }, now);
-  await addActivity(ctx.carrier.id, event({ type: "check_call", loadId: load.id, message: `Truck ${truck.unitNumber} stopped ${hours} near ${where}`, detail: `${load.referenceNumber} · not at a stop, driver on duty. The AI texted ${driver?.name.split(" ")[0] ?? "the driver"} to check in.`, severity: "warning" }));
+  await addActivity(ctx.carrier.id, event({ type: "check_call", loadId: load.id, message: `Truck ${truck.unitNumber} stopped ${hours} near ${where}`, detail: `${load.referenceNumber} · not at a stop, driver on duty. Backroute texted ${driver?.name.split(" ")[0] ?? "the driver"} to check in.`, severity: "warning" }));
   return true;
 }
 

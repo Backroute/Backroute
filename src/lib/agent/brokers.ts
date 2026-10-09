@@ -90,11 +90,11 @@ export async function untrustedBroker(ctx: CarrierContext, broker: Broker, loadI
       withinRules: true,
       why: `Ask ${broker.company} for their MC number?`,
     });
-    await tellOwner(ctx, { reason: `${broker.company} sent loads but no MC number. The AI asked them for it and checks it with FMCSA before booking.`, loadId, source: "email", brokerId: broker.id });
+    await tellOwner(ctx, { reason: `${broker.company} sent loads but no MC number. Backroute asked them for it and checks it with FMCSA before booking.`, loadId, source: "email", brokerId: broker.id });
     return;
   }
   await tellOwner(ctx, {
-    reason: `The AI isn't booking with ${broker.company}${broker.email ? ` <${broker.email}>` : ""}: ${broker.verifyNote ?? "they didn't pass the broker check."} If you know them, mark them trusted on the broker and the AI will book with them.`,
+    reason: `Backroute isn't booking with ${broker.company}${broker.email ? ` <${broker.email}>` : ""}: ${broker.verifyNote ?? "they didn't pass the broker check."} If you know them, mark them trusted on the broker and Backroute will book with them.`,
     loadId,
     label: "Got it",
     source: "email",

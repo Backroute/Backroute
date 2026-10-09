@@ -99,7 +99,7 @@ export const callsActions = (set: SetState): Pick<Actions, "answerDispatchCall" 
         ],
         outcome: `${OWNER_NAME} took the call over`,
       });
-      callEvent(d, call, `${OWNER_NAME} took over an AI call with ${first}`, KIND_LABEL[call.kind]);
+      callEvent(d, call, `${OWNER_NAME} took over a dispatch call with ${first}`, KIND_LABEL[call.kind]);
       return { dispatchCalls: d.dispatchCalls, activity: [...d.events, ...state.activity].slice(0, 80) };
     }),
 

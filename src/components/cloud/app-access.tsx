@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
-import { invite, team, type Role } from "@/lib/cloud/account";
+import { invite, letDriversIn, team, type Role } from "@/lib/cloud/account";
 import { formatPhone, toE164 } from "@/lib/cloud/phone";
 import { signOut } from "@/lib/cloud/sync";
 import { useStore } from "@/lib/store";
@@ -15,8 +15,8 @@ import { cn } from "@/lib/utils";
 type Team = Awaited<ReturnType<typeof team>>;
 
 /**
- * Who can sign in to this fleet. Drivers sign in with the phone number on their profile; the owner lets each one in
- * with a tap. Backroute doesn't text them the link yet, so the card says what to send.
+ * Who can sign in to this fleet. Drivers sign in with the phone number on their profile. Drivers added at sign-up or
+ * with a truck are let in and texted the app link; anyone else is one tap here (which texts them too).
  */
 export function AppAccessCard() {
   const carrierId = useStore((s) => s.session.carrierId);
@@ -49,7 +49,11 @@ export function AppAccessCard() {
     setBusy(key);
     setError(null);
     try {
-      await invite(carrierId, e164, role, driverId);
+      // A driver is let in by the server, which also texts them the app link; office people are invited here.
+      if (role === "driver" && driverId) {
+        const r = await letDriversIn([driverId]);
+        if (!r?.[0]?.invited) throw new Error("not invited");
+      } else await invite(carrierId, e164, role, driverId);
       await refresh();
       if (role !== "driver") setPhone("");
     } catch {
@@ -101,7 +105,7 @@ export function AppAccessCard() {
         </ul>
 
         <div className="rounded-2xl bg-ink-50 px-4 py-3 text-xs text-ink-600">
-          <p>Send your drivers this link. They sign in with the phone number shown above.</p>
+          <p>Drivers get this link by text when they&apos;re let in. They sign in with the phone number shown above.</p>
           <button
             type="button"
             onClick={() => {

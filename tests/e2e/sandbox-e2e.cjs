@@ -63,8 +63,25 @@ const driverPhone = "+12145550148";
   const simNoKey = await fetch(`${BASE}/api/sim`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "state", carrier: "sim-x" }) });
   check("the simulator is hidden without the eval secret", simNoKey.status === 404);
 
+  // A driver let in while in practice mode: no link yet (it would never go out), and it goes once the carrier is live.
+  const NEWD = `drv-link-${RUN}`, newPhone = "+14695550177";
+  db(`delete from drivers where carrier_id = '${cid}' and phone_last10 = '4695550177'`);
+  db(`delete from invites where carrier_id = '${cid}' and phone like '%4695550177'`);
+  db(`insert into drivers (id, carrier_id, name, phone, data) values ('${NEWD}', '${cid}', 'Lee Grant', '${newPhone}', '${JSON.stringify({ id: NEWD, name: "Lee Grant", phone: newPhone, homeBase: "Dallas, TX", prefs: {} })}'::jsonb)`);
+  const ownerJwt = execSync(`node ${S}/pgrst/jwt.cjs aaaaaaaa-0000-0000-0000-000000000001 12145550100`).toString().trim();
+  tw0 = texted().length;
+  const access = await (await fetch(`${BASE}/api/agent/driver-access`, { method: "POST", headers: { authorization: `Bearer ${ownerJwt}`, "content-type": "application/json" }, body: JSON.stringify({ driverIds: [NEWD] }) })).json();
+  check("practice mode: a driver let in can sign in, but isn't texted the link yet", access.results?.[0]?.invited === true && access.results[0].reason === "practice" && !texted().slice(tw0).some((x) => x.params.To === newPhone), JSON.stringify(access));
+
   settings({ sandbox: false });
   db(`delete from outbound where carrier_id = '${cid}'`);
+  tw0 = texted().length;
+  await fetch(`${BASE}/api/cron/dispatch`, { headers: { authorization: "Bearer cron-secret" } });
+  await fetch(`${BASE}/api/cron/dispatch`, { headers: { authorization: "Bearer cron-secret" } });
+  const links = texted().slice(tw0).filter((x) => x.params.To === newPhone && /sign in with this phone number/.test(x.params.Body ?? ""));
+  check("...live: the rounds text them the link, once", links.length === 1, JSON.stringify(texted().slice(tw0).filter((x) => x.params.To === newPhone).map((x) => x.params.Body.slice(0, 60))));
+  db(`delete from drivers where id = '${NEWD}' and carrier_id = '${cid}'`);
+  db(`delete from invites where carrier_id = '${cid}' and phone like '%4695550177'`);
 
   // ── A provider outage ─────────────────────────────────────────────────────────────────────────────────
   fs.writeFileSync(`${S}/fakes/outage-twilio`, "");

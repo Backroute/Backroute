@@ -23,7 +23,7 @@ export async function noticeApprovals(ctx: CarrierContext, approved: Escalation)
   if (!(await claimMark(ctx.carrier.id, "rules", `suggest:${rule}`))) return;
   const info = ruleInfo(rule);
   const e = await passToOwner(ctx, {
-    reason: `You've sent the last ${STREAK} ${info.kind} the AI wrote without changing a word. Want it to send these on its own from now on? You can turn it off in Settings any time.`,
+    reason: `You've sent the last ${STREAK} ${info.kind} Backroute wrote without changing a word. Want it to send these on its own from now on? You can turn it off in Settings any time.`,
     label: "Not now",
     source: "app",
     to: "owner",
@@ -47,7 +47,7 @@ export async function noticeDecisions(ctx: CarrierContext, answered: Escalation)
   if (!(await claimMark(ctx.carrier.id, "rules", `suggest:${rule}`))) return;
   const info = ruleInfo(rule);
   const e = await passToOwner(ctx, {
-    reason: `You've said yes the last ${STREAK} times the AI asked about ${info.kind}. Want it to make these calls on its own from now on? You can turn it off in Settings any time.`,
+    reason: `You've said yes the last ${STREAK} times Backroute asked about ${info.kind}. Want it to make these calls on its own from now on? You can turn it off in Settings any time.`,
     label: "Not now",
     source: "app",
     to: "owner",

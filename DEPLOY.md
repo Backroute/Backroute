@@ -346,7 +346,9 @@ Check each provider's current prices. The support console's Numbers tab estimate
 
 In **Settings → Billing & Team → Who can sign in**:
 
-- Tap **Let them sign in** next to each driver.
+- Drivers typed in at sign-up or with **Add a truck** are let in already, and each gets one text with the app link
+  (in practice mode, the text waits until the carrier is live; the dispatcher's rounds send it then, in the driver's
+  daytime). For anyone else, tap **Let them sign in** next to the driver.
 - Add dispatchers by phone number.
 - Add a bookkeeper by phone number: they see the money and the fleet, record advances and mark invoices paid, and can't book or message anyone.
 - Send them the sign-in link on the card.

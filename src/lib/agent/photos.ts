@@ -75,7 +75,7 @@ export async function driverPhotos(ctx: CarrierContext, driver: Driver, media: {
     current = { ...current, documents: [...current.documents.filter((d) => !(d.type === kind && kind !== "lumper_receipt")), doc], updatedAt: new Date().toISOString() };
     if (kind === "pod" && check?.exceptions.some((e) => DAMAGE.test(e))) podDamage = check.exceptions;
     if (flagged) {
-      await passToOwner(ctx, { reason: `${driver.name} texted the ${NAMES[kind]} for ${load.referenceNumber}, and it needs a look: ${note ?? "the AI couldn't read it."}`, loadId: load.id, label: "Checked", source: "sms", to: "owner" });
+      await passToOwner(ctx, { reason: `${driver.name} texted the ${NAMES[kind]} for ${load.referenceNumber}, and it needs a look: ${note ?? "Backroute couldn't read it."}`, loadId: load.id, label: "Checked", source: "sms", to: "owner" });
       said.push(`Got the ${NAMES[kind]}, but ${check && !check.signed && kind !== "lumper_receipt" ? "I don't see a signature on it" : "something on it needs a look"}. If you can, get it signed and send another photo.`);
     } else said.push(`Got the ${NAMES[kind]} for ${load.referenceNumber}${amount ? ` ($${amount})` : ""}, thanks.`);
   }

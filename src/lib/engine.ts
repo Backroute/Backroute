@@ -552,7 +552,7 @@ export function resolveLoadOffer(loads: Load[], offerGroupId: string, chosenId: 
     return { ...l, stage: "declined" as const, progressPct: 100, updatedAt: now };
   });
 
-  const actorLabel = actor === "driver" ? "Driver selected the next load" : actor === "carrier" ? "Carrier selected the next load" : "AI auto-selected the top-scored load";
+  const actorLabel = actor === "driver" ? "Driver selected the next load" : actor === "carrier" ? "Carrier selected the next load" : "Backroute auto-selected the top-scored load";
   const events: ActivityEvent[] = [
     mkEvent(
       chosen.carrierId,
@@ -736,7 +736,7 @@ export function finishBrokerCall(load: Load, broker: Broker | undefined): StepRe
   return {
     load: next,
     events: [
-      mkEvent(load.carrierId, load.id, "call_completed", `AI closed ${b.company} by phone at $${live.finalRate.toLocaleString()}`, gain > 0 ? `$${gain.toLocaleString()} more than the broker's first offer · checking the rate con` : "Checking the rate con", "success", "voice"),
+      mkEvent(load.carrierId, load.id, "call_completed", `Backroute closed ${b.company} by phone at $${live.finalRate.toLocaleString()}`, gain > 0 ? `$${gain.toLocaleString()} more than the broker's first offer · checking the rate con` : "Checking the rate con", "success", "voice"),
     ],
   };
 }
@@ -775,17 +775,17 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
   switch (load.stage) {
     case "sourced": {
       next.stage = "scoring";
-      events.push(mkEvent(load.carrierId, load.id, "scoring_done", "AI scored a new load", `${load.lane.origin} → ${load.lane.destination} · est. net $${(load.targetRate - load.fuelCost - load.tollCost).toLocaleString()}`, "info"));
+      events.push(mkEvent(load.carrierId, load.id, "scoring_done", "Backroute scored a new load", `${load.lane.origin} → ${load.lane.destination} · est. net $${(load.targetRate - load.fuelCost - load.tollCost).toLocaleString()}`, "info"));
       break;
     }
     case "scoring": {
       next.stage = "negotiating";
       const msg: NegotiationMessage = {
-        id: uid("msg"), channel: "email", direction: "outbound", from: "Backroute AI",
+        id: uid("msg"), channel: "email", direction: "outbound", from: "Backroute",
         timestamp: new Date().toISOString(), content: EMAIL_OPEN(load.lane.origin, load.lane.destination, load.lane.miles),
       };
       next.messages = [...load.messages, msg];
-      events.push(mkEvent(load.carrierId, load.id, "negotiation_email", "AI opened negotiation by email", `${b.company} · ${load.lane.origin} → ${load.lane.destination}`, "info", "email"));
+      events.push(mkEvent(load.carrierId, load.id, "negotiation_email", "Backroute opened negotiation by email", `${b.company} · ${load.lane.origin} → ${load.lane.destination}`, "info", "email"));
       break;
     }
     case "negotiating": {
@@ -800,8 +800,8 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
       if (load.surchargePct && rounds >= 3 && chance(0.2)) {
         next.stage = "declined";
         next.progressPct = 100;
-        next.cancellationReason = `${b.company} wouldn't pay the ${load.surchargePct}% slow-pay premium. The AI walked away and is finding another load.`;
-        events.push(mkEvent(load.carrierId, load.id, "load_cancelled", `${b.company} passed on the slow-pay premium`, "The AI walked away and is finding another load", "info"));
+        next.cancellationReason = `${b.company} wouldn't pay the ${load.surchargePct}% slow-pay premium. Backroute walked away and is finding another load.`;
+        events.push(mkEvent(load.carrierId, load.id, "load_cancelled", `${b.company} passed on the slow-pay premium`, "Backroute walked away and is finding another load", "info"));
         const truckUpdates = truck && truck.nextLoadId === load.id ? { id: truck.id, nextLoadId: null } : undefined;
         return { load: next, events, truckUpdates };
       }
@@ -835,7 +835,7 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
           next.stage = "rate_confirmed";
           applyBookedEconomics(next, load, finalAmt, b.reliability ?? 70);
           next.documents = [...load.documents, { id: uid("doc"), type: "rate_confirmation", name: `RateCon_${load.referenceNumber}.pdf`, generatedAt: new Date().toISOString(), status: "verified" }];
-          events.push(mkEvent(load.carrierId, load.id, "rate_confirmed", "Rate agreed. AI is checking the rate con", `${b.company} · $${finalAmt.toLocaleString()} all-in`, "success", "sms"));
+          events.push(mkEvent(load.carrierId, load.id, "rate_confirmed", "Rate agreed. Backroute is checking the rate con", `${b.company} · $${finalAmt.toLocaleString()} all-in`, "success", "sms"));
         }
       } else {
         const isAiTurn = rounds % 2 === 0;
@@ -851,11 +851,11 @@ export function advanceLoad(load: Load, broker: Broker | undefined, truck: Truck
         const isFirstAiAsk = isAiTurn && priorAiOffers.length === 0;
         const msg: NegotiationMessage = {
           id: uid("msg"), channel: pick(["email", "sms"]), direction: isAiTurn ? "outbound" : "inbound",
-          from: isAiTurn ? "Backroute AI" : b.contact, timestamp: new Date().toISOString(),
+          from: isAiTurn ? "Backroute" : b.contact, timestamp: new Date().toISOString(),
           content: isAiTurn ? pick(isFirstAiAsk ? AI_OPEN_ASK : AI_CONCEDE)(amt) : BROKER_LOW(amt), offerAmount: amt,
         };
         next.messages = [...load.messages, msg];
-        events.push(mkEvent(load.carrierId, load.id, isAiTurn ? "negotiation_email" : "negotiation_sms", isAiTurn ? "AI sent a counter-offer" : "Broker replied with a counter", `${b.company} · $${amt.toLocaleString()}`, "info", msg.channel));
+        events.push(mkEvent(load.carrierId, load.id, isAiTurn ? "negotiation_email" : "negotiation_sms", isAiTurn ? "Backroute sent a counter-offer" : "Broker replied with a counter", `${b.company} · $${amt.toLocaleString()}`, "info", msg.channel));
       }
       break;
     }
@@ -1014,7 +1014,7 @@ export function pushForBetterRate(
     id: uid("msg"),
     channel: "email",
     direction: "outbound",
-    from: "Backroute AI",
+    from: "Backroute",
     timestamp: new Date().toISOString(),
     content: hasSpecificAsk ? COUNTER_REQUEST_COPY[actor](newTarget) : PUSH_REQUEST_COPY[actor](newTarget),
     offerAmount: newTarget,
@@ -1027,8 +1027,8 @@ export function pushForBetterRate(
       load.id,
       "negotiation_email",
       actor === "driver"
-        ? (hasSpecificAsk ? `Driver countered at $${newTarget.toLocaleString()}` : "Driver asked AI to push for a better rate")
-        : (hasSpecificAsk ? `Carrier countered at $${newTarget.toLocaleString()}` : "Carrier asked AI to push for a better rate"),
+        ? (hasSpecificAsk ? `Driver countered at $${newTarget.toLocaleString()}` : "Driver asked Backroute to push for a better rate")
+        : (hasSpecificAsk ? `Carrier countered at $${newTarget.toLocaleString()}` : "Carrier asked Backroute to push for a better rate"),
       `${b.company} · new target $${newTarget.toLocaleString()}`,
       "info",
       "email",
@@ -1070,7 +1070,7 @@ function instructionMessage(category: InstructionCategory, text: string, b: Brok
         : category === "payment"
           ? `Quick one on terms, ${b.contact.split(" ")[0]}. Any chance of quick pay or a shorter cycle on this load?`
           : `Also wanted to flag on this one: "${text}"`;
-  return { id: uid("msg"), channel: "email", direction: "outbound", from: "Backroute AI", timestamp: new Date().toISOString(), content };
+  return { id: uid("msg"), channel: "email", direction: "outbound", from: "Backroute", timestamp: new Date().toISOString(), content };
 }
 
 /** The general version of "push for better rate" — driver/carrier can tell the AI ANY ask (money, detention terms,
@@ -1096,7 +1096,7 @@ export function applyNegotiationInstruction(
       load.carrierId,
       load.id,
       "negotiation_email",
-      actor === "driver" ? "Driver asked AI to raise something with the broker" : "Carrier asked AI to raise something with the broker",
+      actor === "driver" ? "Driver asked Backroute to raise something with the broker" : "Carrier asked Backroute to raise something with the broker",
       `${b.company} · ${text}`,
       "info",
       "email",
@@ -1123,7 +1123,7 @@ const OFFER_PENDING_REPLY: Record<Exclude<InstructionCategory, "rate">, (company
  * card at all — it just points to where that capability actually lives.
  */
 const RATE_REDIRECT_REPLY =
-  "This offer already reflects our strongest data-driven ask for this lane and broker. Select the load and the AI can keep pushing the broker directly during negotiation.";
+  "This offer already reflects our strongest data-driven ask for this lane and broker. Select the load and Backroute can keep pushing the broker directly during negotiation.";
 
 /**
  * The offer-card equivalent of applyNegotiationInstruction, scoped to what makes sense before a load is booked:
@@ -1200,7 +1200,7 @@ function incidentPlan(type: IncidentType, ctx: IncidentContext): IncidentStep[] 
     if (onLoad && ctx.backupTruck) {
       steps.push({ label: "Lined up a backup truck", detail: `${ctx.backupTruck.unitNumber} is empty ${ctx.backupMiles ?? randInt(25, 60)} mi away and can relay the load if the repair runs long` });
     }
-    steps.push({ label: `Approve the $${quote.toLocaleString()} repair`, detail: `${shop}'s quote is over the $750 the AI can approve on its own`, owner: "human" });
+    steps.push({ label: `Approve the $${quote.toLocaleString()} repair`, detail: `${shop}'s quote is over the $750 Backroute can approve on its own`, owner: "human" });
     steps.push({ label: "Repaired and rolling again", detail: onLoad ? `${broker} and the receiver have the final ETA` : "Truck back in service" });
   } else if (type === "accident") {
     steps.push({ label: "Driver checked on", detail: "A Backroute safety specialist is on the line with the driver" });
@@ -1245,7 +1245,7 @@ export function createIncident(driverId: string, carrierId: string, truckId: str
 }
 
 export function incidentOpenedEvent(incident: Incident, truck: Truck | undefined): ActivityEvent {
-  const base = incident.note || "AI dispatcher is handling it now.";
+  const base = incident.note || "Dispatch is handling it now.";
   return mkEvent(
     incident.carrierId,
     incident.loadId ?? undefined,
@@ -1275,6 +1275,6 @@ export function advanceIncident(incident: Incident): { incident: Incident; event
   const step = steps[nextStepIndex];
   return {
     incident: updated,
-    event: mkEvent(incident.carrierId, incident.loadId ?? undefined, "incident", `AI: ${step.label}`, step.detail ?? `${INCIDENT_LABEL[incident.type]} · in progress`, "info"),
+    event: mkEvent(incident.carrierId, incident.loadId ?? undefined, "incident", `Backroute: ${step.label}`, step.detail ?? `${INCIDENT_LABEL[incident.type]} · in progress`, "info"),
   };
 }

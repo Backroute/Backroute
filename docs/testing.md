@@ -286,6 +286,19 @@ The code was run against local stand-ins that behave like the real services:
   - Driving mode, calls and sheets open above everything. `demo-smoke` taps the centre and both ends of every button and line in driving mode on a phone and fails if anything else is there. It caught the old bug ("Delivery" and the footer were under the app's own bars) when the fix was taken out.
   - "I'm parked" sits fully on screen and closes driving mode; the website doesn't scroll sideways on a phone and leads with the new headline.
   - The production build still works offline (6 checks), and dark mode was checked by eye on the owner's Home and the driver's loads.
+- **Drivers getting in, and carriers leaving:**
+  - Each driver typed in at sign-up is texted the app link once, after the notice of who's texting, and can sign in with
+    their phone (`real-e2e`). In practice mode the link waits; once the carrier is live the rounds send it, once
+    (`sandbox-e2e`).
+  - Leaving (21 checks in `leave-e2e`): only the owner can download or delete. The download comes a page at a time
+    (1,005 rows come back as 1,000 + 5), with every file, and never a saved website password or an ELD key. Deleting
+    needs the company name typed exactly; if Stripe won't cancel the subscription nothing is deleted; once it does,
+    every table of theirs is empty, the account and drivers' consent records are kept, and the sign-ins that were only
+    for them are removed. Support's `export` and `delete` do the same, and `delete` refuses without the name.
+  - The .zip itself (5 unit checks): the standard CRC-32 check value, and the system `unzip` reads it back byte for byte,
+    with a non-English file name and its date.
+  - A driver's first day, walked through on a phone (sign in from the link, agree, pre-trip, pickup, BOL, delivery,
+    POD): every step works and every screen is free of serious accessibility problems.
 - **Access rules:** 125 checks.
   - A stale copy saving one field of a load changes only that field.
   - What carriers cost to run is server-only.

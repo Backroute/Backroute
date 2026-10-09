@@ -202,7 +202,8 @@ export function TripMap({
   // fills an absolutely positioned wrapper rather than being positioned itself.
   return (
     <div className={cn("absolute inset-0 z-0", className)} style={{ background: "#141414" }}>
-      <div ref={el} aria-hidden className="h-full w-full" />
+      {/* Inert: a picture of the route. MapLibre makes its canvas focusable; nothing in here should take focus. */}
+      <div ref={el} inert className="h-full w-full" />
       {straight && !compact && (
         <span className="pointer-events-none absolute top-14 right-3 rounded-full bg-black/60 px-2 py-0.5 text-xs font-medium text-white/80">Straight line · not directions</span>
       )}

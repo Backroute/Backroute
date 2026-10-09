@@ -48,6 +48,17 @@ const sub = "aaaaaaaa-0000-0000-0000-000000000001", phone = "12145550100";
   check("drivers saved with phones", db(`select string_agg(phone_last10, ',' order by phone_last10) from drivers where carrier_id = '${cid}'`) === "2145550148,9725550163");
   check("no sample loads, calls or messages", db(`select (select count(*) from loads where carrier_id='${cid}') + (select count(*) from dispatch_calls where carrier_id='${cid}') + (select count(*) from driver_messages where carrier_id='${cid}')`) === "0");
 
+  // Each driver typed in can sign in to the driver app, and gets the link by text (after the first-text notice).
+  let linkTexts = [];
+  for (let i = 0; i < 30 && linkTexts.length < 2; i++) {
+    await p.waitForTimeout(1000);
+    linkTexts = tw().filter((x) => /Messages\.json/.test(x.path) && /sign in with this phone number/.test(x.params.Body ?? ""));
+  }
+  check("each driver is texted the app link, once", linkTexts.length === 2 && new Set(linkTexts.map((x) => x.params.To)).size === 2 && linkTexts.every((x) => /http:\/\/localhost:3210\/login/.test(x.params.Body)), JSON.stringify(linkTexts.map((x) => [x.params.To, x.params.Body.slice(0, 60)])));
+  const order = tw().filter((x) => x.params.To === "+12145550148").map((x) => (/Reply YES/.test(x.params.Body ?? "") ? "notice" : /sign in with this/.test(x.params.Body ?? "") ? "link" : "other"));
+  check("...after the notice of who's texting", order.indexOf("notice") === 0 && order.indexOf("link") === 1, order.join(","));
+  check("...and can sign in with their phone", db(`select string_agg(right(phone, 10), ',' order by phone) from invites where carrier_id = '${cid}' and role = 'driver'`) === "2145550148,9725550163", db(`select string_agg(phone, ',') from invites where carrier_id = '${cid}'`));
+
   // Add a load from its rate con
   await p.getByRole("link", { name: /Go to your dashboard/ }).click();
   // The dashboard's first compile after a change can take a while on a cold dev server.

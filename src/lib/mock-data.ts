@@ -359,7 +359,7 @@ function buildNegotiationThread(
     id: rng.id("msg"),
     channel: "email",
     direction: "outbound",
-    from: "Backroute AI",
+    from: "Backroute",
     timestamp: iso(t),
     content: rng.pick(EMAIL_OPENERS)(lane.origin, lane.destination, lane.miles, pickupLabel),
   });
@@ -391,7 +391,7 @@ function buildNegotiationThread(
       id: rng.id("msg"),
       channel: round === 0 ? "email" : "sms",
       direction: "outbound",
-      from: "Backroute AI",
+      from: "Backroute",
       timestamp: iso(t),
       content: rng.pick(round === 0 ? EMAIL_COUNTERS : EMAIL_CONCEDE)(aiAsk),
       offerAmount: aiAsk,
@@ -469,7 +469,7 @@ function buildNegotiationThread(
       id: rng.id("msg"),
       channel: "sms",
       direction: "outbound",
-      from: "Backroute AI",
+      from: "Backroute",
       timestamp: iso(t),
       content: rng.pick(SMS_NUDGES),
     });
@@ -811,7 +811,7 @@ export function generateWorld(seed = 20260916): World {
 
   const activity: ActivityEvent[] = [
     { id: rng.id("act"), timestamp: iso(-4), type: "load_sourced", message: "New load sourced from DAT One", detail: `Dallas, TX → Atlanta, GA · $${loads[1]?.listedRate ?? 1850}`, loadId: loads[1]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info" },
-    { id: rng.id("act"), timestamp: iso(-11), type: "negotiation_sms", channel: "sms", message: "AI countered broker via SMS", detail: "Meridian Freight Services · Countered at $2,140", loadId: loads[4]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info" },
+    { id: rng.id("act"), timestamp: iso(-11), type: "negotiation_sms", channel: "sms", message: "Backroute countered broker via SMS", detail: "Meridian Freight Services · Countered at $2,140", loadId: loads[4]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info" },
     { id: rng.id("act"), timestamp: iso(-26), type: "call_completed", channel: "voice", message: "Voice call closed, rate locked", detail: "Cascade Logistics Partners · $2,310 all-in", loadId: loads[6]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "success" },
     { id: rng.id("act"), timestamp: iso(-33), type: "tms_synced", message: "Load synced to TMS", detail: `Reference ${loads[7]?.referenceNumber}`, loadId: loads[7]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "success" },
     { id: rng.id("act"), timestamp: iso(-58), type: "check_call", message: "Automated check call completed", detail: "Truck T-107 · On schedule, ETA 6:40 PM", loadId: loads[9]?.id, carrierId: PRIMARY_CARRIER_ID, severity: "info" },

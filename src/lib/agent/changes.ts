@@ -62,7 +62,7 @@ export async function answerChange(ctx: CarrierContext, load: Load, kind: LoadCh
   const extra = await extraMiles(load, kind, clean);
   const what = kind === "reroute" ? `deliver to ${clean[0].city}, ${clean[0].state} instead` : `add ${clean.length === 1 ? "a stop" : `${clean.length} stops`} in ${clean.map((p) => `${p.city}, ${p.state}`).join(" and ")}`;
   if (extra === null) {
-    await passToOwner(ctx, { reason: `${sender.fromName} wants ${load.referenceNumber} to ${what}. The AI couldn't work out the extra miles: price it and reply.`, loadId: load.id, label: "I'll price it", source: "email", to: "decider" });
+    await passToOwner(ctx, { reason: `${sender.fromName} wants ${load.referenceNumber} to ${what}. Backroute couldn't work out the extra miles: price it and reply.`, loadId: load.id, label: "I'll price it", source: "email", to: "decider" });
     return "change passed on (unknown miles)";
   }
   const rate = load.bookedRate ?? load.targetRate;
@@ -152,7 +152,7 @@ export async function changeReply(ctx: CarrierContext, load: Load, r: { agreed: 
     return true;
   }
   if (r.brokerRate !== null || !r.agreed) {
-    await passToOwner(ctx, { reason: `${fromName} came back on the change to ${load.referenceNumber}${r.brokerRate ? ` with $${r.brokerRate.toLocaleString("en-US")} all in` : ""}; the AI asked $${c.newTotal.toLocaleString("en-US")} (+$${c.extra} for ${c.extraMiles} extra miles${c.kind === "add_stop" ? " and stop pay" : ""}). Take it or push back?`, loadId: load.id, label: "Decided", source: "email", to: "decider" });
+    await passToOwner(ctx, { reason: `${fromName} came back on the change to ${load.referenceNumber}${r.brokerRate ? ` with $${r.brokerRate.toLocaleString("en-US")} all in` : ""}; Backroute asked $${c.newTotal.toLocaleString("en-US")} (+$${c.extra} for ${c.extraMiles} extra miles${c.kind === "add_stop" ? " and stop pay" : ""}). Take it or push back?`, loadId: load.id, label: "Decided", source: "email", to: "decider" });
     return true;
   }
   return false;

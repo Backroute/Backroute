@@ -92,7 +92,7 @@ const twAfter = (i) => read("twilio").slice(i);
   await email("acme.dispatch.loads@gmail.com", "Bob", "Acme lanes", "Acme lanes this week: MEM to BHM van $1100. Bob, Acme Freight MC 999999");
   const fake = broker("acme.dispatch.loads@gmail.com");
   check("someone posing as a broker (inactive MC, free email): not verified, high risk", fake && !fake.authorityVerified && fake.fraudRisk === "high" && /no active broker authority/.test(fake.verifyNote), fake?.verifyNote);
-  check("...the AI doesn't book with them, and the owner is told why (not support)", pmAfter(pm0).length === 0 && esc("The AI isn't booking with Acme Freight <acme.dispatch.loads@gmail.com>%") === "open", esc("The AI isn't booking with Acme Freight%"));
+  check("...the AI doesn't book with them, and the owner is told why (not support)", pmAfter(pm0).length === 0 && esc("Backroute isn't booking with Acme Freight <acme.dispatch.loads@gmail.com>%") === "open", esc("Backroute isn't booking with Acme Freight%"));
   await email("dispatch@acmefreight.test", "Rosa at Acme", "Acme lanes", "Acme lanes this week: MEM to BHM van $1100. Rosa, Acme Freight, MC 555001, (312) 555-0142");
   const real = broker("dispatch@acmefreight.test");
   check("a real broker is verified with FMCSA (active authority, name matches)", real?.authorityVerified === true && real.mc === "555001" && real.legalName === "ACME FREIGHT LLC" && real.phone === "(312) 555-0142", real?.verifyNote);

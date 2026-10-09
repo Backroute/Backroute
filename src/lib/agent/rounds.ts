@@ -1,5 +1,6 @@
 import "server-only";
 import { canCall, canEmail, canText } from "../channels/out";
+import { appLinkRounds } from "./app-link";
 import { appointmentRounds } from "./appointments";
 import { sendLayoverClaims } from "./layover";
 import { claimRounds } from "./claims";
@@ -95,6 +96,8 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   if (canText(ctx.carrier)) done.push(...(await trackingRounds(ctx, now)));
   if (canCall(ctx.carrier)) done.push(...(await appointmentRounds(ctx, now)));
   done.push(...(await weeklyCare(ctx, now)));
+  // Drivers let in who were never texted the app link (a carrier just gone live, or made with the pilot script).
+  done.push(...(await appLinkRounds(ctx, now, base).catch((e) => (console.error("[rounds] app links failed", e), []))));
   // The driver's morning text, reefer readings, and the owner's Monday review.
   done.push(...(await morningBriefs(ctx, now).catch((e) => (console.error("[rounds] morning texts failed", e), []))));
   done.push(...(await reeferRounds(ctx, now).catch((e) => (console.error("[rounds] reefer checks failed", e), []))));

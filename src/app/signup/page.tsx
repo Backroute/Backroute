@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import type { RunType } from "@/lib/types";
 import type { FmcsaResult } from "@/lib/fmcsa";
 import { cloudEnabled } from "@/lib/cloud/client";
-import { chooseCarrier, createCarrierAccount } from "@/lib/cloud/account";
+import { chooseCarrier, createCarrierAccount, letDriversIn } from "@/lib/cloud/account";
 import { connect as connectCarrier } from "@/lib/cloud/sync";
 import { inDemo } from "@/lib/cloud/demo";
 import { FleetForm } from "@/components/cloud/fleet-form";
@@ -120,6 +120,9 @@ function Signup() {
         });
         chooseCarrier(m.carrierId);
         await connectCarrier(m, { fresh: true });
+        // Each driver typed in can sign in to the driver app and gets a text with the link (an owner-operator is
+        // already in). The fleet is saved a moment after this, so the server waits for it.
+        if (!solo) void letDriversIn(useStore.getState().drivers.map((d) => d.id));
       } catch {
         setSaving(false);
         return setSaveError("Couldn't create your account. Check your connection and try again.");

@@ -81,7 +81,7 @@ async function giveUp(ctx: CarrierContext, load: Load, stop: Stop, why: string):
   const state = stateOf(load, stop);
   const saved = await saveAppt(ctx, load, stop, { ...appt, status: email ? "broker" : "failed", note: why, brokerAskedAt: new Date().toISOString() });
   if (!email) {
-    await passToOwner(ctx, { reason: `${load.referenceNumber}: the AI couldn't ${appt.purpose === "move" ? "move" : "book"} the ${stop} appointment with ${nameOf(load, stop)} (${why}), and there's no broker email to ask. ${phoneOf(load, stop) ? `Their number: ${phoneOf(load, stop)}.` : ""}`, loadId: load.id, label: "Set", source: "voice", to: "owner" });
+    await passToOwner(ctx, { reason: `${load.referenceNumber}: Backroute couldn't ${appt.purpose === "move" ? "move" : "book"} the ${stop} appointment with ${nameOf(load, stop)} (${why}), and there's no broker email to ask. ${phoneOf(load, stop) ? `Their number: ${phoneOf(load, stop)}.` : ""}`, loadId: load.id, label: "Set", source: "voice", to: "owner" });
     return `${stop} appointment: owner told (${why})`;
   }
   const broker = ctx.brokers.find((b) => b.id === load.brokerId);
@@ -95,7 +95,7 @@ async function giveUp(ctx: CarrierContext, load: Load, stop: Stop, why: string):
     withinRules: true,
     why: `Ask ${broker?.company ?? "the broker"} to set the ${stop} appointment on ${load.referenceNumber}?`,
   });
-  await tellOwner(ctx, { reason: `${load.referenceNumber}: ${nameOf(load, stop)} ${/they said/.test(why) ? "wants the broker to set" : "couldn't be reached about"} the ${stop} appointment, so the AI asked ${broker?.company ?? "the broker"} to set it.`, loadId: load.id, source: "voice" });
+  await tellOwner(ctx, { reason: `${load.referenceNumber}: ${nameOf(load, stop)} ${/they said/.test(why) ? "wants the broker to set" : "couldn't be reached about"} the ${stop} appointment, so Backroute asked ${broker?.company ?? "the broker"} to set it.`, loadId: load.id, source: "voice" });
   return `${stop} appointment: broker asked (${why})`;
 }
 

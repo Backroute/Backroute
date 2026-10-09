@@ -3,7 +3,7 @@ import type { Item } from "./rows";
 import { applyFromServer } from "./sync";
 
 const REASON: Record<string, string> = {
-  email_off: "Email isn't switched on yet, so the AI can't write to the broker.",
+  email_off: "Email isn't switched on yet, so Backroute can't write to the broker.",
   not_offered: "That offer isn't open any more.",
   not_pending: "That load isn't waiting on the broker.",
   sign_in: "Only the office can do that. Sign in again if you're the owner.",
@@ -30,7 +30,7 @@ export async function askToBook(loadId: string, also: string[] = []): Promise<st
   const plan = also.length ? { with: also } : {};
   let r = await call("/api/agent/book", { loadId, ...plan });
   if (!r.ok && r.error === "need_price") {
-    const typed = window.prompt("The broker didn't post a rate, and no lowest rate per mile is set. What should the AI ask, all in ($)?");
+    const typed = window.prompt("The broker didn't post a rate, and no lowest rate per mile is set. What should Backroute ask, all in ($)?");
     const ask = Number((typed ?? "").replace(/[$,\s]/g, ""));
     if (!(ask > 0)) return null;
     r = await call("/api/agent/book", { loadId, ask, ...plan });

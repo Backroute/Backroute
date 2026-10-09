@@ -9,6 +9,7 @@
     "lint": "eslint",
     "measure": "node eval/measure.mjs",
     "pilot:carrier": "node scripts/pilot-carrier.mjs",
+    "pilot:kit": "node scripts/pilot-kit.mjs",
     "check:live": "node scripts/go-live-check.mjs",
     "test:setup": "bash tests/setup.sh",
     "test:unit": "bash tests/unit.sh",

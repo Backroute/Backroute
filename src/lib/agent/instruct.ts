@@ -91,6 +91,6 @@ export async function ownerInstruction(ctx: CarrierContext, load: Load, text: st
   if (!to) return { error: "no_broker_email" };
   const line = await relayLine(text);
   const body = `Hi${name ? ` ${name}` : ""},\n\n${line}\n\nThanks,\n${ctx.carrier.name}`;
-  await sendOrQueue(ctx, { purpose: "reply", to, toName: name, subject, body, loadId: load.id, withinRules: true, ownerAsked: true, why: "You asked the AI to send this." });
+  await sendOrQueue(ctx, { purpose: "reply", to, toName: name, subject, body, loadId: load.id, withinRules: true, ownerAsked: true, why: "You asked Backroute to send this." });
   return { done: "relay", note: `Sent: "${line}"` };
 }

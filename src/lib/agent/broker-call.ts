@@ -290,7 +290,7 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
           return `We can't haul it: ${tooHeavy} Tell them politely, thank them, and end the call.`;
         }
         if (current.hazmat && !ctx.settings.hazmat) {
-          await passToOwner(ctx, { reason: `${current.referenceNumber} is hazmat${commodity ? ` (${commodity})` : ""}. The AI didn't book it: is the truck and driver set up for hazmat?`, loadId: current.id, label: "Decided", source: "voice", to: "owner" });
+          await passToOwner(ctx, { reason: `${current.referenceNumber} is hazmat${commodity ? ` (${commodity})` : ""}. Backroute didn't book it: is the truck and driver set up for hazmat?`, loadId: current.id, label: "Decided", source: "voice", to: "owner" });
           return "Hazmat: don't book. Say you need to check hazmat with the office and will email back.";
         }
         return "Noted. It fits our truck.";
@@ -334,7 +334,7 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
       inputSchema: z.object({ question: z.string() }),
       run: async ({ question }) => {
         // Something only the carrier knows (their own policy, a detail not on file): the owner's to answer.
-        await passToOwner(ctx, { reason: `${ctx.brokers.find((b) => b.id === current.brokerId)?.company ?? "The broker"} asked on the phone about ${current.referenceNumber}: "${question}". The AI didn't know; reply to them, or add it to your settings so it knows next time.`, loadId: current.id, label: "Answered", source: "voice", to: "owner" });
+        await passToOwner(ctx, { reason: `${ctx.brokers.find((b) => b.id === current.brokerId)?.company ?? "The broker"} asked on the phone about ${current.referenceNumber}: "${question}". Backroute didn't know; reply to them, or add it to your settings so it knows next time.`, loadId: current.id, label: "Answered", source: "voice", to: "owner" });
         return "Noted for the office. Tell them someone will email the answer shortly.";
       },
     }),

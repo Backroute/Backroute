@@ -49,11 +49,16 @@ node scripts/pilot-carrier.mjs create --name "Lone Star Hauling" --mc 123456 --d
 
 ### Day 0, with the owner (30 minutes, on a call)
 
+Before the call, print their kit (`docs/pilot-kit`): `npm run pilot:kit -- --carrier "Lone Star Hauling" --dispatch "(469) 555-0199" --inbound <their Backroute address>`.
+Send the owner the guide, and the driver sheet for each driver's cab.
+
+
 - They sign in with their phone, check trucks and drivers, set the lowest rate per mile, billing email and factoring,
   upload W-9 and COI (and a voided check if they want the AI doing setup websites), and name who signs rate cons.
 - They turn on phone alerts (Settings → Notifications) and add Backroute to their home screen on an iPhone.
 - They forward broker load emails to their Backroute address, or CC it on threads.
-- Drivers get the text with the app link; each signs in with their phone, taps I agree to texts from dispatch, and
+- Drivers get one text with the app link (sent by the rounds once the carrier is live, if it was made in practice
+  mode or with this script); each signs in with their phone, taps I agree to texts from dispatch, and
   turns on notifications (Profile). Drivers on WhatsApp just message the dispatch line there. If the owner has each
   driver's written OK already, add `--drivers-agreed` when creating the carrier (or check the box in Add a truck).
 - Ask the owner to forward (or upload) a few months of old rate cons in Settings → Bring your history, so the AI prices

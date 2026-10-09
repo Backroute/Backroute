@@ -62,6 +62,7 @@ export ELEVENLABS_VOICE_ID=voice-1
 export ELEVENLABS_BASE=http://localhost:3009/elevenlabs
 export WEATHER_API_BASE=http://localhost:3009/weather
 export BRIEF_HOURS=0-24
+export APP_LINK_HOURS=0-24
 export REVIEW_DAY=any
 export REVIEW_HOURS=0-24
 export QUIET_HOURS=0-0

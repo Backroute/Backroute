@@ -40,7 +40,7 @@ export async function sendSetupPacket(ctx: CarrierContext, sender: { from: strin
   const byAi = invite && portalOn(ctx) ? await queuePortalTask(ctx, { kind: "carrier_setup", url: invite, data: { from: sender.from, fromName: sender.fromName, subject: sender.subject } }).catch(() => null) : null;
   if (invite && !onFile && !byAi)
     await passToOwner(ctx, {
-      reason: `${sender.fromName} wants ${ctx.carrier.name} set up through their onboarding portal: ${invite}. Complete it with the details and papers in Settings; the AI sent the papers by email too.`,
+      reason: `${sender.fromName} wants ${ctx.carrier.name} set up through their onboarding portal: ${invite}. Complete it with the details and papers in Settings; Backroute sent the papers by email too.`,
       label: "Set up",
       source: "email",
       to: "support",
@@ -52,7 +52,7 @@ export async function sendSetupPacket(ctx: CarrierContext, sender: { from: strin
   const missing = [!has("w9") && "W-9", !coi && "insurance certificate", coi?.expires_on && coi.expires_on < today && "a current insurance certificate (the one on file expired)"].filter(Boolean);
   if (missing.length) {
     await passToOwner(ctx, {
-      reason: `${sender.fromName} asked for your setup papers. Upload ${missing.join(" and ")} in Settings → General → Your papers, and the AI will send them next time. Or send them yourself.`,
+      reason: `${sender.fromName} asked for your setup papers. Upload ${missing.join(" and ")} in Settings → General → Your papers, and Backroute will send them next time. Or send them yourself.`,
       label: "I'll send them",
       source: "email",
       to: "owner",
@@ -185,7 +185,7 @@ export async function sendInvoices(ctx: CarrierContext): Promise<string[]> {
       const to = ctx.settings.factoringEmail ?? billTo(ctx, load);
       const broker = brokerOf(ctx, load);
       if (!to) {
-        await passToOwner(ctx, { reason: `${load.referenceNumber} delivered and the POD is in, but there's no email anywhere to bill ${broker?.company ?? "the broker"}. Add their email on the load and the AI sends it.`, loadId: load.id, label: "Added", source: "email", to: "owner" });
+        await passToOwner(ctx, { reason: `${load.referenceNumber} delivered and the POD is in, but there's no email anywhere to bill ${broker?.company ?? "the broker"}. Add their email on the load and Backroute sends it.`, loadId: load.id, label: "Added", source: "email", to: "owner" });
         continue;
       }
       const number = `INV-${load.referenceNumber}`.replace(/[^\w-]/g, "");

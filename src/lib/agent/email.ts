@@ -116,7 +116,7 @@ async function handle(carrierId: string, email: InboundEmail) {
         // Nothing is booked on it. The broker we dealt with is asked, at the address we already had, to send their own
         // rate con; the owner is told. A real mix-up gets fixed by their answer; a double broker gets nothing.
         if (double) {
-          await passToOwner(ctx, { reason: `Possible double brokering on ${load.referenceNumber}. ${double} The AI didn't book it and asked ${onLoad!.company} at the address you already had to send a rate con from their own company.`, loadId: load.id, label: "Got it", source: "email", to: "owner", brokerId: onLoad!.id });
+          await passToOwner(ctx, { reason: `Possible double brokering on ${load.referenceNumber}. ${double} Backroute didn't book it and asked ${onLoad!.company} at the address you already had to send a rate con from their own company.`, loadId: load.id, label: "Got it", source: "email", to: "owner", brokerId: onLoad!.id });
           const known = onLoad!.email && onLoad!.email.toLowerCase() !== from ? onLoad!.email : load.brokerContactEmail;
           if (known && (await claimMark(carrierId, load.id, "double_ask")))
             await sendOrQueue(ctx, { purpose: "ack", to: known, toName: onLoad!.contact || undefined, subject: mail.subjectFor(load, "Rate con"), body: `Hi${onLoad!.contact ? ` ${onLoad!.contact}` : ""},\n\nWe got a rate con for ${load.referenceNumber} from ${from} that shows a different broker (${reading.brokerMc ?? "another MC"}), not ${onLoad!.company}. We won't run it as is. If the load is yours, please send the rate con from ${onLoad!.company}.\n\nThanks,\n${ctx.carrier.name}`, loadId: load.id, withinRules: true, why: `Ask ${onLoad!.company} to confirm ${load.referenceNumber}?` });
@@ -136,7 +136,7 @@ async function handle(carrierId: string, email: InboundEmail) {
             const problems = reading.mismatches.filter((m) => m.serious).map((m) => `${m.item}: we agreed ${m.agreed}, the rate con says ${m.onDoc}`);
             await sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: mail.rateConFix(ctx.carrier, ctx.settings, load, problems, fromName), inReplyTo: sender.messageId, loadId: load.id, withinRules: true, why: `Ask ${fromName} to fix the rate con for ${load.referenceNumber}?` });
             replied = true;
-            await tellOwner(ctx, { reason: `${fromName}'s rate con for ${load.referenceNumber} doesn't match what was agreed: ${reading.summary} The AI asked them for a corrected one and books it when that comes.`, loadId: load.id, label: "Got it", source: "email", severity: "warning" });
+            await tellOwner(ctx, { reason: `${fromName}'s rate con for ${load.referenceNumber} doesn't match what was agreed: ${reading.summary} Backroute asked them for a corrected one and books it when that comes.`, loadId: load.id, label: "Got it", source: "email", severity: "warning" });
           } else {
             if (ctx.settings.autonomy !== "ask") {
               load = (await bookIt(ctx, load, reading.totalRate ?? undefined)).load;
@@ -165,7 +165,7 @@ async function handle(carrierId: string, email: InboundEmail) {
                 await sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: `Hi${fromName ? ` ${fromName.split(" ")[0]}` : ""},\n\nCould you email the rate con for ${load.referenceNumber} as a PDF? We sign and send it straight back.\n\nThanks,\n${ctx.carrier.name}`, inReplyTo: sender.messageId, loadId: load.id, withinRules: true, why: `Ask ${fromName} for the rate con as a PDF?` });
               else if (await claimMark(carrierId, load.id, "portal_support")) await passToOwner(ctx, { reason: `${fromName} needs the rate con for ${load.referenceNumber} signed in their online portal (they didn't send a PDF when asked). Sign it from the link in their email.`, loadId: load.id, label: "Signed", source: "email", to: "support" });
             }
-            else if (booked && !ctx.settings.rateConSigner?.name && (await claimMark(carrierId, `carrier:${carrierId}`, "no_signer"))) await passToOwner(ctx, { reason: `The AI booked ${load.referenceNumber} on a matching rate con but can't sign it for you yet. In Settings → Your rules, add who signs rate cons, and the AI will sign and return them.`, loadId: load.id, label: "Added", source: "email", to: "owner" });
+            else if (booked && !ctx.settings.rateConSigner?.name && (await claimMark(carrierId, `carrier:${carrierId}`, "no_signer"))) await passToOwner(ctx, { reason: `Backroute booked ${load.referenceNumber} on a matching rate con but can't sign it for you yet. In Settings → Your rules, add who signs rate cons, and Backroute will sign and return them.`, loadId: load.id, label: "Added", source: "email", to: "owner" });
             await sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: mail.rateConThanks(ctx.carrier, ctx.settings, load, who, fromName, !!signed, booked && !!truck && !truck.nextLoadId && !ctx.loads.some((l) => l.truckId === truck.id && l.id !== load!.id && ["booked", "rate_confirmed"].includes(l.stage))), inReplyTo: sender.messageId, loadId: load.id, attachments: signed ? [signed] : undefined, withinRules: true, why: `Thank ${fromName} for the rate con on ${load.referenceNumber}?` });
             replied = true;
           }
@@ -176,7 +176,7 @@ async function handle(carrierId: string, email: InboundEmail) {
             type: "document_captured",
             loadId: load.id,
             message: serious ? `Rate con from ${fromName} doesn't match: ${serious} thing${serious === 1 ? "" : "s"} to fix` : `Rate con from ${fromName} matches what was agreed`,
-            detail: `${pdf.Name} · read by AI from email`,
+            detail: `${pdf.Name} · read by Backroute from email`,
             severity: serious ? "warning" : "success",
           }),
         );
@@ -211,7 +211,7 @@ async function handle(carrierId: string, email: InboundEmail) {
     if (real?.email && (await claimMark(carrierId, `broker:${real.id}`, `impostor:${domain}`)))
       await sendOrQueue(ctx!, { purpose: "ack", to: real.email, toName: real.contact || undefined, subject: `Someone is emailing as ${real.company}`, body: `Hi${real.contact ? ` ${real.contact}` : ""},\n\nHeads up: we got an email from ${from}, which looks like your address but isn't. We didn't act on it. If it wasn't you, you may want to warn other carriers.\n\nThanks,\n${ctx!.carrier.name}`, withinRules: true, why: `Warn ${real.company} that someone is using a lookalike address?` });
     await passToOwner(ctx!, {
-      reason: `${fromName} <${from}> emailed "${email.Subject}" from an address that imitates ${real?.company ?? "a broker you work with"}'s${real?.email ? ` (${real.email})` : ""}. The AI didn't answer or act on it${real?.email ? `, and warned ${real.company}` : ""}. Don't do anything it asks.`,
+      reason: `${fromName} <${from}> emailed "${email.Subject}" from an address that imitates ${real?.company ?? "a broker you work with"}'s${real?.email ? ` (${real.email})` : ""}. Backroute didn't answer or act on it${real?.email ? `, and warned ${real.company}` : ""}. Don't do anything it asks.`,
       loadId: load?.id,
       label: "Got it",
       source: "email",
@@ -233,7 +233,7 @@ async function handle(carrierId: string, email: InboundEmail) {
     if (!suspect() && (await claimMark(carrierId, `broker:${from}`, `bank:${new Date().toISOString().slice(0, 10)}`)))
       await sendOrQueue(ctx, { purpose: "ack", to: from, toName: fromName, subject: /^re:/i.test(email.Subject) ? email.Subject : `Re: ${email.Subject}`, body: `Hi,\n\nWe don't share, confirm or change payment or bank details by email. Our payment details are on our invoices${ctx.settings.factoringEmail ? " and our notice of assignment" : ""}. For anything about them, please call our office.\n\nThanks,\n${ctx.carrier.name}`, inReplyTo: sender.messageId, withinRules: true, why: `Tell ${fromName} payment details don't change by email?` });
     await passToOwner(ctx, {
-      reason: `${fromName} <${from}> asked about bank or payment details ("${email.Subject}"). That's the most common way carriers get robbed. The AI changed nothing and told them it isn't done by email. If they call, confirm who they are on a number you already had.`,
+      reason: `${fromName} <${from}> asked about bank or payment details ("${email.Subject}"). That's the most common way carriers get robbed. Backroute changed nothing and told them it isn't done by email. If they call, confirm who they are on a number you already had.`,
       label: "Got it",
       source: "email",
       to: "owner",
@@ -356,7 +356,7 @@ async function handle(carrierId: string, email: InboundEmail) {
   const thread = (await threadWith(carrierId, "email", from, 8)).filter((m) => !(m.direction === "in" && m.body === text));
   const draft = await brokerEmailDraft(ctx, { from, fromName, subject: email.Subject, text, attachmentNotes: notes, thread, load });
   if (draft.effects.failed) {
-    await passToOwner(ctx, { reason: `New email from ${fromName}: "${email.Subject}". The AI couldn't write a reply (twice), so it told them someone will get back to them.`, loadId: load?.id, label: "I'll answer", source: "email", to: "support" });
+    await passToOwner(ctx, { reason: `New email from ${fromName}: "${email.Subject}". Backroute couldn't write a reply (twice), so it told them someone will get back to them.`, loadId: load?.id, label: "I'll answer", source: "email", to: "support" });
     await holdingReply();
     return;
   }
@@ -376,6 +376,6 @@ async function handle(carrierId: string, email: InboundEmail) {
     inReplyTo: sender.messageId,
     loadId: load?.id,
     withinRules: onlyKnownPrices(draft.body, known),
-    why: `${fromName} emailed about ${load ? load.referenceNumber : `"${email.Subject}"`}. The AI wrote a reply for you to check.`,
+    why: `${fromName} emailed about ${load ? load.referenceNumber : `"${email.Subject}"`}. Backroute wrote a reply for you to check.`,
   });
 }

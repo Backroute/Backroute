@@ -29,7 +29,7 @@ function autoAssess(b: Broker): { policy: BrokerPolicy; reasons: string[] } {
   if (b.avgDaysToPay > 40) surcharge.push(`Pays in about ${b.avgDaysToPay} days, not ${STANDARD_TERMS_DAYS}`);
   if (b.detentionPaidPct < 50) surcharge.push(`Paid only ${b.detentionPaidPct}% of detention claims`);
   if (b.cancellations90d >= 3) surcharge.push(`Cancelled ${b.cancellations90d} booked loads in the last 90 days`);
-  const notes = b.fraudRisk === "medium" ? ["Elevated fraud risk: the AI confirms the contact and rate con before booking"] : [];
+  const notes = b.fraudRisk === "medium" ? ["Elevated fraud risk: Backroute confirms the contact and rate con before booking"] : [];
   return { policy: surcharge.length ? "surcharge" : "normal", reasons: [...surcharge, ...notes] };
 }
 

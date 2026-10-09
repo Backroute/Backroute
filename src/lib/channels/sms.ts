@@ -78,7 +78,7 @@ export async function receiveText(t: IncomingText): Promise<{ now?: string; late
           return;
         }
         const result = aiConfigured() ? await ownerTurn(ctx, "sms", said, history) : { reply: "", effects: { done: [], failed: true } };
-        if (result.effects.failed) await passToOwner(ctx, { reason: `The owner texted: "${said}". The AI couldn't answer (twice).`, label: "Answered", source: "sms", to: "support" });
+        if (result.effects.failed) await passToOwner(ctx, { reason: `The owner texted: "${said}". Backroute couldn't answer (twice).`, label: "Answered", source: "sms", to: "support" });
         const text = result.reply || PASSED_ON_TEXT[lang];
         const sid = await textTo(ctx.carrier, from, text).catch((e) => {
           console.error("[sms] send failed", e);
@@ -146,7 +146,7 @@ export async function receiveText(t: IncomingText): Promise<{ now?: string; late
       const tracked = !media.length ? ((await trackingReply(ctx, driver, said).catch(() => null)) ?? (await claimStatementReply(ctx, driver, said).catch(() => null))) : null;
       const talk = !tracked && !consentYes && (!media.length || said.length > 40 || said.includes("?"));
       const result = talk && aiConfigured() ? await driverTurn(ctx, driver, "sms", said || "(sent a photo)", history) : { reply: "", effects: { done: [] as string[], failed: talk } };
-      if (result.effects.failed) await passToOwner(ctx, { reason: `${driver.name} texted: "${said}". The AI couldn't answer (twice).`, label: "I'll answer", source: "sms", to: "support" });
+      if (result.effects.failed) await passToOwner(ctx, { reason: `${driver.name} texted: "${said}". Backroute couldn't answer (twice).`, label: "I'll answer", source: "sms", to: "support" });
       const text = [photos, tracked, result.reply].filter(Boolean).join(" ") || (consentYes ? THANKS_YES[lang] : PASSED_ON_TEXT[lang]);
       // A voice message gets a voice answer too (on WhatsApp, or as MMS to a phone that just sent one), so they can
       // listen instead of reading at the wheel.

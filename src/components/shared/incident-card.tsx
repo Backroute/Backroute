@@ -48,7 +48,7 @@ export function IncidentCard({ incident, viewer, label, onApprove }: {
             </p>
           </div>
         </div>
-        <span className="shrink-0 text-xs text-white/40">{now ? timeAgo(incident.createdAt, now) : ""}</span>
+        <span className="shrink-0 text-xs text-white/60">{now ? timeAgo(incident.createdAt, now) : ""}</span>
       </div>
 
       <CompletionBar value={done / incident.steps.length} caption={`${done} of ${incident.steps.length} done${incident.humanNotified ? " · safety specialist on the line" : ""}`} />

@@ -29,7 +29,7 @@ export async function answerCall(request: Request, params: Record<string, string
   const first = driver.name.split(" ")[0];
   const greeting = GREETING[lang](first, carrier?.name ?? "your carrier");
   await logChannel({ carrierId, channel: "voice", direction: "out", providerId: `${params.CallSid}:greeting`, driverId: driver.id, counterparty: callKey(params.CallSid), body: greeting });
-  await addActivity(carrierId, event({ type: "call_started", message: `${first} called the dispatch line`, detail: "AI dispatcher answered", severity: "info" }));
+  await addActivity(carrierId, event({ type: "call_started", message: `${first} called the dispatch line`, detail: "Backroute answered", severity: "info" }));
   if (realtimeFor(lang)) return streamTwiml({ kind: "driver", carrier: carrierId, ref: driver.id, callSid: params.CallSid, lang, opening: greeting });
   return twiml(sayAndListen(greeting, lang, publicUrl(request, "/api/channels/voice/turn")));
 }
@@ -115,13 +115,13 @@ async function driverCallAnswer(carrierId: string, driver: Driver, callSid: stri
   const history = earlier.map((m) => ({ from: m.direction === "in" ? ("them" as const) : ("ai" as const), text: m.body ?? "" }));
   const result = aiConfigured() ? await driverTurn(ctx, driver, "voice", said, history) : { reply: "", effects: { done: [], failed: true } };
   if (result.effects.failed) {
-    await passToOwner(ctx, { reason: `${driver.name} called and said: "${said}". The AI couldn't answer (twice).`, label: "I'll call back", source: "voice", to: "support" });
+    await passToOwner(ctx, { reason: `${driver.name} called and said: "${said}". Backroute couldn't answer (twice).`, label: "I'll call back", source: "voice", to: "support" });
     await logChannel({ carrierId, channel: "voice", direction: "out", driverId: driver.id, counterparty: key, body: PASSED_ON_CALL[lang] });
     return { reply: PASSED_ON_CALL[lang], hangUp: true };
   }
   await logChannel({ carrierId, channel: "voice", direction: "out", driverId: driver.id, counterparty: key, body: result.reply, data: { did: result.effects.done } });
   if (result.effects.done.length)
-    await addActivity(carrierId, event({ type: "call_completed", message: `AI on the phone with ${driver.name.split(" ")[0]}`, detail: result.effects.done.join(" · "), severity: "info" }));
+    await addActivity(carrierId, event({ type: "call_completed", message: `Backroute on the phone with ${driver.name.split(" ")[0]}`, detail: result.effects.done.join(" · "), severity: "info" }));
   return { reply: result.reply, hangUp: !!result.effects.hangUp };
 }
 
@@ -148,7 +148,7 @@ async function otherCaller(request: Request, params: Record<string, string>) {
   if (ctx && load) {
     const opening = brokerCallBackOpening(ctx, load);
     await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "out", providerId: `${params.CallSid}:greeting`, counterparty: brokerCallKey(params.CallSid), body: opening, data: { kind: "broker_call", loadId: load.id, callback: true } });
-    await addActivity(ctx.carrier.id, event({ type: "call_started", loadId: load.id, message: `${ctx.brokers.find((b) => b.id === load.brokerId)?.company ?? "A broker"} called back`, detail: `${load.referenceNumber} · AI dispatcher answered`, severity: "info" }));
+    await addActivity(ctx.carrier.id, event({ type: "call_started", loadId: load.id, message: `${ctx.brokers.find((b) => b.id === load.brokerId)?.company ?? "A broker"} called back`, detail: `${load.referenceNumber} · Backroute answered`, severity: "info" }));
     if (realtimeFor("en")) return streamTwiml({ kind: "broker", carrier: ctx.carrier.id, ref: load.id, callSid: params.CallSid, lang: "en", opening });
     return twiml(sayAndListen(opening, "en", publicUrl(request, `/api/channels/voice/broker/turn?carrier=${encodeURIComponent(ctx.carrier.id)}&load=${encodeURIComponent(load.id)}`)));
   }
@@ -181,7 +181,7 @@ async function ownerCallAnswer(carrierId: string, callSid: string, said: string,
   const history = earlier.map((m) => ({ from: m.direction === "in" ? ("them" as const) : ("ai" as const), text: m.body ?? "" }));
   const result = ctx && aiConfigured() ? await ownerTurn(ctx, "voice", said, history) : { reply: "", effects: { done: [], failed: true } as { done: string[]; failed?: boolean; hangUp?: boolean } };
   if (result.effects.failed) {
-    if (ctx) await passToOwner(ctx, { reason: `The owner called and said: "${said}". The AI couldn't answer.`, label: "Called back", source: "voice", to: "support" });
+    if (ctx) await passToOwner(ctx, { reason: `The owner called and said: "${said}". Backroute couldn't answer.`, label: "Called back", source: "voice", to: "support" });
     return { reply: PASSED_ON_CALL[lang], hangUp: true };
   }
   await logChannel({ carrierId, channel: "voice", direction: "out", counterparty: key, body: result.reply, data: { kind: "owner_call" } });

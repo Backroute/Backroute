@@ -24,8 +24,8 @@ export const messagesActions = (set: SetState, get: GetState): Pick<Actions, "re
           steps: i.steps.map((st) =>
             st.owner === "human" && st.status === "pending"
               ? approve
-                ? { ...st, status: "done" as const, timestamp: new Date().toISOString(), label: st.label.replace(/^Approve/, "Approved"), detail: `Approved by ${actor}. The AI booked the repair.` }
-                : { ...st, status: "done" as const, timestamp: new Date().toISOString(), label: "Repair declined", detail: backup ? `The AI is relaying the load with ${backup} instead.` : "The AI is towing the truck to the nearest in-network shop instead." }
+                ? { ...st, status: "done" as const, timestamp: new Date().toISOString(), label: st.label.replace(/^Approve/, "Approved"), detail: `Approved by ${actor}. Backroute booked the repair.` }
+                : { ...st, status: "done" as const, timestamp: new Date().toISOString(), label: "Repair declined", detail: backup ? `Backroute is relaying the load with ${backup} instead.` : "Backroute is towing the truck to the nearest in-network shop instead." }
               : st,
           ),
         };
@@ -39,7 +39,7 @@ export const messagesActions = (set: SetState, get: GetState): Pick<Actions, "re
         ...(rc?.events ?? []),
         {
           id: uid("act"), timestamp: new Date().toISOString(), type: "escalation" as const,
-          message: approve ? `Escalation approved by ${actor}` : `Escalation rejected by ${actor}, AI re-sourcing`,
+          message: approve ? `Escalation approved by ${actor}` : `Escalation rejected by ${actor}, Backroute re-sourcing`,
           detail: note || state.escalations.find((e) => e.id === id)?.reason || "",
           loadId: state.escalations.find((e) => e.id === id)?.loadId,
           carrierId: PRIMARY_CARRIER_ID, severity: (approve ? "success" : "info") as ActivityEvent["severity"],

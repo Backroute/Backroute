@@ -3,7 +3,7 @@ import type { Load, LoadStage } from "./types";
 /** Driver-facing headline for each stage a "current load" can be in — what an Uber-style trip screen
  *  shows instead of a generic stage pill, so the card reads as live progress instead of a static label. */
 export const LOAD_STATUS_HEADLINE: Partial<Record<LoadStage, string>> = {
-  negotiating: "AI is negotiating your rate",
+  negotiating: "Negotiating your rate",
   rate_confirmed: "Rate locked, getting you dispatched",
   booked: "Booked, getting you dispatched",
   dispatched: "Heading to pickup",
@@ -45,9 +45,9 @@ export function nextStop(load: Load): { label: string; window: string } {
 /** What the AI dispatcher is doing on this load right now — the load detail page surfaces this as a
  *  small live badge so it reads as an actively-managed AI dispatch, not just a static record. */
 export function aiDispatcherNote(stage: LoadStage): string {
-  if (stage === "negotiating") return "AI Dispatcher · Negotiating rate";
-  if (stage === "rate_confirmed" || stage === "booked") return "AI Dispatcher · Dispatching";
-  if (stage === "delivered") return "AI Dispatcher · Trip complete";
-  if (isTransitStage(stage)) return "AI Dispatcher · Monitoring trip";
-  return "AI Dispatcher";
+  if (stage === "negotiating") return "Backroute · Negotiating rate";
+  if (stage === "rate_confirmed" || stage === "booked") return "Backroute · Dispatching";
+  if (stage === "delivered") return "Backroute · Trip complete";
+  if (isTransitStage(stage)) return "Backroute · Monitoring trip";
+  return "Backroute";
 }

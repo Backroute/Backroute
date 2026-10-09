@@ -148,8 +148,8 @@ export function replyToCall(d: CallDraft, callId: string, reply: string, heard?:
     const esc: Escalation = {
       id: uid("esc"), loadId: call.loadId ?? "", carrierId: call.carrierId,
       reason: toSupport
-        ? `${turn.report.person} on an AI call (${KIND_LABEL[call.kind].toLowerCase()}). Backroute Support is calling back.`
-        : `${turn.report.person} on an AI call (${KIND_LABEL[call.kind].toLowerCase()}). Call them back at ${driver?.phone ?? "their number"}.`,
+        ? `${turn.report.person} on a dispatch call (${KIND_LABEL[call.kind].toLowerCase()}). Backroute Support is calling back.`
+        : `${turn.report.person} on a dispatch call (${KIND_LABEL[call.kind].toLowerCase()}). Call them back at ${driver?.phone ?? "their number"}.`,
       createdAt: now, status: toSupport ? "with_support" : "open", complexity: "routine",
       recommendedAction: "approve", recommendedLabel: `Called ${first} back`,
     };
@@ -176,7 +176,7 @@ export function endCall(d: CallDraft, callId: string) {
       d.trucks = lined.trucks;
       d.events.push(...resolved.events);
     } else if (effect.type === "reserve_parking") {
-      callEvent(d, call, `AI reserved parking for ${first}`, `${effect.place} · $${effect.cost} on the fleet card`, "success");
+      callEvent(d, call, `Backroute reserved parking for ${first}`, `${effect.place} · $${effect.cost} on the fleet card`, "success");
     } else if (effect.type === "prefs") {
       d.drivers = d.drivers.map((x) => (x.id === call.driverId ? { ...x, prefs: { ...x.prefs, ...effect.prefs } } : x));
     }
@@ -197,13 +197,13 @@ export function endCall(d: CallDraft, callId: string) {
   if (answered && recordOn && call.lines.length) {
     const startedAt = call.answeredAt ?? call.createdAt;
     const record: VoiceCall = {
-      id: uid("call"), title: `AI dispatch call with ${first} · ${KIND_LABEL[call.kind]}`, status: "completed", startedAt,
+      id: uid("call"), title: `Dispatch call with ${first} · ${KIND_LABEL[call.kind]}`, status: "completed", startedAt,
       durationSec: Math.max(12, Math.round((Date.now() - Date.parse(startedAt)) / 1000)),
       transcript: call.lines.map((l) => ({ speaker: l.speaker === "owner" ? "carrier" : l.speaker, text: l.text })), outcome,
     };
     d.loads = d.loads.map((l) => (l.id === recordOn ? { ...l, calls: [...l.calls, record] } : l));
   }
-  if (answered) callEvent(d, call, `AI called ${first}: ${KIND_LABEL[call.kind].toLowerCase()}`, outcome ?? "Call ended");
+  if (answered) callEvent(d, call, `Backroute called ${first}: ${KIND_LABEL[call.kind].toLowerCase()}`, outcome ?? "Call ended");
 }
 
 /** The calls the AI decides to make this tick, then who's ringing, held, missed or talking. */
@@ -241,12 +241,12 @@ export function runDispatchCalls(d: CallDraft, newOfferBatches: { truckId: strin
     if (longRun && p >= 0.12 && p < 0.6 && milesLeft / 50 > driver.hoursRemaining && !has(driver.id, "hours_parking", load.id)) {
       const { call, newWindow } = parkingCall(driver, load, milesLeft);
       d.loads = d.loads.map((l) => (l.id === load.id ? { ...l, deliveryWindow: newWindow } : l));
-      callEvent(d, call, `AI moved ${driver.name.split(" ")[0]}'s delivery to tomorrow`, `${load.lane.destination} · out of drive hours before the receiver, broker told`, "warning");
+      callEvent(d, call, `Backroute moved ${driver.name.split(" ")[0]}'s delivery to tomorrow`, `${load.lane.destination} · out of drive hours before the receiver, broker told`, "warning");
       queue(call);
     } else if (p >= 0.25 && p < 0.55 && lateOnThisLoad(load.id) && !has(driver.id, "late_eta", load.id) && !has(driver.id, "hours_parking", load.id)) {
       const { call, newWindow } = lateCall(driver, load);
       d.loads = d.loads.map((l) => (l.id === load.id ? { ...l, deliveryWindow: newWindow } : l));
-      callEvent(d, call, "AI moved a delivery appointment", `${load.lane.destination} · ${call.facts.road} wreck, ${newWindow.toLowerCase()}, receiver and broker told`, "warning");
+      callEvent(d, call, "Backroute moved a delivery appointment", `${load.lane.destination} · ${call.facts.road} wreck, ${newWindow.toLowerCase()}, receiver and broker told`, "warning");
       queue(call);
     }
     if (near("delivery") && !has(driver.id, "delivery_brief", load.id)) queue(briefCall(driver, load, "delivery", p));
@@ -290,7 +290,7 @@ export function runDispatchCalls(d: CallDraft, newOfferBatches: { truckId: strin
         textInstead(d, active);
         const texted = d.dispatchCalls.find((c) => c.id === active.id)?.textedAt;
         if (again) queue({ ...callBack(active, nowMs), textedAt: texted });
-        callEvent(d, active, `${driver.name.split(" ")[0]} missed an AI call`, `${KIND_LABEL[active.kind]} · texted${again ? ", calling back in a few minutes" : " instead"}`);
+        callEvent(d, active, `${driver.name.split(" ")[0]} missed a dispatch call`, `${KIND_LABEL[active.kind]} · texted${again ? ", calling back in a few minutes" : " instead"}`);
       }
       continue;
     }
@@ -322,7 +322,7 @@ export function runDispatchCalls(d: CallDraft, newOfferBatches: { truckId: strin
         if (call.status !== "held") {
           patchCall(d, call.id, { status: "held", heldReason: quiet });
           textInstead(d, call);
-          callEvent(d, call, `AI held a call to ${driver.name.split(" ")[0]}`, `${quiet}. Texted instead, will call if it still matters later`);
+          callEvent(d, call, `Backroute held a call to ${driver.name.split(" ")[0]}`, `${quiet}. Texted instead, will call if it still matters later`);
         }
       } else if (call.status === "held") patchCall(d, call.id, { status: "queued", heldReason: undefined });
     }

@@ -64,7 +64,7 @@ export function paperworkDue(input: { trucks: Truck[]; drivers: Driver[]; insura
     if (t.registrationExpires)
       add({ key: `registration:${t.id}:${dayOf(t.registrationExpires)}`, kind: "registration", what: `Truck ${t.unitNumber}'s registration`, due: t.registrationExpires, truckId: t.id, todo: "Renew the plates (IRP) and put the new cab card in the truck." });
     if (t.nextInspectionDue)
-      add({ key: `inspection:${t.id}:${dayOf(t.nextInspectionDue)}`, kind: "inspection", what: `Truck ${t.unitNumber}'s annual DOT inspection`, due: t.nextInspectionDue, truckId: t.id, todo: "Book it at a shop. The AI stops booking the truck once it lapses." });
+      add({ key: `inspection:${t.id}:${dayOf(t.nextInspectionDue)}`, kind: "inspection", what: `Truck ${t.unitNumber}'s annual DOT inspection`, due: t.nextInspectionDue, truckId: t.id, todo: "Book it at a shop. Backroute stops booking the truck once it lapses." });
   }
   for (const d of input.drivers) {
     if (d.cdlExpires)

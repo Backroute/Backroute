@@ -34,7 +34,7 @@ function tonuDraft() {
   check("two sent as written after an edited one: the AI doesn't suggest anything yet", suggestion() === "0");
   await approve(tonuDraft());
   const s = db(`select status || '|' || (data->>'reason') from escalations where carrier_id = '${cid}' and data->>'suggestRule' = 'tonu_default'`);
-  check("three in a row sent as written: the AI offers to stop asking about TONU claims", /^open\|You've sent the last 3 TONU claims the AI wrote without changing a word/.test(s), s);
+  check("three in a row sent as written: the AI offers to stop asking about TONU claims", /^open\|You've sent the last 3 TONU claims Backroute wrote without changing a word/.test(s), s);
   await approve(tonuDraft());
   check("...once", suggestion() === "1");
 

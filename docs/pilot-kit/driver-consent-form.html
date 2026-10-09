@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Driver consent to texts and calls (DRAFT)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* The words are docs/legal/driver-text-consent.md's draft. Not for use with drivers until a lawyer approves them. */
+  @page { size: Letter; margin: 0.6in 0.7in; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Geist, "Helvetica Neue", Arial, sans-serif; color: #111; font-size: 10.5pt; line-height: 1.5; position: relative; }
+  .draft-bar { border: 1.2pt solid #b00; color: #b00; font-weight: 600; text-align: center; padding: 5pt; border-radius: 4pt; font-size: 9.5pt; }
+  .watermark { position: fixed; top: 38%; left: 0; right: 0; text-align: center; font-size: 110pt; font-weight: 600; color: rgba(187, 0, 0, 0.08); transform: rotate(-30deg); pointer-events: none; }
+  h1 { font-size: 17pt; font-weight: 600; letter-spacing: -0.01em; margin: 14pt 0 2pt; }
+  .sub { color: #555; margin: 0 0 12pt; }
+  .words { border-left: 2.5pt solid #111; padding: 2pt 0 2pt 12pt; margin: 10pt 0 14pt; font-size: 11pt; }
+  .counsel { color: #b00; font-size: 9pt; }
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 24pt 26pt; margin-top: 16pt; }
+  .langs { margin-top: 26pt; }
+  .f { border-bottom: 0.8pt solid #111; height: 26pt; position: relative; }
+  .f span { position: absolute; bottom: -13pt; left: 0; font-size: 8pt; color: #555; }
+  .f b { position: absolute; bottom: 3pt; left: 0; font-weight: 500; }
+  .note { margin-top: 30pt; font-size: 8.8pt; color: #444; border-top: 0.6pt solid #ccc; padding-top: 6pt; }
+</style>
+</head>
+<body>
+  <div class="watermark">DRAFT</div>
+  <div class="draft-bar">DRAFT for attorney review. Don't give this to drivers until a lawyer has approved the wording.</div>
+
+  <h1>Consent to texts and calls from dispatch</h1>
+  <p class="sub">{{carrier}} · dispatch line run by Backroute</p>
+
+  <div class="words">
+    I agree that <b>{{carrier}}</b> and its dispatch provider, Backroute, may send me text messages and make calls,
+    including automated ones and calls from an AI assistant, to the phone number below about my loads, schedule, pay
+    and safety. Consent isn't a condition of employment <span class="counsel">[confirm with counsel]</span>. I can reply
+    STOP at any time to stop texts, and HELP for help. Message frequency varies; message and data rates may apply.
+  </div>
+
+  <div class="fields">
+    <div class="f"><span>Driver's name (print)</span></div>
+    <div class="f"><span>Mobile phone number</span></div>
+    <div class="f"><span>Signature</span></div>
+    <div class="f"><span>Date</span></div>
+    <div class="f"><span>Received for {{carrier}} by</span></div>
+    <div class="f"><span>Carrier</span><b>{{carrier}}</b></div>
+  </div>
+  <p class="langs">Preferred language: ☐ English &nbsp; ☐ Español &nbsp; ☐ ਪੰਜਾਬੀ &nbsp; ☐ हिन्दी &nbsp; ☐ Русский &nbsp; ☐ Українська &nbsp; ☐ Français</p>
+
+  <p class="note">
+    For {{carrier}}: keep the signed copy. When you add this driver in Backroute, check the box confirming they agreed in
+    writing. The driver can also agree in the driver app, or by replying YES to the first text from dispatch; every answer
+    is recorded with the time and the words shown. <span class="counsel">[Per counsel: how long to keep this form; whether a
+    Spanish version is needed.]</span>
+  </p>
+</body>
+</html>
