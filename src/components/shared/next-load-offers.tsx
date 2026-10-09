@@ -2,7 +2,7 @@
 
 import { LoadOfferCard } from "./load-offer-card";
 import { OfferRail } from "./offer-rail";
-import { emailedPairs, offerOptions } from "@/lib/plans";
+import { emailedPairs, emailedTrips, offerOptions } from "@/lib/plans";
 import { crewOf, type Crew } from "@/lib/hos-plan";
 import { TruckDriverChip } from "./truck-driver-chip";
 import type { OfferAskDraft } from "@/lib/engine";
@@ -58,8 +58,9 @@ export function NextLoadOffers({
         {offerGroups.map(([groupId, groupLoads]) => {
           // Each choice is a load or a plan of several. The best fit leads: it can beat a higher score once home time,
           // the next reload and the empty miles between loads are counted.
-          // A real account's emailed loads that chain also show as one plan, next to the singles.
-          const options = real ? [...offerOptions(groupLoads), ...emailedPairs(groupLoads)] : offerOptions(groupLoads);
+          // A real account's emailed loads that chain, or partials that share the trailer, also show as one plan,
+          // next to the singles.
+          const options = real ? [...offerOptions(groupLoads), ...emailedPairs(groupLoads), ...emailedTrips(groupLoads)] : offerOptions(groupLoads);
           const loads = options.map((o) => o[0]);
           const truck = trucks && loads[0].truckId ? trucks.get(loads[0].truckId) : undefined;
           const driver = drivers && truck?.driverId ? drivers.get(truck.driverId) : undefined;

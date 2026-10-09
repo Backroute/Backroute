@@ -1,6 +1,6 @@
 import { advanceLoad, createLoadOfferBatch, lineUpChoice, replacePlanLeg, resolveLoadOffer } from "../../src/lib/engine";
 import { generateWorld } from "../../src/lib/mock-data";
-import { emailedPairs, offerOptions, planStops, planTotals } from "../../src/lib/plans";
+import { emailedPairs, emailedTrips, offerOptions, planStops, planTotals } from "../../src/lib/plans";
 import { promoteChainedLoad } from "../../src/lib/store/support";
 import type { Load, Truck } from "../../src/lib/types";
 
@@ -135,5 +135,18 @@ ok("…nor one 2,000 miles away", !pairs.some((p) => p.some((l) => l.id === "F")
 ok("…the singles stay as they were (the plan is copies)", !A.plan && !B.plan);
 ok("…another truck's load isn't paired", emailedPairs([A, { ...B, truckId: "truck-y" }]).length === 0);
 ok("…nor a partial", emailedPairs([A, { ...B, partial: { pallets: 6 } }]).length === 0);
+
+// …and emailed partials that can share the trailer.
+const P1 = mail("P1", ["Dallas", "TX"], ["Houston", "TX"], 240, T0, T0 + 24 * H, { partial: { pallets: 6 }, targetRate: 600, weight: 6000 });
+const P2 = mail("P2", ["Fort Worth", "TX"], ["Waco", "TX"], 90, T0 + 2 * H, T0 + 14 * H, { partial: { feet: 12 }, targetRate: 450, weight: 7000 });
+const P3 = mail("P3", ["Seattle", "WA"], ["Portland", "OR"], 175, T0, T0 + 8 * H, { partial: { pallets: 4 }, targetRate: 500, weight: 4000 });
+const big = mail("PB", ["Dallas", "TX"], ["Houston", "TX"], 240, T0 + H, T0 + 12 * H, { partial: { feet: 48 }, targetRate: 1100, weight: 20000 });
+const tripsOut = emailedTrips([P1, P2, P3, A]);
+ok("emailed partials picked up near each other show as one plan: one trailer", tripsOut.length === 1 && tripsOut[0].map((l) => l.id).sort().join() === "P1,P2" && tripsOut[0][0].plan?.kind === "shared_trailer", tripsOut.map((t) => t.map((l) => l.id)));
+const tOrder = tripsOut[0]?.[0].plan?.order ?? [];
+ok("…with the stops in an order that works: both pickups first, Waco dropped on the way to Houston", tOrder.map((x) => `${x.kind[0]}${x.loadId}`).join(" ") === "pP1 pP2 dP2 dP1", tOrder.map((x) => `${x.kind[0]}${x.loadId}`).join(" "));
+ok("…not with a full load, nor one picking up 2,000 miles away", !tripsOut.flat().some((l) => l.id === "A" || l.id === "P3"));
+ok("…not when they don't fit the trailer together", emailedTrips([P1, { ...big, partial: { feet: 50 } }]).length === 0);
+ok("…another truck's partial isn't put with it", emailedTrips([P1, { ...P2, truckId: "truck-y" }]).length === 0);
 
 console.log(`${pass} passed, ${fail} failed`);
