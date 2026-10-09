@@ -19,7 +19,7 @@ const BUTTONS: { side: "left" | "right"; top: string; height: string }[] = [
 
 export function PhonePreview() {
   return (
-    <div aria-hidden className="relative mx-auto w-[min(100%,19.5rem)] select-none">
+    <div aria-hidden className="relative mx-auto w-[19.5rem] max-w-full select-none [zoom:0.8] sm:[zoom:1]">
       {BUTTONS.map((b, i) => (
         <span
           key={i}

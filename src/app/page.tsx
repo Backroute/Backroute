@@ -74,12 +74,12 @@ export default function Home() {
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-6xl items-center gap-14 px-5 pb-20 pt-14 sm:px-8 md:pt-20 lg:grid-cols-[1.5fr_1fr] lg:gap-12 lg:pb-24">
+      <section className="mx-auto grid max-w-6xl items-center gap-10 px-5 pb-14 pt-10 sm:gap-14 sm:px-8 sm:pb-20 md:pt-20 lg:grid-cols-[1.5fr_1fr] lg:gap-12 lg:pb-24">
         <div>
           <p className="inline-flex items-center gap-2 rounded-full bg-ink-100 px-3 py-1.5 text-[13px] font-semibold text-ink-950">
             <span className="h-2 w-2 rounded-full bg-[var(--dot-live)]" /> The AI dispatcher for small fleets
           </p>
-          <h1 className="mt-6 text-[clamp(2.75rem,6.4vw,5.25rem)] font-bold leading-[0.98] tracking-[-0.032em] text-balance">
+          <h1 className="mt-6 text-[clamp(2.6rem,6.4vw,5.25rem)] font-bold leading-[0.98] tracking-[-0.032em] text-balance">
             Your next load
             <br />
             is already booked.
@@ -103,14 +103,14 @@ export default function Home() {
       </section>
 
       <section id="product" className="scroll-mt-16 bg-ink-100">
-        <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 md:py-28">
+        <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20 md:py-28">
           <h2 className={`${H2} max-w-3xl`}>From load board to paid invoice.</h2>
           <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink-600">The whole job a dispatcher does, every day, for every truck.</p>
-          <ol className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <ol className="mt-8 grid gap-3 sm:mt-12 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
             {STEPS.map((s, i) => (
-              <li key={s.title} className="flex flex-col rounded-2xl bg-white p-6">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black text-sm font-bold text-white tabular">{i + 1}</span>
-                <h3 className="mt-6 text-xl font-bold tracking-[-0.015em]">{s.title}</h3>
+              <li key={s.title} className="grid grid-cols-[2.25rem_1fr] gap-x-3 rounded-2xl bg-white p-5 sm:flex sm:flex-col sm:p-6">
+                <span className="row-span-2 flex h-9 w-9 items-center justify-center rounded-full bg-black text-sm font-bold text-white tabular">{i + 1}</span>
+                <h3 className="pt-1 text-lg font-bold tracking-[-0.015em] sm:mt-6 sm:pt-0 sm:text-xl">{s.title}</h3>
                 <p className="mt-2 text-[15px] leading-relaxed text-ink-600">{s.body}</p>
               </li>
             ))}
@@ -118,7 +118,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-20 sm:px-8 md:py-28 lg:grid-cols-2 lg:gap-16">
+      <section className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-14 sm:px-8 sm:py-20 md:py-28 lg:grid-cols-2 lg:gap-16">
         <div>
           <h2 className={H2}>Every load, the real numbers.</h2>
           <p className="mt-5 max-w-lg text-lg leading-relaxed text-ink-600">
@@ -137,7 +137,7 @@ export default function Home() {
       </section>
 
       <section className="border-t border-line">
-        <div className="mx-auto grid max-w-6xl gap-12 px-5 py-20 sm:px-8 md:py-28 lg:grid-cols-[1fr_1.3fr] lg:gap-16">
+        <div className="mx-auto grid max-w-6xl gap-12 px-5 py-14 sm:px-8 sm:py-20 md:py-28 lg:grid-cols-[1fr_1.3fr] lg:gap-16">
           <div>
             <p className="text-sm font-semibold text-ink-500">A sample day</p>
             <h2 className={`${H2} mt-2`}>A Tuesday, handled.</h2>
@@ -145,7 +145,7 @@ export default function Home() {
           </div>
           <ol className="flex flex-col">
             {DAY.map((d) => (
-              <li key={d.time} className={`grid grid-cols-[4.25rem_1fr] gap-4 rounded-xl px-4 py-4 ${d.you ? "bg-black text-white" : ""}`}>
+              <li key={d.time} className={`grid gap-1 rounded-xl px-4 py-3.5 sm:grid-cols-[4.25rem_1fr] sm:gap-4 sm:py-4 ${d.you ? "bg-black text-white" : ""}`}>
                 <span className={`pt-0.5 text-sm font-semibold tabular ${d.you ? "text-white" : "text-ink-500"}`}>{d.time}</span>
                 <p className={`text-[17px] leading-relaxed ${d.you ? "font-semibold" : "text-ink-700"}`}>{d.text}</p>
               </li>
@@ -155,7 +155,7 @@ export default function Home() {
       </section>
 
       <section id="drivers" className="theme-ink scroll-mt-16 bg-black text-white">
-        <div className="mx-auto grid max-w-6xl gap-12 px-5 py-20 sm:px-8 md:py-28 lg:grid-cols-2">
+        <div className="mx-auto grid max-w-6xl gap-12 px-5 py-14 sm:px-8 sm:py-20 md:py-28 lg:grid-cols-2">
           <div>
             <p className="text-sm font-semibold text-white/60">For drivers</p>
             <h2 className={`${H2} mt-2`}>One dispatcher. In their language.</h2>
@@ -179,12 +179,12 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="pricing" className="scroll-mt-16 mx-auto max-w-6xl px-5 py-20 sm:px-8 md:py-28">
+      <section id="pricing" className="scroll-mt-16 mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20 md:py-28">
         <h2 className={H2}>Simple pricing.</h2>
         <p className="mt-4 max-w-xl text-lg leading-relaxed text-ink-600">A monthly plan for your fleet size, plus 2% of booked freight.</p>
         <div className="mt-12 grid gap-4 md:grid-cols-3">
           {PLANS.map((p) => (
-            <div key={p.name} className={`flex flex-col rounded-2xl p-7 ${p.featured ? "theme-invert bg-black" : "bg-ink-100"}`}>
+            <div key={p.name} className={`flex flex-col rounded-2xl p-6 sm:p-7 ${p.featured ? "theme-invert bg-black" : "bg-ink-100"}`}>
               <div className="flex items-center justify-between">
                 <p className="text-lg font-bold">{p.name}</p>
                 {p.featured && <span className="rounded-full bg-ink-950 px-2.5 py-1 text-xs font-semibold text-ink-0">Most fleets</span>}
@@ -214,7 +214,7 @@ export default function Home() {
       </section>
 
       <section id="questions" className="scroll-mt-16 bg-ink-100">
-        <div className="mx-auto max-w-3xl px-5 py-20 sm:px-8 md:py-28">
+        <div className="mx-auto max-w-3xl px-5 py-14 sm:px-8 sm:py-20 md:py-28">
           <h2 className={H2}>Questions.</h2>
           <div className="mt-10 flex flex-col">
             {QUESTIONS.map((x) => (
@@ -230,16 +230,16 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-5 py-24 text-center sm:px-8 md:py-32">
+      <section className="mx-auto max-w-6xl px-5 py-16 text-center sm:px-8 sm:py-24 md:py-32">
         <h2 className="mx-auto max-w-3xl text-[clamp(2.25rem,5vw,4rem)] font-bold leading-[1.02] tracking-[-0.03em] text-balance">
           Spend tomorrow driving, not dialing brokers.
         </h2>
-        <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-          <Button href="/signup" size="lg" className="!px-7">
+        <div className="mx-auto mt-9 flex max-w-sm flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center">
+          <Button href="/signup" size="lg" className="w-full !px-7 sm:w-auto">
             Get started <ArrowRight className="h-4 w-4" />
           </Button>
           {demoAllowed && (
-            <Button href="/demo" size="lg" variant="secondary" className="!px-7">
+            <Button href="/demo" size="lg" variant="secondary" className="w-full !px-7 sm:w-auto">
               See a sample fleet
             </Button>
           )}
