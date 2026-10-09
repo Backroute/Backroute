@@ -125,7 +125,7 @@ export default function LoadDetailPage() {
         )}
         {load.aiPaused && (
           <p className="mt-4 flex items-center gap-1.5 rounded-xl bg-warn-soft px-3.5 py-2.5 text-xs font-medium text-[var(--accent-warn)]">
-            <ShieldAlert className="h-3.5 w-3.5" /> Backroute support has paused Backroute on this load while they take a look.
+            <ShieldAlert className="h-3.5 w-3.5" /> Backroute support has paused this load while they take a look.
           </p>
         )}
         {load.stage === "declined" && load.cancellationReason && (

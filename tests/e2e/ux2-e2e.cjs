@@ -120,7 +120,7 @@ async function signIn(browser, { width = 1280, theme } = {}) {
   await p.keyboard.press("Enter");
   await sleep(4000);
   check("typing \"pause the AI\" pauses it, and it's saved", db(`select settings->>'paused' from carriers where id = '${cid}'`) === "true");
-  await p.getByRole("status").filter({ hasText: "The AI is paused" }).waitFor({ timeout: 10000 }).catch(() => {});
+  await p.getByRole("status").filter({ hasText: "Backroute is paused" }).waitFor({ timeout: 10000 }).catch(() => {});
   check("…Home says it's paused, with Resume", (await p.getByText(/Backroute is paused/).count()) >= 1);
   await p.getByRole("button", { name: "Resume" }).first().click();
   await sleep(3000);

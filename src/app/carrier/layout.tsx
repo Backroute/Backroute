@@ -117,8 +117,8 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
       heading: "Do",
       items: [
         paused
-          ? { id: "resume", label: "Resume Backroute", icon: Play, keywords: "start unpause continue", run: () => updateSettings({ paused: false, pausedAt: undefined }) }
-          : { id: "pause", label: "Pause Backroute", sublabel: "emergency stop", icon: Pause, keywords: "stop halt freeze emergency", run: () => updateSettings({ paused: true, pausedAt: new Date().toISOString() }) },
+          ? { id: "resume", label: "Resume Backroute", icon: Play, keywords: "start unpause continue the ai dispatcher autopilot", run: () => updateSettings({ paused: false, pausedAt: undefined }) }
+          : { id: "pause", label: "Pause Backroute", sublabel: "emergency stop", icon: Pause, keywords: "stop halt freeze emergency the ai dispatcher autopilot", run: () => updateSettings({ paused: true, pausedAt: new Date().toISOString() }) },
         { id: "theme-dark", label: "Dark mode", icon: Moon, keywords: "night theme appearance", run: () => setTheme("dark") },
         { id: "theme-light", label: "Light mode", icon: Sun, keywords: "day theme appearance", run: () => setTheme("light") },
         { id: "theme-auto", label: "Match my phone's light or dark", icon: Monitor, keywords: "auto system theme appearance", run: () => setTheme("system") },
