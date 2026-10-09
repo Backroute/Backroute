@@ -424,7 +424,8 @@ function buildSharedTrailer(
   const pallets = lanes.length === 2 ? [randInt(10, 14), randInt(6, 11)] : [randInt(8, 10), randInt(5, 8), randInt(4, 7)];
   const bases = lanes.map((lane, i) => {
     const b = createSourcedLoad(brokers, carrierId, refSeed + i, truckId, isChained, opts.excludeTiers, opts.equipmentType, { lane, deadheadMiles: i === 0 ? main.deadheadMiles : 0 }, opts.surcharges);
-    const partial = { pallets: pallets[i] };
+    // Some shippers' pallets stack two high (half the floor); others are marked do-not-stack.
+    const partial = { pallets: pallets[i], stackable: chance(0.4) };
     const share = partialShare({ partial });
     // Partials pay more per foot of trailer than a full load does: the broker is saving the shipper a whole truck.
     const pay = share * PARTIAL_PREMIUM;

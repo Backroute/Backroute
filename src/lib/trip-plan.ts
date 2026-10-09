@@ -39,11 +39,23 @@ export function trailerOf(truck: Pick<Truck, "trailer" | "equipmentType">): { fe
   return { feet: truck.trailer?.feet ?? (truck.equipmentType === "Flatbed" ? 48 : FULL_FEET), lbs: truck.trailer?.payloadLbs ?? 44_000 };
 }
 
-/** Feet of trailer a load takes: what the broker said, else its pallets, else all of it (a full load). */
+/** Inside height of a dry van or reefer, in inches (about 108–110 in a 53-footer; the low side, to be safe). */
+export const INSIDE_HEIGHT_IN = 108;
+/** A pallet the broker gave no height for: a standard 48-inch load. */
+const PALLET_HEIGHT_IN = 48;
+
+/** Floor spots a partial's pallets take: two high when they're stackable and two fit under the roof, else one each. */
+export function palletSpots(p: NonNullable<Load["partial"]>): number {
+  const pallets = p.pallets ?? 0;
+  const twoHigh = p.stackable && (p.heightIn ?? PALLET_HEIGHT_IN) * 2 <= INSIDE_HEIGHT_IN;
+  return twoHigh ? Math.ceil(pallets / 2) : pallets;
+}
+
+/** Feet of trailer a load takes: what the broker said, else its pallets' floor spots, else all of it (a full load). */
 export function loadFeet(l: Pick<Load, "partial">): number {
   if (!l.partial) return FULL_FEET;
   if (l.partial.feet) return l.partial.feet;
-  if (l.partial.pallets) return Math.ceil(l.partial.pallets * FEET_PER_PALLET);
+  if (l.partial.pallets) return Math.ceil(palletSpots(l.partial) * FEET_PER_PALLET);
   return UNKNOWN_PARTIAL_FEET;
 }
 
@@ -180,6 +192,7 @@ export function runTrip(order: TripStop[], loads: Map<string, TripLoad>, start: 
         const why = cantShare(o, l);
         if (why) return fail(`${l.referenceNumber} can't ride with ${o.referenceNumber}: ${why}`);
       }
+      if ((l.partial?.heightIn ?? 0) > INSIDE_HEIGHT_IN) return fail(`${l.referenceNumber} is ${l.partial!.heightIn} in tall, more than the trailer's ${INSIDE_HEIGHT_IN} in inside`);
       onboard.push(l);
       const feet = onboard.reduce((n, o) => n + loadFeet(o), 0);
       const lbs = onboard.reduce((n, o) => n + (o.weight || 0), 0);

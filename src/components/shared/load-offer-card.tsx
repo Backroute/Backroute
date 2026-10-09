@@ -36,6 +36,13 @@ function driveTime(miles: number) {
  * the one reason it's a good fit, and one button. Everything else is under Details. The driver never sees the broker's
  * credit or fraud checks: that's the owner's call.
  */
+/** " · 12 pallets, stackable": a partial's size, so the driver knows how it loads. */
+function palletWords(l: Load): string {
+  const p = l.partial;
+  if (!p?.pallets) return "";
+  return ` · ${p.pallets} pallets${p.stackable === true ? ", stackable" : p.stackable === false ? ", don't stack" : ""}`;
+}
+
 /** "Overnight rest near Amarillo, TX", or the week's reset when the 70 hours run out. */
 function restWords(r: { place: string; hours: number }): string {
   const what = r.hours >= 34 ? "34-hour reset" : r.hours < 10 ? `${Math.round(r.hours)}-hour rest (split sleeper)` : "Overnight rest";
@@ -277,7 +284,7 @@ export function LoadOfferCard({
             {legs.map((l, i) => (
               <div key={l.id} className="flex justify-between gap-3 font-medium text-ink-950">
                 <dt className="min-w-0 truncate">
-                  {isPlan ? `Load ${i + 1}: ${l.lane.origin} to ${l.lane.destination} · ${brokerOf(l)?.company ?? "Broker"}` : "Load pays"}
+                  {isPlan ? `Load ${i + 1}: ${l.lane.origin} to ${l.lane.destination} · ${brokerOf(l)?.company ?? "Broker"}${palletWords(l)}` : "Load pays"}
                 </dt>
                 <dd>{formatCurrency(l.targetRate)}</dd>
               </div>

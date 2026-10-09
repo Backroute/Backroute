@@ -210,7 +210,9 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
     const miles = o.miles ?? (await route({ city: o.originCity, state: o.originState }, { city: o.destinationCity, state: o.destinationState }))?.miles ?? estimateMiles({ city: o.originCity, state: o.originState }, { city: o.destinationCity, state: o.destinationState });
     if (!miles) continue;
     // A partial (LTL-sized) load: how much of the trailer it takes, so it can ride with others on one trip.
-    const partial: Load["partial"] | undefined = o.partial ? { ...(o.lengthFeet ? { feet: o.lengthFeet } : {}), ...(o.pallets ? { pallets: o.pallets } : {}) } : undefined;
+    const partial: Load["partial"] | undefined = o.partial
+      ? { ...(o.lengthFeet ? { feet: o.lengthFeet } : {}), ...(o.pallets ? { pallets: o.pallets } : {}), ...(o.stackable != null ? { stackable: o.stackable } : {}), ...(o.palletHeightIn ? { heightIn: o.palletHeightIn } : {}) }
+      : undefined;
     const lane = { origin: o.originCity, originState: o.originState, destination: o.destinationCity, destState: o.destinationState, miles, marketRpm: 0 };
     const asTrip: TripLoad | undefined = partial ? { id: `offer-${o.loadNumber ?? added.length}`, referenceNumber: o.loadNumber ?? "the new load", lane, equipmentType: equipment, weight: o.weight ?? 0, pickupAt: pickupAt ?? undefined, deliveryAt: deliveryAt ?? undefined, partial } : undefined;
     const fit = bestTruck(ctx, { equipment, originCity: o.originCity, originState: o.originState, destinationState: o.destinationState, pickupAt: pickupAt ? Date.parse(pickupAt) : null, miles, ...(asTrip ? { trip: asTrip } : {}) });

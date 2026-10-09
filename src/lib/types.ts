@@ -722,8 +722,9 @@ export interface Load {
   scheduleWarnings?: ScheduleWarning[];
   /** Real accounts: a reefer load's temperatures, as the driver read them off the unit (lib/agent/reefer). */
   reeferLog?: { at: string; tempF: number; pulp?: boolean; by: "driver" | "photo" }[];
-  /** A partial (LTL-sized) load: how much of the trailer it takes. Absent: a full truckload. */
-  partial?: { feet?: number; pallets?: number };
+  /** A partial (LTL-sized) load: how much of the trailer it takes. Absent: a full truckload. `stackable` pallets go
+   *  two high when they're short enough (`heightIn`), so they take half the floor; "do not stack" takes a spot each. */
+  partial?: { feet?: number; pallets?: number; stackable?: boolean; heightIn?: number };
   /** The shipper wants the trailer to itself (exclusive use): nothing rides with it. */
   exclusive?: boolean;
   /** The multi-load trip it rides on (Truck.trip), when it shares the trailer with others. */

@@ -53,6 +53,20 @@ ok("64 ft of freight doesn't fit a 53-foot trailer", !tooMuch.ok && /no room/.te
 const heavy = runTrip([{ loadId: "a", kind: "pickup" }, { loadId: "b", kind: "pickup" }, { loadId: "a", kind: "delivery" }, { loadId: "b", kind: "delivery" }], new Map([["a", { ...A, weight: 25000 }], ["b", { ...B, weight: 25000 }]]), start, trailer);
 ok("50,000 lbs is over what the truck can carry", !heavy.ok && /too heavy/.test(heavy.why ?? ""), heavy.why);
 const backwards = runTrip([{ loadId: "a", kind: "delivery" }, { loadId: "a", kind: "pickup" }], new Map([["a", A]]), start, trailer);
+// Stacking: short stackable pallets go two high and take half the floor; tall or do-not-stack ones take a spot each.
+ok("16 stackable pallets take 8 floor spots (17 ft), not 16 (33 ft)", loadFeet({ partial: { pallets: 16, stackable: true } }) === 17 && loadFeet({ partial: { pallets: 16 } }) === 33);
+ok("…unless they're too tall to go two high (60 in)", loadFeet({ partial: { pallets: 16, stackable: true, heightIn: 60 } }) === 33);
+ok("…and 'do not stack' takes a spot each", loadFeet({ partial: { pallets: 16, stackable: false } }) === 33);
+const stacked = ["s1", "s2", "s3"].map((id) => P(id, lane("Dallas", "TX", "Houston", "TX", 240), { partial: { pallets: 20, stackable: true } }));
+const stackRun = runTrip([...stacked.map((l) => ({ loadId: l.id, kind: "pickup" as const })), ...stacked.map((l) => ({ loadId: l.id, kind: "delivery" as const }))], new Map(stacked.map((l) => [l.id, l])), start, trailer);
+ok("60 stackable pallets (30 floor spots, 63 ft) don't fit", !stackRun.ok && /no room/.test(stackRun.why ?? ""), stackRun.why);
+const two = stacked.slice(0, 2);
+const twoRun = runTrip([...two.map((l) => ({ loadId: l.id, kind: "pickup" as const })), ...two.map((l) => ({ loadId: l.id, kind: "delivery" as const }))], new Map(two.map((l) => [l.id, l])), start, trailer);
+ok("40 stackable pallets (20 spots, 42 ft) do fit", twoRun.ok, twoRun.why);
+const tall = runTrip([{ loadId: "t", kind: "pickup" }, { loadId: "t", kind: "delivery" }], new Map([["t", P("t", lane("Dallas", "TX", "Houston", "TX", 240), { partial: { pallets: 4, heightIn: 115 } })]]), start, trailer);
+ok("a 115-inch pallet doesn't fit inside a van", !tall.ok && /tall/.test(tall.why ?? ""), tall.why);
+ok("feed notes: 'stackable, 48\" tall'", partialOf({ notes: "Partial, 10 pallets, stackable, 48\" tall" }).stackable === true && partialOf({ notes: "Partial, 10 pallets, stackable, 48\" tall" }).palletHeightIn === 48);
+ok("feed notes: 'do not stack'", partialOf({ notes: "LTL 6 skids do not stack" }).stackable === false);
 ok("a drop before its pickup doesn't run", !backwards.ok && /before it's picked up/.test(backwards.why ?? ""));
 
 // Appointments and hours
@@ -84,16 +98,16 @@ const truck = { id: "t1", currentLoadId: "a", nextLoadId: null, status: "on_load
 let loads: any[] = tl({ a: "in_transit" });
 ok("next stop: pick up B (stop 2 of 6)", nextStop(truck, loads)?.load.id === "b" && nextStop(truck, loads)?.index === 2 && nextStop(truck, loads)?.total === 6);
 ok("the stop already made is done", tripStops(truck, loads)[0].done && !tripStops(truck, loads)[1].done);
-ok("chain: the next stop's load first, the trip's others after", chainOf(loads, truck).map((l) => l.id).join() === "b,c,a" || chainOf(loads, truck)[0].id === "b", chainOf(loads, truck).map((l) => l.id));
+ok("chain: the next stop's load first, the trip's others after", chainOf(loads, truck, now).map((l) => l.id).join() === "b,c,a" || chainOf(loads, truck, now)[0].id === "b", chainOf(loads, truck, now).map((l) => l.id));
 ok("a trip counts as one of the three lined up", linedUp(loads, truck) === 1);
-ok("the truck ends where the trip's last drop is", chainEnd(loads, truck)?.id === "a" && freeAfter(loads, truck).city === "Houston");
+ok("the truck ends where the trip's last drop is", chainEnd(loads, truck, now)?.id === "a" && freeAfter(loads, truck, now).city === "Houston");
 loads = tl({ a: "in_transit", b: "delivered", c: "in_transit" });
-ok("B dropped and C loaded: next is the drop of C", nextStop(truck, loads)?.load.id === "c" && nextStop(truck, loads)?.stop.kind === "delivery" && slotsFor(loads, truck).currentLoadId === "c");
+ok("B dropped and C loaded: next is the drop of C", nextStop(truck, loads)?.load.id === "c" && nextStop(truck, loads)?.stop.kind === "delivery" && slotsFor(loads, truck, now).currentLoadId === "c");
 ok("the drop line for the driver", /^Next stop \(5 of 6\): drop C in Houston, TX/.test(nextStopLine(truck, loads) ?? ""), nextStopLine(truck, loads));
 const cancelled = tl({ a: "in_transit", b: "cancelled" });
 ok("a cancelled load's stops drop off the trip", tripStops(truck, cancelled).length === 4 && nextStop(truck, cancelled)?.load.id === "c");
 const after = [...tl({ a: "delivered", b: "delivered", c: "delivered" }), { ...P("f", lane("Houston", "TX", "Austin", "TX", 165), { partial: undefined }), stage: "booked", tripId: undefined, pickupAt: iso(now + 30 * H) }];
-const s = slotsFor(after, truck);
+const s = slotsFor(after, truck, now);
 ok("every stop made: the trip is over and the next load moves up", !s.trip && s.currentLoadId === "f" && s.status === "on_load", s);
 ok("trip loads aren't in the 'Then' lineup", truckLineup(tl({ a: "in_transit" }), truck).length === 0);
 ok("where it fits on the trip, for the driver's text", stopsLine(trip, "c") === "Pick it up at stop 4 and drop it at stop 5 of 6.");
@@ -126,7 +140,7 @@ ok("floor for half the trailer: half", floorFor({ lane: { miles: 400 } as any, p
 ok("ask for a partial with no post: its share, plus room", askFor({ lane: { miles: 400 } as any, listedRate: 0, partial: { feet: 26.5 } } as any, { minRpm: 3 } as any) === 750);
 
 // Partials in feeds and board posts
-ok("feed: 'P' flag with feet", JSON.stringify(partialOf({ fullPartial: "P", length: 20 })) === JSON.stringify({ partial: true, pallets: null, lengthFeet: 20 }));
+ok("feed: 'P' flag with feet", JSON.stringify(partialOf({ fullPartial: "P", length: 20 })) === JSON.stringify({ partial: true, pallets: null, lengthFeet: 20, stackable: null, palletHeightIn: null }));
 ok("feed notes: 'Partial, 8 pallets'", partialOf({ notes: "Partial, 8 pallets, no touch" }).pallets === 8);
 ok("feed: a full load says nothing", JSON.stringify(partialOf({ fullPartial: "FULL", notes: "53' van" })) === "{}");
 const row = toRow({ origin_city: "Dallas", origin_state: "tx", destination_city: "Waco", destination_state: "TX", broker_email: "x@y.com", full_partial: "LTL", length_feet: 14 });

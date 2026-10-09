@@ -38,14 +38,17 @@ const num = (v: unknown) => {
  * pallets and the feet of trailer it takes, or words in the notes ("partial, 8 pallets", "12 ft"). Nothing when it's
  * a full load or it doesn't say.
  */
-export function partialOf(f: { fullPartial?: unknown; pallets?: unknown; length?: unknown; notes?: unknown }): { partial?: boolean; pallets?: number | null; lengthFeet?: number | null } {
+export function partialOf(f: { fullPartial?: unknown; pallets?: unknown; length?: unknown; notes?: unknown }): { partial?: boolean; pallets?: number | null; lengthFeet?: number | null; stackable?: boolean | null; palletHeightIn?: number | null } {
   const flag = f.fullPartial === true || /^(p|partial|ltl|ptl|volume)$/i.test(String(f.fullPartial ?? "").trim());
   const notes = String(f.notes ?? "");
   const said = /\b(partial|ltl|ptl|volume (load|shipment)|co-?load)\b/i.test(notes);
   if (!flag && !said) return {};
   const pallets = num(f.pallets) ?? (Number(notes.match(/\b(\d{1,2})\s*(pallets?|plts?|skids?)\b/i)?.[1]) || null);
   const feet = num(f.length) ?? (Number(notes.match(/\b(\d{1,2})\s*(ft|feet|')(?![a-z])/i)?.[1]) || null);
-  return { partial: true, pallets: pallets && pallets > 0 && pallets <= 30 ? pallets : null, lengthFeet: feet && feet > 0 && feet < 53 ? feet : null };
+  // "Stackable" or "do not stack" in the notes, and a height like 48" or 48 in.
+  const stackable = /\b(do not|don'?t|no|non[- ]?)\s*stack/i.test(notes) ? false : /\bstackable\b/i.test(notes) ? true : null;
+  const height = Number(notes.match(/\b(\d{2,3})\s*(?:"|in\b|inch(?:es)?\b)\s*(?:tall|high)?/i)?.[1]) || null;
+  return { partial: true, pallets: pallets && pallets > 0 && pallets <= 30 ? pallets : null, lengthFeet: feet && feet > 0 && feet < 53 ? feet : null, stackable, palletHeightIn: height && height >= 20 && height <= 120 ? height : null };
 }
 
 export function toRow(r: Record<string, unknown>): FeedRow | null {
