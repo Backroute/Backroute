@@ -21,8 +21,9 @@ const Offer = z.object({
   partial: z.boolean().nullable(),
   pallets: z.number().nullable(),
   lengthFeet: z.number().nullable(),
-  stackable: z.boolean().nullable(),
-  palletHeightIn: z.number().nullable(),
+  // Optional: older readings (and a model that leaves them out) still parse.
+  stackable: z.boolean().nullish(),
+  palletHeightIn: z.number().nullish(),
 });
 
 const Reading = z.object({

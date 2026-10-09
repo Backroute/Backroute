@@ -33,7 +33,7 @@ function flexEncode(points) {
   return out;
 }
 const systemText = (b) => (Array.isArray(b.system) ? b.system.map((x) => x.text).join("\n") : b.system ?? "");
-const offer = (o) => ({ loadNumber: null, originCity: null, originState: null, destinationCity: null, destinationState: null, pickup: null, delivery: null, pickupLocal: null, deliveryLocal: null, equipment: null, rate: null, miles: null, weight: null, notes: null, partial: null, pallets: null, lengthFeet: null, ...o });
+const offer = (o) => ({ loadNumber: null, originCity: null, originState: null, destinationCity: null, destinationState: null, pickup: null, delivery: null, pickupLocal: null, deliveryLocal: null, equipment: null, rate: null, miles: null, weight: null, notes: null, partial: null, pallets: null, lengthFeet: null, stackable: null, palletHeightIn: null, ...o });
 function brokerMail(text) {
   const base = { kind: "other", offers: [], brokerRate: null, agreedToOurRate: false, loadNumber: null, contactName: "Kim", brokerCompany: null, brokerMc: null, brokerPhone: null, payments: [], cancelReason: null, brokerRpm: null, question: null, language: "en", changeKind: null, changePlaces: [], appointmentStop: null, appointmentLocal: null, appointmentConfirmation: null };
   // Signatures the tests use: a real broker, and someone posing as one.
