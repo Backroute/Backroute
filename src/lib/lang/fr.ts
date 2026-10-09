@@ -153,7 +153,7 @@ export const fr: CallPack = {
     parkNot: (p) => `T'es à court d'heures avant le receveur. Livraison déplacée à demain 7 h. ${p.stop}, à ${p.ahead} milles, prend les réservations (${p.cost} $).`,
     setup: "Tes réglages d'appel sont enregistrés. Change-les quand tu veux dans ton profil.",
     inPay: (pay, n) => `Ta paye cette semaine jusqu'ici : ${pay} sur ${n} ${pl(n, "voyage", "voyages")}. Détail complet dans Gains.`,
-    inBreakdown: "Panne enregistrée. L'IA trouve un garage et a avisé le courtier. Reste avec le camion; l'heure d'arrivée suit par appel et texto.",
+    inBreakdown: "Panne enregistrée. La répartition trouve un garage et a avisé le courtier. Reste avec le camion; l'heure d'arrivée suit par appel et texto.",
     inLate: (a) => `Noté : retard de ${a}. On avise le receveur et le courtier; ta nouvelle heure de rendez-vous suit par texto.`,
     inGeneric: "De ton appel avec la répartition : question réglée.",
     autoBooked: (p) => `J'ai réservé ton prochain voyage : ${p.origin} → ${p.dest}, ${p.miles} milles, ramassage ${p.pickup}. Détails dans l'appli.`,
@@ -174,7 +174,7 @@ export const fr: CallPack = {
   },
 
   owner: {
-    greetFleet: "Répartiteur IA. De quoi as-tu besoin pour ta flotte?",
+    greetFleet: "Répartition. De quoi as-tu besoin pour ta flotte?",
     greetLoad: (o, d, b) => `J'appelle pour le voyage ${o} → ${d} avec ${b}. Sur quoi je pousse?`,
     ack: {
       rate: (b) => `Je m'en occupe. Je retourne voir ${b} tout de suite et je confirme dès qu'ils répondent.`,

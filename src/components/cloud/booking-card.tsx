@@ -60,7 +60,7 @@ export function BookingCard({ load, broker }: { load: Load; broker?: Broker }) {
                 </p>
               )}
               <p className="text-xs text-ink-500">
-                {req.passedAt ? "We passed: too far under your lowest. If they come back with more, the AI picks it up." : pending ? STATUS[req.status] : load.bookedRate ? `Booked at ${formatCurrency(load.bookedRate)}` : STATUS[req.status]} · {formatDateTime(req.askedAt)}
+                {req.passedAt ? "We passed: too far under your lowest. If they come back with more, Backroute picks it up." : pending ? STATUS[req.status] : load.bookedRate ? `Booked at ${formatCurrency(load.bookedRate)}` : STATUS[req.status]} · {formatDateTime(req.askedAt)}
               </p>
             </div>
           </div>
@@ -68,7 +68,7 @@ export function BookingCard({ load, broker }: { load: Load; broker?: Broker }) {
         {pending && (
           <div className="rounded-xl bg-ink-50 p-3">
             <p className="text-xs text-ink-600">
-              When the broker confirms, the AI books it as soon as their rate con arrives and matches (on Within my rules or Full autopilot). If they confirmed another way, book it here: it goes on the truck and the driver gets a text.
+              When the broker confirms, Backroute books it as soon as their rate con arrives and matches (on Within my rules or Full autopilot). If they confirmed another way, book it here: it goes on the truck and the driver gets a text.
             </p>
             <Button size="sm" className="mt-2" disabled={busy} onClick={book}>
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />} The broker confirmed: book it

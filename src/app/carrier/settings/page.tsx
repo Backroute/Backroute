@@ -44,7 +44,7 @@ const TABS = [
   { key: "basics", label: "Basics" },
   { key: "general", label: "More" },
   { key: "integrations", label: "Integrations" },
-  { key: "addons", label: "AI Add-ons" },
+  { key: "addons", label: "Add-ons" },
   { key: "billing", label: "Billing & Team" },
   { key: "security", label: "Security" },
 ] as const;
@@ -169,7 +169,7 @@ function Settings() {
               <Card>
                 <CardHeader>
                   <CardTitle>Negotiation aggressiveness</CardTitle>
-                  <CardDescription>How hard the AI pushes before it accepts, holds, or escalates.</CardDescription>
+                  <CardDescription>How hard Backroute pushes before it accepts, holds, or escalates.</CardDescription>
                 </CardHeader>
                 <CardContent className="!pt-3">
                   <div className="grid gap-3 sm:grid-cols-3">
@@ -201,7 +201,7 @@ function Settings() {
                     {!signedIn && (
                       <>
                     <ToggleRow label="Avoid low-reliability brokers" desc="Never source or negotiate with 'watch' tier brokers" checked={settings.avoidWatchBrokers} onChange={(v) => updateSettings({ avoidWatchBrokers: v })} />
-                    <ToggleRow label="Voice agent" desc="Allow the AI to call brokers directly" checked={settings.voiceEnabled} onChange={(v) => updateSettings({ voiceEnabled: v })} />
+                    <ToggleRow label="Voice agent" desc="Allow Backroute to call brokers directly" checked={settings.voiceEnabled} onChange={(v) => updateSettings({ voiceEnabled: v })} />
                     <ToggleRow label="SMS agent" desc="Allow rate checks and counters over SMS" checked={settings.smsEnabled} onChange={(v) => updateSettings({ smsEnabled: v })} />
                     <ToggleRow label="Email agent" desc="Allow inbox monitoring and negotiation by email" checked={settings.emailEnabled} onChange={(v) => updateSettings({ emailEnabled: v })} />
                       </>
@@ -215,7 +215,7 @@ function Settings() {
                   </CardHeader>
                   <CardContent className="!pt-3 flex flex-col gap-4">
                     <p className="text-xs text-ink-500">
-                      Only three kinds of alerts reach you: something that needs you, money moving, and safety. Everything else the AI does stays in its log.
+                      Only three kinds of alerts reach you: something that needs you, money moving, and safety. Everything else Backroute does stays in its log.
                     </p>
                     {signedIn && <PhoneAlerts />}
                     <ToggleRow help="notifySms" label="Text me when something needs me" desc="Approvals, loads to pick, drivers' requests" checked={settings.notifySms} onChange={(v) => updateSettings({ notifySms: v })} />
@@ -238,7 +238,7 @@ function Settings() {
             <Card>
               <CardHeader>
                 <CardTitle>Integrations</CardTitle>
-                <CardDescription>The load boards, TMS, ELD, and back-office tools the AI reads and writes to.</CardDescription>
+                <CardDescription>The load boards, TMS, ELD, and back-office tools Backroute reads and writes to.</CardDescription>
               </CardHeader>
               <CardContent className="!pt-3 flex flex-col gap-5">
                 <div>
@@ -314,8 +314,8 @@ function Settings() {
             <Card>
               <CardHeader>
                 <div>
-                  <CardTitle className="flex items-center gap-2"><Sparkles className="h-4 w-4" /> AI Add-ons</CardTitle>
-                  <CardDescription>Extra AI agents beyond dispatch, all free, no per-feature charge.</CardDescription>
+                  <CardTitle className="flex items-center gap-2"><Sparkles className="h-4 w-4" /> Add-ons</CardTitle>
+                  <CardDescription>Extra helpers beyond dispatch, all free, no per-feature charge.</CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="!pt-3 flex flex-col gap-5">
@@ -365,7 +365,7 @@ function Settings() {
                 <CardHeader>
                   <CardTitle>Billing</CardTitle>
                   <CardDescription>
-                    {carrier.plan} plan &middot; {formatCurrency(carrier.mrr)}/mo + 2% of booked freight. AI add-ons are free; Backroute earns from partner referrals instead.
+                    {carrier.plan} plan &middot; {formatCurrency(carrier.mrr)}/mo + 2% of booked freight. Add-ons are free; Backroute earns from partner referrals instead.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="!pt-3 flex flex-col gap-5">

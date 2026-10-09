@@ -45,12 +45,13 @@ function useDailyText(): string | null {
 
 export function DailyTextPreview() {
   const text = useDailyText();
-  const phone = "(214) 555-0100";
+  // The demo's sample owner; a real account's text goes to the owner's own phone, which this screen doesn't know.
+  const demo = useStore((s) => s.session.mode === "demo");
   if (!text) return null;
   return (
     <div className="rounded-2xl bg-ink-50 p-4">
       <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-ink-400">
-        <MessageSquare className="h-3.5 w-3.5" /> Text to {phone} at 6 PM
+        <MessageSquare className="h-3.5 w-3.5" /> Text to {demo ? "(214) 555-0100" : "you"} at 6 PM
       </p>
       <p className="mt-2 max-w-md rounded-2xl rounded-bl-sm bg-white px-3.5 py-2.5 text-sm leading-relaxed text-ink-800 shadow-sm">{text}</p>
     </div>

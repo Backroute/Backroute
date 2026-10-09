@@ -26,14 +26,14 @@ export function OwnerLanguageCard() {
             <Languages className="h-4 w-4" /> Languages
           </CardTitle>
           <CardDescription>
-            Each driver hears the AI in their own language. This dashboard is in English; the AI can text you in a different language. Brokers are always handled in English.
+            Each driver hears Backroute in their own language. This dashboard is in English; Backroute can text you in a different language. Brokers are always handled in English.
           </CardDescription>
         </div>
       </CardHeader>
       <CardContent className="!pt-3 flex flex-col gap-4">
         <div>
           <p className="text-xs font-medium text-ink-800">Texts and calls to you</p>
-          <p className="text-xs text-ink-500">Your end-of-day text, and your own calls with the AI about the fleet or a load.</p>
+          <p className="text-xs text-ink-500">Your end-of-day text, and your own calls with Backroute about the fleet or a load.</p>
           <div className="mt-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Texts and calls to you">
             {LANGS.map((l) => (
               <button key={l.code} type="button" role="radio" aria-checked={lang === l.code} lang={l.code} onClick={() => updateSettings({ ownerLanguage: l.code })} className={pill(lang === l.code)}>
@@ -64,7 +64,7 @@ export function OwnerLanguageCard() {
         <p className="text-xs text-ink-500">
           Your drivers talk in: {talk.map((c) => LANG_INFO[c].english).join(", ")}. Drivers pick their calls-and-texts language and their app language separately in the app, or you can set how each one talks on the Fleet page.
         </p>
-        <p className="text-xs text-ink-400">Demo: the AI&apos;s scripted calls, texts and the driver app&apos;s main screens are translated.</p>
+        <p className="text-xs text-ink-400">Demo: Backroute&apos;s scripted calls, texts and the driver app&apos;s main screens are translated.</p>
       </CardContent>
     </Card>
   );

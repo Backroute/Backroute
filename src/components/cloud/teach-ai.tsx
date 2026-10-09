@@ -38,13 +38,13 @@ export function TeachAi({ load, className }: { load: Load; className?: string })
     if (!(n >= 0.5 && n <= 15)) return;
     updateSettings({ laneFloors: { ...settings.laneFloors, [key]: Math.round(n * 100) / 100 } });
     setOpen(null);
-    setDone(`Done: the AI won't take less than $${n.toFixed(2)}/mi from ${load.lane.originState} to ${load.lane.destState}.`);
+    setDone(`Done: Backroute won't take less than $${n.toFixed(2)}/mi from ${load.lane.originState} to ${load.lane.destState}.`);
   }
 
   return (
     <div className={cn("rounded-2xl border border-dashed border-line-strong p-3", className)}>
       <p className="flex items-center gap-1.5 text-xs font-semibold text-ink-700">
-        <GraduationCap className="h-3.5 w-3.5" /> Teach the AI
+        <GraduationCap className="h-3.5 w-3.5" /> Teach Backroute
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
         {broker && (
@@ -78,7 +78,7 @@ export function TeachAi({ load, className }: { load: Load; className?: string })
             disabled={!!driver.homePriority}
             onClick={() => {
               setHomePriority(driver.id, true);
-              setDone(`Done: the AI picks loads that get ${driver.name.split(" ")[0]} home first.`);
+              setDone(`Done: Backroute picks loads that get ${driver.name.split(" ")[0]} home first.`);
             }}
           >
             {driver.homePriority ? `${driver.name.split(" ")[0]}: home first` : `Get ${driver.name.split(" ")[0]} home first`}

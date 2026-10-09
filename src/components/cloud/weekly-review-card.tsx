@@ -75,7 +75,7 @@ export function WeeklyReviewCard() {
         </p>
         {review.learned?.length ? (
           <div>
-            <p className="text-xs font-semibold text-ink-700">What the AI learned</p>
+            <p className="text-xs font-semibold text-ink-700">What Backroute learned</p>
             <ul className="mt-1 flex list-disc flex-col gap-1 pl-5 text-sm text-ink-800">
               {review.learned.map((l) => (
                 <li key={l}>{l}</li>

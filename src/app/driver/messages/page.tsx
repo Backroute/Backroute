@@ -38,13 +38,13 @@ export default function DriverMessagesPage() {
     <div className="flex h-full flex-col">
       <div className="flex items-start justify-between px-5">
         <div>
-          <LargeTitle className="font-display text-2xl text-ink-950">AI Dispatcher</LargeTitle>
+          <LargeTitle className="font-display text-2xl text-ink-950">Dispatch</LargeTitle>
           <p className="text-xs text-ink-500">Available 24/7 · responds in seconds</p>
         </div>
         <button
           onClick={() => startInboundCall(driver.id)}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink-100 text-ink-700"
-          aria-label="Call AI Dispatcher"
+          aria-label="Call dispatch"
         >
           <Phone className="h-4 w-4" />
         </button>

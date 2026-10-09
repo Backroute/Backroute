@@ -142,7 +142,7 @@ export default function DriverProfilePage() {
             </button>
           ))}
         </div>
-        <p className="mt-2 text-xs text-ink-500">{RUN_TYPE_DETAIL[driver.runType]}. The AI only books loads that fit.</p>
+        <p className="mt-2 text-xs text-ink-500">{RUN_TYPE_DETAIL[driver.runType]}. Backroute only books loads that fit.</p>
 
         {driver.runType !== "local" && (
           <>
@@ -171,7 +171,7 @@ export default function DriverProfilePage() {
           <CalendarClock className="h-3.5 w-3.5 text-ink-400" />
           <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">Time off</p>
         </div>
-        <p className="mt-1 text-xs text-ink-500">Always reviewed by your carrier directly. The AI never decides this one.</p>
+        <p className="mt-1 text-xs text-ink-500">Always reviewed by your carrier directly. Backroute never decides this one.</p>
 
         {myTimeOff.length > 0 && (
           <div className="mt-3 flex flex-col gap-2">

@@ -14,6 +14,19 @@ Everything is in [`tests/`](../tests/README.md): the commands, what each suite c
 
 Run `npm run test:setup` once per machine first.
 
+`real-e2e` sets up the test carrier every other suite uses. If it fails, `npm run test:e2e` stops there and says so,
+instead of running the rest against a half-made carrier (that once turned a single slow compile into 68 failures).
+
+### Load and walkthrough checks (not in the suites)
+
+- **Load test, 60 carriers:** 3 trucks each, live within the rules, each sent broker loads; then the dispatcher's rounds
+  are timed. Against the stand-ins a round took 8.5 s (22.1 s before the rounds ran six carriers at a time).
+- **A new carrier, start to first load, phone and laptop sizes:** sign-up (including an MC FMCSA doesn't know and an
+  empty fleet form), the first dashboard, Loads, Fleet, Money, Settings and Add a load, with screenshots, an axe
+  accessibility scan (WCAG 2 A/AA, serious and critical), sideways scroll and console errors on each. It found a
+  stranger's phone number on the evening-text preview, a dead link in the evening text, the demo's autopilot wording
+  in a real sign-up, an unnamed call button and "AI" on most screens; all fixed, and the second pass was clean.
+
 ## How it was tested
 
 The code was run against local stand-ins that behave like the real services:

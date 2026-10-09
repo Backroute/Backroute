@@ -5,7 +5,7 @@ import { TimeAgo } from "./time-ago";
 
 export function NegotiationThread({ messages }: { messages: NegotiationMessage[] }) {
   if (messages.length === 0) {
-    return <p className="py-6 text-center text-sm text-ink-400">No messages yet. AI hasn’t reached out on this load.</p>;
+    return <p className="py-6 text-center text-sm text-ink-400">No messages yet. Backroute hasn’t reached out on this load.</p>;
   }
   return (
     <div className="flex flex-col gap-3">
@@ -16,7 +16,7 @@ export function NegotiationThread({ messages }: { messages: NegotiationMessage[]
             <div className={cn("max-w-[80%] rounded-2xl px-4 py-3", isAi ? "bg-ink-950 text-white rounded-br-sm" : "bg-ink-100 text-ink-900 rounded-bl-sm")}>
               <div className={cn("mb-1 flex items-center gap-1.5 text-xs uppercase tracking-wider", isAi ? "text-white/60" : "text-ink-500")}>
                 <ChannelIcon channel={m.channel} className="h-3 w-3" />
-                <span>{isAi ? "Backroute AI" : m.from}</span>
+                <span>{isAi ? "Backroute" : m.from}</span>
                 <span>·</span>
                 <TimeAgo iso={m.timestamp} />
               </div>

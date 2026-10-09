@@ -43,7 +43,7 @@ export function homeTimeLine(status: HomeTimeStatus, viewer: "driver" | "carrier
       case "on_track":
         return `After this load ${you} ${away}, and ${yours} ${left}. Room for another ${status.runType === "intown" ? "move" : "local run"}.`;
       case "head_home":
-        return `After this load ${you} ${away} with ${left}. The AI only books a ${status.runType === "intown" ? "move" : "run"} that ends near home.`;
+        return `After this load ${you} ${away} with ${left}. Backroute only books a ${status.runType === "intown" ? "move" : "run"} that ends near home.`;
       case "late":
         return `Not enough hours left today to get home: ${away}, ${left}.${viewer === "driver" ? " Your carrier can see this." : ""}`;
       case "no_target":
@@ -53,16 +53,16 @@ export function homeTimeLine(status: HomeTimeStatus, viewer: "driver" | "carrier
   switch (status.state) {
     case "home":
       return status.runType === "otr"
-        ? "Empties near home. The AI books the next run out, or a load close by if a home day is due."
-        : `Empties near home. The AI keeps the next loads inside ${viewer === "driver" ? "your" : "their"} region.`;
+        ? "Empties near home. Backroute books the next run out, or a load close by if a home day is due."
+        : `Empties near home. Backroute keeps the next loads inside ${viewer === "driver" ? "your" : "their"} region.`;
     case "on_track":
-      return `After this load ${you} ${away}. There's time, so the AI books the best-paying loads.`;
+      return `After this load ${you} ${away}. There's time, so Backroute books the best-paying loads.`;
     case "head_home":
-      return `After this load ${you} ${away}. The AI is only booking loads that come closer to home now.`;
+      return `After this load ${you} ${away}. Backroute is only booking loads that come closer to home now.`;
     case "late":
-      return `Straight home is ${away}. The AI is booking toward home${viewer === "driver" ? " and your carrier can see this" : ""}.`;
+      return `Straight home is ${away}. Backroute is booking toward home${viewer === "driver" ? " and your carrier can see this" : ""}.`;
     case "no_target":
-      return `After this load ${you} ${away}.${viewer === "driver" ? " Set a home-time goal in Profile and the AI works around it." : ""}`;
+      return `After this load ${you} ${away}.${viewer === "driver" ? " Set a home-time goal in Profile and Backroute works around it." : ""}`;
   }
 }
 

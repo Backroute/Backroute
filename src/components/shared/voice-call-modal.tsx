@@ -42,11 +42,11 @@ const NEGOTIATION_CALL_REPLY: Record<Exclude<ReturnType<typeof classifyInstructi
 function greeting(spec: VoiceCallSpec): string {
   switch (spec.kind) {
     case "checkin":
-      return `Hey ${spec.driverFirstName.split(" ")[0]}, AI Dispatcher here. What's going on?`;
+      return `Hey ${spec.driverFirstName.split(" ")[0]}, dispatch here. What's going on?`;
     case "fleet":
-      return "AI Dispatcher. What do you need on your fleet?";
+      return "Dispatch. What do you need on your fleet?";
     case "incident":
-      return "AI Dispatcher. Go ahead, what happened?";
+      return "Dispatch. Go ahead, what happened?";
     case "negotiation":
       return `Calling about the ${spec.origin} → ${spec.dest} load with ${spec.brokerName}. What do you need me to push on?`;
   }
@@ -56,11 +56,11 @@ function outcomeFor(spec: VoiceCallSpec, saidSomething: boolean): string {
   if (!saidSomething) return "Call ended, nothing logged.";
   switch (spec.kind) {
     case "checkin":
-      return "Logged with your AI dispatcher.";
+      return "Logged with Backroute.";
     case "fleet":
-      return "Logged with your AI dispatcher.";
+      return "Logged with Backroute.";
     case "incident":
-      return "Incident reported, AI dispatcher is on it.";
+      return "Incident reported, dispatch is on it.";
     case "negotiation":
       return "Relayed to the broker. Check the negotiation thread for updates.";
   }
@@ -237,7 +237,7 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
 
   return (
     <Portal>
-    <div role="dialog" aria-modal="true" aria-label="Voice call with AI Dispatcher" className="theme-ink fixed inset-0 z-50 flex flex-col bg-ink-950 pb-[env(safe-area-inset-bottom)] text-white">
+    <div role="dialog" aria-modal="true" aria-label="Voice call with dispatch" className="theme-ink fixed inset-0 z-50 flex flex-col bg-ink-950 pb-[env(safe-area-inset-bottom)] text-white">
       <div className="flex flex-col items-center gap-2 px-6 pb-4 pt-[max(2.5rem,env(safe-area-inset-top))]">
         <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-white/10">
           {phase === "connecting" && (
@@ -248,7 +248,7 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
           )}
           <Phone className="h-8 w-8" />
         </div>
-        <p className="mt-1 text-lg font-semibold">AI Dispatcher</p>
+        <p className="mt-1 text-lg font-semibold">Dispatch</p>
         <p className="text-xs text-white/50">
           {phase === "connecting" ? "Calling…" : phase === "live" ? formatDuration(elapsedSec) : "Call ended"}
         </p>
@@ -312,7 +312,7 @@ export function VoiceCallModal({ spec, onClose }: { spec: VoiceCallSpec; onClose
                 </div>
               )}
               {englishAnswers && (
-                <p className="text-xs text-white/40">Fleet answers are in English in the demo. The live AI answers in your language.</p>
+                <p className="text-xs text-white/40">Fleet answers are in English in the demo. The live version answers in your language.</p>
               )}
               <div className="flex items-center gap-2">
                 <input

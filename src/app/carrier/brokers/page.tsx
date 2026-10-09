@@ -30,17 +30,17 @@ export default function BrokersPage() {
 
   return (
     <div>
-      <PageHeader title="Brokers" description="How each broker pays and treats carriers, and how the AI deals with them." />
+      <PageHeader title="Brokers" description="How each broker pays and treats carriers, and how Backroute deals with them." />
       <div className="flex flex-col gap-5 px-4 py-6 sm:px-8">
         <div className="grid grid-cols-3 gap-3">
           <Summary label="Book normally" value={counts.normal} tone="text-ink-950" />
           <Summary label="Ask more to cover slow pay" value={counts.surcharge} tone="text-[var(--accent-warn)]" />
-          <Summary label="AI won't book" value={counts.block} tone="text-[var(--accent-danger)]" />
+          <Summary label="Won't book" value={counts.block} tone="text-[var(--accent-danger)]" />
         </div>
 
         <p className="flex items-start gap-2 rounded-2xl bg-ink-50 px-4 py-3 text-xs leading-relaxed text-ink-600">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          Days to pay and detention history come from your own invoices plus the factoring partner&apos;s broker credit data. The AI can&apos;t make a
+          Days to pay and detention history come from your own invoices plus the factoring partner&apos;s broker credit data. Backroute can&apos;t make a
           broker pay faster. It can only avoid them or ask for more to cover the wait, and some brokers will give the load to another carrier instead.
         </p>
 
@@ -74,7 +74,7 @@ export default function BrokersPage() {
 
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
                 <label htmlFor={`policy-${b.id}`} className="text-xs text-ink-500">
-                  {a.overridden ? `Your call. The AI would ${POLICY_LABEL[a.auto].toLowerCase()}.` : "AI's call from this record"}
+                  {a.overridden ? `Your call. Backroute would ${POLICY_LABEL[a.auto].toLowerCase()}.` : "Backroute's call from this record"}
                 </label>
                 <select
                   id={`policy-${b.id}`}
@@ -82,7 +82,7 @@ export default function BrokersPage() {
                   onChange={(e) => setBrokerPolicy(b.id, e.target.value === "auto" ? null : (e.target.value as BrokerPolicy))}
                   className="rounded-full border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink-800 outline-none focus:border-ink-400"
                 >
-                  <option value="auto">Let the AI decide ({POLICY_LABEL[a.auto].toLowerCase()})</option>
+                  <option value="auto">Let Backroute decide ({POLICY_LABEL[a.auto].toLowerCase()})</option>
                   <option value="normal">{POLICY_LABEL.normal}</option>
                   <option value="surcharge">{POLICY_LABEL.surcharge}</option>
                   <option value="block">{POLICY_LABEL.block}</option>

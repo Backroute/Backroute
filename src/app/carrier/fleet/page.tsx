@@ -62,7 +62,7 @@ export default function FleetPage() {
         <h2 id="retention-title" className="text-sm font-semibold text-ink-950">Driver check-in</h2>
         <p className="mt-0.5 max-w-2xl text-xs text-ink-500">
           Warning signs, not a prediction: home time, pay, unpaid dock time, money you owe them, long days, and how long since
-          someone talked to them. The AI can steer loads toward home and chase what drivers are owed. Pay, time off and the call are yours.
+          someone talked to them. Backroute can steer loads toward home and chase what drivers are owed. Pay, time off and the call are yours.
         </p>
         {flagged.length === 0 ? (
           <p className="mt-3 rounded-2xl border border-line bg-white px-4 py-5 text-center text-sm text-ink-500">Every driver looks good this week.</p>
@@ -109,7 +109,7 @@ export default function FleetPage() {
                     </p>
                     {signedIn && truck.plan && truck.plan.lines.length > 0 && (
                       <div className="mt-2 rounded-xl bg-ink-50 px-2.5 py-2 text-xs leading-relaxed text-ink-700">
-                        <p className="font-medium text-ink-900">The AI&apos;s plan</p>
+                        <p className="font-medium text-ink-900">Backroute&apos;s plan</p>
                         {truck.plan.lines.map((line) => (
                           <p key={line}>{line}</p>
                         ))}
@@ -143,14 +143,14 @@ export default function FleetPage() {
                       value={driver.prefs?.language ?? "en"}
                       onChange={(e) => setDriverPrefs(driver.id, { language: e.target.value as Lang })}
                       aria-label={`Language ${driver.name} talks in`}
-                      title="The language the AI calls and texts this driver in. Their app screens are set separately in the driver app."
+                      title="The language Backroute calls and texts this driver in. Their app screens are set separately in the driver app."
                       className="rounded-full border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink-800 outline-none focus:border-ink-400"
                     >
                       {LANGS.map((l) => (
                         <option key={l.code} value={l.code}>{l.native}</option>
                       ))}
                     </select>
-                    <a href={`tel:${driver.phone.replace(/[^\d+]/g, "")}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-100 text-ink-600 hover:bg-ink-200">
+                    <a href={`tel:${driver.phone.replace(/[^\d+]/g, "")}`} aria-label={`Call ${driver.name}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-100 text-ink-600 hover:bg-ink-200">
                       <Phone className="h-3.5 w-3.5" />
                     </a>
                   </div>
@@ -163,7 +163,7 @@ export default function FleetPage() {
                       <p className="truncate text-sm font-medium text-ink-900">{secondDriver.name} <span className="text-ink-400">· co-driver</span></p>
                       <p className="truncate text-xs text-ink-400">{secondDriver.phone}</p>
                     </div>
-                    <a href={`tel:${secondDriver.phone.replace(/[^\d+]/g, "")}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-100 text-ink-600 hover:bg-ink-200">
+                    <a href={`tel:${secondDriver.phone.replace(/[^\d+]/g, "")}`} aria-label={`Call ${secondDriver.name}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-100 text-ink-600 hover:bg-ink-200">
                       <Phone className="h-3.5 w-3.5" />
                     </a>
                   </div>

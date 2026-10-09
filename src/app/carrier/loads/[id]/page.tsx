@@ -114,7 +114,7 @@ export default function LoadDetailPage() {
             <LoadScoreBadge score={load.score} size="xl" />
             <div className="flex flex-col items-start gap-1.5">
               <LoadStagePill stage={load.stage} className="!text-xs !px-3 !py-1.5" />
-              <Badge tone="info">AI confidence {load.aiConfidence}%</Badge>
+              <Badge tone="info">Confidence {load.aiConfidence}%</Badge>
             </div>
           </div>
         </div>
@@ -125,7 +125,7 @@ export default function LoadDetailPage() {
         )}
         {load.aiPaused && (
           <p className="mt-4 flex items-center gap-1.5 rounded-xl bg-warn-soft px-3.5 py-2.5 text-xs font-medium text-[var(--accent-warn)]">
-            <ShieldAlert className="h-3.5 w-3.5" /> Backroute support has paused the AI on this load while they take a look.
+            <ShieldAlert className="h-3.5 w-3.5" /> Backroute support has paused Backroute on this load while they take a look.
           </p>
         )}
         {load.stage === "declined" && load.cancellationReason && (
@@ -200,7 +200,7 @@ export default function LoadDetailPage() {
                   <button
                     onClick={() => setCalling(true)}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-ink-700 hover:border-ink-300"
-                    aria-label="Call AI Dispatcher"
+                    aria-label="Call dispatch"
                   >
                     <Phone className="h-4 w-4" />
                   </button>
@@ -222,7 +222,7 @@ export default function LoadDetailPage() {
                       key={call.id}
                       call={call}
                       brokerName={broker?.company}
-                      title={call.transcript.some((l) => l.speaker === "driver" || l.speaker === "carrier") ? "Your call with AI Dispatcher" : "Voice Agent Call"}
+                      title={call.transcript.some((l) => l.speaker === "driver" || l.speaker === "carrier") ? "Your call with dispatch" : "Voice Agent Call"}
                     />
                   ))}
                 </div>
@@ -305,7 +305,7 @@ export default function LoadDetailPage() {
             <CardContent className="!pt-3">
               <div className="flex flex-col gap-3.5">
                 <Row label="Listed rate" value={formatCurrency(load.listedRate)} />
-                <Row label="AI target rate" value={formatCurrency(load.targetRate)} />
+                <Row label="Target rate" value={formatCurrency(load.targetRate)} />
                 <Row label="Booked rate" value={load.bookedRate ? formatCurrency(load.bookedRate) : "Pending"} strong />
                 <Row
                   label={load.bookedRate ? "Net profit" : "Est. net profit"}

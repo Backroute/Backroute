@@ -155,7 +155,7 @@ export const es: CallPack = {
     parkNot: (p) => `Te quedas sin horas antes de la entrega. Entrega movida a mañana a las 7. ${p.stop}, a ${p.ahead} millas, acepta reservaciones ($${p.cost}).`,
     setup: "Tus preferencias de llamada quedaron guardadas. Cámbialas cuando quieras en Perfil.",
     inPay: (pay, n) => `Tu pago de esta semana hasta ahora: ${pay} en ${n} ${pl(n, "carga", "cargas")}. Desglose completo en Ganancias.`,
-    inBreakdown: "Avería registrada. La IA está buscando taller y ya le avisó al bróker. Quédate con el camión; la hora de llegada te llega por llamada y mensaje.",
+    inBreakdown: "Avería registrada. Despacho está buscando taller y ya le avisó al bróker. Quédate con el camión; la hora de llegada te llega por llamada y mensaje.",
     inLate: (a) => `Registrado: vas ${a} tarde. Estamos avisando al que recibe y al bróker; la nueva hora de tu cita te llega por mensaje.`,
     inGeneric: "De tu llamada con despacho: pregunta resuelta.",
     autoBooked: (p) => `Reservé tu próxima carga: ${p.origin} → ${p.dest}, ${p.miles} millas, se recoge ${p.pickup}. Detalles en la app.`,
@@ -176,7 +176,7 @@ export const es: CallPack = {
   },
 
   owner: {
-    greetFleet: "Despachador de IA. ¿Qué necesitas de tu flota?",
+    greetFleet: "Despacho. ¿Qué necesitas de tu flota?",
     greetLoad: (o, d, b) => `Te llamo por la carga ${o} → ${d} con ${b}. ¿Qué quieres que le pida?`,
     ack: {
       rate: (b) => `Ya voy. Se lo llevo a ${b} ahora mismo y te confirmo en cuanto contesten.`,

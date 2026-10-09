@@ -14,7 +14,7 @@ export function CounterOfferButton({
   load,
   onSubmit,
   variant = "outline",
-  label = "Ask AI to push for more",
+  label = "Push for more",
 }: {
   load: Load;
   onSubmit: (amount: number) => void;

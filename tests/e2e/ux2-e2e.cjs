@@ -114,20 +114,20 @@ async function signIn(browser, { width = 1280, theme } = {}) {
   check("…one tap sends them all", toBroker(a, pm).length === 1 && toBroker(b, pm).length === 1 && db(`select count(*) from escalations where carrier_id = '${cid}' and id in ('esc-u2-a-${RUN}', 'esc-u2-b-${RUN}') and status = 'resolved'`) === "2");
 
   // The status pill and the command bar.
-  check("the AI's status shows up top", (await p.getByRole("button", { name: /AI status and pause/ }).count()) === 1);
+  check("the AI's status shows up top", (await p.getByRole("button", { name: /Autopilot status and pause/ }).count()) === 1);
   await p.keyboard.press("Control+k");
-  await p.getByLabel("Search or tell the AI").fill("pause the AI");
+  await p.getByLabel("Search or tell Backroute").fill("pause the AI");
   await p.keyboard.press("Enter");
   await sleep(4000);
   check("typing \"pause the AI\" pauses it, and it's saved", db(`select settings->>'paused' from carriers where id = '${cid}'`) === "true");
   await p.getByRole("status").filter({ hasText: "The AI is paused" }).waitFor({ timeout: 10000 }).catch(() => {});
-  check("…Home says it's paused, with Resume", (await p.getByText(/The AI is paused/).count()) >= 1);
+  check("…Home says it's paused, with Resume", (await p.getByText(/Backroute is paused/).count()) >= 1);
   await p.getByRole("button", { name: "Resume" }).first().click();
   await sleep(3000);
   check("…and Resume undoes it", db(`select coalesce(settings->>'paused', 'false') from carriers where id = '${cid}'`) === "false");
   await p.keyboard.press("Control+k");
-  await p.getByLabel("Search or tell the AI").fill("what did we make this week?");
-  check("a question in the command bar goes to the AI", (await p.getByText("Ask the AI dispatcher").count()) === 1);
+  await p.getByLabel("Search or tell Backroute").fill("what did we make this week?");
+  check("a question in the command bar goes to the AI", (await p.getByText("Ask Backroute").count()) === 1);
   await p.keyboard.press("Escape");
 
   // The load timeline: who asked.
@@ -157,7 +157,7 @@ async function signIn(browser, { width = 1280, theme } = {}) {
   // Offered while the owner is new (fewer than 3 real loads booked); after that it's out of the way.
   const booked = Number(db(`select count(*) from loads where carrier_id = '${cid}' and coalesce((data->>'imported')::boolean, false) = false and data->>'stage' not in ('sourced', 'scoring', 'offered', 'negotiating', 'declined')`));
   const open = p.getByRole("button", { name: "Open the sample fleet" });
-  await p.getByRole("button", { name: /AI status and pause/ }).waitFor({ timeout: 60000 }).catch(() => {});
+  await p.getByRole("button", { name: /Autopilot status and pause/ }).waitFor({ timeout: 60000 }).catch(() => {});
   if (booked < 3) await open.waitFor({ timeout: 30000 }).catch(() => {});
   else await sleep(3000);
   check(booked < 3 ? "a new owner is offered the sample fleet" : "an owner with booked loads isn't pestered with the sample fleet", (await open.count()) === (booked < 3 ? 1 : 0), `${booked} booked`);
@@ -169,14 +169,14 @@ async function signIn(browser, { width = 1280, theme } = {}) {
     await p.screenshot({ path: `${S}/.out/ux2-sample.png` });
     await p.getByRole("button", { name: "Back to my fleet" }).first().click();
     await p.waitForURL(/\/carrier/, { timeout: 60000 });
-    await p.getByRole("button", { name: /AI status and pause/ }).waitFor({ timeout: 60000 }).catch(() => {});
+    await p.getByRole("button", { name: /Autopilot status and pause/ }).waitFor({ timeout: 60000 }).catch(() => {});
     check("…and Back to my fleet returns to the real account", (await p.getByRole("note", { name: "Sample fleet" }).count()) === 0 && (await p.getByText("Practice on the sample fleet").count()) === 0);
   }
 
   // Dark, and the phone.
   const dk = await signIn(browser, { theme: "dark" });
   await dk.goto(`${BASE}/carrier`, { waitUntil: "domcontentloaded" });
-  await dk.getByRole("button", { name: /AI status and pause/ }).waitFor({ timeout: 120000 }).catch(() => {});
+  await dk.getByRole("button", { name: /Autopilot status and pause/ }).waitFor({ timeout: 120000 }).catch(() => {});
   await sleep(1500);
   check("dark mode applies before the page draws", (await dk.evaluate(() => document.documentElement.dataset.theme)) === "dark");
   await dk.screenshot({ path: `${S}/.out/ux2-home-dark.png` });

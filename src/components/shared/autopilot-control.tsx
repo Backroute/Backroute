@@ -7,16 +7,17 @@ const LEVELS: Autonomy[] = ["ask", "rules", "full"];
 
 /** What each level does in a real account today: the AI answers drivers on its own; this decides broker emails. */
 const REAL_DETAIL: Record<Autonomy, string> = {
-  ask: "The AI answers drivers and checks in with them on its own. Every email to a broker (book requests, invoices, replies) waits for your OK.",
-  rules: "The AI also asks to book loads, counters, accepts, sends invoices, detention claims and setup packets on its own, but only at or above your lowest rate per mile. Replies it writes itself, and anything under your lowest, wait for you.",
+  ask: "Backroute answers drivers and checks in with them on its own. Every email to a broker (book requests, invoices, replies) waits for your OK.",
+  rules: "Backroute also asks to book loads, counters, accepts, sends invoices, detention claims and setup packets on its own, but only at or above your lowest rate per mile. Replies it writes itself, and anything under your lowest, wait for you.",
   full: "Everything in Within my rules, plus it sends the replies it writes. A reply that names a new price, or anything under your lowest rate, still waits for you.",
 };
 
 /** The one autopilot setting — how much the AI books without asking. */
-export function AutopilotControl({ dark }: { dark?: boolean }) {
+export function AutopilotControl({ dark, real: realAccount }: { dark?: boolean; /** Sign-up, before the account exists. */ real?: boolean }) {
   const autonomy = useStore((s) => s.settings.autonomy);
   const setAutonomy = useStore((s) => s.actions.setAutonomy);
-  const real = useStore((s) => s.session.mode !== "demo");
+  const signedIn = useStore((s) => s.session.mode !== "demo");
+  const real = realAccount ?? signedIn;
   return (
     <div>
       <div role="radiogroup" aria-label="Autopilot" className={cn("grid grid-cols-3 gap-1 rounded-full p-1", dark ? "bg-white/10" : "bg-ink-100")}>

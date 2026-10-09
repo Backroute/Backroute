@@ -4,9 +4,9 @@ import type { Lang, OwnerRule } from "../types";
 
 export const AUTONOMY_LABEL: Record<Autonomy, string> = { ask: "Ask me first", rules: "Within my rules", full: "Full autopilot" };
 export const AUTONOMY_DETAIL: Record<Autonomy, string> = {
-  ask: "The AI finds, scores and negotiates. You or the driver pick every load.",
-  rules: "The AI books on its own when a load makes money, pays your minimum rate and fits home time. The rest wait for a pick.",
-  full: "The AI books every truck's next load the moment it finds the best one.",
+  ask: "Backroute finds, scores and negotiates. You or the driver pick every load.",
+  rules: "Backroute books on its own when a load makes money, pays your minimum rate and fits home time. The rest wait for a pick.",
+  full: "Backroute books every truck's next load the moment it finds the best one.",
 };
 
 /** The language the owner reads driver calls in on the dashboard. */

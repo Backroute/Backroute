@@ -175,7 +175,7 @@ export function OwnerMoney({ truck }: { truck: Truck | undefined }) {
           <Cost label="Empty miles" value={costs.empty} />
           <Cost label="Backroute fee" value={costs.fee} />
         </ul>
-        <p className="mt-3 text-xs text-white/40">Before your truck payment, insurance and maintenance, which the AI doesn&apos;t see yet.</p>
+        <p className="mt-3 text-xs text-white/40">Before your truck payment, insurance and maintenance, which Backroute doesn&apos;t see yet.</p>
       </section>
 
       <section>

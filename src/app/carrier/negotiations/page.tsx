@@ -66,7 +66,7 @@ export default function NegotiationsPage() {
 
         <div className="mt-6 flex flex-col gap-4">
           {active.length === 0 && (
-            <EmptyNextStep what="negotiations" fallback="No active negotiations right now. The AI answers the next offer as it comes in." />
+            <EmptyNextStep what="negotiations" fallback="No active negotiations right now. Backroute answers the next offer as it comes in." />
           )}
           {active.map((load) => {
             const broker = brokers.get(load.brokerId);
@@ -108,7 +108,7 @@ export default function NegotiationsPage() {
 
                   {lastMsg && (
                     <div className="rounded-xl bg-ink-50/70 px-3.5 py-2.5 text-xs text-ink-600">
-                      <span className="font-medium text-ink-800">{lastMsg.direction === "outbound" ? "Backroute AI" : broker?.contact}:</span> {lastMsg.content}
+                      <span className="font-medium text-ink-800">{lastMsg.direction === "outbound" ? "Backroute" : broker?.contact}:</span> {lastMsg.content}
                     </div>
                   )}
 
@@ -132,7 +132,7 @@ export default function NegotiationsPage() {
                         {!real && <button
                           onClick={() => setCallingLoadId(load.id)}
                           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-ink-700 hover:border-ink-300"
-                          aria-label="Call AI Dispatcher about this load"
+                          aria-label="Call dispatch about this load"
                         >
                           <Phone className="h-3.5 w-3.5" />
                         </button>}

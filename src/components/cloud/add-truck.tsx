@@ -29,7 +29,7 @@ export function AddTruckButton() {
               <input type="checkbox" className="mt-0.5" checked={agreed} onChange={(e) => (setAgreed(e.target.checked), setNeedAgree(false))} />
               <span>{OWNER_ATTESTS(carrier.name)}</span>
             </label>
-            {needAgree && <p className="-mt-1 mb-3 text-xs text-[var(--accent-danger)]">Check this first: the AI texts and calls each driver.</p>}
+            {needAgree && <p className="-mt-1 mb-3 text-xs text-[var(--accent-danger)]">Check this first: Backroute texts and calls each driver.</p>}
             <FleetForm
               solo={false}
               submitLabel="Add to my fleet"

@@ -34,7 +34,7 @@ export function BasicsCard() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Question n={1} help="minRpm" q="What's the lowest you'll take per loaded mile?" hint="The AI never asks for or agrees to less. Anything lower comes to you.">
+      <Question n={1} help="minRpm" q="What's the lowest you'll take per loaded mile?" hint="Backroute never asks for or agrees to less. Anything lower comes to you.">
         <label className="flex items-center gap-2 text-sm text-ink-800">
           $
           <input
@@ -56,7 +56,7 @@ export function BasicsCard() {
         </label>
       </Question>
 
-      <Question n={2} help="deadhead" q="How far will you drive empty to a pickup?" hint="The AI won't take a load further away than this.">
+      <Question n={2} help="deadhead" q="How far will you drive empty to a pickup?" hint="Backroute won't take a load further away than this.">
         <label className="flex items-center gap-2 text-sm text-ink-800">
           <input
             aria-label="Most empty miles to a pickup"
@@ -76,13 +76,13 @@ export function BasicsCard() {
         </label>
       </Question>
 
-      <Question n={3} help="autopilot" q="How much can the AI do without asking?" hint="It always stays inside your numbers above.">
+      <Question n={3} help="autopilot" q="How much can Backroute do without asking?" hint="It always stays inside your numbers above.">
         <AutopilotControl />
         <div className="mt-3">
           <p className="flex items-center gap-1 text-xs font-medium text-ink-700">
-            Time to stop the AI&apos;s emails to brokers before they go <Help topic="undo" />
+            Time to stop Backroute&apos;s emails to brokers before they go <Help topic="undo" />
           </p>
-          <div className="mt-1.5 flex flex-wrap gap-2" role="radiogroup" aria-label="Time to stop the AI's emails">
+          <div className="mt-1.5 flex flex-wrap gap-2" role="radiogroup" aria-label="Time to stop Backroute's emails">
             {UNDO.map((u) => {
               const on = (settings.undoSeconds ?? 90) === u.s;
               return (
@@ -105,7 +105,7 @@ export function BasicsCard() {
         </div>
       </Question>
 
-      <Question n={4} help="homeTime" q="When should each driver get home?" hint="The AI checks this before every load, and won't book one that makes a driver miss it.">
+      <Question n={4} help="homeTime" q="When should each driver get home?" hint="Backroute checks this before every load, and won't book one that makes a driver miss it.">
         {drivers.length ? (
           <ul className="flex flex-col gap-2">
             {drivers.map((d) => (

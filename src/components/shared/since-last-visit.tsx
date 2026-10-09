@@ -90,7 +90,7 @@ export function SinceLastVisit({ needsYou }: { needsYou: number }) {
         <div>
           <p className="t-label text-ink-500">Since {when(since, now)}</p>
           <p className="mt-1 text-base font-semibold text-ink-950">
-            {parts.length ? `The AI: ${parts.join(" · ")}.` : "Quiet while you were away. Nothing new got booked or delivered."}
+            {parts.length ? `Backroute: ${parts.join(" · ")}.` : "Quiet while you were away. Nothing new got booked or delivered."}
           </p>
           <p className="mt-0.5 text-sm text-ink-600">
             {needsYou ? `${needsYou} thing${needsYou === 1 ? "" : "s"} need${needsYou === 1 ? "s" : ""} you, below.` : "Nothing needs you."}

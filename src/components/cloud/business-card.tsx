@@ -63,14 +63,14 @@ export function BusinessCard() {
     <Card>
       <CardHeader>
         <CardTitle>Rates, billing and check-ins</CardTitle>
-        <CardDescription>The AI uses these when it prices loads, sends invoices and texts drivers.</CardDescription>
+        <CardDescription>Backroute uses these when it prices loads, sends invoices and texts drivers.</CardDescription>
       </CardHeader>
       <CardContent className="!pt-3 flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-xs font-medium text-ink-700">
             Lowest rate per loaded mile
             <input className={input} inputMode="decimal" placeholder="e.g. 2.25" value={f.minRpm} onChange={(e) => set({ minRpm: e.target.value })} />
-            <span className="font-normal text-ink-500">The AI never asks for or agrees to less. Anything lower comes to you.</span>
+            <span className="font-normal text-ink-500">Backroute never asks for or agrees to less. Anything lower comes to you.</span>
           </label>
           <label className="flex flex-col gap-1 text-xs font-medium text-ink-700">
             Billing email
@@ -112,7 +112,7 @@ export function BusinessCard() {
 
 const PAPERS: { kind: FileKind; label: string; hint: string; expires?: boolean }[] = [
   { kind: "w9", label: "W-9", hint: "Every broker asks for it at setup." },
-  { kind: "coi", label: "Insurance certificate (COI)", hint: "The AI reminds you before it expires.", expires: true },
+  { kind: "coi", label: "Insurance certificate (COI)", hint: "Backroute reminds you before it expires.", expires: true },
   { kind: "authority", label: "Operating authority (MC letter)", hint: "From FMCSA." },
   { kind: "noa", label: "Notice of assignment", hint: "Only if you factor." },
   { kind: "voided_check", label: "Voided check", hint: "Broker setup websites ask for it to pay you. Only there, never by email." },
@@ -147,7 +147,7 @@ export function DocumentsCard() {
     <Card>
       <CardHeader>
         <CardTitle>Your papers</CardTitle>
-        <CardDescription>When a broker asks to set you up, the AI sends these. Nothing goes out without them.</CardDescription>
+        <CardDescription>When a broker asks to set you up, Backroute sends these. Nothing goes out without them.</CardDescription>
       </CardHeader>
       <CardContent className="!pt-3 flex flex-col divide-y divide-line">
         {PAPERS.map((p) => (

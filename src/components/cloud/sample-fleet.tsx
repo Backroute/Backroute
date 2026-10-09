@@ -13,9 +13,9 @@ import { cn } from "@/lib/utils";
 const STEPS = [
   { key: "approve", title: "Answer something in Needs you", how: "Tap its button, or swipe it right on a phone." },
   { key: "pick", title: "Pick the next load for a truck", how: "Under Pick the next load, choose one of the offers." },
-  { key: "ask", title: "Ask the AI a question", how: "Press Ctrl+K (or the search box) and type a question." },
+  { key: "ask", title: "Ask Backroute a question", how: "Press Ctrl+K (or the search box) and type a question." },
   { key: "timeline", title: "Open a load's timeline", how: "Open any load and look at Timeline on the right." },
-  { key: "pause", title: "Pause the AI, then resume it", how: "The status pill at the top: Pause everything, then Resume." },
+  { key: "pause", title: "Pause Backroute, then resume it", how: "The status pill at the top: Pause everything, then Resume." },
 ] as const;
 type StepKey = (typeof STEPS)[number]["key"];
 
@@ -131,7 +131,7 @@ export function TrySampleFleet({ className }: { className?: string }) {
   return (
     <div className={cn("flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-line-strong px-4 py-3", className)}>
       <p className="text-sm text-ink-700">
-        <span className="font-medium text-ink-950">New here?</span> Try it on a sample fleet first: approve, pick loads and talk to the AI with nothing real at stake.
+        <span className="font-medium text-ink-950">New here?</span> Try it on a sample fleet first: approve, pick loads and talk to Backroute with nothing real at stake.
       </p>
       <div className="flex items-center gap-1">
         <Button size="sm" variant="outline" onClick={() => startSample("/carrier")}>

@@ -81,7 +81,7 @@ export function BillingCard() {
       : b.status === "active"
         ? `${b.billedTrucks} truck${b.billedTrucks === 1 ? "" : "s"} · renews ${day(b.periodEnd)}${b.cancelAt ? ` · ends ${day(b.cancelAt)}` : ""}`
         : b.status === "past_due"
-          ? `Your card didn't go through${b.pastDueSince ? ` on ${day(b.pastDueSince)}` : ""}. Update it to keep the AI booking.`
+          ? `Your card didn't go through${b.pastDueSince ? ` on ${day(b.pastDueSince)}` : ""}. Update it to keep Backroute booking.`
           : b.status === "canceled"
             ? "Your subscription ended."
             : `Start with ${b.trialDays} days free. You're billed per truck, ${b.trucks} now.`;
@@ -106,7 +106,7 @@ export function BillingCard() {
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} {subscribed ? "Manage billing" : b.status === "canceled" ? "Start again" : "Start subscription"}
           </Button>
         </div>
-        {b.hold && <p className="rounded-xl bg-warn-soft px-3 py-2 text-xs text-ink-700">The AI isn&apos;t booking new loads: {b.hold}. Loads already booked keep running.</p>}
+        {b.hold && <p className="rounded-xl bg-warn-soft px-3 py-2 text-xs text-ink-700">Backroute isn&apos;t booking new loads: {b.hold}. Loads already booked keep running.</p>}
         {b.invoices?.length ? (
           <ul className="flex flex-col divide-y divide-line">
             {b.invoices.map((i) => (

@@ -7,7 +7,7 @@ import type { CallTranscriptLine, VoiceCall } from "@/lib/types";
 import { BrokerCallModal } from "./broker-call";
 
 const SPEAKER_LABEL: Record<CallTranscriptLine["speaker"], string> = {
-  ai: "AI",
+  ai: "Backroute",
   broker: "Broker",
   driver: "Driver",
   carrier: "You",

@@ -149,8 +149,8 @@ function PaymentsList({ loads, now }: { loads: Load[]; now: number | null }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-ink-500">
           {factoringOn
-            ? `Factoring on: the AI submits each invoice packet to the factoring partner (${FACTORING_FEE_PCT * 100}% fee, recourse). Brokers the factor won't buy are invoiced directly.`
-            : "Factoring off: the AI invoices each broker directly on Net 30 and follows up when a payment is late."}
+            ? `Factoring on: Backroute submits each invoice packet to the factoring partner (${FACTORING_FEE_PCT * 100}% fee, recourse). Brokers the factor won't buy are invoiced directly.`
+            : "Factoring off: Backroute invoices each broker directly on Net 30 and follows up when a payment is late."}
           {!factoringOn && (
             <button type="button" onClick={() => toggleAddon("factoring-ai")} className="ml-1.5 font-medium text-ink-950 underline">
               Turn on factoring
@@ -176,7 +176,7 @@ function PaymentsList({ loads, now }: { loads: Load[]; now: number | null }) {
         <Card><CardContent><StatTile label="Funding soon" value={formatCurrency(sum(["submitted"]))} sublabel={`${count(["submitted"])} with the factor`} /></CardContent></Card>
         <Card><CardContent><StatTile label="Paid" value={formatCurrency(sum(["funded", "paid"]))} sublabel={`${count(["funded", "paid"])} invoices`} /></CardContent></Card>
         <Card><CardContent><StatTile label="Waiting on brokers" value={formatCurrency(sum(["invoiced"]))} sublabel={`${count(["invoiced"])} on Net 30`} /></CardContent></Card>
-        <Card><CardContent><StatTile label="Overdue or on hold" value={formatCurrency(sum(["overdue", "held"]))} sublabel={`${count(["overdue", "held"])} the AI is chasing`} /></CardContent></Card>
+        <Card><CardContent><StatTile label="Overdue or on hold" value={formatCurrency(sum(["overdue", "held"]))} sublabel={`${count(["overdue", "held"])} Backroute is chasing`} /></CardContent></Card>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -213,7 +213,7 @@ function PaymentsList({ loads, now }: { loads: Load[]; now: number | null }) {
                   </span>
                 </li>
               ))}
-              {p.factorDeclined && <li className="text-xs text-ink-500">{p.factorDeclined}, so the AI invoiced them directly.</li>}
+              {p.factorDeclined && <li className="text-xs text-ink-500">{p.factorDeclined}, so Backroute invoiced them directly.</li>}
               {p.pendingExtras > 0 && <li className="text-xs text-ink-500">{formatCurrency(p.pendingExtras)} in extras is still waiting on the broker&apos;s OK and goes on a follow-up invoice.</li>}
             </ol>
           </details>

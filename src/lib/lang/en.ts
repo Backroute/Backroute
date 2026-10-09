@@ -151,7 +151,7 @@ export const en: CallPack = {
     parkNot: (p) => `You're out of hours before the receiver. Delivery moved to tomorrow 7 AM. ${p.stop}, ${p.ahead} mi ahead, takes reservations ($${p.cost}).`,
     setup: "Your call settings are saved. Change them any time in Profile.",
     inPay: (pay, n) => `Your pay this week so far: ${pay} on ${n} load${s(n)}. Full breakdown in Earnings.`,
-    inBreakdown: "Breakdown logged. The AI is finding a shop and has told the broker. Stay with the truck; the ETA comes by call and text.",
+    inBreakdown: "Breakdown logged. Dispatch is finding a shop and has told the broker. Stay with the truck; the ETA comes by call and text.",
     inLate: (a) => `Logged: running ${a} late. The receiver and broker are being told; your new appointment time comes by text.`,
     inGeneric: "From your call with dispatch: question answered.",
     autoBooked: (p) => `Booked your next load: ${p.origin} → ${p.dest}, ${p.miles} mi, picks up ${p.pickup}. Details in the app.`,
@@ -172,7 +172,7 @@ export const en: CallPack = {
   },
 
   owner: {
-    greetFleet: "AI Dispatcher. What do you need on your fleet?",
+    greetFleet: "Dispatch. What do you need on your fleet?",
     greetLoad: (o, d, b) => `Calling about the ${o} → ${d} load with ${b}. What do you need me to push on?`,
     ack: {
       rate: (b) => `On it. Taking that back to ${b} right now, I'll confirm the second they answer.`,

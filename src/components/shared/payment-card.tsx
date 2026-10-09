@@ -42,7 +42,7 @@ export function PaymentCard({ load }: { load: Load }) {
           <span className="text-ink-500">{p.fee ? `${formatCurrency(p.invoiceAmount)} − ${formatCurrency(p.fee)} fee` : "Invoice"}</span>
           <span className="font-semibold tabular text-ink-950">{formatCurrency(p.payout)}</span>
         </div>
-        {p.factorDeclined && <p className="mt-2 text-xs text-ink-500">{p.factorDeclined}, so the AI invoiced them directly.</p>}
+        {p.factorDeclined && <p className="mt-2 text-xs text-ink-500">{p.factorDeclined}, so Backroute invoiced them directly.</p>}
       </CardContent>
     </Card>
   );

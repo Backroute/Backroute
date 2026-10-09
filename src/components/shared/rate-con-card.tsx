@@ -27,9 +27,9 @@ export function RateConCard({ load }: { load: Load }) {
   const mc = review.issues.some((i) => i.field === "mc");
   const headline =
     review.status === "checking"
-      ? "AI is reading the rate con"
+      ? "Reading the rate con"
       : review.status === "fixing"
-        ? "AI asked the broker for a corrected rate con"
+        ? "Asked the broker for a corrected rate con"
         : review.status === "needs_you"
           ? mc
             ? "Different MC on the rate con. Not signed"
@@ -37,7 +37,7 @@ export function RateConCard({ load }: { load: Load }) {
           : review.status === "walked"
             ? "Walked away over the rate con"
             : review.issues.length
-              ? "Signed after the AI's corrections"
+              ? "Signed after Backroute's corrections"
               : "Matches what was agreed. Signed";
 
   return (

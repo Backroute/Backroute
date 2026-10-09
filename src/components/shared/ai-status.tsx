@@ -50,7 +50,7 @@ export function AiStatus({ needsYou }: { needsYou: number }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        aria-label={`${SHORT[state]}. AI status and pause`}
+        aria-label={`${SHORT[state]}. Autopilot status and pause`}
         className={cn(
           "flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
           paused ? "border-line bg-ink-100 text-[var(--accent-danger)]" : "border-line text-ink-600 hover:border-ink-300",
@@ -62,8 +62,8 @@ export function AiStatus({ needsYou }: { needsYou: number }) {
         <span className="hidden sm:inline">{SHORT[state]}</span>
       </button>
       {open && (
-        <div role="dialog" aria-label="AI status" className="absolute right-0 z-40 mt-2 w-80 rounded-2xl border border-line bg-white p-4 shadow-xl">
-          <p className="t-section text-ink-950">{paused ? "The AI is paused" : practice ? "Practice mode: nothing leaves" : "The AI is dispatching"}</p>
+        <div role="dialog" aria-label="Autopilot status" className="absolute right-0 z-40 mt-2 w-80 rounded-2xl border border-line bg-white p-4 shadow-xl">
+          <p className="t-section text-ink-950">{paused ? "Backroute is paused" : practice ? "Practice mode: nothing leaves" : "Backroute is dispatching"}</p>
           <p className="mt-1 text-xs leading-relaxed text-ink-600">
             {paused
               ? `Since ${since ?? "now"}. It keeps reading email and answering drivers, but books nothing, sends nothing to brokers and calls no broker or dock. What it would send waits in Needs you.`
@@ -74,7 +74,7 @@ export function AiStatus({ needsYou }: { needsYou: number }) {
           <div className="mt-3">
             {paused ? (
               <Button size="sm" onClick={() => (updateSettings({ paused: false, pausedAt: undefined }), setOpen(false))}>
-                <Play className="h-3.5 w-3.5" /> Resume the AI
+                <Play className="h-3.5 w-3.5" /> Resume Backroute
               </Button>
             ) : (
               <Button size="sm" variant="danger" onClick={() => (updateSettings({ paused: true, pausedAt: new Date().toISOString() }), setOpen(false))}>
@@ -99,7 +99,7 @@ export function PausedBanner() {
     <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-danger-soft px-4 py-3">
       <p className="flex items-center gap-2 text-sm font-medium text-ink-900">
         <Pause className="h-4 w-4 text-[var(--accent-danger)]" />
-        The AI is paused{pausedAt ? ` since ${new Date(pausedAt).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })}` : ""}. It books and sends nothing until you resume.
+        Backroute is paused{pausedAt ? ` since ${new Date(pausedAt).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })}` : ""}. It books and sends nothing until you resume.
       </p>
       <Button size="sm" onClick={() => updateSettings({ paused: false, pausedAt: undefined })}>
         <Play className="h-3.5 w-3.5" /> Resume

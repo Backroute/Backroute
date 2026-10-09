@@ -78,8 +78,8 @@ export function MoneyCard() {
                 </Link>
                 {" · "}
                 {reminders.length
-                  ? `the AI sent ${reminders.length} reminder${reminders.length === 1 ? "" : "s"}, last on ${new Date(reminders.at(-1)!).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
-                  : "the AI sends a reminder 3 days past terms"}
+                  ? `Backroute sent ${reminders.length} reminder${reminders.length === 1 ? "" : "s"}, last on ${new Date(reminders.at(-1)!).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+                  : "Backroute sends a reminder 3 days past terms"}
               </li>
             ))}
           </ul>

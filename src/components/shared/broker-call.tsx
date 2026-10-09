@@ -121,7 +121,7 @@ function BrokerCallPlayer({
           <Phone className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">AI Dispatcher ↔ {contactName ? `${contactName}, ` : ""}{brokerName}</p>
+          <p className="truncate text-sm font-semibold">Backroute ↔ {contactName ? `${contactName}, ` : ""}{brokerName}</p>
           <p className="text-xs text-white/55">
             {ringing ? "Ringing…" : ended ? (replay ? "Replay finished" : "Call ended") : `${replay ? "Replaying" : "Live"} · ${formatDuration(talkSec)}`}
           </p>
@@ -141,7 +141,7 @@ function BrokerCallPlayer({
 
       <div className="grid grid-cols-2 gap-2">
         <Ticker label={`${brokerName.split(" ")[0]} offers`} value={brokerAt} />
-        <Ticker label="AI is asking" value={aiAt} strong />
+        <Ticker label="Asking" value={aiAt} strong />
       </div>
 
       <div ref={scroller} className="mt-3 flex min-h-[8rem] flex-1 flex-col gap-2 overflow-y-auto pr-1">
@@ -154,7 +154,7 @@ function BrokerCallPlayer({
               )}
             >
               <span className={cn("mr-1.5 text-xs font-semibold uppercase tracking-wide", l.speaker === "ai" ? "text-ink-400" : "text-white/45")}>
-                {l.speaker === "ai" ? "AI" : "Broker"}
+                {l.speaker === "ai" ? "Backroute" : "Broker"}
               </span>
               {l.text}
             </p>
@@ -303,7 +303,7 @@ export function BrokerCallRow({ load, brokerName, contactName, onCall, compact }
             <Phone className="h-4 w-4 text-white" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium text-white">AI is on the phone with {brokerName}</span>
+            <span className="block truncate text-sm font-medium text-white">On the phone with {brokerName}</span>
             {!compact && <span className="block text-xs text-white/60">Hear it negotiate your rate, live</span>}
           </span>
           <span className="flex shrink-0 items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-ink-950">
@@ -318,7 +318,7 @@ export function BrokerCallRow({ load, brokerName, contactName, onCall, compact }
     return (
       <>
         <button type="button" onClick={() => setOpen("replay")} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-2 text-xs font-semibold">
-          <Headphones className="h-3.5 w-3.5" /> Replay the AI&apos;s call
+          <Headphones className="h-3.5 w-3.5" /> Replay Backroute&apos;s call
         </button>
         {modal}
       </>
@@ -327,7 +327,7 @@ export function BrokerCallRow({ load, brokerName, contactName, onCall, compact }
   if (load.stage === "negotiating" && !compact) {
     return (
       <button type="button" onClick={onCall} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-2 text-xs font-semibold">
-        <Phone className="h-3.5 w-3.5" /> Have the AI call {brokerName}
+        <Phone className="h-3.5 w-3.5" /> Have Backroute call {brokerName}
       </button>
     );
   }

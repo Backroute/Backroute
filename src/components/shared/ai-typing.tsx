@@ -8,7 +8,7 @@ export function AiTyping({ thread }: { thread: string }) {
   const typing = useAiTyping((s) => !!s.threads[thread]);
   if (!typing) return null;
   return (
-    <div className="flex justify-start" role="status" aria-label="AI dispatcher is typing">
+    <div className="flex justify-start" role="status" aria-label="Dispatch is typing">
       <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm bg-ink-100 px-4 py-3.5">
         {[0, 150, 300].map((d) => (
           <span key={d} className="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-400" style={{ animationDelay: `${d}ms` }} />
@@ -21,9 +21,9 @@ export function AiTyping({ thread }: { thread: string }) {
 /** Marks a reply the real AI wrote, so it's clear which answers came from it. */
 export function LiveAiMark({ label }: { label?: string }) {
   return (
-    <span className="inline-flex items-center gap-0.5" title="Answered by the live AI">
+    <span className="inline-flex items-center gap-0.5" title="Answered live">
       <Sparkles className="h-2.5 w-2.5" aria-hidden />
-      {label ?? <span className="sr-only">Live AI</span>}
+      {label ?? <span className="sr-only">Live answer</span>}
     </span>
   );
 }

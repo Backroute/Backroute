@@ -80,7 +80,7 @@ function BookingCard({ load, brokerName, viewer = "driver", onCall, onCounter }:
     <CardShell>
       {from && to && (
         <MapHeader from={from} to={to} laneKey={`${origin}|${destination}`} progress={0} showTruck={false}>
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-white/70" /> AI is booking
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-white/70" /> Booking
         </MapHeader>
       )}
       <CardHeading kicker="Booking" reference={load.referenceNumber} title={<Lane from={load.lane.origin} to={load.lane.destination} />} sub={`Pickup ${load.pickupWindow} · ${load.lane.miles} mi`} />
@@ -266,7 +266,7 @@ function DeliveryCard({ load, brokerName, upNext, viewer = "driver", driverName,
 /** Why the final swipe is still locked, in the order the driver has to fix it. */
 export function lockReason(s: TripState, docName: "BOL" | "POD", preTrip: boolean): string | undefined {
   if (!s.handled) return docName === "BOL" ? "Confirm you're loaded to continue" : "Confirm you're unloaded to continue";
-  if (!s.docDone) return s.doc ? `AI is checking the ${docName}…` : `Upload the ${docName} to continue`;
+  if (!s.docDone) return s.doc ? `Checking the ${docName}…` : `Upload the ${docName} to continue`;
   if (preTrip) return "Do your pre-trip inspection first";
   return undefined;
 }
@@ -284,7 +284,7 @@ export function DockTimer({ load, brokerName, compact }: { load: Load; brokerNam
   let text: string;
   if (claim) {
     tone = "good";
-    text = claim.status === "approved" ? `${broker} approved ${formatCurrency(claim.amount)} detention` : `AI billed ${broker} ${formatCurrency(claim.amount)} detention`;
+    text = claim.status === "approved" ? `${broker} approved ${formatCurrency(claim.amount)} detention` : `Billed ${broker} ${formatCurrency(claim.amount)} detention`;
   } else if (!clock.running) {
     tone = "calm";
     text = `${formatDockTime(clock.minutes)} at the dock, inside free time`;
@@ -295,7 +295,7 @@ export function DockTimer({ load, brokerName, compact }: { load: Load; brokerNam
     tone = "warn";
     text = compact
       ? `Detention ${formatCurrency(clock.owed)} · ${formatDockTime(clock.minutes)} at the dock`
-      : `Detention running: ${formatCurrency(clock.owed)} so far at ${formatCurrency(DETENTION_RATE_HR)}/hr. AI bills ${broker} when you're done.`;
+      : `Detention running: ${formatCurrency(clock.owed)} so far at ${formatCurrency(DETENTION_RATE_HR)}/hr. Backroute bills ${broker} when you're done.`;
   }
 
   return (
@@ -382,7 +382,7 @@ export function DriverTripCompleteCard({
             <Check className="h-3.5 w-3.5" /> Invoice packet sent to {payment.method === "factoring" ? "factoring" : brokerName ?? "the broker"}
           </span>
           <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Your pay goes on this week&apos;s settlement</span>
-          {detention > 0 && <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> {formatCurrency(detention)} detention billed by AI</span>}
+          {detention > 0 && <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> {formatCurrency(detention)} detention billed</span>}
         </p>
 
         <div className={cn("mt-4 flex items-center justify-between gap-3 rounded-2xl px-4 py-3", postTripDone ? "bg-white/5" : "bg-white/10")}>
@@ -414,7 +414,7 @@ export function DriverTripCompleteCard({
             <>
               {offersCount > 0 ? (
                 <>
-                  <p className="text-sm text-white/80">AI found the top {offersCount} loads for your next trip.</p>
+                  <p className="text-sm text-white/80">Backroute found the top {offersCount} loads for your next trip.</p>
                   <button onClick={chooseNext} className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-white py-4 text-base font-semibold text-ink-950">
                     Choose your next load <ArrowDown className="h-4 w-4" />
                   </button>
@@ -422,7 +422,7 @@ export function DriverTripCompleteCard({
               ) : (
                 <>
                   <p className="flex items-center gap-2 text-sm text-white/80">
-                    <Loader2 className="h-4 w-4 animate-spin" /> AI is finding your next load
+                    <Loader2 className="h-4 w-4 animate-spin" /> Finding your next load
                   </p>
                   <button onClick={onContinue} className="mt-3 w-full rounded-full border border-white/25 py-3 text-sm font-semibold text-white">
                     Done
@@ -668,7 +668,7 @@ export function DocumentSlot({ doc, label, readOnly, onFile }: { doc?: LoadDocum
         <p className="truncate text-xs font-medium">{doc.name}</p>
         {doc.status === "pending" ? (
           <p className="mt-0.5 flex items-center gap-1 text-xs text-white/60">
-            <Loader2 className="h-3 w-3 animate-spin" /> AI is reading it…
+            <Loader2 className="h-3 w-3 animate-spin" /> Reading it…
           </p>
         ) : doc.status === "failed" ? (
           <p className="mt-0.5 text-xs leading-snug text-[var(--accent-warn)]">{doc.aiNote ?? "Didn't upload."} Tap Retake.</p>

@@ -18,7 +18,7 @@ const problem = (e: FleetEntry) =>
   !e.driverName.trim()
     ? "Add the driver's name."
     : !toE164(e.phone)
-      ? "Add the driver's cell number: the AI texts and calls it, and they sign in with it."
+      ? "Add the driver's cell number: Backroute texts and calls it, and they sign in with it."
       : !e.unitNumber.trim()
         ? "Add the truck's unit number."
         : !e.homeCity.trim() || !/^[A-Za-z]{2}$/.test(e.homeState.trim())

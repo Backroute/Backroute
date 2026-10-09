@@ -105,20 +105,20 @@ export default function EarningsPage() {
             </div>
             {week.overMarket > 0 && (
               <p className="mt-6 flex w-fit items-center gap-1.5 rounded-2xl bg-white/10 px-3.5 py-2 text-sm font-medium text-white/85">
-                <TrendingUp className="h-4 w-4" /> AI earned you {formatCurrency(week.overMarket)} more than market
+                <TrendingUp className="h-4 w-4" /> Backroute earned you {formatCurrency(week.overMarket)} more than market
               </p>
             )}
           </section>
           <BentoTile label="Revenue / mile, all miles" value={`$${week.rpmAll.toFixed(2)}`} />
           <BentoTile label="Empty miles" value={`${week.emptyPct.toFixed(0)}%`} tone={week.emptyPct > 20 ? "danger" : undefined} />
           <BentoTile label="Above posted rates" value={`+${formatCurrency(week.overPosted)}`} tone={week.overPosted > 0 ? "live" : undefined} />
-          <BentoTile label="Detention billed by AI" value={week.extras ? `+${formatCurrency(week.extras)}` : "$0"} />
+          <BentoTile label="Detention billed for you" value={week.extras ? `+${formatCurrency(week.extras)}` : "$0"} />
 
           <section aria-labelledby="trucks-title" className="col-span-2 rounded-3xl border border-line bg-white p-5 lg:row-span-2">
             <h3 id="trucks-title" className="t-section text-ink-950">
               Profit by truck
             </h3>
-            <p className="mt-0.5 text-xs text-ink-500">This week. The AI plans each truck&apos;s next loads to lift the weakest ones.</p>
+            <p className="mt-0.5 text-xs text-ink-500">This week. Backroute plans each truck&apos;s next loads to lift the weakest ones.</p>
             <ul className="mt-4 flex flex-col gap-3">
               {perTruck.slice(0, 5).map(({ truck, driver, w }) => {
                 const top = Math.max(1, ...perTruck.map((p) => p.w.net));

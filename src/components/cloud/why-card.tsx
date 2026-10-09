@@ -17,7 +17,7 @@ export function WhyCard({ load }: { load: Load }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Lightbulb className="h-4 w-4" /> Why the AI did this
+          <Lightbulb className="h-4 w-4" /> Why Backroute did this
         </CardTitle>
       </CardHeader>
       <CardContent className="!pt-2 flex flex-col gap-3">

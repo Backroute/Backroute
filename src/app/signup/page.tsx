@@ -154,7 +154,7 @@ function Signup() {
           {step === "mc" && (
             <>
               <h1 className="font-display text-2xl text-ink-950">What&apos;s your MC number?</h1>
-              <p className="mt-1 text-sm text-ink-500">The AI looks up your authority and insurance with FMCSA, so you don&apos;t type them in.</p>
+              <p className="mt-1 text-sm text-ink-500">Backroute looks up your authority and insurance with FMCSA, so you don&apos;t type them in.</p>
               <div className="mt-5 flex gap-2">
                 <input
                   value={mc}
@@ -240,7 +240,7 @@ function Signup() {
             <>
               <h1 className="font-display text-2xl text-ink-950">{solo ? "Your truck" : "Your trucks and drivers"}</h1>
               <p className="mt-1 text-sm text-ink-500">
-                The AI texts and calls {solo ? "you" : "each driver"} on this number, in {solo ? "your" : "their"} language. Connecting your ELD to fill this in
+                Backroute texts and calls {solo ? "you" : "each driver"} on this number, in {solo ? "your" : "their"} language. Connecting your ELD to fill this in
                 automatically is coming; for now, type {solo ? "it" : "them"} in once.
               </p>
               <div className="mt-5">
@@ -261,7 +261,7 @@ function Signup() {
             <>
               <h1 className="font-display text-2xl text-ink-950">Connect your ELD</h1>
               <p className="mt-1 text-sm text-ink-500">
-                Your trucks, drivers, locations and hours come straight from it. The AI also reads the last 30 days of trips to see how each driver runs.
+                Your trucks, drivers, locations and hours come straight from it. Backroute also reads the last 30 days of trips to see how each driver runs.
               </p>
               <div className="mt-5 grid grid-cols-2 gap-2">
                 {ELDS.map((name) => (
@@ -358,10 +358,10 @@ function Signup() {
 
           {step === "autopilot" && (
             <>
-              <h1 className="font-display text-2xl text-ink-950">How much should the AI book on its own?</h1>
+              <h1 className="font-display text-2xl text-ink-950">How much should Backroute book on its own?</h1>
               <p className="mt-1 text-sm text-ink-500">Most carriers start with &quot;Ask me first&quot; and move up after a week or two. You can change it any time.</p>
               <div className="mt-5">
-                <AutopilotControl />
+                <AutopilotControl real={real} />
               </div>
               {saveError && <p className="mt-4 text-sm text-[var(--accent-danger)]">{saveError}</p>}
               <Button className="mt-6 w-full" disabled={saving} onClick={finish}>
@@ -378,10 +378,10 @@ function Signup() {
               <h1 className="mt-4 font-display text-2xl text-ink-950">You&apos;re set up</h1>
               <p className="mt-1 text-sm text-ink-500">
                 {real
-                  ? `Next: add your ${solo ? "" : "drivers' "}loads on the Loads page, or send the rate con to your Backroute email. The AI keeps ${solo ? "you" : "your drivers"} updated by text and answers the dispatch line.`
+                  ? `Next: add your ${solo ? "" : "drivers' "}loads on the Loads page, or send the rate con to your Backroute email. Backroute keeps ${solo ? "you" : "your drivers"} updated by text and answers the dispatch line.`
                   : solo
-                    ? "The AI is already looking for your next load. Everything is in one app on your phone."
-                    : `The AI is already looking for loads for your ${trucks.length} trucks.`}
+                    ? "Backroute is already looking for your next load. Everything is in one app on your phone."
+                    : `Backroute is already looking for loads for your ${trucks.length} trucks.`}
               </p>
               <Button href={solo ? "/driver" : "/carrier"} className="mt-6 w-full">
                 {solo ? "Open your app" : "Go to your dashboard"} <ArrowRight className="h-4 w-4" />

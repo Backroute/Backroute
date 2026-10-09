@@ -138,7 +138,7 @@ export default function CostsPage() {
           <CardHeader>
             <div>
               <CardTitle>What each load really cost</CardTitle>
-              <CardDescription>Fuel and tolls from the statements, against the estimate the AI booked it on.</CardDescription>
+              <CardDescription>Fuel and tolls from the statements, against the estimate Backroute booked it on.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="!pt-3">

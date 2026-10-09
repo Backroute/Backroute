@@ -174,7 +174,7 @@ function ReadyOrSetUp({ area, children }: { area: Area; children: React.ReactNod
     <>
       {practice && (
         <div role="note" aria-label="Practice mode" className="w-full bg-ink-950 px-4 py-1.5 text-center text-xs text-white">
-          <span className="font-semibold">Practice mode</span> · the AI works as usual but sends nothing.{" "}
+          <span className="font-semibold">Practice mode</span> · Backroute works as usual but sends nothing.{" "}
           <Link href="/carrier/settings" className="underline">
             See what it would have sent
           </Link>

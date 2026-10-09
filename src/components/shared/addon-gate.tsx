@@ -16,7 +16,7 @@ export function AddonGate({ addonId, children }: { addonId: string; children: Re
   return (
     <div className="rounded-2xl border border-dashed border-line-strong bg-ink-50/50 p-8 text-center">
       <Lock className="mx-auto h-5 w-5 text-ink-400" />
-      <p className="mt-3 text-sm font-semibold text-ink-950">{addon?.name ?? "This AI agent"} isn&apos;t turned on</p>
+      <p className="mt-3 text-sm font-semibold text-ink-950">{addon?.name ?? "This add-on"} isn&apos;t turned on</p>
       <p className="mx-auto mt-1 max-w-sm text-xs text-ink-500">{addon?.tagline}</p>
       <Button size="sm" className="mt-4" onClick={() => toggleAddon(addonId)}>
         Turn on, free

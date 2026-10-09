@@ -51,10 +51,10 @@ function stepsOf(load: Load, names: { broker?: string; driver?: string }): { ste
     },
     {
       key: "ask",
-      title: req?.byOwner ? "You asked to book it" : "AI asked to book it",
+      title: req?.byOwner ? "You asked to book it" : "Backroute asked to book it",
       at: req?.askedAt,
       who: req ? (req.byOwner ? "you" : "ai") : undefined,
-      whoLabel: req ? (req.byOwner ? "You" : "AI dispatcher") : undefined,
+      whoLabel: req ? (req.byOwner ? "You" : "Backroute") : undefined,
       detail: req
         ? `Asked ${formatCurrency(req.opening ?? req.ask)}${rounds > 1 ? ` · ${rounds} offers back and forth` : ""}${req.brokerOffer ? ` · ${broker} came back at ${formatCurrency(req.brokerOffer)}` : ""}`
         : undefined,
@@ -72,8 +72,8 @@ function stepsOf(load: Load, names: { broker?: string; driver?: string }): { ste
       title: load.rateConSignedAt ? "Rate con signed" : "Rate con in",
       at: load.rateConSignedAt ?? rateCon?.generatedAt,
       who: load.rateConSignedAt ? "ai" : rateCon ? "broker" : undefined,
-      whoLabel: load.rateConSignedAt ? `AI signed as ${load.rateConSignedBy ?? "the carrier"}` : rateCon ? broker : undefined,
-      detail: rateCon ? (rateCon.flagged ? "The AI found something to check on it" : "Checked against what was agreed") : undefined,
+      whoLabel: load.rateConSignedAt ? `Signed as ${load.rateConSignedBy ?? "the carrier"}` : rateCon ? broker : undefined,
+      detail: rateCon ? (rateCon.flagged ? "Backroute found something to check on it" : "Checked against what was agreed") : undefined,
     },
     {
       key: "pickup",
@@ -98,7 +98,7 @@ function stepsOf(load: Load, names: { broker?: string; driver?: string }): { ste
       title: "Invoiced",
       at: load.invoice?.sentAt,
       who: load.invoice?.sentAt ? "ai" : undefined,
-      whoLabel: load.invoice?.sentAt ? "AI dispatcher" : undefined,
+      whoLabel: load.invoice?.sentAt ? "Backroute" : undefined,
       detail: load.invoice ? `${formatCurrency(load.invoice.amount)}${load.invoice.sentTo ? ` to ${load.invoice.sentTo}` : ""}${load.invoice.remindedAt?.length ? ` · reminded ${load.invoice.remindedAt.length}×` : ""}` : undefined,
     },
     {

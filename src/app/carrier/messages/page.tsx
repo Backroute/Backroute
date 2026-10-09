@@ -37,13 +37,13 @@ export default function CarrierMessagesPage() {
     <div className="flex h-[calc(100vh-73px)] flex-col">
       <PageHeader
         title="Messages"
-        description="Ask your AI dispatcher about your fleet, not tied to one load"
+        description="Ask Backroute about your fleet, not tied to one load"
         right={
           <>
             <button
               onClick={() => setCalling(true)}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink-100 text-ink-700 hover:bg-ink-150"
-              aria-label="Call AI Dispatcher"
+              aria-label="Call dispatch"
             >
               <Phone className="h-4 w-4" />
             </button>
@@ -67,7 +67,7 @@ export default function CarrierMessagesPage() {
                 <p className="leading-relaxed">{m.content}</p>
                 <p className={cn("mt-1 flex items-center gap-1.5 text-xs", m.from === "carrier" ? "text-white/50" : "text-ink-400")}>
                   <TimeAgo iso={m.timestamp} />
-                  {m.ai && <LiveAiMark label="Live AI" />}
+                  {m.ai && <LiveAiMark label="Live answer" />}
                 </p>
               </div>
             </div>

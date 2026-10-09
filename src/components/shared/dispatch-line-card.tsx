@@ -16,7 +16,7 @@ export function DispatchLineCard() {
       <CardHeader>
         <div>
           <CardTitle>Dispatch phone line</CardTitle>
-          <CardDescription>Drivers call or text this number any time and the AI answers. It calls and texts drivers from it too.</CardDescription>
+          <CardDescription>Drivers call or text this number any time and Backroute answers. It calls and texts drivers from it too.</CardDescription>
         </div>
         <Badge tone="warning">Demo · not connected</Badge>
       </CardHeader>

@@ -43,7 +43,7 @@ export default function ReportIncidentPage() {
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-ink-950 text-white">
           <AlertTriangle className="h-6 w-6" />
         </div>
-        <p className="font-display text-xl text-ink-950">AI dispatcher is on it</p>
+        <p className="font-display text-xl text-ink-950">Dispatch is on it</p>
         <p className="text-sm text-ink-500">
           {type === "accident"
             ? "Notifying the broker, working the checklist, and looping in a live safety specialist. Check Home for live status."
@@ -61,14 +61,14 @@ export default function ReportIncidentPage() {
 
       <div>
         <LargeTitle className="font-display text-2xl text-ink-950">Report an issue</LargeTitle>
-        <p className="mt-1 text-sm text-ink-500">Tell us what&apos;s going on. The AI dispatcher takes it from here.</p>
+        <p className="mt-1 text-sm text-ink-500">Tell us what&apos;s going on. Backroute takes it from here.</p>
       </div>
 
       <button
         onClick={() => startInboundCall(driver.id)}
         className="flex items-center justify-center gap-2 rounded-2xl border border-line py-3 text-sm font-medium text-ink-700"
       >
-        <Phone className="h-4 w-4" /> Call AI Dispatcher instead
+        <Phone className="h-4 w-4" /> Call dispatch instead
       </button>
 
       <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-wider text-ink-300">
@@ -105,7 +105,7 @@ export default function ReportIncidentPage() {
       />
 
       <Button size="lg" disabled={!type} onClick={handleSubmit}>
-        Send to AI dispatcher
+        Send to dispatch
       </Button>
 
     </div>

@@ -39,8 +39,8 @@ export function RateConReader({ load, broker }: { load: Load; broker: Broker | u
       setError(
         result.reason === "off"
           ? demo
-            ? "Reading real PDFs uses the live AI, which is off in the demo."
-            : "The AI reader isn't switched on for this account yet."
+            ? "Reading real PDFs is off in the demo."
+            : "Backroute reader isn't switched on for this account yet."
           : "Couldn't read that PDF. Try again, or check it's the rate con.",
       );
   }
@@ -78,7 +78,7 @@ export function RateConReader({ load, broker }: { load: Load; broker: Broker | u
           </p>
         ) : !reading ? (
           <p className="text-ink-500">
-            Upload the rate con the broker sent. The AI reads it and checks the rate, detention, fines, payment terms, dates and broker against what
+            Upload the rate con the broker sent. Backroute reads it and checks the rate, detention, fines, payment terms, dates and broker against what
             was agreed on this load, before anyone signs.
           </p>
         ) : (
@@ -144,7 +144,7 @@ export function RateConReader({ load, broker }: { load: Load; broker: Broker | u
             )}
 
             <p className="flex items-center gap-1.5 text-xs text-ink-400">
-              <LiveAiMark label="Read by AI" /> {reading.fileName} · {formatDateTime(reading.readAt)} · Check anything important on the PDF yourself before signing.
+              <LiveAiMark label="Read for you" /> {reading.fileName} · {formatDateTime(reading.readAt)} · Check anything important on the PDF yourself before signing.
             </p>
           </>
         )}

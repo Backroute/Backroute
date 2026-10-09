@@ -33,7 +33,7 @@ export function PaperworkCard() {
           <CardTitle className="flex items-center gap-2">
             <CalendarClock className="h-4 w-4" /> Papers and dates
           </CardTitle>
-          <CardDescription>Plates, inspections, CDLs, medical cards, insurance and IFTA. The AI reminds you 30, 14 and 7 days ahead, and stops booking a truck or driver once something runs out.</CardDescription>
+          <CardDescription>Plates, inspections, CDLs, medical cards, insurance and IFTA. Backroute reminds you 30, 14 and 7 days ahead, and stops booking a truck or driver once something runs out.</CardDescription>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 !pt-3">

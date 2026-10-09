@@ -30,11 +30,11 @@ export function SetupProgress() {
 
   const live = loads.filter((l) => !l.imported);
   const steps = [
-    { done: trucks.length > 0, title: "Add a truck", why: "So the AI knows what you haul and where it is.", href: "/carrier/fleet", cta: "Add truck" },
-    { done: drivers.some((d) => !!d.phone), title: "Add its driver", why: "The AI texts them pickup details and checks in on the road.", href: "/carrier/fleet", cta: "Add driver" },
-    { done: !!settings.minRpm, title: "Set your lowest rate", why: "The AI never asks for or agrees to less.", href: "/carrier/settings?tab=basics", cta: "Set it" },
-    { done: live.some((l) => l.offerEmail || l.source?.startsWith("Email from")), title: "Send broker emails to Backroute", why: "Forward load offers to your Backroute address and the AI starts pricing them.", href: "/carrier/settings?tab=general", cta: "See your address" },
-    { done: live.some((l) => !["sourced", "scoring", "offered", "declined", "cancelled"].includes(l.stage)), title: "Book your first load", why: "Pick one of the offers, or let the AI ask for the best one.", href: "/carrier/loads", cta: "See offers" },
+    { done: trucks.length > 0, title: "Add a truck", why: "So Backroute knows what you haul and where it is.", href: "/carrier/fleet", cta: "Add truck" },
+    { done: drivers.some((d) => !!d.phone), title: "Add its driver", why: "Backroute texts them pickup details and checks in on the road.", href: "/carrier/fleet", cta: "Add driver" },
+    { done: !!settings.minRpm, title: "Set your lowest rate", why: "Backroute never asks for or agrees to less.", href: "/carrier/settings?tab=basics", cta: "Set it" },
+    { done: live.some((l) => l.offerEmail || l.source?.startsWith("Email from")), title: "Send broker emails to Backroute", why: "Forward load offers to your Backroute address and Backroute starts pricing them.", href: "/carrier/settings?tab=general", cta: "See your address" },
+    { done: live.some((l) => !["sourced", "scoring", "offered", "declined", "cancelled"].includes(l.stage)), title: "Book your first load", why: "Pick one of the offers, or let Backroute ask for the best one.", href: "/carrier/loads", cta: "See offers" },
   ];
   const doneCount = steps.filter((s) => s.done).length;
   if (doneCount === steps.length) return null;

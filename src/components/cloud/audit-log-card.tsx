@@ -15,7 +15,7 @@ interface Entry {
   target: string | null;
 }
 
-const WHO: Record<string, string> = { owner: "Owner", dispatcher: "Dispatcher", bookkeeper: "Bookkeeper", driver: "Driver", ai: "AI dispatcher", support: "Backroute support" };
+const WHO: Record<string, string> = { owner: "Owner", dispatcher: "Dispatcher", bookkeeper: "Bookkeeper", driver: "Driver", ai: "Backroute", support: "Backroute support" };
 
 /** Who changed what: people let in or removed, settings, loads moving, rates set, invoices and drivers paid. Owner only. */
 export function AuditLogCard() {
@@ -39,7 +39,7 @@ export function AuditLogCard() {
           <CardTitle className="flex items-center gap-2">
             <History className="h-4 w-4" /> Who changed what
           </CardTitle>
-          <CardDescription>The last 100 changes by anyone on the team, the AI, or Backroute support. Only the owner sees this.</CardDescription>
+          <CardDescription>The last 100 changes by anyone on the team, Backroute, or Backroute support. Only the owner sees this.</CardDescription>
         </div>
         <select aria-label="Who" value={who} onChange={(e) => setWho(e.target.value)} className="h-9 rounded-full border border-line bg-white px-3 text-sm">
           <option value="">Everyone</option>

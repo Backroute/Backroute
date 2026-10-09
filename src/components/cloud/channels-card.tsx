@@ -53,10 +53,10 @@ export function ChannelsCard() {
   const c = status?.channels;
   const number = c?.number ? formatPhone(c.number) : null;
   const rows = [
-    { icon: Sparkles, label: "AI answers", on: !!c?.ai && !!c?.server, note: "Claude reads and replies for you" },
+    { icon: Sparkles, label: "Automatic answers", on: !!c?.ai && !!c?.server, note: "Claude reads and replies for you" },
     { icon: MessageSquare, label: "Texts with drivers", on: !!c?.sms, note: number ? `Drivers text ${number}` : "Drivers text the dispatch number" },
     { icon: Phone, label: "Calls to dispatch", on: !!c?.voice, note: number ? `Drivers call ${number}` : "Drivers call the dispatch number" },
-    { icon: Mail, label: "Broker email", on: !!c?.email, note: status?.inboundEmail ? "Brokers write to the address below" : "Brokers email the AI" },
+    { icon: Mail, label: "Broker email", on: !!c?.email, note: status?.inboundEmail ? "Brokers write to the address below" : "Brokers email Backroute" },
     { icon: Sunset, label: "End-of-day text", on: !!c?.dailyText, note: "A summary to your phone every evening" },
   ];
 
@@ -64,7 +64,7 @@ export function ChannelsCard() {
     <Card>
       <CardHeader>
         <CardTitle>Phone, text and email</CardTitle>
-        <CardDescription>How the AI dispatcher reaches your drivers and brokers. It says it&apos;s an AI, and anything it would promise a broker waits for your OK.</CardDescription>
+        <CardDescription>How Backroute reaches your drivers and brokers. It says it&apos;s an AI, and anything it would promise a broker waits for your OK.</CardDescription>
       </CardHeader>
       <CardContent className="!pt-3 flex flex-col gap-4">
         <PracticeMode on={practice} onChange={(on) => updateSettings({ sandbox: on })} held={(status?.outbound ?? []).filter((m) => m.status === "held")} />
@@ -87,7 +87,7 @@ export function ChannelsCard() {
 
         {status?.inboundEmail && (
           <div className="rounded-2xl bg-ink-50 px-4 py-3 text-xs text-ink-600">
-            <p>Give brokers this address, or forward rate cons to it. The AI reads them and drafts replies for you to send.</p>
+            <p>Give brokers this address, or forward rate cons to it. Backroute reads them and drafts replies for you to send.</p>
             <button
               type="button"
               className="mt-1.5 flex items-center gap-1.5 font-medium text-ink-950"
@@ -115,7 +115,7 @@ export function ChannelsCard() {
                   <li key={n} className="flex items-start gap-2 text-xs">
                     <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-400" />
                     <span className="min-w-0 flex-1 text-ink-700">
-                      <span className="font-medium text-ink-900">{m.direction === "in" ? who(m.counterparty) : `AI → ${who(m.counterparty)}`}</span>{" "}
+                      <span className="font-medium text-ink-900">{m.direction === "in" ? who(m.counterparty) : `Backroute → ${who(m.counterparty)}`}</span>{" "}
                       {held && <span className="mr-1 rounded bg-ink-100 px-1 py-0.5 text-xs font-medium text-ink-600">not sent: practice</span>}
                       <span className="text-ink-500">{m.data?.subject ? `${m.data.subject}: ` : ""}{(m.body ?? "").slice(0, 140)}</span>
                     </span>
@@ -145,14 +145,14 @@ function PracticeMode({ on, onChange, held }: { on: boolean; onChange: (on: bool
         <div>
           <p className="text-sm font-medium text-ink-900">Practice mode</p>
           <p className="text-xs text-ink-500">
-            The AI reads your broker email and does its whole job, but sends nothing: no texts, emails or calls. Keep dispatching as you do today and compare.
+            Backroute reads your broker email and does its whole job, but sends nothing: no texts, emails or calls. Keep dispatching as you do today and compare.
           </p>
         </div>
         <Switch checked={on} onChange={onChange} label="Practice mode" />
       </div>
       {on && (
         <div className="mt-3">
-          <p className="text-xs font-medium text-ink-700">What the AI would have sent</p>
+          <p className="text-xs font-medium text-ink-700">What Backroute would have sent</p>
           {!held.length ? (
             <p className="mt-1.5 text-xs text-ink-400">Nothing yet. Forward your broker emails to the address below and it starts working.</p>
           ) : (

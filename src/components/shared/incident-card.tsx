@@ -33,7 +33,7 @@ export function IncidentCard({ incident, viewer, label, onApprove }: {
   const resolved = incident.status === "resolved";
 
   return (
-    <section className="theme-ink animate-rise-in overflow-hidden rounded-3xl bg-ink-950 p-5 text-white" aria-label={`${TITLE[incident.type]}, handled by the AI`}>
+    <section className="theme-ink animate-rise-in overflow-hidden rounded-3xl bg-ink-950 p-5 text-white" aria-label={`${TITLE[incident.type]}, handled by Backroute`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span className={cn("flex h-9 w-9 items-center justify-center rounded-full", resolved ? "bg-white/10 text-[var(--accent-live)]" : "bg-white/10 text-[var(--accent-danger)]")}>
@@ -44,7 +44,7 @@ export function IncidentCard({ incident, viewer, label, onApprove }: {
               {TITLE[incident.type]}{label ? ` · ${label}` : ""}
             </p>
             <p className="text-base font-semibold">
-              {resolved ? "Handled. Back on plan." : waitingOnHuman ? (viewer === "carrier" ? "AI needs one OK from you" : "Waiting on your carrier's OK") : "AI is handling it"}
+              {resolved ? "Handled. Back on plan." : waitingOnHuman ? (viewer === "carrier" ? "Needs one OK from you" : "Waiting on your carrier's OK") : "Backroute is handling it"}
             </p>
           </div>
         </div>
@@ -94,7 +94,7 @@ export function IncidentCard({ incident, viewer, label, onApprove }: {
       )}
       {!resolved && viewer === "driver" && (
         <p className="mt-4 flex items-center gap-2 rounded-2xl bg-white/5 px-4 py-3 text-xs text-white/65">
-          <LifeBuoy className="h-4 w-4 shrink-0" /> Stay with the truck. The AI will message you as each step lands.
+          <LifeBuoy className="h-4 w-4 shrink-0" /> Stay with the truck. Backroute will message you as each step lands.
         </p>
       )}
     </section>

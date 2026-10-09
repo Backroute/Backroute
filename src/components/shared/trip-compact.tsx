@@ -251,7 +251,7 @@ export function TripDetails({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">{d.name}</p>
                   <p className="text-xs text-white/50">
-                    {d.status === "pending" ? "Reading it…" : d.aiNote ? `AI checked: ${d.aiNote}` : d.uploadedBy === "driver" ? "Uploaded by driver" : "Made by Backroute"}
+                    {d.status === "pending" ? "Reading it…" : d.aiNote ? `Checked: ${d.aiNote}` : d.uploadedBy === "driver" ? "Uploaded by driver" : "Made by Backroute"}
                   </p>
                 </div>
               </li>
@@ -323,13 +323,13 @@ function loadHistory(load: DriverTripCardProps["load"], broker: string, rate: nu
     items.push({
       id: `${load.id}-neg`,
       timestamp: load.messages[load.messages.length - 1].timestamp,
-      message: `AI negotiated with ${broker}`,
+      message: `Negotiated with ${broker}`,
       detail: `${load.messages.length} message${load.messages.length === 1 ? "" : "s"} · ${formatCurrency(rate)}`,
       severity: "info",
     });
   }
   for (const c of load.calls) {
-    items.push({ id: c.id, timestamp: c.startedAt, message: `AI called ${broker}`, detail: c.outcome ?? "Call logged", severity: "info" });
+    items.push({ id: c.id, timestamp: c.startedAt, message: `Called ${broker}`, detail: c.outcome ?? "Call logged", severity: "info" });
   }
   for (const d of load.documents) {
     items.push({ id: d.id, timestamp: d.generatedAt, message: `${d.name} filed`, detail: d.aiNote ?? (d.uploadedBy === "driver" ? "Uploaded by driver" : "Made by Backroute"), severity: "success" });

@@ -103,7 +103,7 @@ export function ConnectionsCard() {
       <CardHeader>
         <CardTitle>ELD, load boards and feeds</CardTitle>
         <CardDescription>
-          With your ELD, the AI sees where trucks are and drivers&apos; hours. With load boards, it searches for every truck that&apos;s empty or about to be, lines up the
+          With your ELD, Backroute sees where trucks are and drivers&apos; hours. With load boards, it searches for every truck that&apos;s empty or about to be, lines up the
           reload before delivery, and posts your trucks.
         </CardDescription>
       </CardHeader>
@@ -221,7 +221,7 @@ export function ConnectionsCard() {
             </Button>
           </div>
           <p className="text-xs text-ink-500">
-            Most cards can publish a daily transactions report as CSV at a link (ask the card&apos;s account manager for a scheduled report). The AI reads it each morning and puts every line on its load. Or bring in a file on Money → Fuel &amp; tolls.
+            Most cards can publish a daily transactions report as CSV at a link (ask the card&apos;s account manager for a scheduled report). Backroute reads it each morning and puts every line on its load. Or bring in a file on Money → Fuel &amp; tolls.
           </p>
         </div>
         {msg && <p className={`text-xs ${msg.ok ? "text-ink-950" : "text-[var(--accent-danger)]"}`}>{msg.text}</p>}

@@ -143,7 +143,7 @@ export function TopBar({
                 <p className="text-sm font-semibold text-ink-950">{alertsOnly ? "Alerts" : "Notifications"}</p>
                 {alertsOnly && (
                   <p className="mt-0.5 text-xs text-ink-500">
-                    {(["needs_you", "money", "safety"] as const).map((k) => `${notifications.filter((n) => alertKind(n) === k).length} ${ALERT_LABEL[k].toLowerCase()}`).join(" · ")}. Everything else is in the AI log.
+                    {(["needs_you", "money", "safety"] as const).map((k) => `${notifications.filter((n) => alertKind(n) === k).length} ${ALERT_LABEL[k].toLowerCase()}`).join(" · ")}. Everything else is in Backroute log.
                   </p>
                 )}
               </div>

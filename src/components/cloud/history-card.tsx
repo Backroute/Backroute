@@ -59,7 +59,7 @@ export function HistoryCard() {
       <CardHeader>
         <CardTitle>Bring your history</CardTitle>
         <CardDescription>
-          A spreadsheet of the loads you&apos;ve hauled this past year (CSV from your TMS, QuickBooks or your own sheet): date, broker, from, to and rate, plus miles and the broker&apos;s email if you have them. The AI prices from it from day one.
+          A spreadsheet of the loads you&apos;ve hauled this past year (CSV from your TMS, QuickBooks or your own sheet): date, broker, from, to and rate, plus miles and the broker&apos;s email if you have them. Backroute prices from it from day one.
         </CardDescription>
       </CardHeader>
       <CardContent className="!pt-3 flex flex-col gap-3">
@@ -92,7 +92,7 @@ export function HistoryCard() {
             )}
           </div>
         )}
-        {done && <p className="text-sm text-ink-700">{done.error ? "The import didn't go through. Try again." : `Imported ${done.loads} loads and ${done.brokers} brokers. The AI uses them for pricing now.`}</p>}
+        {done && <p className="text-sm text-ink-700">{done.error ? "The import didn't go through. Try again." : `Imported ${done.loads} loads and ${done.brokers} brokers. Backroute uses them for pricing now.`}</p>}
         <RateConHistory onImported={() => setRefresh((n) => n + 1)} />
         <RecentImports refresh={refresh} />
       </CardContent>
@@ -186,7 +186,7 @@ function RateConHistory({ onImported }: { onImported: () => void }) {
   return (
     <div className="mt-2 border-t border-line pt-4">
       <p className="text-sm font-medium text-ink-900">Or use your old rate cons</p>
-      <p className="mt-0.5 text-xs text-ink-500">Up to 40 PDFs or photos at a time. The AI reads the broker, lane, rate and terms off each one; nothing else is sent anywhere. A file already imported is skipped.</p>
+      <p className="mt-0.5 text-xs text-ink-500">Up to 40 PDFs or photos at a time. Backroute reads the broker, lane, rate and terms off each one; nothing else is sent anywhere. A file already imported is skipped.</p>
       <div className="mt-2 flex flex-wrap gap-2">
         <label className="flex w-fit cursor-pointer items-center gap-2 rounded-xl border border-line px-3 py-2 text-sm font-medium text-ink-900 hover:bg-ink-50">
           <Upload className="h-4 w-4" /> {busy ?? "Upload rate cons"}

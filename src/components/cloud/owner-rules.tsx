@@ -24,7 +24,7 @@ export function OwnerRulesCard() {
     <Card>
       <CardHeader>
         <CardTitle>Your rules</CardTitle>
-        <CardDescription>Calls the AI makes without asking you. Everything else outside your numbers still waits for you.</CardDescription>
+        <CardDescription>Calls Backroute makes without asking you. Everything else outside your numbers still waits for you.</CardDescription>
       </CardHeader>
       <CardContent className="!pt-3 flex flex-col gap-3">
         {OWNER_RULES.map((r) => (
@@ -66,10 +66,10 @@ export function OwnerRulesCard() {
             onChange={(e) => setDeadhead(e.target.value.replace(/\D/g, ""))}
             onBlur={() => miles >= 25 && miles <= 1000 && updateSettings({ maxDeadhead: miles })}
           />
-          <span className="text-xs font-normal text-ink-500">The AI won&apos;t take a load further away than this.</span>
+          <span className="text-xs font-normal text-ink-500">Backroute won&apos;t take a load further away than this.</span>
         </label>
         <div className="flex flex-col gap-2 border-t border-line pt-3">
-          <p className="text-xs text-ink-500">What the AI asks every broker to put on the rate con:</p>
+          <p className="text-xs text-ink-500">What Backroute asks every broker to put on the rate con:</p>
           <DollarField label="Detention per hour, after 2 hours free" value={settings.detentionPerHour ?? 50} min={25} max={200} onSave={(n) => updateSettings({ detentionPerHour: n })} />
           <DollarField label="Truck ordered, not used (TONU)" value={settings.tonuFee ?? 150} min={50} max={1000} onSave={(n) => updateSettings({ tonuFee: n })} />
           <DollarField label="Layover, per day held overnight" value={settings.layoverPay ?? 250} min={100} max={1000} onSave={(n) => updateSettings({ layoverPay: n })} />
@@ -78,7 +78,7 @@ export function OwnerRulesCard() {
         <div className="flex flex-col gap-2 border-t border-line pt-3">
           <p className="text-sm font-medium text-ink-900">Rate cons</p>
           <p className="text-xs text-ink-500">
-            Who&apos;s authorized to sign for the company. The AI signs a rate con in their name only when it matches what was agreed, and sends it back. Empty: it asks you to sign.
+            Who&apos;s authorized to sign for the company. Backroute signs a rate con in their name only when it matches what was agreed, and sends it back. Empty: it asks you to sign.
           </p>
           <TextField label="Signer's name" placeholder="Maria Lopez" value={settings.rateConSigner?.name ?? ""} onSave={(v) => updateSettings({ rateConSigner: v ? { name: v, title: settings.rateConSigner?.title } : undefined })} />
           <TextField label="Title" placeholder="Owner" value={settings.rateConSigner?.title ?? ""} disabled={!settings.rateConSigner?.name} onSave={(v) => settings.rateConSigner?.name && updateSettings({ rateConSigner: { name: settings.rateConSigner.name, title: v || undefined } })} />
@@ -87,21 +87,21 @@ export function OwnerRulesCard() {
           <p className="text-sm font-medium text-ink-900">Brokers&apos; credit and cargo claims</p>
           <NumberField label="Lowest broker credit score to book" hint="out of 100, when a credit service is connected" value={settings.minBrokerCredit ?? 70} min={0} max={100} onSave={(n) => updateSettings({ minBrokerCredit: n })} />
           <TextField label="Cargo insurer's claims email" placeholder="claims@insurer.com" type="email" value={settings.cargoInsurerEmail ?? ""} onSave={(v) => updateSettings({ cargoInsurerEmail: v || undefined })} />
-          <p className="text-xs text-ink-500">The AI puts each claim file together; it goes to your insurer only after you OK it.</p>
+          <p className="text-xs text-ink-500">Backroute puts each claim file together; it goes to your insurer only after you OK it.</p>
         </div>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-medium text-ink-900">We haul hazmat</p>
-            <p className="text-xs text-ink-500">Off: the AI won&apos;t book a load the broker says is hazmat, and asks you.</p>
+            <p className="text-xs text-ink-500">Off: Backroute won&apos;t book a load the broker says is hazmat, and asks you.</p>
           </div>
           <Switch checked={!!settings.hazmat} onChange={(on) => updateSettings({ hazmat: on })} label="We haul hazmat" />
         </div>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-ink-900">Brokers who see my truck posts call the AI</p>
+            <p className="text-sm font-medium text-ink-900">Brokers who see my truck posts call Backroute</p>
             <p className="text-xs text-ink-500">Your posts on the load boards say to call the dispatch line and ask for you. Off: they call you.</p>
           </div>
-          <Switch checked={settings.postContact !== "owner"} onChange={(on) => updateSettings({ postContact: on ? "ai" : "owner" })} label="Brokers who see my truck posts call the AI" />
+          <Switch checked={settings.postContact !== "owner"} onChange={(on) => updateSettings({ postContact: on ? "ai" : "owner" })} label="Brokers who see my truck posts call Backroute" />
         </div>
       </CardContent>
     </Card>
@@ -179,7 +179,7 @@ export function RuleSuggestion({ escalation }: { escalation: Escalation }) {
         variant="primary"
         onClick={() => {
           updateSettings({ ownerRules: { ...settings.ownerRules, [rule]: true } });
-          resolveEscalation(escalation.id, true, "carrier", "Turned on: the AI sends these on its own.");
+          resolveEscalation(escalation.id, true, "carrier", "Turned on: Backroute sends these on its own.");
         }}
       >
         <Check className="h-3.5 w-3.5" /> Yes, stop asking

@@ -67,7 +67,7 @@ export function PortalApproval({ escalation }: { escalation: Escalation }) {
       </p>
       {shot && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={shot} alt={`What the AI sees on ${task.site}`} className="max-h-72 w-full rounded-lg border border-line object-contain object-top" />
+        <img src={shot} alt={`What Backroute sees on ${task.site}`} className="max-h-72 w-full rounded-lg border border-line object-contain object-top" />
       )}
       {!waiting ? (
         <p className="text-xs text-ink-500">Already taken care of.</p>

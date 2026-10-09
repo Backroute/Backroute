@@ -12,13 +12,13 @@ const TOURS = [
     href: "/carrier",
     icon: LayoutGrid,
     title: "Owner dashboard",
-    body: "Watch the AI find, negotiate and book loads for a 6-truck fleet, call drivers, and check rate cons. You only approve the few things that need you.",
+    body: "Watch Backroute find, negotiate and book loads for a 6-truck fleet, call drivers, and check rate cons. You only approve the few things that need you.",
   },
   {
     href: "/driver",
     icon: Smartphone,
     title: "Driver app",
-    body: "What a driver sees: the next load, calls from the AI dispatcher in their own language, hands-free driving mode, documents and pay.",
+    body: "What a driver sees: the next load, calls from Backroute in their own language, hands-free driving mode, documents and pay.",
   },
   {
     href: "/signup",
@@ -40,7 +40,7 @@ export default function DemoPage() {
         <div>
           <h1 className="font-display text-4xl tracking-tight text-ink-950 sm:text-5xl">See how Backroute works</h1>
           <p className="mt-3 text-base text-ink-600">
-            A sample fleet with the AI dispatcher running live. No account needed. Everything here is made up: the trucks, brokers, loads and calls.
+            A sample fleet with Backroute running live. No account needed. Everything here is made up: the trucks, brokers, loads and calls.
             Nothing is saved, and nobody gets texted or called.
           </p>
         </div>
@@ -68,7 +68,7 @@ export default function DemoPage() {
         </ul>
 
         <p className="rounded-2xl bg-ink-100 px-4 py-3 text-sm text-ink-700">
-          Tip: switch between the owner and driver side from the yellow bar at the top. It&apos;s the same fleet, so a call the AI makes to a
+          Tip: switch between the owner and driver side from the yellow bar at the top. It&apos;s the same fleet, so a call Backroute makes to a
           driver shows up on the owner&apos;s dashboard too.
         </p>
 

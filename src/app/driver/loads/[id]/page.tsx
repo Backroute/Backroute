@@ -151,7 +151,7 @@ export default function DriverLoadDetailPage() {
             )}
             <div className="grid grid-cols-2 gap-2">
               <Link href="/driver/messages" className="flex items-center justify-center gap-2 rounded-full border border-white/25 py-3 text-sm font-medium text-white">
-                <MessageCircle className="h-4 w-4" /> Message AI
+                <MessageCircle className="h-4 w-4" /> Message dispatch
               </Link>
               <Link href="/driver/incident" className="flex items-center justify-center gap-2 rounded-full border border-white/25 py-3 text-sm font-medium text-white">
                 <LifeBuoy className="h-4 w-4" /> Report issue

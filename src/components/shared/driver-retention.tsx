@@ -80,7 +80,7 @@ export function DriverCheckInCard({ driver, view }: { driver: Driver; view: Rete
         <div className="flex items-center justify-between gap-3 rounded-xl bg-ink-50 px-3 py-2.5">
           <div>
             <p className="text-xs font-medium text-ink-900">Get {first} home first</p>
-            <p className="text-xs text-ink-500">The AI only books loads that bring them closer to home, even at a lower rate.</p>
+            <p className="text-xs text-ink-500">Backroute only books loads that bring them closer to home, even at a lower rate.</p>
           </div>
           <Switch checked={!!driver.homePriority} onChange={(on) => setHomePriority(driver.id, on)} label={`Get ${first} home first`} />
         </div>

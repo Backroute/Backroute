@@ -111,7 +111,7 @@ export function CommandPalette({ groups, onAsk }: { groups: CommandGroup[]; onAs
     const idx = flatItems.indexOf(item);
     return (
       <div className="mb-1">
-        <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-ink-400">Ask the AI dispatcher</p>
+        <p className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-ink-400">Ask Backroute</p>
         <button
           onMouseEnter={() => setActiveIndex(idx)}
           onClick={() => select(item)}
@@ -130,7 +130,7 @@ export function CommandPalette({ groups, onAsk }: { groups: CommandGroup[]; onAs
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Search, jump to, or tell the AI"
+        aria-label="Search, jump to, or tell Backroute"
         className="w-full max-w-lg overflow-hidden rounded-2xl border border-line-strong bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -139,7 +139,7 @@ export function CommandPalette({ groups, onAsk }: { groups: CommandGroup[]; onAs
           <input
             ref={inputRef}
             value={query}
-            aria-label="Search or tell the AI"
+            aria-label="Search or tell Backroute"
             onChange={(e) => {
               setQuery(e.target.value);
               setActiveIndex(0);
@@ -155,7 +155,7 @@ export function CommandPalette({ groups, onAsk }: { groups: CommandGroup[]; onAs
                 select(flatItems[activeIndex]);
               }
             }}
-            placeholder={onAsk ? "Search, or tell the AI what to do…" : "Search or jump to..."}
+            placeholder={onAsk ? "Search, or tell Backroute what to do…" : "Search or jump to..."}
             className="flex-1 bg-transparent text-sm text-ink-950 outline-none placeholder:text-ink-400"
           />
           <kbd className="rounded border border-line px-1.5 py-0.5 text-xs text-ink-400">esc</kbd>
@@ -164,7 +164,7 @@ export function CommandPalette({ groups, onAsk }: { groups: CommandGroup[]; onAs
         <div className="max-h-[22rem] overflow-y-auto p-2">
           {!text && onAsk && (
             <p className="px-3 pb-2 pt-1 text-xs text-ink-500">
-              Try &ldquo;pause the AI&rdquo;, &ldquo;dark mode&rdquo;, a truck or load number, or an order like &ldquo;book Marcus home by Friday&rdquo;.
+              Try &ldquo;pause Backroute&rdquo;, &ldquo;dark mode&rdquo;, a truck or load number, or an order like &ldquo;book Marcus home by Friday&rdquo;.
             </p>
           )}
           {ask && askFirst && askRow(ask)}

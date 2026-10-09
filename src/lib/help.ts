@@ -2,8 +2,8 @@
 export const HELP = {
   minRpm: {
     title: "Lowest rate per loaded mile",
-    what: "The AI never asks for, counters at, or agrees to less than this per loaded mile. A broker who won't come up to it gets a polite pass.",
-    example: "At $2.00, a 500-mile load has to pay at least $1,000 before the AI will take it.",
+    what: "Backroute never asks for, counters at, or agrees to less than this per loaded mile. A broker who won't come up to it gets a polite pass.",
+    example: "At $2.00, a 500-mile load has to pay at least $1,000 before Backroute will take it.",
   },
   deadhead: {
     title: "Empty miles to a pickup",
@@ -11,24 +11,24 @@ export const HELP = {
     example: "At 150 miles, a truck empty in Dallas won't be sent to a pickup in Houston (240 miles).",
   },
   autopilot: {
-    title: "How much the AI does without asking",
+    title: "How much Backroute does without asking",
     what: "Ask me first: every email to a broker waits for you. Within my rules: it books and bills on its own inside your numbers. Full autopilot: it also sends the replies it writes.",
     example: "On Within my rules, a $2.40/mile load over your $2.00 floor gets booked; a $1.80 one comes to you.",
   },
   undo: {
-    title: "Time to stop the AI's emails",
-    what: "When the AI books, counters or accepts on its own, the email waits this long first. Tap Undo on Home and it never goes.",
+    title: "Time to stop an email",
+    what: "When Backroute books, counters or accepts on its own, the email waits this long first. Tap Undo on Home and it never goes.",
     example: "Undo 90 seconds: you have a minute and a half to stop an email before the broker gets it.",
   },
   homeTime: {
     title: "When each driver gets home",
-    what: "The AI checks every load against this before booking it, and plans the next loads to bring the driver home on time.",
+    what: "Backroute checks every load against this before booking it, and plans the next loads to bring the driver home on time.",
     example: "\"Home by Friday\" means no Wednesday load that would leave the truck 900 miles away on Friday.",
   },
   alerts: {
     title: "How we reach you",
-    what: "Only three things reach you: something that needs your decision, money moving, and safety. Everything else happens quietly and shows in the AI log.",
-    example: "A detention claim the AI sent is logged; a broker paying $300 short texts you.",
+    what: "Only three things reach you: something that needs your decision, money moving, and safety. Everything else happens quietly and shows in the log.",
+    example: "A detention claim Backroute sent is logged; a broker paying $300 short texts you.",
   },
   dailyText: {
     title: "End-of-day text",

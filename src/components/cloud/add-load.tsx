@@ -88,7 +88,7 @@ function AddLoadPanel({ onDone }: { onDone: () => void }) {
     setNote(null);
     const result = await readRateCon(file, null);
     setBusy(null);
-    if (!result.ok) return setNote(result.reason === "off" ? "Reading PDFs needs the live AI, which isn't switched on. Type the load in instead." : "Couldn't read that PDF. Type the load in instead.");
+    if (!result.ok) return setNote(result.reason === "off" ? "Reading PDFs isn't switched on yet. Type the load in instead." : "Couldn't read that PDF. Type the load in instead.");
     const r = result.reading;
     if (!r.isRateCon) return setNote("That doesn't look like a rate con. Type the load in instead.");
     const readAt = new Date().toISOString();
@@ -167,7 +167,7 @@ function AddLoadPanel({ onDone }: { onDone: () => void }) {
   const driverOf = (id: string | null) => drivers.find((d) => d.id === id)?.name;
 
   return (
-    <Sheet open onClose={onDone} title="Add a load" description="Upload the broker's rate con and the AI fills this in, or type it." size="lg">
+    <Sheet open onClose={onDone} title="Add a load" description="Upload the broker's rate con and Backroute fills this in, or type it." size="lg">
       <div>
 
         <Button className="w-full" variant="outline" disabled={!!busy} onClick={() => fileInput.current?.click()}>

@@ -33,7 +33,7 @@ export default function DriverEarningsPage() {
     <div className="flex flex-col gap-5 px-5">
       <div>
         <LargeTitle className="font-display text-2xl text-ink-950">Earnings</LargeTitle>
-        <p className="mt-1 text-sm text-ink-500">This week, from every load the AI booked for you.</p>
+        <p className="mt-1 text-sm text-ink-500">This week, from every load Backroute booked for you.</p>
       </div>
 
       {/* An owner-operator sees the truck's profit and their invoices; a company driver sees their pay. */}
@@ -49,7 +49,7 @@ export default function DriverEarningsPage() {
           </p>
           {week.overMarket > 0 && (
             <p className="mt-3 flex items-center gap-1.5 rounded-2xl bg-white/10 px-3 py-2 text-xs font-medium text-white/85">
-              <TrendingUp className="h-3.5 w-3.5 shrink-0" /> AI booked your loads {formatCurrency(week.overMarket)} above market rate
+              <TrendingUp className="h-3.5 w-3.5 shrink-0" /> Backroute booked your loads {formatCurrency(week.overMarket)} above market rate
             </p>
           )}
 
@@ -95,7 +95,7 @@ export default function DriverEarningsPage() {
       <section>
         <h2 className="mb-2 text-sm font-semibold text-ink-950">Loads this week</h2>
         {sorted.length === 0 ? (
-          <p className="rounded-2xl border border-line px-4 py-6 text-center text-sm text-ink-500">No booked loads yet this week. The AI is on it.</p>
+          <p className="rounded-2xl border border-line px-4 py-6 text-center text-sm text-ink-500">No booked loads yet this week. Backroute is on it.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {sorted.map((l) => (

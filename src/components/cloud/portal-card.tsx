@@ -54,7 +54,7 @@ export function PortalCard() {
       <CardHeader>
         <CardTitle>Broker websites</CardTitle>
         <CardDescription>
-          The AI signs rate cons in DocuSign and broker portals, fills carrier setups (MyCarrierPackets, RMIS, Highway) and books dock appointments online. Add the logins it should use. Passwords are encrypted and never shown again.
+          Backroute signs rate cons in DocuSign and broker portals, fills carrier setups (MyCarrierPackets, RMIS, Highway) and books dock appointments online. Add the logins it should use. Passwords are encrypted and never shown again.
         </CardDescription>
       </CardHeader>
       <CardContent className="!pt-3 flex flex-col gap-4">
@@ -63,10 +63,10 @@ export function PortalCard() {
         ) : (
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium text-ink-900">Let the AI do these itself</p>
+              <p className="text-sm font-medium text-ink-900">Let Backroute do these itself</p>
               <p className="text-xs text-ink-500">It checks the rate before it signs, and asks you before it submits a carrier setup, unless you told it not to. Off: Backroute support does them.</p>
             </div>
-            <Switch checked={on} onChange={(v) => updateSettings({ portalAi: v })} label="Let the AI do these itself" />
+            <Switch checked={on} onChange={(v) => updateSettings({ portalAi: v })} label="Let Backroute do these itself" />
           </div>
         )}
         <section className="flex flex-col gap-2">
@@ -104,13 +104,13 @@ export function PortalCard() {
               ))}
             </ul>
           ) : (
-            <p className="text-xs text-ink-500">None yet. When a site needs one the AI doesn&apos;t have, it asks you once, or opens the account itself on setup networks.</p>
+            <p className="text-xs text-ink-500">None yet. When a site needs one Backroute doesn&apos;t have, it asks you once, or opens the account itself on setup networks.</p>
           )}
         </section>
 
         {data?.answers.length ? (
           <section className="flex flex-col gap-2 border-t border-line pt-3">
-            <p className="text-sm font-medium text-ink-900">Answers the AI keeps for these sites</p>
+            <p className="text-sm font-medium text-ink-900">Answers Backroute keeps for these sites</p>
             <ul className="flex flex-col divide-y divide-line">
               {data.answers.map((a) => (
                 <li key={a.id} className="flex items-center justify-between gap-3 py-2">

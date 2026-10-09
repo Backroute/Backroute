@@ -42,7 +42,7 @@ export default function CustomersPage() {
             <CardHeader>
               <div>
                 <CardTitle>New customer</CardTitle>
-                <CardDescription>The AI invoices them at this email when a load delivers, with the POD, and follows up on their terms.</CardDescription>
+                <CardDescription>Backroute invoices them at this email when a load delivers, with the POD, and follows up on their terms.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="!pt-3">
@@ -90,7 +90,7 @@ export default function CustomersPage() {
                 <CardTitle className="flex items-center gap-2">
                   <CalendarPlus className="h-4 w-4" /> Next week&apos;s contract loads
                 </CardTitle>
-                <CardDescription>The AI makes each scheduled pickup a load a week ahead, on a truck with the right trailer. Do it now to see them.</CardDescription>
+                <CardDescription>Backroute makes each scheduled pickup a load a week ahead, on a truck with the right trailer. Do it now to see them.</CardDescription>
               </div>
               <Button
                 size="sm"

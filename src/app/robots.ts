@@ -4,7 +4,7 @@ import type { MetadataRoute } from "next";
 export default function robots(): MetadataRoute.Robots {
   const base = (process.env.PUBLIC_BASE_URL ?? "https://backroute.pro").replace(/\/$/, "");
   return {
-    rules: { userAgent: "*", allow: "/", disallow: ["/api/", "/carrier", "/driver", "/ops"] },
+    rules: { userAgent: "*", allow: "/", disallow: ["/api/", "/carrier", "/driver", "/ops", "/today"] },
     sitemap: `${base}/sitemap.xml`,
   };
 }

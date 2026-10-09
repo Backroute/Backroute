@@ -71,9 +71,9 @@ async function signIn(browser, sub, phone) {
   await o.screenshot({ path: `${S}/.out/ui-connections.png`, fullPage: true });
   check("Settings has the owner's rules, all off to start", (await o.getByText("Your rules").count()) === 1 && (await o.getByRole("switch", { name: "Claim TONU at the usual amount" }).getAttribute("aria-checked")) === "false");
   await o.goto("http://localhost:3210/carrier/fleet", { waitUntil: "domcontentloaded" });
-  await o.getByText("The AI's plan").first().waitFor({ timeout: 60000 }).catch(() => {});
+  await o.getByText("Backroute's plan").first().waitFor({ timeout: 60000 }).catch(() => {});
   const fleet = await o.locator("main").innerText();
-  check("Fleet shows the AI's plan per truck and where the GPS comes from", /The AI's plan/.test(fleet) && /Empty in|Now:/.test(fleet) && /GPS via Motive|no ELD connected/.test(fleet), fleet.slice(0, 300));
+  check("Fleet shows the AI's plan per truck and where the GPS comes from", /Backroute's plan/.test(fleet) && /Empty in|Now:/.test(fleet) && /GPS via Motive|no ELD connected/.test(fleet), fleet.slice(0, 300));
   await o.screenshot({ path: `${S}/.out/ui-fleet-plan.png`, fullPage: true });
   console.log("owner errors:", o.errors);
   await browser.close();

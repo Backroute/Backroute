@@ -66,14 +66,14 @@ export function DriverCallsBoard({ limit = 6 }: { limit?: number }) {
             {live > 0 && <Badge tone="success" dot>{live} live</Badge>}
           </h2>
           <p className="mt-0.5 text-xs text-ink-500">
-            The AI calls drivers like a dispatcher would. Whatever gets agreed updates the load and both apps when it hangs up.
+            Backroute calls drivers like a dispatcher would. Whatever gets agreed updates the load and both apps when it hangs up.
           </p>
         </div>
       </div>
 
       {mine.length === 0 ? (
         <p className="mt-4 rounded-2xl bg-ink-50 px-4 py-5 text-center text-xs text-ink-500">
-          No calls yet. The AI calls when there&apos;s a load to offer, a pickup number to give, or a change on the road.
+          No calls yet. Backroute calls when there&apos;s a load to offer, a pickup number to give, or a change on the road.
         </p>
       ) : (
         <ul className="mt-3 flex flex-col divide-y divide-line">
@@ -119,16 +119,16 @@ export function DriverCallsBoard({ limit = 6 }: { limit?: number }) {
                     {call.lines.length === 0 ? (
                       <p className="text-xs text-ink-500">
                         {call.status === "held"
-                          ? `The AI didn't ring: ${call.heldReason?.toLowerCase()}. The driver got the details by text.`
+                          ? `Backroute didn't ring: ${call.heldReason?.toLowerCase()}. The driver got the details by text.`
                           : call.status === "missed"
-                            ? "Nobody picked up, so the AI texted the details instead."
+                            ? "Nobody picked up, so Backroute texted the details instead."
                             : "Nothing said yet."}
                       </p>
                     ) : (
                       <ul className="flex flex-col gap-2">
                         {call.lines.map((l, i) => (
                           <li key={i} className="text-xs leading-relaxed">
-                            <span className="font-semibold text-ink-950">{l.speaker === "ai" ? "AI" : l.speaker === "owner" ? "You" : driver?.name.split(" ")[0] ?? "Driver"}: </span>
+                            <span className="font-semibold text-ink-950">{l.speaker === "ai" ? "Backroute" : l.speaker === "owner" ? "You" : driver?.name.split(" ")[0] ?? "Driver"}: </span>
                             <span className="text-ink-700" lang={showOriginal || !l.tr?.[readLang] ? call.lang : readLang}>
                               {showOriginal ? l.text : (l.tr?.[readLang] ?? l.text)}
                             </span>
@@ -212,7 +212,7 @@ function OwnerControls({ call, driverFirst }: { call: DispatchCall; driverFirst:
       </div>
       <p className="text-xs text-ink-500">
         {driverFirst} hears you as {OWNER_NAME}
-        {call.lang !== readLang ? `, in ${LANG_INFO[call.lang].english}: the quick phrases above are translated for you. Typed words go as typed in the demo; on a real line the AI translates as you talk.` : ". The AI keeps notes and logs the call. Demo: you type here; on a real line you'd talk."}
+        {call.lang !== readLang ? `, in ${LANG_INFO[call.lang].english}: the quick phrases above are translated for you. Typed words go as typed in the demo; on a real line Backroute translates as you talk.` : ". Backroute keeps notes and logs the call. Demo: you type here; on a real line you'd talk."}
       </p>
     </div>
   );

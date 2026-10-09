@@ -61,10 +61,10 @@ function Ringing({ call }: { call: DispatchCall }) {
   const { t } = useDriverUi();
   useRingtone();
   return (
-    <div role="alertdialog" aria-modal="true" aria-label="Incoming call from AI Dispatch" className="theme-ink fixed inset-0 z-[80] flex flex-col items-center bg-ink-950 px-6 pb-[max(3rem,env(safe-area-inset-bottom))] pt-[max(6rem,calc(env(safe-area-inset-top)+4rem))] text-white">
+    <div role="alertdialog" aria-modal="true" aria-label="Incoming call from dispatch" className="theme-ink fixed inset-0 z-[80] flex flex-col items-center bg-ink-950 px-6 pb-[max(3rem,env(safe-area-inset-bottom))] pt-[max(6rem,calc(env(safe-area-inset-top)+4rem))] text-white">
       <span className="relative flex h-24 w-24 items-center justify-center">
         <span className="absolute inset-0 animate-ping rounded-full bg-white/20" />
-        <span className="relative flex h-24 w-24 items-center justify-center rounded-full bg-white text-2xl font-semibold text-ink-950">AI</span>
+        <span className="relative flex h-24 w-24 items-center justify-center rounded-full bg-white text-2xl font-semibold text-ink-950">B</span>
       </span>
       <p className="mt-6 text-3xl font-semibold tracking-tight">{call.channel === "phone" ? "Titan Dispatch" : t.aiDispatch}</p>
       <p className="mt-2 text-base text-white/60">{call.channel === "phone" ? `${DISPATCH_LINE} · ${t.phoneCall}` : t.ringSub[call.kind]}</p>
@@ -171,7 +171,7 @@ function LiveCall({ call }: { call: DispatchCall }) {
   const bookedSomething = call.effects.some((e) => e.type === "book" || e.type === "reserve_parking");
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Call with AI Dispatch" className="theme-ink fixed inset-0 z-[80] flex flex-col bg-ink-950 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] text-white">
+    <div role="dialog" aria-modal="true" aria-label="Call with dispatch" className="theme-ink fixed inset-0 z-[80] flex flex-col bg-ink-950 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] text-white">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-lg font-semibold">{call.ownerTookOver ? `${OWNER_NAME} · Titan Freight` : t.aiDispatch}</p>
