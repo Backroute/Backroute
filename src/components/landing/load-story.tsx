@@ -76,12 +76,13 @@ function StepText({ i, active }: { i: number; active: boolean }) {
   const s = STEPS[i];
   const Icon = s.icon;
   return (
-    <div className={`transition-opacity duration-300 ${active ? "opacity-100" : "opacity-35"}`}>
+    // The steps you're not on are dimmed with lighter text, not transparency, so they stay readable (WCAG AA contrast).
+    <div className="transition-colors duration-300">
       <p className="flex items-center gap-2 text-sm font-semibold text-ink-500">
         <Icon className="h-4 w-4" /> Step {i + 1}
       </p>
-      <h3 className="mt-1 text-2xl font-semibold tracking-[-0.02em] lg:text-[28px]">{s.title}</h3>
-      <p className="mt-2 max-w-md text-[16px] leading-relaxed text-ink-600">{s.body}</p>
+      <h3 className={`mt-1 text-2xl font-semibold tracking-[-0.02em] transition-colors duration-300 lg:text-[28px] ${active ? "text-ink-950" : "text-ink-400"}`}>{s.title}</h3>
+      <p className={`mt-2 max-w-md text-[16px] leading-relaxed transition-colors duration-300 ${active ? "text-ink-600" : "text-ink-500"}`}>{s.body}</p>
     </div>
   );
 }
