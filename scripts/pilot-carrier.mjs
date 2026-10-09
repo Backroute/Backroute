@@ -6,6 +6,10 @@
 //   node scripts/pilot-carrier.mjs stage <carrier-id> shadow|ask|rules|full
 //   node scripts/pilot-carrier.mjs status <carrier-id>
 //   node scripts/pilot-carrier.mjs pause <carrier-id>        (back to practice mode: nothing leaves)
+//   node scripts/pilot-carrier.mjs resume <carrier-id>       (back to the stage it was paused from)
+//   node scripts/pilot-carrier.mjs list                      (every carrier, its stage, live or practice)
+//   node scripts/pilot-carrier.mjs pause-all                 (the stop button: every live carrier to practice mode)
+//   node scripts/pilot-carrier.mjs resume-all                (each carrier back to where pause-all found it)
 //
 // --drivers-agreed records that the owner has each driver's written OK to texts and calls (docs/legal); without it,
 // each driver's first text asks them to confirm.
@@ -85,13 +89,55 @@ async function carrier(id) {
   return rows[0];
 }
 
-async function setStage(id, stage) {
+async function setStage(id, stage, { pausing = false } = {}) {
   const s = STAGES[stage];
   if (!s) throw new Error(`Stage is one of: ${Object.keys(STAGES).join(", ")}`);
   const c = await carrier(id);
-  const settings = { ...(c.settings ?? {}), sandbox: s.sandbox, autonomy: s.autonomy, pilotStage: stage, pilotStageAt: new Date().toISOString() };
+  const before = c.settings ?? {};
+  const settings = { ...before, sandbox: s.sandbox, autonomy: s.autonomy, pilotStage: stage, pilotStageAt: new Date().toISOString() };
+  // A pause remembers exactly how the carrier ran (a carrier that signed up on its own has no pilot stage), so resume
+  // puts it back; moving a stage on purpose forgets it.
+  if (pausing && !before.sandbox) settings.pausedFrom = { sandbox: false, autonomy: before.autonomy ?? "ask", pilotStage: before.pilotStage ?? null, pilotStageAt: before.pilotStageAt ?? null };
+  else if (!pausing) delete settings.pausedFrom;
   await rest_("PATCH", `carriers?id=eq.${encodeURIComponent(id)}`, { settings });
-  console.log(`${c.name}: ${stage}. ${s.note}`);
+  console.log(`${c.name}: ${stage}. ${s.note}${pausing && settings.pausedFrom ? ` (was live, autopilot ${settings.pausedFrom.autonomy}: resume puts it back)` : ""}`);
+}
+
+async function resume(id) {
+  const c = await carrier(id);
+  const back = c.settings?.pausedFrom;
+  if (!back) return console.log(`${c.name}: wasn't paused from live; nothing to resume (use stage to move it).`);
+  const { pausedFrom, ...rest } = c.settings;
+  const settings = { ...rest, sandbox: back.sandbox, autonomy: back.autonomy };
+  if (back.pilotStage) Object.assign(settings, { pilotStage: back.pilotStage, pilotStageAt: back.pilotStageAt });
+  else delete settings.pilotStage, delete settings.pilotStageAt;
+  await rest_("PATCH", `carriers?id=eq.${encodeURIComponent(id)}`, { settings });
+  console.log(`${c.name}: live again, autopilot ${back.autonomy}${back.pilotStage ? ` (${back.pilotStage})` : ""}.`);
+}
+
+async function all() {
+  return rest_("GET", "carriers?select=id,name,settings&order=created_at");
+}
+
+async function list() {
+  for (const c of await all()) {
+    const s = c.settings ?? {};
+    console.log(`${c.id}  ${s.sandbox ? "practice" : "LIVE    "}  ${(s.pilotStage ?? "-").padEnd(6)}  autopilot ${(s.autonomy ?? "ask").padEnd(5)}  ${c.name}${s.pausedFrom ? "  (paused: resume puts it back)" : ""}`);
+  }
+}
+
+/** The stop button: every carrier that sends anything goes to practice mode at once. Each remembers its stage. */
+async function pauseAll() {
+  const live = (await all()).filter((c) => !c.settings?.sandbox);
+  if (!live.length) return console.log("No live carriers: nothing to pause.");
+  for (const c of live) await setStage(c.id, "shadow", { pausing: true });
+  console.log(`\n${live.length} carrier${live.length === 1 ? "" : "s"} in practice mode: nothing goes to brokers or drivers until they're resumed.`);
+}
+
+async function resumeAll() {
+  const paused = (await all()).filter((c) => c.settings?.pausedFrom);
+  if (!paused.length) return console.log("Nothing paused by pause-all.");
+  for (const c of paused) await resume(c.id);
 }
 
 async function create() {
@@ -152,9 +198,13 @@ try {
   if (!URL_ || !KEY) throw new Error("Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
   if (cmd === "create") await create();
   else if (cmd === "stage") await setStage(positional[0], positional[1]);
-  else if (cmd === "pause") await setStage(positional[0], "shadow");
+  else if (cmd === "pause") await setStage(positional[0], "shadow", { pausing: true });
+  else if (cmd === "resume") await resume(positional[0]);
   else if (cmd === "status") await status(positional[0]);
-  else console.log("Usage: create | stage <id> shadow|ask|rules|full | status <id> | pause <id>   (see the top of this file)");
+  else if (cmd === "list") await list();
+  else if (cmd === "pause-all") await pauseAll();
+  else if (cmd === "resume-all") await resumeAll();
+  else console.log("Usage: create | stage <id> shadow|ask|rules|full | status <id> | pause <id> | resume <id> | list | pause-all | resume-all   (see the top of this file)");
 } catch (e) {
   console.error(e.message ?? e);
   process.exit(1);

@@ -46,6 +46,12 @@ You can also run the demo on the real site by leaving `NEXT_PUBLIC_DEMO` unset t
 Keys go in Vercel's **Environment Variables**, and in `.env.local` when running locally. Never commit them or paste
 them in chat. `.env.example` lists every variable.
 
+When you think it's all set, run `npm run check:live -- --env <file with the production values>` (or with the values
+in your shell). It checks each value looks right (no secret in a `NEXT_PUBLIC_` variable, the anon and service keys
+not swapped, long random secrets, no test-only settings) and then asks each service whether its key works and points
+at your site. It only reads, so nothing is texted, emailed or charged, and it never prints a secret. `--offline`
+checks the values alone. Fix every ✗ before the first carrier.
+
 ### 1. Supabase: accounts and the database
 
 1. Create a project at supabase.com (region near your drivers, e.g. US East).
@@ -69,7 +75,7 @@ Demo visitors keep the scripted replies unless you set `AI_IN_DEMO=on`. That all
 ### 3. Twilio: the dispatch number
 
 1. Buy a US phone number with SMS and Voice.
-2. **Start A2P 10DLC registration now.** US carriers block business texts from unregistered numbers, and approval can take 1–2 weeks.
+2. **Start A2P 10DLC registration now.** US carriers block business texts from unregistered numbers, and approval can take 1–2 weeks. Every answer the form asks for, and what reviewers check first, is in `docs/sms-registration.md`.
 3. On the number's settings, set these, both **HTTP POST**:
    - **A message comes in:** `https://YOUR-SITE/api/channels/sms`
    - **A call comes in:** `https://YOUR-SITE/api/channels/voice`

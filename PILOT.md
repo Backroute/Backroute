@@ -16,9 +16,13 @@ and `npm run measure` (the AI's report card).
 3. **Production is set up and watched** (DEPLOY.md): every step through 15, the migrations, `SUPPORT_PHONES` and
    `SUPPORT_EMAIL` for alerts, and an uptime monitor on `https://your-app/api/health`. The System tab in `/ops` is all
    green (or "not set up" for what you're not using).
+   `npm run check:live -- --env <the production settings file>` says "Nothing blocking": it asks each service whether
+   its key works and points at this site (Twilio's number, Postmark's inbound webhook, the database's access rules,
+   the migrations, the security headers), without sending anything.
 4. **The paperwork is signed** (docs/legal: drafts for your lawyer): the carrier agreement with the authority to act
    and sign for the carrier, drivers' consent to texts, and the call-recording notice where it applies.
-5. **Text registration (A2P 10DLC) is approved** on the dispatch number. Without it US carriers block the texts.
+5. **Text registration (A2P 10DLC) is approved** on the dispatch number (`docs/sms-registration.md`). Without it US
+   carriers block the texts.
 
 ## Picking pilot carriers
 
@@ -79,6 +83,8 @@ node scripts/pilot-carrier.mjs create --name "Lone Star Hauling" --mc 123456 --d
 - **rules → full:** two weeks with no booking or money mistakes and fewer than two things a week the owner had to fix.
 
 ## When to step back (at once: `pause <id>`)
+
+For everyone at once (`pause-all`), and for outages and alerts, see `docs/runbook.md`.
 
 - The AI books, offers or accepts under the owner's lowest rate, or on the wrong truck.
 - Anything goes to someone it shouldn't (an impostor, the wrong broker, a driver's private details).

@@ -20,6 +20,11 @@ for s in $SUITES; do
   [ $code -ne 0 ] && [ $f -eq 0 ] && note=" (stopped: $(grep -m1 -E "Error" "$T/.out/logs/$s.log" | cut -c1-120))"
   printf "%-16s %3d passed, %d failed%s\n" "$s" "$p" "$f" "$note"
   { [ $f -gt 0 ] || [ $code -ne 0 ]; } && failed=1
+  # real-e2e makes the carrier every other suite uses: past a failure there, theirs would only be noise.
+  if [ "$s" = real-e2e ] && { [ $f -gt 0 ] || [ $code -ne 0 ]; } && [ "$SUITES" != real-e2e ]; then
+    echo "real-e2e didn't finish setting up the test carrier, so the other suites weren't run (tests/.out/logs/real-e2e.log)."
+    break
+  fi
 done
 echo "All: $total_pass passed, $total_fail failed"
 [ -z "$KEEP" ] && stop_all

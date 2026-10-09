@@ -200,6 +200,21 @@ async function twilio(path, params) {
   execSync(`node ${ROOT}/scripts/pilot-carrier.mjs pause ${pid}`, { env, cwd: S });
   st = JSON.parse(db(`select settings from carriers where id = '${pid}'`));
   check("pause puts them straight back in practice mode", st.sandbox === true && st.pilotStage === "shadow");
+  execSync(`node ${ROOT}/scripts/pilot-carrier.mjs resume ${pid}`, { env, cwd: S });
+  st = JSON.parse(db(`select settings from carriers where id = '${pid}'`));
+  check("resume puts them back where they were (live, within the rules)", st.sandbox === false && st.autonomy === "rules" && st.pilotStage === "rules" && !st.pausedFrom, JSON.stringify(st));
+
+  // The stop button, on every carrier at once, and back: the test carrier signed up on its own (no pilot stage).
+  const mainBefore = JSON.parse(db(`select settings from carriers where id = '${cid}'`));
+  const listed = execSync(`node ${ROOT}/scripts/pilot-carrier.mjs list`, { env, cwd: S }).toString();
+  check("list shows each carrier live or in practice", new RegExp(`${pid}\\s+LIVE`).test(listed) && listed.includes(cid), listed);
+  const stopped = execSync(`node ${ROOT}/scripts/pilot-carrier.mjs pause-all`, { env, cwd: S }).toString();
+  const live = db(`select count(*) from carriers where coalesce((settings->>'sandbox')::boolean, false) = false`);
+  check("pause-all: no carrier is live (nothing goes to brokers or drivers)", live === "0" && /in practice mode/.test(stopped), `${live} live; ${stopped}`);
+  execSync(`node ${ROOT}/scripts/pilot-carrier.mjs resume-all`, { env, cwd: S });
+  const mainAfter = JSON.parse(db(`select settings from carriers where id = '${cid}'`));
+  const same = (k) => JSON.stringify(mainBefore[k] ?? null) === JSON.stringify(mainAfter[k] ?? null);
+  check("resume-all: each carrier runs exactly as before, even one with no pilot stage", ["sandbox", "autonomy", "pilotStage"].every(same) && !mainAfter.pausedFrom && JSON.parse(db(`select settings from carriers where id = '${pid}'`)).autonomy === "rules", JSON.stringify({ mainBefore, mainAfter }).slice(0, 300));
   db(`delete from carriers where id in ('${pid}', 'pilot-two')`);
 
   console.log(`\n${passed} passed, ${failed} failed`);

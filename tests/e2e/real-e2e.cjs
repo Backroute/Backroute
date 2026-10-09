@@ -50,7 +50,8 @@ const sub = "aaaaaaaa-0000-0000-0000-000000000001", phone = "12145550100";
 
   // Add a load from its rate con
   await p.getByRole("link", { name: /Go to your dashboard/ }).click();
-  await p.waitForURL(/\/carrier$/);
+  // The dashboard's first compile after a change can take a while on a cold dev server.
+  await p.waitForURL(/\/carrier$/, { timeout: 90000 });
   await p.waitForTimeout(3000);
   // The page's words, less the fleet map (its truck labels and map credits draw in once the tiles arrive).
   const words = () => p.evaluate(() => { const m = document.querySelector("main").cloneNode(true); m.querySelector('section[aria-labelledby="fleet-map-title"]')?.remove(); return m.innerText; });
