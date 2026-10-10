@@ -24,8 +24,10 @@ export default function DriverMessagesPage() {
   const { current } = truckActiveLoads(useCarrierLoads(), truck);
 
   const typing = useAiTyping((s) => !!s.threads[`driver:${driver.id}`]);
+  // Scroll the thread, not the page: the page moving would slide the header and the call button out of reach.
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    const list = endRef.current?.parentElement;
+    list?.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
   }, [messages.length, typing]);
 
   function handleSend() {

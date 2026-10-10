@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Phone, Send } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
@@ -35,10 +35,12 @@ function Messages() {
   const setThread = (t: string) => setPicked({ asked, thread: t });
   const driver = drivers.find((d) => d.id === thread);
   const [calling, setCalling] = useState(false);
+  const [fill, height] = useFillHeight();
 
   return (
-    <div className="flex h-[calc(100vh-73px)] flex-col">
+    <div ref={fill} className="flex flex-col" style={{ height }}>
       <PageHeader
+        compact
         title="Messages"
         description={driver ? `You and ${driver.name}. Backroute's messages to them show too.` : "Ask Backroute about your fleet, not tied to one load"}
         right={
@@ -52,7 +54,7 @@ function Messages() {
         }
       />
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col overflow-hidden px-4 sm:px-8">
-        <div className="flex gap-1.5 overflow-x-auto pt-3 no-scrollbar" role="tablist" aria-label="Conversations">
+        <div className="flex shrink-0 gap-1.5 overflow-x-auto pt-2 no-scrollbar sm:pt-3" role="tablist" aria-label="Conversations">
           {[{ id: "backroute", name: "Backroute" }, ...drivers.map((d) => ({ id: d.id, name: d.name }))].map((t) => (
             <button
               key={t.id}
@@ -71,6 +73,29 @@ function Messages() {
       {calling && <VoiceCallModal spec={{ kind: "fleet", carrierId: carrier.id }} onClose={() => setCalling(false)} />}
     </div>
   );
+}
+
+/**
+ * The height that fills the screen from where the thread starts down to the bottom (above the tab bar on a phone),
+ * so the page itself never scrolls: whatever sits above it (the demo bar, the top bar, the Today/Messages switch).
+ */
+function useFillHeight(): [React.RefObject<HTMLDivElement | null>, string] {
+  const ref = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState("calc(100dvh - 73px)");
+  useLayoutEffect(() => {
+    const fit = () => {
+      const el = ref.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      // Below lg the app's tab bar covers the bottom (the page keeps 6rem free for it).
+      const below = window.innerWidth < 1024 ? 96 : 0;
+      setHeight(`${Math.max(320, window.innerHeight - top - below)}px`);
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
+  return [ref, height];
 }
 
 function Composer({ placeholder, onSend, note }: { placeholder: string; onSend: (text: string) => void; note?: string | null }) {
@@ -110,10 +135,12 @@ function Composer({ placeholder, onSend, note }: { placeholder: string; onSend: 
   );
 }
 
+/** Keeps the newest message in view by scrolling the thread itself; scrolling the page would push the tabs off a phone. */
 function useScrollToEnd(dep: unknown) {
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    const list = endRef.current?.parentElement;
+    list?.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
   }, [dep]);
   return endRef;
 }
@@ -125,7 +152,7 @@ function BackrouteThread({ carrierId }: { carrierId: string }) {
   const endRef = useScrollToEnd(`${messages.length}${typing}`);
   return (
     <>
-      <div className="flex-1 space-y-3 overflow-y-auto py-6">
+      <div className="flex-1 space-y-3 overflow-y-auto py-3 sm:py-6">
         {messages.length === 0 && <p className="py-12 text-center text-sm text-ink-400">Ask about net profit, open escalations, fleet status, or anything else.</p>}
         {messages.map((m) => (
           <div key={m.id} className={cn("flex", m.from === "carrier" ? "justify-end" : "justify-start")}>
@@ -161,7 +188,7 @@ function DriverThread({ driverId, name }: { driverId: string; name: string }) {
   const first = name.split(" ")[0];
   return (
     <>
-      <div className="flex-1 space-y-3 overflow-y-auto py-6">
+      <div className="flex-1 space-y-3 overflow-y-auto py-3 sm:py-6">
         {messages.length === 0 && <p className="py-12 text-center text-sm text-ink-400">Nothing with {first} yet. What you write here goes to their phone.</p>}
         {messages.map((m) => {
           const mine = m.from === "owner";

@@ -79,6 +79,19 @@ the round arrows on its left and right edges (`components/shared/offer-rail.tsx`
   equipment and gets there sooner, with no nights.
 - One reason, one blue button.
 
+## Lists on a phone
+
+- **Live loads on Home** are one line per truck (`components/owner/live-load-row.tsx`): where it's headed, how it's
+  going on the right ("To delivery · 3 h 10 min", "At the shipper", red "Late · ETA" with the red "!" mark), the truck,
+  driver and load number under it, and a thin bar for how far along. Empty trucks come last, grey, with Choose and
+  Auto-pick on the line. The full trip opens from a tap.
+- **Today's stops** put the time on top and the date under it in the left column, and the place, the truck and the
+  status each on their own line, so nothing is cut off. Stops with no clock time come after the day's timed ones.
+- **A page whose content needs the room** (Messages) uses `PageHeader compact`: a slim header on a phone, its
+  description from tablet up. The thread fills the screen down to the tab bar and scrolls by itself; the page doesn't.
+- **The load page leads with what the stage needs:** the deal while it's being won, then the papers, the load sheet, the
+  stops and the driver once it's booked, then getting paid once delivered (`sectionOrder` on the load page).
+
 ## Notifications
 
 - One number in the whole owner dashboard: what needs the owner, on the Home tab. The bell is a quiet history.

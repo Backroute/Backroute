@@ -18,6 +18,7 @@ interface Stop {
   kind: "pickup" | "delivery";
   city: string;
   time: string | null;
+  date: string | null;
   at: number;
   relative: string | null;
   state: { mark: StatusKind; word: string };
@@ -55,7 +56,9 @@ export function TodayBoard() {
         kind,
         city: kind === "pickup" ? `${load.lane.origin}, ${load.lane.originState}` : `${load.lane.destination}, ${load.lane.destState}`,
         time: w.time,
-        at: w.at ?? w.day ?? 0,
+        date: w.date,
+        // A stop with no clock time ("any time", "by appointment") goes after the day's timed ones, not first.
+        at: w.at ?? (w.day ?? 0) + 86_399_000,
         relative: w.relative,
         state: stateOf(load, kind),
       });
@@ -84,19 +87,22 @@ export function TodayBoard() {
             const driver = truck?.driverId ? drivers.get(truck.driverId) : undefined;
             return (
               <li key={s.key} className="border-t border-line first:border-0">
-                <Link href={`/carrier/loads/${s.load.id}`} className="flex items-center gap-3 py-2.5 hover:bg-ink-50">
-                  <span className="w-20 shrink-0 text-xs tabular text-ink-500">{s.time ?? "Any time"}</span>
+                <Link href={`/carrier/loads/${s.load.id}`} className="flex gap-3 py-2.5 hover:bg-ink-50">
+                  <span className="w-[4.75rem] shrink-0 text-xs tabular leading-snug">
+                    <span className="block font-medium text-ink-900">{s.time ?? "Any time"}</span>
+                    {s.date && <span className="block text-ink-400">{s.date}</span>}
+                  </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-ink-900">
+                    <span className="block text-sm font-medium leading-snug text-ink-900">
                       {s.kind === "pickup" ? "Pickup" : "Delivery"} · {s.city}
                     </span>
-                    <span className="block truncate text-xs text-ink-500">
+                    <span className="block text-xs text-ink-500">
                       {truck?.unitNumber ?? "Truck"}
                       {driver ? ` · ${driver.name}` : ""} · {s.load.referenceNumber}
                     </span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-ink-700">
-                    <StatusMark kind={s.state.mark} /> {s.state.word}
+                    <span className="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-ink-700">
+                      <StatusMark kind={s.state.mark} /> {s.state.word}
+                    </span>
                   </span>
                 </Link>
               </li>

@@ -262,18 +262,21 @@ export function PageHeader({
   title,
   description,
   right,
+  compact,
 }: {
   title: string;
   description?: string;
   right?: React.ReactNode;
+  /** A screen whose content needs the room (Messages): a slim header on a phone, the description from tablet up. */
+  compact?: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line bg-white px-4 py-6 sm:px-8">
-      <div>
+    <div className={cn("flex justify-between gap-4 border-b border-line bg-white px-4 sm:px-8", compact ? "items-center py-3 sm:items-start sm:py-6" : "flex-wrap items-start py-6")}>
+      <div className="min-w-0">
         <LargeTitle>{title}</LargeTitle>
-        {description && <p className="mt-1 text-sm text-ink-500">{description}</p>}
+        {description && <p className={cn("mt-1 text-sm text-ink-500", compact && "hidden sm:block")}>{description}</p>}
       </div>
-      {right && <div className="flex items-center gap-3">{right}</div>}
+      {right && <div className="flex shrink-0 items-center gap-3">{right}</div>}
     </div>
   );
 }

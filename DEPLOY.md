@@ -92,7 +92,7 @@ Demo visitors keep the scripted replies unless you set `AI_IN_DEMO=on`. That all
 1. Create a server.
 2. **Sending:** verify your sending domain (DKIM and Return-Path) and set `EMAIL_FROM`, e.g. `dispatch@yourdomain.com`. Replies go out under the carrier's name from that address.
 3. **Inbound:** on the inbound stream, set the webhook to `https://YOUR-SITE/api/channels/email?token=A-LONG-RANDOM-SECRET`. Put the same secret in `EMAIL_WEBHOOK_TOKEN`.
-4. Set `EMAIL_INBOUND_ADDRESS` to the inbound address Postmark gives you (e.g. `abc123@inbound.postmarkapp.com`). Each carrier's own address is that one with `+their-key` added, and it's shown in their Settings.
+4. Set `EMAIL_INBOUND_ADDRESS` to the inbound address Postmark gives you (e.g. `abc123@inbound.postmarkapp.com`). Each carrier's own address is that one with `+their-key` added, and it's shown in their Settings. Every email to a broker carries it as its Reply-To (a bill also the owner's payments email), so a broker's answer, or the rate con they send back, comes to the carrier and not to the shared sending address. Without it, broker replies are lost.
 5. Set `POSTMARK_SERVER_TOKEN`.
 
 ### 5. Vercel: hosting and the two jobs
@@ -305,6 +305,16 @@ In QuickBooks, Backroute finds or makes:
 - the expense accounts "Fuel", "Tolls and Scales" and "Lumper and Driver Expenses"
 
 Costs are recorded against the company's credit card account if it has one, else its bank account.
+
+### 25. The owner's mailbox: Gmail and Outlook (optional)
+
+Brokers email the address on the carrier's setup packets, which is usually the owner's own Gmail or Outlook. Owners can forward it to their Backroute address (Settings shows the steps and a live test), or connect the mailbox so Backroute reads broker mail with no forwarding.
+
+- **Gmail:** in Google Cloud, create an OAuth client (web) with the Gmail API turned on and the `gmail.readonly` scope. Add `PUBLIC_BASE_URL/api/integrations/mailbox/callback` as a redirect address. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. `gmail.readonly` is a **restricted** scope: until Google verifies the app, which includes a yearly third-party security assessment (CASA), only up to 100 test users you add in the console can connect. Plan for weeks and a fee for the assessment.
+- **Outlook / Microsoft 365:** in Microsoft Entra, register an app for "any organization and personal accounts", with the delegated `Mail.Read`, `User.Read` and `offline_access` permissions and the same redirect address. Set `MS_CLIENT_ID` and `MS_CLIENT_SECRET`. Work accounts may need their admin to consent.
+- `PORTAL_VAULT_KEY` must be set: the mailbox's sign-in is stored encrypted with it.
+
+Every dispatcher round, the mail since the last look is listed and only freight mail is taken (from a broker the carrier works with, or a rate con, tender, BOL, setup packet or payment by its subject or file name). The rest is skipped without being stored. Nothing is sent from the mailbox or changed in it. One mailbox per carrier.
 
 ### Security, in short
 

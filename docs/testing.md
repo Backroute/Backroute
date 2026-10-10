@@ -297,6 +297,16 @@ The code was run against local stand-ins that behave like the real services:
     things-for-you list, time off from Home, the office's message marked as such, and an expense that starts with the
     receipt. The unit checks: minutes from what a driver says, Take it books at the broker's last offer, Walk away
     frees the truck, and plans count as one choice.
+  - The "fix everything" round (`fixes-e2e`, 45 in `fixes-unit`): the owner's Gmail connected through Google's sign-in
+    stand-in (a changed state turned away, the sign-in stored sealed), then read for freight mail only (the rate con in,
+    a friend's note and a phone bill skipped, nothing taken twice); the owner's "Backroute test" and Gmail's forwarding
+    code show in the setup and never reach the AI; disconnecting revokes. Every broker email answers to the carrier's
+    Backroute address (`dispatch-e2e`). An invoice sent again to accounts payable, then marked paid $150 short and the
+    broker asked about it, once. Truck papers: the driver sees their truck's and the fleet's, not another truck's or the
+    company's W-9. Screens on a phone: one-line live loads, the load sheet (and no rate for a per-mile driver), papers
+    before money on a load that's moving, Messages with nothing scrolled away. The unit checks: one TONU, who sees the
+    rate, Reply-To, the freight filter, the signed connect state, setup mail, pre-dispatch stops (cards past delivery,
+    hazmat, the 70-hour clock), the ELD's arrive and leave, and the sheet line with no money in it.
   - Leaving (21 checks in `leave-e2e`): only the owner can download or delete. The download comes a page at a time
     (1,005 rows come back as 1,000 + 5), with every file, and never a saved website password or an ELD key. Deleting
     needs the company name typed exactly; if Stripe won't cancel the subscription nothing is deleted; once it does,

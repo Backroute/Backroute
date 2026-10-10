@@ -20,6 +20,7 @@ import type { DriverDocType } from "@/lib/store";
 import type { Load, LoadDocument } from "@/lib/types";
 import { autoCrop, pagesToPdf } from "@/lib/doc-scan";
 import { QuickPreTrip } from "@/components/driver/quick-pretrip";
+import { LiveScanner } from "@/components/driver/live-scanner";
 import { Lane } from "@/components/ui/lane";
 import { usePayView } from "@/lib/pay-view";
 import { useDriverUi } from "@/lib/lang/use-driver-ui";
@@ -631,9 +632,12 @@ export function DocumentSlot({ doc, label, readOnly, onFile, pagesKey }: { doc?:
   const adding = useRef(false);
   const [, bump] = useState(0);
   const pageCount = pagesKey ? PAGES.get(pagesKey)?.length ?? 0 : 0;
+  // The live camera with hints when the phone has one; otherwise (or by choice) the phone's own picker.
+  const [scanning, setScanning] = useState(false);
   const pick = (add: boolean) => {
     adding.current = add;
-    input.current?.click();
+    if (typeof navigator !== "undefined" && "mediaDevices" in navigator && typeof navigator.mediaDevices?.getUserMedia === "function") setScanning(true);
+    else input.current?.click();
   };
 
   const send = (file: File, preview?: File) => onFile({ name: file.name, previewUrl: (preview ?? file).type.startsWith("image/") ? URL.createObjectURL(preview ?? file) : undefined, file });
@@ -652,7 +656,10 @@ export function DocumentSlot({ doc, label, readOnly, onFile, pagesKey }: { doc?:
   async function handle(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file) return;
+    if (file) await check(file);
+  }
+
+  async function check(file: File) {
     const verdict = await checkPhoto(file);
     if (!verdict.ok) return setDoubt({ file, why: verdict.why });
     setDoubt(null);
@@ -661,7 +668,17 @@ export function DocumentSlot({ doc, label, readOnly, onFile, pagesKey }: { doc?:
   }
 
   const picker = readOnly ? null : (
-    <input ref={input} type="file" accept="image/*,application/pdf" onChange={(e) => void handle(e)} className="sr-only" tabIndex={-1} aria-label={label} />
+    <>
+      <input ref={input} type="file" accept="image/*,application/pdf" onChange={(e) => void handle(e)} className="sr-only" tabIndex={-1} aria-label={label} />
+      {scanning && (
+        <LiveScanner
+          label={label}
+          onClose={() => setScanning(false)}
+          onFile={() => (setScanning(false), input.current?.click())}
+          onPhoto={(f) => (setScanning(false), void check(f))}
+        />
+      )}
+    </>
   );
 
   if (doubt)
@@ -670,7 +687,7 @@ export function DocumentSlot({ doc, label, readOnly, onFile, pagesKey }: { doc?:
         {picker}
         <p className="text-xs leading-snug text-white/85">{PHOTO_PROBLEM[doubt.why]}</p>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => input.current?.click()} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-semibold text-ink-950">
+          <button type="button" onClick={() => pick(adding.current)} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-semibold text-ink-950">
             <Camera className="h-3.5 w-3.5" /> Retake
           </button>
           <button

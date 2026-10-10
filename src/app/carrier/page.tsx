@@ -7,11 +7,13 @@ import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ActivityFeed } from "@/components/shared/activity-feed";
-import { TripCompactCard, TripDetails, TripSheet } from "@/components/shared/trip-compact";
+import { TripDetails, TripSheet } from "@/components/shared/trip-compact";
 import type { DriverTripCardProps } from "@/components/shared/driver-trip-card";
 import { Switch } from "@/components/ui/switch";
 import { PickNextLoad, choiceCount } from "@/components/shared/pick-next-load";
 import { TodayBoard } from "@/components/owner/today-board";
+import { LiveLoadRow } from "@/components/owner/live-load-row";
+import { StatusMark } from "@/components/ui/mark";
 import { ContactRow } from "@/components/shared/contact-row";
 import { IncidentCard } from "@/components/shared/incident-card";
 import { DailyTextPreview } from "@/components/shared/daily-text";
@@ -165,42 +167,37 @@ export default function CarrierOverviewPage() {
               View fleet <ArrowUpRight className="h-3.5 w-3.5" />
             </Button>
           </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {fleet.map(({ truck, driver, current, next }) => {
+          {/* One line per truck: a fleet fits on a phone screen. Empty trucks come after the moving ones. */}
+          <div className="divide-y divide-line overflow-hidden rounded-3xl border border-line bg-white">
+            {[...fleet].sort((a, b) => Number(!a.current) - Number(!b.current)).map(({ truck, driver, current, next }) => {
               const hasOffers = trucksWithOffers.has(truck.id);
+              const who = `${truck.unitNumber} · ${driver?.name ?? "Unassigned"}`;
               if (!current) {
                 return (
-                  <div key={truck.id} className="flex flex-col justify-between gap-3 rounded-3xl border border-line bg-white p-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">
-                        {truck.unitNumber} · {driver?.name ?? "Unassigned"}{driver ? ` · ${RUN_TYPE_LABEL[driver.runType]}` : ""}
+                  <div key={truck.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
+                    <span className="flex h-4 w-3.5 shrink-0 items-center justify-center">
+                      <StatusMark kind="off" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-ink-950">Empty in {truck.currentCity}, {truck.currentState}</p>
+                      <p className="truncate text-xs text-ink-500">
+                        {who}{driver ? ` · ${RUN_TYPE_LABEL[driver.runType]}` : ""} · {hasOffers ? `${choicesFor(truck.id)} load${choicesFor(truck.id) === 1 ? "" : "s"} to pick from` : "looking for the next load"}
                       </p>
-                      <p className="mt-0.5 text-lg font-semibold text-ink-950">Available in {truck.currentCity}, {truck.currentState}</p>
-                      <p className="mt-1 text-xs text-ink-500">
-                        {hasOffers ? `${choicesFor(truck.id)} load${choicesFor(truck.id) === 1 ? "" : "s"} ready for your pick.` : "Looking for the next load."}
-                      </p>
-                      {hasOffers && (
-                        <Button size="sm" className="mt-3" onClick={() => setPicking(truck.id)}>
-                          Choose
-                        </Button>
-                      )}
                     </div>
-                    <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
-                      <span className="text-xs font-medium text-ink-700">Auto-pick the next load</span>
+                    {hasOffers && (
+                      <Button size="sm" onClick={() => setPicking(truck.id)}>
+                        Choose
+                      </Button>
+                    )}
+                    <span className="flex items-center gap-2 text-xs text-ink-500">
+                      Auto-pick
                       <Switch checked={!!truck.autoChainNextLoad} onChange={(on) => setAutoChain(truck.id, on)} label={`Auto-pick the next load for ${truck.unitNumber}`} />
-                    </div>
+                    </span>
                   </div>
                 );
               }
-              return (
-                <TripCompactCard
-                  key={truck.id}
-                  {...carrierTripProps(truck, driver, current, next, hasOffers)}
-                  showMap={false}
-                  truckLabel={`${truck.unitNumber} · ${driver?.name ?? "Unassigned"}${driver ? ` · ${RUN_TYPE_LABEL[driver.runType]}` : ""}`}
-                  onOpen={() => setOpenTruckId(truck.id)}
-                />
-              );
+              const props = carrierTripProps(truck, driver, current, next, hasOffers);
+              return <LiveLoadRow key={truck.id} load={current} who={who} needsPreTrip={!!props.needsPreTrip} onOpen={() => setOpenTruckId(truck.id)} />;
             })}
           </div>
         </section>

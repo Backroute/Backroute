@@ -398,6 +398,44 @@ What the real version does today, and what it doesn't do yet. How to switch each
     address, on duty, location already allowed; nothing is marked until the driver says yes).
   - **Time off from Home**, under when they're home next. All of it in the app's 7 languages.
 
+- **Rate cons reach Backroute first:**
+  - **Broker answers come back to the carrier.** Every email to a broker carries the carrier's own Backroute address as
+    its Reply-To (an invoice also the payments email). Before, a broker's reply went to the shared sending address and
+    was lost.
+  - **Connect Gmail or Outlook** (Settings → Phone, text and email): read-only, every few minutes, freight mail only
+    (`lib/agent/mailbox.ts`, `api/integrations/mailbox`). The same email forwarded and read is taken once.
+  - **Email setup, step by step, with a live test:** connect, or forward (Gmail, Outlook and other steps; Gmail's
+    confirmation code shows in the app as it arrives), then send "Backroute test" to the usual address and watch it
+    arrive. If it came straight to the Backroute address, it says forwarding wasn't tested.
+- **One TONU everywhere:** what the rate con says, else the carrier's fee (Settings), else $150. The cancel form, the
+  claim, the invoice and the signed rate con all use it (`lib/tonu.ts`).
+- **Drivers see their own pay, not what the load pays** (`lib/pay-view.ts`). Owner-operators and drivers paid a
+  percentage still see the rate; the owner can switch it per driver in Fleet. It's what the screens show: the load's
+  numbers still come down to the phone with the load.
+- **The load page leads with what the stage needs:** the broker and the money while winning it; the papers, the load
+  sheet, the stops and who's driving once booked; getting paid once delivered.
+- **Getting paid, one invoice at a time:** open it, send it again (to the broker's accounts payable), send the packet to
+  factoring, remind the broker now, or mark it paid. Paid short, Backroute asks the broker what the difference is for
+  (`api/agent/invoice`).
+- **More off the rate con:** pickup and delivery numbers, every other reference number (BOL, PO, PRO, seal), the
+  commodity, weight, pieces and special instructions. The driver gets them as a **load sheet** (never the rate) on the
+  trip card, the load page and in the new-load text; the numbers copy with a tap.
+- **Dock times from the ELD:** pulling into the shipper's or receiver's lot marks the truck arrived; driving out records
+  when it left, which detention is measured to (`lib/agent/geofence.ts`). Only with the dock's street address found
+  exactly; the driver's own tap, when first, stays.
+- **Truck papers on the driver's phone** for a roadside inspection: registration (cab card), insurance card, IFTA
+  license, annual inspection. The office adds them per truck or for the whole fleet in Fleet; the driver shows them
+  from Profile.
+- **Before dispatch:** hours today and on the 70-hour clock, CDL and medical card good past delivery, and the
+  endorsements the load needs (hazmat, tanker, doubles, TWIC; set per driver in Settings → paperwork). The AI never
+  puts a load on a driver who can't legally run it, and tells the owner when one is booked anyway. The load page shows
+  the list, and Reassign shows each truck's stops.
+- **Live scan:** the camera with a hint as the driver lines up the page (too dark, glare, hold still, get the whole page
+  in, looks good), then the same crop and check as before. No camera: the phone's own picker.
+- **Home's live loads are one line each** (where, how it's going, a thin progress bar), so a fleet fits on a phone;
+  empty trucks follow with Choose and Auto-pick. **Messages** keeps a slim header on a phone. **Today's stops** show
+  the date, wrap instead of cutting off, and put stops with no set time after the timed ones.
+
 ## What it doesn't do yet
 
 The AI now does the day-to-day work of a dispatcher by email, text and phone. What's still out of its reach, or needs something from outside:
@@ -429,6 +467,9 @@ The AI now does the day-to-day work of a dispatcher by email, text and phone. Wh
 - **Weather covers the US and Canada only.** Mexico isn't covered.
 - **Holidays are the US ones.** A dock's hours come from what drivers told the AI, else its posted hours on Google Places (a heads-up only). A dock with neither is assumed open.
 - **Parking needs a reservation partner** (step 23). The API Backroute expects is small and written down. Each network (Truck Parking Club, TA, Pilot) has its own partner terms. Without one, the AI finds lots nearby and the driver books in their truck stop app.
+- **Reading Gmail needs Google's verification** (step 25): `gmail.readonly` is a restricted scope, so until the app passes Google's review and yearly security assessment, only test users can connect. Outlook needs no review, but some company accounts need their admin's consent. Forwarding works for everyone meanwhile.
+- **Hiding the rate from drivers is what the screens show,** not a lock: the load's numbers still reach the phone with the load (they're needed for the driver's pay). Keeping them off the phone entirely would mean a separate driver view of each load on the server.
+- **Dock times from the ELD need a routing account** (step 12) to find the dock's exact spot from its street address, and an ELD connected (step 8). Without either, the driver taps.
 - **QuickBooks Online needs Backroute's Intuit app approved** for production (step 24); until then it runs against Intuit's sandbox companies. QuickBooks Desktop isn't supported, and a payment already in QuickBooks isn't changed when a load's charges change after it was paid.
 - **Real accounts' emailed plans are up to three loads.** Two or three emailed loads that chain, or two or three partials that share the trailer, show as one choice; more than that, and long runs, are picked one load at a time (partials picked one by one still ride together), and the server books up to three loads ahead by itself. Rest stops are named by the nearest known freight town to the straight line between stops, not truck routing.
 - **Partial trips choose their order on rough miles.** The stop order is picked on straight-line miles times the usual detour (the miles it adds are then measured by truck road when HERE is set up), and trailer space in feet, from the broker's feet or the pallets' floor spots: stackable pallets go two high when two fit under the roof (108 inches inside), "do not stack" takes a spot each, and a pallet taller than the trailer is turned down. Read from the broker's email or the board's notes. A trip of partials can wait behind the lineup's last full load, but the first partial there is booked like any lineup load (so with three lined up already, none is added). A load that has to come off from behind another is a heads-up to the driver, not something the AI arranges with the shipper.
