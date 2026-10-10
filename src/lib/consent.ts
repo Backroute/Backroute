@@ -36,6 +36,11 @@ export async function consentsFor(carrierId: string): Promise<Map<string, Consen
   return out;
 }
 
+/** Texts to this driver wait for their yes (CONSENT_REQUIRED=1 and they haven't said it): nothing is claimed or sent. */
+export async function textsHeld(carrierId: string, driverId: string): Promise<boolean> {
+  return consentRequired() && !(await consentOf(carrierId, driverId))?.granted;
+}
+
 async function consentOf(carrierId: string, driverId: string): Promise<ConsentRecord | null> {
   const { data } = await admin().from("driver_consents").select("driver_id, granted, via, at, version").eq("carrier_id", carrierId).eq("driver_id", driverId).order("at", { ascending: false }).limit(1);
   const r = data?.[0];

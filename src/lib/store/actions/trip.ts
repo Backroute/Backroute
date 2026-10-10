@@ -352,7 +352,7 @@ export const tripActions = (set: SetState, get: GetState): Pick<Actions, "driver
       const activityEvent: ActivityEvent = {
         id: uid("act"), timestamp: new Date().toISOString(), type: "dvir" as const,
         message: `${kindLabel} DVIR ${overallStatus === "pass" ? "passed" : "flagged a defect"}: ${truck?.unitNumber ?? truckId}`,
-        detail: overallStatus === "defect" ? items.filter((i) => i.status === "defect").map((i) => i.label).join(", ") : undefined,
+        detail: overallStatus === "defect" ? items.filter((i) => i.status === "defect").map((i) => (i.note ? `${i.label}: ${i.note}` : i.label)).join(", ") : undefined,
         carrierId: PRIMARY_CARRIER_ID, severity: (overallStatus === "pass" ? "success" : "warning") as ActivityEvent["severity"],
       };
 
@@ -365,7 +365,7 @@ export const tripActions = (set: SetState, get: GetState): Pick<Actions, "driver
 
       const escalation: Escalation = {
         id: uid("esc"), loadId: truck?.currentLoadId ?? "", carrierId: PRIMARY_CARRIER_ID,
-        reason: `${kindLabel} DVIR on ${truck?.unitNumber ?? truckId} flagged a defect: ${items.filter((i) => i.status === "defect").map((i) => i.label).join(", ")}.`,
+        reason: `${kindLabel} DVIR on ${truck?.unitNumber ?? truckId} flagged a defect: ${items.filter((i) => i.status === "defect").map((i) => (i.note ? `${i.label} (${i.note})` : i.label)).join(", ")}.${items.some((i) => i.photoFileId || i.photoPreview) ? " Photo on the inspection." : ""}`,
         createdAt: new Date().toISOString(), status: "open", complexity: "critical",
       };
       return {
@@ -417,13 +417,15 @@ export const tripActions = (set: SetState, get: GetState): Pick<Actions, "driver
       };
     }),
 
-  submitExpense: (driverId, loadId, category, amount, note) =>
+  submitExpense: (driverId, loadId, category, amount, note, receipt) =>
     set((state) => {
       if (!Number.isFinite(amount) || amount <= 0) return {};
       const driver = state.drivers.find((d) => d.id === driverId);
       const expense: Expense = {
-        id: uid("exp"), driverId, carrierId: PRIMARY_CARRIER_ID, loadId, category, amount: Math.round(amount), note,
+        id: uid("exp"), driverId, carrierId: PRIMARY_CARRIER_ID, loadId, category, amount: Math.round(amount * 100) / 100, note,
         status: "pending", createdAt: new Date().toISOString(),
+        ...(receipt?.fileId ? { receiptFileId: receipt.fileId } : {}),
+        ...(receipt?.preview ? { receiptPreview: receipt.preview } : {}),
       };
       return {
         expenses: [expense, ...state.expenses],

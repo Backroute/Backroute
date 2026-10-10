@@ -9,7 +9,7 @@ import { LayoutGrid, Monitor, Moon, Pause, Play, Settings, Sun, Truck, Users, Wa
 import { useRouter } from "next/navigation";
 import { setTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { slideTypes } from "@/lib/nav-direction";
+import { noteNavigation, slideTypes } from "@/lib/nav-direction";
 import { isAlert, isUrgent } from "@/lib/alerts";
 import { PortalShell, type NavItem } from "@/components/shared/portal-shell";
 import { TopBar } from "@/components/shared/top-bar";
@@ -25,8 +25,10 @@ import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierLoads } from "@/lib/selectors";
 import { InstallPrompt } from "@/components/shared/install-prompt";
 
-/** Five sections instead of eleven pages; each section's pages sit on tabs inside it. */
-const SECTIONS: { nav: NavItem; tabs: { href: string; label: string }[] }[] = [
+/** Five sections instead of eleven pages; each section's pages sit on tabs inside it, three at most so they fit a
+ *  phone. A tab with `sub` pages shows them as a switch under the tabs (the first one is the tab's own page). */
+type Tab = { href: string; label: string; sub?: { href: string; label: string }[] };
+const SECTIONS: { nav: NavItem; tabs: Tab[] }[] = [
   { nav: { href: "/carrier", label: "Home", icon: LayoutGrid }, tabs: [{ href: "/carrier", label: "Today" }, { href: "/carrier/messages", label: "Messages" }] },
   { nav: { href: "/carrier/loads", label: "Loads", icon: Truck }, tabs: [{ href: "/carrier/loads", label: "All loads" }, { href: "/carrier/negotiations", label: "Negotiating" }, { href: "/carrier/customers", label: "Customers" }] },
   {
@@ -36,31 +38,48 @@ const SECTIONS: { nav: NavItem; tabs: { href: string; label: string }[] }[] = [
   {
     nav: { href: "/carrier/earnings", label: "Money", icon: Wallet },
     tabs: [
-      { href: "/carrier/earnings", label: "Earnings" },
+      {
+        href: "/carrier/earnings",
+        label: "Earnings",
+        sub: [
+          { href: "/carrier/earnings", label: "Overview" },
+          { href: "/carrier/lanes", label: "Lanes" },
+          { href: "/carrier/brokers", label: "Brokers" },
+        ],
+      },
       { href: "/carrier/settlements", label: "Getting paid" },
-      { href: "/carrier/pay", label: "Driver pay" },
-      { href: "/carrier/costs", label: "Fuel & tolls" },
-      { href: "/carrier/lanes", label: "Lanes" },
-      { href: "/carrier/brokers", label: "Brokers" },
+      {
+        href: "/carrier/pay",
+        label: "Costs & drivers",
+        sub: [
+          { href: "/carrier/pay", label: "Driver pay" },
+          { href: "/carrier/costs", label: "Fuel & tolls" },
+        ],
+      },
     ],
   },
   { nav: { href: "/carrier/settings", label: "Settings", icon: Settings }, tabs: [] },
 ];
-const NAV: NavItem[] = SECTIONS.map((sec) => ({ ...sec.nav, match: sec.tabs.map((t) => t.href).filter((h) => h !== sec.nav.href) }));
+/** Every page a tab stands for: its own and its switch's. */
+const pagesOf = (t: Tab) => (t.sub ? t.sub.map((x) => ({ href: x.href, label: x.label === "Overview" ? t.label : x.label })) : [{ href: t.href, label: t.label }]);
+const NAV: NavItem[] = SECTIONS.map((sec) => ({ ...sec.nav, match: sec.tabs.flatMap(pagesOf).map((t) => t.href).filter((h) => h !== sec.nav.href) }));
 const BOOKS_NAV = new Set(["/carrier/fleet", "/carrier/earnings", "/carrier/settings"]);
-const BOOKS_PAGES = SECTIONS.filter((sec) => BOOKS_NAV.has(sec.nav.href)).flatMap((sec) => (sec.tabs.length ? sec.tabs.map((t) => t.href) : [sec.nav.href]));
-const ALL_PAGES = SECTIONS.flatMap((sec) => (sec.tabs.length ? sec.tabs : [{ href: sec.nav.href, label: sec.nav.label }]).map((t) => ({ ...t, icon: sec.nav.icon })));
+const BOOKS_PAGES = SECTIONS.filter((sec) => BOOKS_NAV.has(sec.nav.href)).flatMap((sec) => (sec.tabs.length ? sec.tabs.flatMap(pagesOf).map((t) => t.href) : [sec.nav.href]));
+const ALL_PAGES = SECTIONS.flatMap((sec) => (sec.tabs.length ? sec.tabs.flatMap(pagesOf) : [{ href: sec.nav.href, label: sec.nav.label }]).map((t) => ({ ...t, icon: sec.nav.icon })));
+const onPage = (pathname: string, href: string) => pathname === href || (href !== "/carrier" && pathname.startsWith(`${href}/`));
+const onTab = (pathname: string, t: Tab) => pagesOf(t).some((x) => onPage(pathname, x.href));
 
 /** The tabs of whichever section the current page belongs to. */
 function SectionTabs() {
   const pathname = usePathname();
-  const section = SECTIONS.find((sec) => sec.tabs.some((t) => pathname === t.href || (t.href !== "/carrier" && pathname.startsWith(`${t.href}/`))));
+  const section = SECTIONS.find((sec) => sec.tabs.some((t) => onTab(pathname, t)));
   if (!section || section.tabs.length < 2) return null;
-  const currentTab = section.tabs.find((t) => pathname === t.href || (t.href !== "/carrier" && pathname.startsWith(`${t.href}/`)));
+  const currentTab = section.tabs.find((t) => onTab(pathname, t));
   return (
+    <>
     <nav aria-label={`${section.nav.label} sections`} className="flex gap-1 overflow-x-auto border-b border-line px-4 pt-3 no-scrollbar sm:px-8">
       {section.tabs.map((t) => {
-        const active = pathname === t.href || (t.href !== "/carrier" && pathname.startsWith(`${t.href}/`));
+        const active = onTab(pathname, t);
         return (
           <Link
             key={t.href}
@@ -77,6 +96,24 @@ function SectionTabs() {
         );
       })}
     </nav>
+    {currentTab?.sub && (
+      <nav aria-label={`${currentTab.label} pages`} className="flex gap-1.5 overflow-x-auto px-4 pt-3 no-scrollbar sm:px-8">
+        {currentTab.sub.map((x) => {
+          const active = onPage(pathname, x.href);
+          return (
+            <Link
+              key={x.href}
+              href={x.href}
+              aria-current={active ? "page" : undefined}
+              className={cn("shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium", active ? "bg-ink-950 text-white" : "bg-ink-100 text-ink-700 hover:bg-ink-150")}
+            >
+              {x.label}
+            </Link>
+          );
+        })}
+      </nav>
+    )}
+    </>
   );
 }
 
@@ -103,6 +140,7 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
   // A bookkeeper keeps the books: Money, the fleet's papers, and Settings. Dispatching isn't theirs.
   const books = useStore((s) => s.session.mode === "books");
   const pathname = usePathname();
+  useEffect(() => noteNavigation(pathname), [pathname]);
   useEffect(() => {
     if (books && !BOOKS_PAGES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) router.replace("/carrier/earnings");
   }, [books, pathname, router]);

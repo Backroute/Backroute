@@ -212,6 +212,7 @@ export const simulationActions = (set: SetState, get: GetState): Pick<Actions, "
           id: uid("esc"), loadId: target.id, carrierId: PRIMARY_CARRIER_ID,
           reason: template.reason, createdAt: new Date().toISOString(), status: "open",
           complexity: template.complexity, recommendedAction: template.recommendedAction, recommendedLabel: template.recommendedLabel,
+          ...(template.answers && target.stage === "negotiating" ? { answers: template.answers } : {}),
         };
         escalations = [esc, ...escalations];
         newEvents.push({

@@ -54,6 +54,7 @@ export default function DriverMessagesPage() {
         {messages.map((m) => (
           <div key={m.id} className={cn("flex", m.from === "driver" ? "justify-end" : "justify-start")}>
             <div className={cn("max-w-[80%] rounded-2xl px-4 py-2.5 text-sm", m.from === "driver" ? "bg-ink-950 text-white rounded-br-sm" : "bg-ink-100 text-ink-900 rounded-bl-sm")}>
+              {m.from === "owner" && <p className="mb-0.5 text-xs font-semibold text-ink-700">The office</p>}
               <p className="leading-relaxed">{m.content}</p>
               <p className={cn("mt-1 flex items-center gap-1.5 text-xs", m.from === "driver" ? "text-white/70" : "text-ink-500")}>
                 <TimeAgo iso={m.timestamp} />

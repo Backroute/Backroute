@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, ChevronDown } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,9 @@ import { ActivityFeed } from "@/components/shared/activity-feed";
 import { TripCompactCard, TripDetails, TripSheet } from "@/components/shared/trip-compact";
 import type { DriverTripCardProps } from "@/components/shared/driver-trip-card";
 import { Switch } from "@/components/ui/switch";
-import { NextLoadOffers } from "@/components/shared/next-load-offers";
+import { PickNextLoad, choiceCount } from "@/components/shared/pick-next-load";
+import { TodayBoard } from "@/components/owner/today-board";
+import { ContactRow } from "@/components/shared/contact-row";
 import { IncidentCard } from "@/components/shared/incident-card";
 import { DailyTextPreview } from "@/components/shared/daily-text";
 import { WeeklyReviewCard } from "@/components/cloud/weekly-review-card";
@@ -43,14 +45,14 @@ export default function CarrierOverviewPage() {
   const truckMap = useTruckMap();
   const { escalations, offerGroups, count: needsYouCount } = useNeedsYou();
   const activity = useStore((s) => s.activity).filter((e) => e.carrierId === carrier.id);
-  const selectLoadOffer = useStore((s) => s.actions.selectLoadOffer);
-  const requestOfferDetail = useStore((s) => s.actions.requestOfferDetail);
-  const resolveOfferDetail = useStore((s) => s.actions.resolveOfferDetail);
   const resolveEscalation = useStore((s) => s.actions.resolveEscalation);
   const dvirs = useStore((s) => s.dvirInspections);
   const setAutoChain = useStore((s) => s.actions.setAutoChain);
   const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
   const [openTruckId, setOpenTruckId] = useState<string | null>(null);
+  const [picking, setPicking] = useState<string | null>(null);
+  const [more, setMore] = useState(false);
+  const callNow = useStore((s) => s.dispatchCalls.some((c) => c.carrierId === carrier.id && (c.status === "live" || c.status === "ringing")));
   const router = useRouter();
   const now = useNow();
   const incidents = useStore((s) => s.incidents).filter(
@@ -64,6 +66,7 @@ export default function CarrierOverviewPage() {
   const chainedCount = trucks.filter((t) => t.nextLoadId).length;
 
   const trucksWithOffers = new Set(offerGroups.map(([, group]) => group[0]?.truckId).filter(Boolean));
+  const choicesFor = (truckId: string) => choiceCount(offerGroups.filter(([, g]) => g[0]?.truckId === truckId));
 
   const fleet = trucks.map((truck) => ({ truck, driver: driverMap.get(truck.driverId ?? ""), ...truckActiveLoads(loads, truck) }));
   const openTrip = fleet.find((f) => f.truck.id === openTruckId);
@@ -150,24 +153,7 @@ export default function CarrierOverviewPage() {
 
         <NeedsYouList />
 
-        {offerGroups.length > 0 && (
-          <div id="next-load" className="scroll-mt-4">
-            <NextLoadOffers
-              offerGroups={offerGroups}
-              brokers={brokers}
-              trucks={truckMap}
-              drivers={driverMap}
-              onSelect={(groupId, loadId, also) => selectLoadOffer(groupId, loadId, "carrier", also)}
-              onAsk={(loadId, text) => requestOfferDetail(loadId, text)}
-              onAskResolve={(loadId, draft) => resolveOfferDetail(loadId, draft)}
-            />
-          </div>
-        )}
-
-        <FleetMap
-          dots={fleet.map(({ truck, driver, current }) => ({ truck, driver, current }))}
-          onSelect={(id) => (fleet.find((f) => f.truck.id === id)?.current ? setOpenTruckId(id) : router.push("/carrier/fleet"))}
-        />
+        <TodayBoard />
 
         <section aria-labelledby="live-loads-title">
           <div className="mb-3 flex items-end justify-between gap-3">
@@ -191,8 +177,13 @@ export default function CarrierOverviewPage() {
                       </p>
                       <p className="mt-0.5 text-lg font-semibold text-ink-950">Available in {truck.currentCity}, {truck.currentState}</p>
                       <p className="mt-1 text-xs text-ink-500">
-                        {hasOffers ? "3 loads ready for your pick." : "Looking for the next load."}
+                        {hasOffers ? `${choicesFor(truck.id)} load${choicesFor(truck.id) === 1 ? "" : "s"} ready for your pick.` : "Looking for the next load."}
                       </p>
+                      {hasOffers && (
+                        <Button size="sm" className="mt-3" onClick={() => setPicking(truck.id)}>
+                          Choose
+                        </Button>
+                      )}
                     </div>
                     <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
                       <span className="text-xs font-medium text-ink-700">Auto-pick the next load</span>
@@ -214,7 +205,29 @@ export default function CarrierOverviewPage() {
           </div>
         </section>
 
-        <DriverCallsBoard />
+        {/* A call with a driver going on right now comes up; the call log, money and the rest wait under More. */}
+        {callNow && <DriverCallsBoard />}
+
+        <section aria-label="More">
+          <button
+            type="button"
+            aria-expanded={more}
+            onClick={() => setMore((v) => !v)}
+            className="flex w-full items-center justify-between rounded-2xl border border-line bg-white px-4 py-3 text-sm font-medium text-ink-800 hover:bg-ink-50"
+          >
+            {more ? "Less" : "More: map, money, calls and what Backroute did"}
+            <ChevronDown className={`h-4 w-4 text-ink-400 transition-transform ${more ? "rotate-180" : ""}`} />
+          </button>
+        </section>
+
+        {more && (
+        <>
+        <FleetMap
+          dots={fleet.map(({ truck, driver, current }) => ({ truck, driver, current }))}
+          onSelect={(id) => (fleet.find((f) => f.truck.id === id)?.current ? setOpenTruckId(id) : router.push("/carrier/fleet"))}
+        />
+
+        {!callNow && <DriverCallsBoard />}
 
         {dailyText && <DailyTextPreview />}
 
@@ -232,10 +245,15 @@ export default function CarrierOverviewPage() {
             <ActivityFeed events={activity.slice(0, 8)} />
           </CardContent>
         </Card>
+        </>
+        )}
       </div>
+
+      <PickNextLoad truckId={picking} open={!!picking} onClose={() => setPicking(null)} />
 
       {openTrip?.current && (
         <TripSheet open onClose={() => setOpenTruckId(null)} title={`${openTrip.truck.unitNumber} · ${openTrip.driver?.name ?? "Unassigned"}`} wide>
+          <ContactRow driver={openTrip.driver} broker={brokers.get(openTrip.current.brokerId)} className="px-2" />
           <TripDetails
             {...carrierTripProps(openTrip.truck, openTrip.driver, openTrip.current, openTrip.next, trucksWithOffers.has(openTrip.truck.id))}
             autoPick={!!openTrip.truck.autoChainNextLoad}

@@ -1,6 +1,6 @@
 /** Helpers the store's actions share: ids, the demo simulation's pieces, and replies the demo AI gives. */
 import { generateWorld, PRIMARY_CARRIER_ID } from "../mock-data";
-import { createIncident, incidentOpenedEvent, lineUpChoice, nextInPlan, resolveLoadOffer, scriptBrokerCall, type InstructionCategory } from "../engine";
+import { applyBookedEconomics, createIncident, incidentOpenedEvent, lineUpChoice, nextInPlan, resolveLoadOffer, scriptBrokerCall, type InstructionCategory } from "../engine";
 import { nextStop } from "../load-status";
 import { cityCoords, distanceMiles } from "../trip-geo";
 import { homeTimeStatus } from "../home";
@@ -241,6 +241,35 @@ export function rateConDecision(state: StoreState, escalationId: string, approve
   };
 }
 
+/**
+ * The owner's answer to a broker under their floor, right from the card: take it books the load at the broker's last
+ * offer; walk away stops negotiating and the truck goes back to getting offers. Null when it isn't that kind of call.
+ */
+export function takeOrWalk(state: StoreState, escalationId: string, take: boolean) {
+  const esc = state.escalations.find((e) => e.id === escalationId);
+  const load = esc?.answers ? state.loads.find((l) => l.id === esc.loadId) : undefined;
+  if (!esc || !load || load.stage !== "negotiating") return null;
+  const broker = state.brokers.find((b) => b.id === load.brokerId);
+  const name = broker?.company ?? "the broker";
+  const iso = new Date().toISOString();
+  const base = { id: uid("act"), timestamp: iso, loadId: load.id, carrierId: load.carrierId };
+  if (take) {
+    const offer = [...load.messages].reverse().find((m) => m.direction === "inbound" && m.offerAmount)?.offerAmount ?? load.listedRate;
+    const next: Load = { ...load, stage: "rate_confirmed", bookedRate: offer, updatedAt: iso, documents: [...load.documents, { id: uid("doc"), type: "rate_confirmation", name: `RateCon_${load.referenceNumber}.pdf`, generatedAt: iso, status: "verified" }] };
+    applyBookedEconomics(next, load, offer, broker?.reliability ?? 70);
+    return {
+      loads: state.loads.map((l) => (l.id === load.id ? next : l)),
+      trucks: state.trucks,
+      events: [{ ...base, type: "rate_confirmed" as const, message: `You took ${name}'s offer. Backroute is checking the rate con`, detail: `${load.referenceNumber} · $${offer.toLocaleString()} all-in`, severity: "success" as const }],
+    };
+  }
+  return {
+    loads: state.loads.map((l) => (l.id === load.id ? { ...l, stage: "declined" as const, cancellationReason: "You walked away: under your floor", updatedAt: iso, progressPct: 100 } : l)),
+    trucks: state.trucks.map((t) => (t.nextLoadId === load.id ? { ...t, nextLoadId: null } : t)),
+    events: [{ ...base, type: "load_cancelled" as const, message: `Walked away from ${name}`, detail: `${load.lane.origin} → ${load.lane.destination} · under your floor. Backroute is finding another load`, severity: "info" as const }],
+  };
+}
+
 export const DRIVER_DOC_LABEL: Record<DriverDocType, string> = { bol: "BOL", pod: "POD", lumper_receipt: "lumper receipt" };
 
 /** What the AI "reads" off a driver's document photo — the details a dispatcher would otherwise check by hand. */
@@ -259,6 +288,8 @@ export interface EscalationTemplate {
   complexity: "routine" | "critical";
   recommendedAction?: "approve" | "reject";
   recommendedLabel?: string;
+  /** Answered right on the card, when the load is still being negotiated. */
+  answers?: { yes: string; no: string };
 }
 
 /** Routine cases: the AI already knows the right call — carrier gets a one-tap default action. Critical cases: no safe default, routed to human support instead. */
@@ -290,6 +321,7 @@ export const ESCALATION_TEMPLATES: EscalationTemplate[] = [
   {
     reason: "The broker offered 8% under your floor. Take it or walk?",
     complexity: "critical",
+    answers: { yes: "Take it", no: "Walk away" },
   },
   {
     reason: "Broker disputing the signed rate confirmation, refusing to pay the agreed amount.",

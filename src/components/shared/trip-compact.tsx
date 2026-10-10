@@ -29,6 +29,7 @@ import {
 } from "./driver-trip-card";
 import { Lane } from "@/components/ui/lane";
 import { StatusMark } from "@/components/ui/mark";
+import { QuickPreTrip } from "@/components/driver/quick-pretrip";
 
 /** The small, always-current trip card — Uber's collapsed sheet: where, when, how far along, and the one next
  *  step (with its button when it's the driver's to take). Tap it for everything else. */
@@ -100,9 +101,12 @@ export function TripCompactCard({
           {action === "loaded" || action === "unloaded" ? (
             <PillButton onClick={() => onTripStep(load.id, action)}>{action === "loaded" ? "I'm loaded" : "I'm unloaded"}</PillButton>
           ) : action === "upload_bol" || action === "upload_pod" ? (
-            <DocumentSlot label={`Photo of ${docName}`} onFile={(f) => onUpload(load.id, action === "upload_bol" ? "bol" : "pod", f)} />
+            <DocumentSlot label={`Photo of ${docName}`} pagesKey={`${load.id}:${action === "upload_bol" ? "bol" : "pod"}`} onFile={(f) => onUpload(load.id, action === "upload_bol" ? "bol" : "pod", f)} />
           ) : action === "pretrip" ? (
-            <InspectionLink kind="pre_trip">Start</InspectionLink>
+            <div className="flex flex-wrap items-center gap-2">
+              <InspectionLink kind="pre_trip">Start</InspectionLink>
+              <QuickPreTrip />
+            </div>
           ) : null}
         </div>
 

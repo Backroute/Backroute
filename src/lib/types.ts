@@ -389,6 +389,10 @@ export interface Roadside {
 export interface DvirItem {
   label: string;
   status: "ok" | "defect";
+  /** A defect: what's wrong, in the driver's words, and a photo of it (stored, or a preview in the demo). */
+  note?: string;
+  photoFileId?: string;
+  photoPreview?: string;
 }
 
 /** FMCSA requires a pre-trip and post-trip inspection report for every driven vehicle. A defect on
@@ -440,6 +444,9 @@ export interface Expense {
   payCode?: string;
   /** Where: the receiver or shipper the lumper is at. */
   facility?: string;
+  /** The receipt the driver photographed: stored (real accounts) or a preview on this device (demo). */
+  receiptFileId?: string;
+  receiptPreview?: string;
 }
 
 /** A booked appointment at a repair shop — created by "Schedule at a shop" on the Maintenance page.
@@ -831,6 +838,9 @@ export interface Escalation {
   decision?: { kind: "reposition"; truckId: string; city: string; state: string; miles: number; doneAt?: string };
   /** How the owner answered a yes/no: true for yes. */
   approved?: boolean;
+  /** A two-way call the owner answers right on the card (a broker under the floor: "Take it" or "Walk away").
+   *  Yes resolves it approved, no resolves it declined; what each does depends on the escalation. */
+  answers?: { yes: string; no: string };
   /** Where this came from, when it arrived by a real channel. */
   source?: MessageChannel;
   /** The person on Backroute's support team who took it. */
@@ -876,7 +886,8 @@ export type DraftPurpose = "reply" | "book_request" | "counter" | "accept" | "se
 export interface DriverMessage {
   id: string;
   driverId: string;
-  from: "driver" | "ai";
+  /** "owner": written by the owner (or a dispatcher) in the office, not the AI. */
+  from: "driver" | "ai" | "owner";
   content: string;
   timestamp: string;
   /** Answered by the real AI (Claude) rather than the scripted demo replies. */
@@ -885,6 +896,8 @@ export interface DriverMessage {
   channel?: MessageChannel;
   /** Written by a person on Backroute's support team, not the AI. */
   bySupport?: string;
+  /** Who in the office wrote it ("the office" when the app doesn't know their name). */
+  byOwner?: string;
 }
 
 /** Fleet-level chat — not tied to any one load, unlike negotiation messages. The carrier's equivalent

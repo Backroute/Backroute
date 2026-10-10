@@ -221,6 +221,7 @@ http.createServer(async (req, res) => {
     }
     if (sys.includes("repair shop said")) return reply(res, msg(b.model, [{ type: "text", text: JSON.stringify({ canHelp: /\b(no|can't|cannot|booked)\b/i.test(text) ? "no" : /\b(yes|sure|can)\b/i.test(text) ? "yes" : "unclear", eta: text.match(/(\d+ (?:minutes|hours?))/)?.[1] ?? null }) }]));
     if (sys.includes("trucking paperwork") && /QkxVUlJZ/.test(text)) return reply(res, msg(b.model, [{ type: "text", text: JSON.stringify({ ...DOC_CHECK, signed: false, readable: "unreadable", retakeTip: "Hold the phone steady over the page with the flash on, and get all four corners in.", note: "Too blurry to read the signature or the numbers.", amount: null }) }]));
+    if (sys.includes("trucking paperwork") && /something a truck driver paid/.test(text)) return reply(res, msg(b.model, [{ type: "text", text: JSON.stringify({ ...DOC_CHECK, amount: 42.5, note: "Parking receipt, $42.50 paid." }) }]));
     if (sys.includes("trucking paperwork")) return reply(res, msg(b.model, [{ type: "text", text: JSON.stringify(/lumper receipt/.test(text) ? { ...DOC_CHECK, amount: 185, note: "Lumper receipt, $185 paid." } : /U0hPUlQ/.test(text) ? { ...DOC_CHECK, exceptions: ["2 cases short"], note: "Receiver wrote a shortage.", amount: null } : { ...DOC_CHECK, amount: null }) }]));
     return reply(res, msg(b.model, [{ type: "text", text: JSON.stringify(readingNow()) }]));
   }

@@ -1,7 +1,7 @@
 import { authHeader } from "../ai/client";
 import { enqueue, startQueue, whenSent, type Queued } from "./upload-queue";
 
-export type FileKind = "w9" | "coi" | "authority" | "noa" | "voided_check" | "bol" | "pod" | "lumper_receipt" | "other";
+export type FileKind = "w9" | "coi" | "authority" | "noa" | "voided_check" | "bol" | "pod" | "lumper_receipt" | "receipt" | "dvir_photo" | "other";
 
 type Uploaded = { ok: true; id: string; status: "verified" | "check"; note: string | null; amount?: number | null } | { ok: false; reason: string; queued?: boolean };
 

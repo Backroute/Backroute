@@ -66,6 +66,9 @@ export interface StoreState {
     /** Fleet-level chat — the carrier's counterpart to sendDriverMessage. Not tied to any one load;
      *  answers from the carrier's whole book (active loads, net profit, open escalations, fleet status). */
     sendCarrierMessage: (carrierId: string, content: string) => void;
+    /** The owner writing to a driver themselves (not the AI): it shows in the driver's Messages, and in a real
+     *  account it buzzes their phone or goes as a text (api/driver-message). */
+    sendOwnerMessage: (driverId: string, content: string) => Promise<"app" | "sms" | "held" | "failed">;
     updateSettings: (partial: Partial<AgentSettings>) => void;
     driverConfirmStage: (loadId: string) => void;
     /** Driver dismissed the "load complete" card — the truck's current (or next-to-pick) load takes over. */
@@ -98,7 +101,7 @@ export interface StoreState {
     respondTimeOff: (id: string, approve: boolean) => void;
     /** Out-of-pocket cost a driver fronted on the road, submitted for reimbursement. Same human-only
      *  approval pattern as time off — this is the driver's own money, not the load's economics. */
-    submitExpense: (driverId: string, loadId: string | null, category: Expense["category"], amount: number, note: string) => void;
+    submitExpense: (driverId: string, loadId: string | null, category: Expense["category"], amount: number, note: string, receipt?: { fileId?: string; preview?: string }) => void;
     respondExpense: (id: string, approve: boolean) => void;
     /** Checks off one intermediate stop on a multi-stop load. Doesn't touch load.stage — the overall
      *  pickup/transit/delivery lifecycle still runs off the existing stage machine untouched. */

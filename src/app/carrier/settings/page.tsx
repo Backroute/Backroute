@@ -31,6 +31,7 @@ import { PortalCard } from "@/components/cloud/portal-card";
 import { BillingCard } from "@/components/cloud/billing-card";
 import { PhoneAlerts } from "@/components/cloud/phone-alerts";
 import { ExportsCard } from "@/components/cloud/exports-card";
+import { SettingsSearch } from "@/components/cloud/settings-search";
 import { LeaveCard } from "@/components/cloud/leave-card";
 import { QuickbooksCard } from "@/components/cloud/quickbooks-card";
 import { ConnectionsCard } from "@/components/cloud/connections-card";
@@ -43,7 +44,7 @@ import type { Aggressiveness } from "@/lib/store";
 
 const TABS = [
   { key: "basics", label: "Basics" },
-  { key: "general", label: "More" },
+  { key: "general", label: "Company" },
   { key: "integrations", label: "Integrations" },
   { key: "addons", label: "Add-ons" },
   { key: "billing", label: "Billing & Team" },
@@ -123,19 +124,43 @@ function Settings() {
       <PageHeader title="Settings" />
 
       <div className="px-4 py-6 sm:px-8">
+        <div className="mb-4 max-w-md">
+          <SettingsSearch
+            signedIn={signedIn}
+            onPick={(spot) => {
+              setTab(spot.tab as TabKey);
+              // The tab renders first; then the card is brought into view and marked for a moment.
+              setTimeout(() => {
+                const el = document.getElementById(spot.id);
+                if (!el) return;
+                el.scrollIntoView({ behavior: "smooth", block: "start" });
+                el.classList.add("ring-2", "ring-[var(--link)]", "rounded-2xl");
+                setTimeout(() => el.classList.remove("ring-2", "ring-[var(--link)]"), 1800);
+              }, 60);
+            }}
+          />
+        </div>
         <Tabs tabs={tabs.map((t) => ({ key: t.key, label: t.label }))} active={tab} onChange={(k) => setTab(k as TabKey)} />
 
         <div className="mt-5 flex flex-col gap-6">
-          {tab === "basics" && signedIn && <BasicsCard />}
+          {tab === "basics" && signedIn && (
+            <div id="set-basics" className="scroll-mt-24">
+              <BasicsCard />
+            </div>
+          )}
           {tab === "security" && (
             <>
-              <SecurityCard />
-              <AuditLogCard />
+              <div id="set-security" className="scroll-mt-24">
+                <SecurityCard />
+              </div>
+              <div id="set-audit" className="scroll-mt-24">
+                <AuditLogCard />
+              </div>
             </>
           )}
           {tab === "general" && (
             <>
-              <Card>
+              <Card id="set-company" className="scroll-mt-24">
                 <CardHeader>
                   <CardTitle>Company profile</CardTitle>
                 </CardHeader>
@@ -147,23 +172,23 @@ function Settings() {
                 </CardContent>
               </Card>
 
-              {signedIn ? <ChannelsCard /> : <DispatchLineCard />}
+              <div id="set-channels" className="scroll-mt-24">{signedIn ? <ChannelsCard /> : <DispatchLineCard />}</div>
 
               {signedIn && (
                 <>
-                  <BusinessCard />
-                  <OwnerRulesCard />
-                  <PortalCard />
-                  <DocumentsCard />
-                  <ConnectionsCard />
-                  <HistoryCard />
-                  <QuickbooksCard />
-                  <ExportsCard />
+                  <div id="set-business" className="scroll-mt-24"><BusinessCard /></div>
+                  <div id="set-rules" className="scroll-mt-24"><OwnerRulesCard /></div>
+                  <div id="set-portals" className="scroll-mt-24"><PortalCard /></div>
+                  <div id="set-papers" className="scroll-mt-24"><DocumentsCard /></div>
+                  <div id="set-connections" className="scroll-mt-24"><ConnectionsCard /></div>
+                  <div id="set-history" className="scroll-mt-24"><HistoryCard /></div>
+                  <div id="set-quickbooks" className="scroll-mt-24"><QuickbooksCard /></div>
+                  <div id="set-exports" className="scroll-mt-24"><ExportsCard /></div>
                 </>
               )}
 
-              <OwnerLanguageCard />
-              <AppearanceCard />
+              <div id="set-language" className="scroll-mt-24"><OwnerLanguageCard /></div>
+              <div id="set-appearance" className="scroll-mt-24"><AppearanceCard /></div>
 
               {/* The demo's simulated negotiation style; in a real account the owner's lowest rate per mile sets the price. */}
               {!signedIn && (
@@ -193,7 +218,7 @@ function Settings() {
               )}
 
               <div className="grid gap-6 lg:grid-cols-2">
-                <Card>
+                <Card id="set-autopilot" className="scroll-mt-24">
                   <CardHeader>
                     <CardTitle>Autopilot</CardTitle>
                   </CardHeader>
@@ -210,7 +235,7 @@ function Settings() {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card id="set-notifications" className="scroll-mt-24">
                   <CardHeader>
                     <CardTitle>Notifications</CardTitle>
                   </CardHeader>
@@ -236,7 +261,7 @@ function Settings() {
           )}
 
           {tab === "integrations" && (
-            <Card>
+            <Card id="set-integrations" className="scroll-mt-24">
               <CardHeader>
                 <CardTitle>Integrations</CardTitle>
                 <CardDescription>The load boards, TMS, ELD, and back-office tools Backroute reads and writes to.</CardDescription>
@@ -312,7 +337,7 @@ function Settings() {
           )}
 
           {tab === "addons" && (
-            <Card>
+            <Card id="set-addons" className="scroll-mt-24">
               <CardHeader>
                 <div>
                   <CardTitle className="flex items-center gap-2"><Sparkles className="h-4 w-4" /> Add-ons</CardTitle>
@@ -361,11 +386,11 @@ function Settings() {
             <>
               {signedIn ? (
                 <>
-                  <BillingCard />
-                  <LeaveCard />
+                  <div id="set-billing" className="scroll-mt-24"><BillingCard /></div>
+                  <div id="set-data" className="scroll-mt-24"><LeaveCard /></div>
                 </>
               ) : (
-              <Card>
+              <Card id="set-billing" className="scroll-mt-24">
                 <CardHeader>
                   <CardTitle>Billing</CardTitle>
                   <CardDescription>
@@ -464,12 +489,12 @@ function Settings() {
               )}
 
               {signedIn ? (
-                <>
+                <div id="set-team" className="scroll-mt-24 flex flex-col gap-6">
                   <AppAccessCard />
                   <DriverConsentsCard />
-                </>
+                </div>
               ) : (
-              <Card>
+              <Card id="set-team" className="scroll-mt-24">
                 <CardHeader>
                   <CardTitle>Team</CardTitle>
                   <CardDescription>Who can see loads, negotiations, and approve escalations.</CardDescription>

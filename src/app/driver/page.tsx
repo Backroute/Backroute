@@ -36,7 +36,11 @@ import { Lane } from "@/components/ui/lane";
 import { stopDates } from "@/lib/load-dates";
 import { crewOf } from "@/lib/hos-plan";
 import { StatusMark } from "@/components/ui/mark";
+import { ArrivalPrompt } from "@/components/driver/arrival-prompt";
+import { TimeOffAsk } from "@/components/driver/time-off-ask";
 
+
+const todoChip = "inline-flex min-h-9 items-center rounded-full bg-ink-100 px-3.5 py-1.5 text-xs font-semibold text-ink-900 hover:bg-ink-150";
 
 export default function DriverHomePage() {
   const driver = usePrimaryDriver();
@@ -184,6 +188,23 @@ export default function DriverHomePage() {
               ? t.nothingNeeds
               : t.thingsForYou(todoCount)}
         </p>
+        {/* What those things are, each a tap from here. */}
+        {!completedLoad && todoCount > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2" role="list" aria-label="For you">
+            {incidents.some((i) => i.status === "active") && (
+              <a role="listitem" href="#problem" className={todoChip}>{t.todo.problem}</a>
+            )}
+            {needsPreTrip && (
+              <Link role="listitem" href="/driver/inspection?kind=pre_trip" className={todoChip}>{t.todo.preTrip}</Link>
+            )}
+            {hasStageAction && (
+              <button role="listitem" type="button" onClick={() => setSheetOpen(true)} className={todoChip}>{t.todo.step}</button>
+            )}
+            {hasOffers && (
+              <a role="listitem" href="#next-load" className={todoChip}>{t.todo.pick}</a>
+            )}
+          </div>
+        )}
         {/* Pay and home in one quiet line: the trip below is what this screen is for. */}
         <Link href="/driver/earnings" className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-ink-50 px-4 py-3 text-sm">
           {/* An owner-operator keeps what the truck makes, so the number that matters is profit, not driver pay. */}
@@ -200,9 +221,13 @@ export default function DriverHomePage() {
 
       {solo && <OwnerNeedsYou driver={driver} truck={truck} />}
 
-      {incidents.map((incident) => (
-        <IncidentCard key={incident.id} incident={incident} viewer="driver" />
-      ))}
+      {incidents.length > 0 && (
+        <div id="problem" className="flex scroll-mt-4 flex-col gap-3">
+          {incidents.map((incident) => (
+            <IncidentCard key={incident.id} incident={incident} viewer="driver" />
+          ))}
+        </div>
+      )}
 
       {completedLoad && truck ? (
         <DriverTripCompleteCard
@@ -217,6 +242,7 @@ export default function DriverHomePage() {
         />
       ) : tripProps ? (
         <>
+          <ArrivalPrompt load={tripProps.load} onArrive={() => driverConfirmStage(tripProps.load.id)} />
           <TripCompactCard {...tripProps} showMap={!hero} onOpen={() => setSheetOpen(true)} />
           <QuickReplies stage={tripProps.load.stage} onSent={(text) => setSentNote(text)} />
           {truck && <RoadTools load={tripProps.load} truck={truck} driver={driver} />}
@@ -248,6 +274,7 @@ export default function DriverHomePage() {
       )}
 
       {homeTime && <HomeTimeCard status={homeTime} />}
+      <TimeOffAsk />
 
       <CallStatusLine driver={driver} />
 
@@ -349,7 +376,7 @@ export default function DriverHomePage() {
           }}
           onArrive={() => driverConfirmStage(currentLoad.id)}
           onTripStep={(step) => confirmTripStep(currentLoad.id, step)}
-          onLate={() => reportIncident(driver.id, truck.id, "delay", "Reported hands-free while driving")}
+          onLate={(m) => reportIncident(driver.id, truck.id, "delay", `Running about ${m >= 60 ? `${m / 60} h` : `${m} min`} late (said hands-free while driving)`)}
           onCall={callDispatch}
         />
       )}

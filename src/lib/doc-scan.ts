@@ -126,3 +126,39 @@ export async function autoCrop(file: File): Promise<{ file: File; cropped: boole
     return { file, cropped: false };
   }
 }
+
+/** Letter size, in PDF points. */
+const PAGE_W = 612;
+const PAGE_H = 792;
+
+/**
+ * Several photographed pages (a two-page BOL, a POD with a lumper slip stapled on) as one PDF, a page each, scaled to
+ * fit a letter page the way a scanner would: brokers want one file per document, not three photos.
+ */
+export async function pagesToPdf(pages: File[], name: string): Promise<File> {
+  const { PDFDocument } = await import("pdf-lib");
+  const pdf = await PDFDocument.create();
+  for (const page of pages) {
+    const bytes = await (await jpegOf(page)).arrayBuffer();
+    const img = await pdf.embedJpg(bytes);
+    const scale = Math.min(PAGE_W / img.width, PAGE_H / img.height);
+    const w = img.width * scale;
+    const h = img.height * scale;
+    pdf.addPage([PAGE_W, PAGE_H]).drawImage(img, { x: (PAGE_W - w) / 2, y: (PAGE_H - h) / 2, width: w, height: h });
+  }
+  const out = await pdf.save();
+  return new File([out as BlobPart], name.replace(/\.[^.]+$/, "") + ".pdf", { type: "application/pdf", lastModified: Date.now() });
+}
+
+/** A photo as JPEG bytes (cropped pages already are; a PNG or HEIC-converted one goes through a canvas). */
+async function jpegOf(file: File): Promise<Blob> {
+  if (file.type === "image/jpeg") return file;
+  const img = await loadImage(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  canvas.getContext("2d")!.drawImage(img, 0, 0);
+  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.86));
+  if (!blob) throw new Error("jpeg");
+  return blob;
+}

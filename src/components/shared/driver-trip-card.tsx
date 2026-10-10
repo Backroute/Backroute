@@ -18,7 +18,8 @@ import { TripMap } from "./trip-map";
 import { BrokerCallRow } from "./broker-call";
 import type { DriverDocType } from "@/lib/store";
 import type { Load, LoadDocument } from "@/lib/types";
-import { autoCrop } from "@/lib/doc-scan";
+import { autoCrop, pagesToPdf } from "@/lib/doc-scan";
+import { QuickPreTrip } from "@/components/driver/quick-pretrip";
 import { Lane } from "@/components/ui/lane";
 
 /** `file` goes to the server in a real account; the demo only keeps the name and a preview. */
@@ -143,7 +144,12 @@ function PickupCard({ load, brokerName, truckCity, truckState, needsPreTrip, vie
       <ol className="mt-5">
         {needsPreTrip && (
           <Step state="current" title="Pre-trip inspection" detail={readOnly ? "The driver's daily inspection is still due." : "Required before you roll today."}>
-            {!readOnly && <InspectionLink kind="pre_trip">Start pre-trip</InspectionLink>}
+            {!readOnly && (
+              <div className="flex flex-wrap items-center gap-2">
+                <InspectionLink kind="pre_trip">Start pre-trip</InspectionLink>
+                <QuickPreTrip />
+              </div>
+            )}
           </Step>
         )}
         <Step state={arrived ? "done" : "current"} title="Drive to the shipper" detail={arrived ? "Checked in" : s.drive} />
@@ -156,7 +162,7 @@ function PickupCard({ load, brokerName, truckCity, truckState, needsPreTrip, vie
           )}
         </Step>
         <Step state={bolDone ? "done" : arrived && loaded ? "current" : "todo"} title="Upload the signed BOL" last={!arrived}>
-          {arrived && <DocumentSlot doc={bol} label="Photo of BOL" readOnly={readOnly} onFile={(f) => onUpload(load.id, "bol", f)} />}
+          {arrived && <DocumentSlot doc={bol} label="Photo of BOL" readOnly={readOnly} pagesKey={`${load.id}:bol`} onFile={(f) => onUpload(load.id, "bol", f)} />}
         </Step>
         {arrived && (
           <Step state={load.tripChecklist?.sealNumber ? "done" : "todo"} title="Seal number" optional last>
@@ -225,7 +231,7 @@ function DeliveryCard({ load, brokerName, upNext, viewer = "driver", driverName,
           )}
         </Step>
         <Step state={podDone ? "done" : arrived && unloaded ? "current" : "todo"} title="Upload the signed POD" last={!arrived}>
-          {arrived && <DocumentSlot doc={pod} label="Photo of POD" readOnly={readOnly} onFile={(f) => onUpload(load.id, "pod", f)} />}
+          {arrived && <DocumentSlot doc={pod} label="Photo of POD" readOnly={readOnly} pagesKey={`${load.id}:pod`} onFile={(f) => onUpload(load.id, "pod", f)} />}
         </Step>
         {arrived && (
           <Step
@@ -588,15 +594,37 @@ export function PillButton({ onClick, children }: { onClick: () => void; childre
   );
 }
 
+/** Pages photographed so far for each document (load and kind), while the app is open: Add a page builds on them. */
+const PAGES = new Map<string, File[]>();
+
 /** Upload slot for a stop document: take a photo (or pick a file), see the AI read it, retake if needed. */
 const PHOTO_PROBLEM = { dark: "Too dark to read. Turn on a light or move to one, then retake.", bright: "Too much glare to read. Tilt it away from the light and retake.", blurry: "Too blurry to read. Hold still, tap to focus, and retake." };
 
-export function DocumentSlot({ doc, label, readOnly, onFile }: { doc?: LoadDocument; label: string; readOnly?: boolean; onFile: (file: UploadedFile) => void }) {
+export function DocumentSlot({ doc, label, readOnly, onFile, pagesKey }: { doc?: LoadDocument; label: string; readOnly?: boolean; onFile: (file: UploadedFile) => void; pagesKey?: string }) {
   const input = useRef<HTMLInputElement>(null);
   // A photo that looks unreadable waits here: retake it, or send it anyway.
   const [doubt, setDoubt] = useState<{ file: File; why: keyof typeof PHOTO_PROBLEM } | null>(null);
+  // The next photo starts the document over (first photo, Retake) or goes on as its next page (Add a page).
+  const adding = useRef(false);
+  const [, bump] = useState(0);
+  const pageCount = pagesKey ? PAGES.get(pagesKey)?.length ?? 0 : 0;
+  const pick = (add: boolean) => {
+    adding.current = add;
+    input.current?.click();
+  };
 
-  const send = (file: File) => onFile({ name: file.name, previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined, file });
+  const send = (file: File, preview?: File) => onFile({ name: file.name, previewUrl: (preview ?? file).type.startsWith("image/") ? URL.createObjectURL(preview ?? file) : undefined, file });
+
+  /** A cropped page in: the document is this page alone, or every page so far as one PDF. */
+  async function take(file: File) {
+    const page = (await autoCrop(file)).file;
+    const before = adding.current && pagesKey ? PAGES.get(pagesKey) ?? [] : [];
+    const pages = [...before, page];
+    if (pagesKey) PAGES.set(pagesKey, pages);
+    bump((n) => n + 1);
+    if (pages.length === 1) return send(page);
+    send(await pagesToPdf(pages, `${label.replace(/^Photo of /, "")}-${pages.length}-pages`), pages[0]);
+  }
 
   async function handle(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -606,7 +634,7 @@ export function DocumentSlot({ doc, label, readOnly, onFile }: { doc?: LoadDocum
     if (!verdict.ok) return setDoubt({ file, why: verdict.why });
     setDoubt(null);
     // Cropped to the paper and cleaned up, like a scanner would (the original if it can't find the sheet).
-    send((await autoCrop(file)).file);
+    await take(file);
   }
 
   const picker = readOnly ? null : (
@@ -627,7 +655,7 @@ export function DocumentSlot({ doc, label, readOnly, onFile }: { doc?: LoadDocum
             onClick={async () => {
               const f = doubt.file;
               setDoubt(null);
-              send((await autoCrop(f)).file);
+              await take(f);
             }}
             className="min-h-11 rounded-full border border-white/25 px-4 py-2 text-xs font-medium text-white/80"
           >
@@ -644,12 +672,12 @@ export function DocumentSlot({ doc, label, readOnly, onFile }: { doc?: LoadDocum
         {picker}
         <button
           type="button"
-          onClick={() => input.current?.click()}
+          onClick={() => pick(false)}
           className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-semibold text-ink-950"
         >
           <Camera className="h-4 w-4" /> {label}
         </button>
-        <p className="text-xs text-white/60">Lay it flat in good light, all four corners in the picture.</p>
+        <p className="text-xs text-white/60">Lay it flat in good light, all four corners in the picture. More than one page? Add the rest after the first.</p>
       </div>
     );
   }
@@ -665,7 +693,9 @@ export function DocumentSlot({ doc, label, readOnly, onFile }: { doc?: LoadDocum
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-medium">{doc.name}</p>
+        <p className="truncate text-xs font-medium">
+          {pageCount > 1 ? `${label.replace(/^Photo of /, "")} · ${pageCount} pages` : doc.name}
+        </p>
         {doc.status === "pending" ? (
           <p className="mt-0.5 flex items-center gap-1 text-xs text-white/60">
             <Loader2 className="h-3 w-3 animate-spin" /> Reading it…
@@ -677,9 +707,16 @@ export function DocumentSlot({ doc, label, readOnly, onFile }: { doc?: LoadDocum
         )}
       </div>
       {!readOnly && (
-        <button type="button" onClick={() => input.current?.click()} className="min-h-11 shrink-0 px-2 text-xs font-semibold text-white/80 underline-offset-2 hover:underline">
-          Retake
-        </button>
+        <div className="flex shrink-0 flex-col items-end">
+          {pagesKey && pageCount > 0 && doc.status !== "failed" && (
+            <button type="button" onClick={() => pick(true)} className="min-h-9 px-2 text-xs font-semibold text-white underline-offset-2 hover:underline">
+              + Add a page
+            </button>
+          )}
+          <button type="button" onClick={() => pick(false)} className="min-h-9 px-2 text-xs font-semibold text-white/70 underline-offset-2 hover:underline">
+            Retake
+          </button>
+        </div>
       )}
     </div>
   );

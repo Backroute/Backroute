@@ -185,9 +185,12 @@ export async function driverThread(carrierId: string, driverId: string, limit = 
  */
 export async function saveDriverMessage(carrierId: string, message: DriverMessage, link = "/driver/messages") {
   await save("driver_messages", carrierId, message as unknown as Item);
-  if (message.from !== "ai") return;
+  if (message.from === "driver") return 0;
   const { pushToDriver } = await import("../push");
-  await pushToDriver(carrierId, message.driverId, { title: "Dispatch", body: message.content, url: link, tag: `dm-${message.driverId}` }).catch((e) => console.error("[push] driver push failed", e));
+  return pushToDriver(carrierId, message.driverId, { title: message.from === "owner" ? "The office" : "Dispatch", body: message.content, url: link, tag: `dm-${message.driverId}` }).catch((e) => {
+    console.error("[push] driver push failed", e);
+    return 0;
+  });
 }
 
 interface ChannelLog {

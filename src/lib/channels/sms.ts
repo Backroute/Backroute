@@ -137,7 +137,7 @@ export async function receiveText(t: IncomingText): Promise<{ now?: string; late
       }
       const history = (await driverThread(carrierId, driver.id, 13))
         .filter((m) => m.id !== incoming.id)
-        .map((m) => ({ from: m.from === "driver" ? ("them" as const) : ("ai" as const), text: m.content }));
+        .map((m) => ({ from: m.from === "driver" ? ("them" as const) : ("ai" as const), text: m.from === "owner" ? `(The owner wrote this to the driver, not you) ${m.content}` : m.content }));
       // Photos (a POD, a BOL, a lumper receipt): stored, checked and put on the load. A caption that says more than
       // what the photo is still gets the AI's answer too.
       const photos = media.length ? await driverPhotos(ctx, driver, media, said).catch((e) => (console.error("[sms] photos failed", e), "Got your photo, but it didn't save. Please send it again or use the app.")) : "";

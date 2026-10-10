@@ -11,6 +11,7 @@ import { useDriverUi } from "@/lib/lang/use-driver-ui";
 import type { DriveCommand, UiText } from "@/lib/lang/ui";
 import type { Lang, Load } from "@/lib/types";
 import { Lane } from "@/components/ui/lane";
+import { minutesIn } from "@/lib/spoken";
 
 /** Commands in the driver's language, checked in this order so "unloaded" wins over "loaded". English also keeps
  *  its looser patterns ("I'm loaded up", "at the dock"). */
@@ -47,7 +48,8 @@ export function DrivingMode({
   onClose: () => void;
   onArrive: () => void;
   onTripStep: (step: "loaded" | "unloaded") => void;
-  onLate: () => void;
+  /** How late, in minutes, when the driver said or picked it. */
+  onLate: (minutes: number) => void;
   onCall: () => void;
 }) {
   const now = useNow();
@@ -76,7 +78,15 @@ export function DrivingMode({
     say(talk === lang ? shown : words(tt, talk), undefined, { lang: talkInfo.speech });
   }
 
-  function run(cmd: DriveCommand) {
+  // "Late" asks how late (four big choices) unless the driver already said it ("late, about 30 minutes").
+  const [askingLate, setAskingLate] = useState(false);
+  function late(minutes: number) {
+    setAskingLate(false);
+    onLate(minutes);
+    respondWith((u) => `${u.toldLate} ${u.lateSent}`);
+  }
+
+  function run(cmd: DriveCommand, heard?: string) {
     let words: (u: UiText, l: Lang) => string;
     if (cmd === "arrived") {
       if (s.next.action === "arrive") {
@@ -89,8 +99,10 @@ export function DrivingMode({
         words = (u) => (cmd === "loaded" ? u.gotLoaded : u.gotUnloaded);
       } else words = (u) => (s.arrived ? u.alreadyDone : u.notThere);
     } else if (cmd === "late") {
-      onLate();
-      words = (u) => u.toldLate;
+      const said = heard ? minutesIn(heard) : null;
+      if (said) return late(said);
+      setAskingLate(true);
+      words = (u) => u.lateHow;
     } else if (cmd === "call") {
       onCall();
       return;
@@ -117,7 +129,7 @@ export function DrivingMode({
       const heard = e.results[0][0].transcript.toLowerCase();
       // Spoken in the talk language, but words from the app's language work too.
       const cmd = commandFor(heard, tt, talk === "en") ?? (lang !== talk ? commandFor(heard, t, lang === "en") : null);
-      if (cmd) run(cmd);
+      if (cmd) run(cmd, heard);
       else respondWith((u) => u.heard(heard));
     };
     r.onend = () => setListening(false);
@@ -148,6 +160,16 @@ export function DrivingMode({
       <p className="mt-6 min-h-[3.5rem] rounded-2xl bg-white/5 px-4 py-3 text-base leading-snug text-white/85" aria-live="polite">
         {reply}
       </p>
+
+      {askingLate && (
+        <div className="mt-4 grid grid-cols-4 gap-2" role="group" aria-label={t.lateHow}>
+          {[15, 30, 60, 120].map((m) => (
+            <button key={m} type="button" onClick={() => late(m)} className="rounded-2xl bg-white py-4 text-base font-semibold text-ink-950 active:scale-[0.98]">
+              {t.lateMin(m)}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="mt-auto grid grid-cols-2 gap-3">
         <button type="button" onClick={() => run(s.arrived && !s.handled ? (s.card === "pickup" ? "loaded" : "unloaded") : "arrived")} className={cn(big, "bg-white text-ink-950")}>

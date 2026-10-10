@@ -19,6 +19,7 @@ import { useNow } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { cn, formatCurrency } from "@/lib/utils";
 import { downloadCsv } from "@/lib/csv-export";
+import { stopDates } from "@/lib/load-dates";
 import type { Broker, Load, LoadStage, Truck } from "@/lib/types";
 import { ViewTransition } from "react";
 import { FORWARD } from "@/lib/nav-direction";
@@ -43,6 +44,16 @@ function exportLoads(loads: Load[], brokers: Map<string, Broker>, trucks: Map<st
       l.updatedAt,
     ]),
   );
+}
+
+/** The stop a load is heading to next and when, for sorting and the list: pickup until it's loaded, then delivery. */
+function nextStop(load: Load, now: number): { kind: "pickup" | "delivery"; when: string; at: number | null } | null {
+  if (["delivered", "declined", "cancelled", "sourced", "scoring"].includes(load.stage)) return null;
+  const kind = ["in_transit", "at_delivery"].includes(load.stage) ? "delivery" : "pickup";
+  const w = stopDates(load, now)[kind];
+  const day = w.relative ?? w.date;
+  if (!day) return null;
+  return { kind, when: [day, w.time?.replace(/\s?[A-Z]{3}$/, "")].filter(Boolean).join(" "), at: w.at ?? w.day ?? null };
 }
 
 const GROUPS: { key: string; label: string; stages: LoadStage[] | "all" }[] = [
@@ -75,8 +86,18 @@ export default function CarrierLoadsPage() {
     // A ready-made view ("Unpaid over 30 days") looks across every load, whichever tab is open.
     const inGroup = filters.filter.view || activeGroup.stages === "all" ? loads : loads.filter((l) => (activeGroup.stages as LoadStage[]).includes(l.stage));
     const list = now === null ? inGroup : filterLoads(inGroup, filters.filter, brokers, trucks, now);
-    return [...list].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  }, [loads, activeGroup, filters.filter, brokers, trucks, now]);
+    // Planning a day goes by the next appointment: soonest pickup or delivery first. Delivered loads, and anything
+    // without a time on it, go by what changed last.
+    if (now === null || group === "delivered") return [...list].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+    const due = new Map(list.map((l) => [l.id, nextStop(l, now)?.at ?? null]));
+    return [...list].sort((a, b) => {
+      const x = due.get(a.id), y = due.get(b.id);
+      if (x != null && y != null) return x - y;
+      if (x != null) return -1;
+      if (y != null) return 1;
+      return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+    });
+  }, [loads, activeGroup, filters.filter, brokers, trucks, now, group]);
   const usedBrokers = useMemo(() => {
     const ids = new Set(loads.map((l) => l.brokerId));
     return [...brokers.values()].filter((b) => ids.has(b.id)).sort((a, b) => a.company.localeCompare(b.company));
@@ -85,6 +106,12 @@ export default function CarrierLoadsPage() {
   const counts = Object.fromEntries(
     GROUPS.map((g) => [g.key, g.stages === "all" ? loads.length : loads.filter((l) => g.stages.includes(l.stage)).length]),
   );
+
+  const driverOf = (truck: Truck) => (truck.driverId ? drivers.get(truck.driverId)?.name.split(" ")[0] : undefined);
+  const nextLabel = (load: Load) => {
+    const n = now === null ? null : nextStop(load, now);
+    return n ? `${n.kind === "pickup" ? "Pickup" : "Delivery"} ${n.when}` : null;
+  };
 
   const offerGroups = useMemo(() => {
     if (group !== "offers") return [];
@@ -154,8 +181,13 @@ export default function CarrierLoadsPage() {
                     </div>
                     <div className="mt-2.5 flex items-center gap-2">
                       <LoadStagePill stage={load.stage} />
-                      {truck && <span className="text-xs text-ink-400">{truck.unitNumber}</span>}
-                      <span className="ml-auto text-xs text-ink-400"><TimeAgo iso={load.updatedAt} /></span>
+                      {truck && (
+                        <span className="truncate text-xs text-ink-500">
+                          {truck.unitNumber}
+                          {driverOf(truck) ? ` · ${driverOf(truck)}` : ""}
+                        </span>
+                      )}
+                      <span className="ml-auto shrink-0 text-xs text-ink-500">{nextLabel(load) ?? <TimeAgo iso={load.updatedAt} />}</span>
                     </div>
                     <div className="mt-3 flex items-center gap-4 border-t border-line pt-3 text-xs">
                       <span className="text-ink-500">
@@ -189,7 +221,7 @@ export default function CarrierLoadsPage() {
                   <th className="px-5 py-3 font-medium">Truck</th>
                   <th className="px-5 py-3 font-medium text-right">Rate</th>
                   <th className="px-5 py-3 font-medium text-right">You keep</th>
-                  <th className="px-5 py-3 font-medium text-right">Updated</th>
+                  <th className="px-5 py-3 font-medium text-right">Next</th>
                 </tr>
               </thead>
               <tbody>
@@ -210,14 +242,17 @@ export default function CarrierLoadsPage() {
                       <td className="px-5 py-3.5 text-ink-600">{broker?.company ?? "—"}</td>
                       <td className="px-5 py-3.5"><LoadScoreBadge score={load.score} size="sm" /></td>
                       <td className="px-5 py-3.5"><LoadStagePill stage={load.stage} /></td>
-                      <td className="px-5 py-3.5 text-ink-600">{truck?.unitNumber ?? "—"}</td>
+                      <td className="px-5 py-3.5 text-ink-600">
+                        {truck?.unitNumber ?? "—"}
+                        {truck && driverOf(truck) ? <span className="block text-xs text-ink-400">{driverOf(truck)}</span> : null}
+                      </td>
                       <td className="px-5 py-3.5 text-right tabular text-ink-950">
                         {load.bookedRate ? formatCurrency(load.bookedRate) : <span className="text-ink-400">{formatCurrency(load.targetRate)}</span>}
                       </td>
                       <td className="px-5 py-3.5 text-right tabular">
                         {load.netProfit ? <span className={load.netProfit > 0 ? "text-ink-950" : "text-[var(--accent-danger)]"}>{formatCurrency(load.netProfit)}</span> : <span className="text-ink-300">—</span>}
                       </td>
-                      <td className="px-5 py-3.5 text-right text-xs text-ink-400"><TimeAgo iso={load.updatedAt} /></td>
+                      <td className="px-5 py-3.5 text-right text-xs text-ink-500">{nextLabel(load) ?? <TimeAgo iso={load.updatedAt} />}</td>
                     </tr>
                   );
                 })}

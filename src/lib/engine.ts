@@ -757,7 +757,7 @@ function mkEvent(carrierId: string, loadId: string | undefined, type: ActivityTy
 }
 
 /** Recomputes the real expense breakdown — fuel, tolls, deadhead, and our 2% commission — once a rate is locked in. */
-function applyBookedEconomics(next: Load, original: Load, finalAmt: number, brokerReliability: number) {
+export function applyBookedEconomics(next: Load, original: Load, finalAmt: number, brokerReliability: number) {
   const { fuelCost, tollCost, deadheadMiles, lane } = original;
   const { deadheadCost, commission, netProfit, rpm } = computeEconomics(finalAmt, lane.miles, deadheadMiles, fuelCost, tollCost);
   next.deadheadCost = deadheadCost;

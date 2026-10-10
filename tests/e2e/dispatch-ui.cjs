@@ -59,9 +59,12 @@ async function signIn(browser, sub, phone, width = 1280) {
   await p.screenshot({ path: `${S}/.out/ui-settings-papers.png`, fullPage: true });
 
   // Offers from email on the dashboard
+  // The card in Needs you opens the choices over itself (no separate offers block on Home any more).
   await p.evaluate(() => window.next.router.push("/carrier"));
+  await p.getByRole("button", { name: "Choose", exact: true }).first().waitFor({ timeout: 30000 });
+  await p.getByRole("button", { name: "Choose", exact: true }).first().click();
   await p.getByText("Choose your next load").waitFor({ timeout: 30000 });
-  const board = await p.locator("#next-load").innerText();
+  const board = await p.getByRole("dialog").innerText();
   check("offers say where they came from and what the AI will ask", /brokers emailed you/.test(board) && /Backroute asks \$[0-9,]+ \(posted \$2,000\)/i.test(board) && /Email from TQL/.test(board), board.slice(0, 300));
   check("no demo load-board wording or fake broker Q&A", !/connected board/.test(board) && (await p.getByRole("button", { name: "Ask a question" }).count()) === 0);
   await p.screenshot({ path: `${S}/.out/ui-offers.png` });
@@ -72,7 +75,10 @@ async function signIn(browser, sub, phone, width = 1280) {
   check("tapping it emails the broker the book request, raised to the new floor ($2.75 × 780 mi → $2,150)", !!req && /\$2,150 all in/.test(req.body.TextBody), req?.body.TextBody?.slice(0, 120));
   check("the offer leaves the board", (await p.getByText("Choose your next load").count()) === 0 && db(`select stage from loads where id = 'load-ui-offer'`) === "negotiating");
 
-  // Needs you: a draft with attachments
+  // Needs you: a draft with attachments (the log of what Backroute sent sits under More on Home now)
+  const more = p.getByRole("button", { name: /^More: map, money/ });
+  if (await more.count()) await more.click();
+  await p.waitForTimeout(1000);
   const drafts = await p.getByText("Invoice INV", { exact: false }).count() + (await p.locator("button:has-text('.pdf')").count());
   check("drafts show their attachments to open", drafts > 0 || (await p.locator("text=/\\.pdf/").count()) > 0);
 

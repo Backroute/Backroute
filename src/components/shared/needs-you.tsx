@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, ArrowDown, CalendarClock, Check, ChevronDown, LifeBuoy, Loader2, Phone, Send, UserRound, X } from "lucide-react";
+import { AlertTriangle, CalendarClock, Check, ChevronDown, LifeBuoy, Loader2, Phone, Send, UserRound, X } from "lucide-react";
 import { AttentionCard, SwipeAction, type AttentionTone } from "@/components/ui/attention";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import type { DraftPurpose, Escalation, Load } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { celebrate, haptic } from "@/lib/feedback";
 import { LumperAsk } from "@/components/owner/lumper-ask";
+import { PickNextLoad, choiceCount } from "./pick-next-load";
 
 /** Everything waiting on the owner, counted one way for the hero line, the badge and the list. */
 export function useNeedsYou() {
@@ -207,6 +208,34 @@ function BatchBar({ batches }: { batches: Batch[] }) {
   );
 }
 
+/** A two-way call answered right on the card: the numbers to decide with, and both answers. */
+function TakeOrWalk({ escalation: e, load, onAnswer }: { escalation: Escalation; load?: Load; onAnswer: (yes: boolean) => void }) {
+  const offer = load ? [...load.messages].reverse().find((m) => m.direction === "inbound" && m.offerAmount)?.offerAmount ?? load.listedRate : undefined;
+  return (
+    <div className="mt-3 flex flex-col gap-3">
+      {load && offer !== undefined && (
+        <p className="text-xs text-ink-600">
+          {load.lane.origin} → {load.lane.destination} · Offer <span className="font-semibold tabular text-ink-950">{formatCurrency(offer)}</span> · You asked{" "}
+          <span className="font-semibold tabular text-ink-950">{formatCurrency(load.targetRate)}</span>
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="primary" onClick={() => onAnswer(true)}>
+          <Check className="h-3.5 w-3.5" /> {e.answers!.yes}
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => onAnswer(false)}>
+          <X className="h-3.5 w-3.5" /> {e.answers!.no}
+        </Button>
+        {e.loadId && (
+          <Link href={`/carrier/loads/${e.loadId}`} className="text-xs font-medium text-ink-500 hover:underline">
+            See the load
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── The list ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
 const enter = { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, scale: 0.97, transition: { duration: 0.16 } } };
@@ -233,6 +262,8 @@ export function NeedsYouList() {
   const pendingSwipes = usePending();
   const waiting = new Set(pendingSwipes.map((p) => p.id));
   const [showLater, setShowLater] = useState(false);
+  // Picking a truck's next load opens the choices over the card, not further down the page.
+  const [picking, setPicking] = useState<string | null>(null);
   const batches = useBatches(listed, signedIn);
   if (!any) return null;
 
@@ -265,7 +296,9 @@ export function NeedsYouList() {
             {(truck || driver) && <TruckDriverChip truck={truck} driver={driver} className="mb-2" />}
             <SourceTag source={e.source} />
             <p className="text-sm leading-relaxed text-ink-800">{e.reason}</p>
-            {e.suggestRule && signedIn ? (
+            {e.answers && e.status === "open" ? (
+              <TakeOrWalk escalation={e} load={load} onAnswer={(yes) => (yes && celebrate("approve"), resolveEscalation(e.id, yes))} />
+            ) : e.suggestRule && signedIn ? (
               <RuleSuggestion escalation={e} />
             ) : e.portalTaskId && signedIn && e.status === "open" ? (
               <PortalApproval escalation={e} />
@@ -376,11 +409,11 @@ export function NeedsYouList() {
                   <p className="mt-0.5 text-xs text-ink-600">
                     {signedIn
                       ? `${group.length} load${group.length === 1 ? "" : "s"} from broker emails fit${group.length === 1 ? "s" : ""}. Pick one and Backroute asks the broker to book it.`
-                      : `${group.length} options, best pays ${formatCurrency(Math.max(...group.map((l) => l.netProfit ?? 0)))} after costs.`}
+                      : `${choiceCount([[groupId, group]])} option${choiceCount([[groupId, group]]) === 1 ? "" : "s"}, best pays ${formatCurrency(Math.max(...group.map((l) => l.netProfit ?? 0)))} after costs.`}
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <Button href="#next-load" size="sm">
-                      Choose <ArrowDown className="h-3.5 w-3.5" />
+                    <Button size="sm" onClick={() => setPicking(group[0]?.truckId ?? null)}>
+                      Choose
                     </Button>
                     {truck && !signedIn && (
                       <Button size="sm" variant="outline" onClick={() => setAutoChain(truck.id, true)}>
@@ -450,6 +483,7 @@ export function NeedsYouList() {
           {showLater ? "Hide" : "Show"} {setAside.length} set aside for later
         </button>
       )}
+      <PickNextLoad truckId={picking} open={!!picking} onClose={() => setPicking(null)} />
       <div aria-live="polite" className="hide-when-driving pointer-events-none fixed inset-x-0 bottom-[5.5rem] z-[65] flex flex-col items-center gap-2 px-4 lg:bottom-6">
         <AnimatePresence>
           {pendingSwipes.map((p) => (

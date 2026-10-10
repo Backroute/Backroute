@@ -21,6 +21,8 @@ import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { ViewTransition } from "react";
 import { BACK } from "@/lib/nav-direction";
 import { Lane } from "@/components/ui/lane";
+import { DocumentSlot } from "@/components/shared/driver-trip-card";
+import { ReceiptCapture, type ReadReceipt } from "@/components/driver/receipt-capture";
 
 const EXPENSE_CATEGORIES: { key: Expense["category"]; label: string }[] = [
   { key: "lumper", label: "Lumper fee" },
@@ -66,6 +68,7 @@ export default function DriverLoadDetailPage() {
   const trucks = useCarrierTrucks();
   const requestBetterRate = useStore((s) => s.actions.requestBetterRate);
   const recaptureDocument = useStore((s) => s.actions.recaptureDocument);
+  const uploadLoadDocument = useStore((s) => s.actions.uploadLoadDocument);
   const completeLoadStop = useStore((s) => s.actions.completeLoadStop);
   const submitExpense = useStore((s) => s.actions.submitExpense);
   const allExpenses = useStore((s) => s.expenses);
@@ -73,6 +76,7 @@ export default function DriverLoadDetailPage() {
   const [expenseCategory, setExpenseCategory] = useState<Expense["category"]>("lumper");
   const [expenseAmount, setExpenseAmount] = useState("");
   const [expenseNote, setExpenseNote] = useState("");
+  const [receipt, setReceipt] = useState<ReadReceipt | null>(null);
 
   if (!load) {
     return (
@@ -87,6 +91,7 @@ export default function DriverLoadDetailPage() {
 
   const truck = trucks.find((t) => t.id === driver.truckId);
   const isCurrent = truck?.currentLoadId === load.id;
+  const isMine = !!truck && load.truckId === truck.id;
   const step = STAGE_CONFIRM[load.stage];
   const pendingType = step?.doc && !load.documents.some((d) => d.type === step.doc) ? step.doc : null;
   const loadId = load.id;
@@ -95,9 +100,10 @@ export default function DriverLoadDetailPage() {
   function handleSubmitExpense() {
     const amount = Number(expenseAmount);
     if (!Number.isFinite(amount) || amount <= 0) return;
-    submitExpense(driver.id, loadId, expenseCategory, amount, expenseNote.trim());
+    submitExpense(driver.id, loadId, expenseCategory, amount, expenseNote.trim(), receipt ? { fileId: receipt.fileId, preview: receipt.preview } : undefined);
     setExpenseAmount("");
     setExpenseNote("");
+    setReceipt(null);
     setShowExpenseForm(false);
   }
 
@@ -218,6 +224,14 @@ export default function DriverLoadDetailPage() {
 
           {showExpenseForm ? (
             <div className="mt-1 flex flex-col gap-2.5 rounded-xl border border-line bg-ink-50/60 p-3.5">
+              <ReceiptCapture
+                loadId={loadId}
+                category={expenseCategory}
+                onRead={(r) => {
+                  setReceipt(r);
+                  if (r.amount) setExpenseAmount(String(r.amount));
+                }}
+              />
               <div className="flex flex-wrap gap-1.5">
                 {EXPENSE_CATEGORIES.map((c) => (
                   <button
@@ -235,7 +249,7 @@ export default function DriverLoadDetailPage() {
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-400">$</span>
                 <input
                   type="number"
-                  inputMode="numeric"
+                  inputMode="decimal"
                   value={expenseAmount}
                   onChange={(e) => setExpenseAmount(e.target.value)}
                   placeholder="0"
@@ -294,7 +308,18 @@ export default function DriverLoadDetailPage() {
               </div>
             </div>
           ))}
-          {pendingType && (
+          {pendingType && isMine && (
+            // The photo goes in right here, not back on Home.
+            <div className="theme-ink rounded-2xl bg-ink-900 p-3 text-white">
+              <p className="mb-2 text-xs font-medium text-white/80">{pendingDocLabel(pendingType)}</p>
+              <DocumentSlot
+                label={`Photo of ${pendingType === "bol" ? "BOL" : "POD"}`}
+                pagesKey={`${load.id}:${pendingType}`}
+                onFile={(f) => uploadLoadDocument(load.id, pendingType, f)}
+              />
+            </div>
+          )}
+          {pendingType && !isMine && (
             <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-ink-300 px-3.5 py-3">
               <div className="flex items-center gap-3">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-50 text-ink-400">
@@ -303,7 +328,7 @@ export default function DriverLoadDetailPage() {
                 <div>
                   <p className="text-xs font-medium text-ink-700">{pendingDocLabel(pendingType)}</p>
                   <p className="text-xs text-ink-400">
-                    {isCurrent ? "Upload it from your trip card on Home." : "Captured once this load reaches that stage."}
+                    Captured once this load reaches that stage.
                   </p>
                 </div>
               </div>

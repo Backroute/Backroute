@@ -1,17 +1,19 @@
 /** Chat with drivers and the owner, and what happens to items in Needs you. */
 import { PRIMARY_CARRIER_ID } from "../../mock-data";
 import { applyNegotiationInstruction, classifyInstruction } from "../../engine";
-import { askAi, setTyping } from "../../ai/client";
+import { askAi, authHeader, setTyping } from "../../ai/client";
 import { driverSnapshot, ownerSnapshot } from "../../ai/snapshot";
 import type { ActivityEvent, CarrierMessage, DriverMessage } from "../../types";
 import { AUTONOMY_LABEL } from "../settings";
-import { NEGOTIATION_REPLY, craftCarrierReply, craftDriverReply, findNegotiatingLoadForDriver, rateConDecision, uid } from "../support";
+import { NEGOTIATION_REPLY, craftCarrierReply, craftDriverReply, findNegotiatingLoadForDriver, rateConDecision, takeOrWalk, uid } from "../support";
 import type { Actions, GetState, SetState } from "../state";
 
-export const messagesActions = (set: SetState, get: GetState): Pick<Actions, "resolveEscalation" | "routeEscalationToSupport" | "sendDriverMessage" | "sendCarrierMessage"> => ({
+const OWNER_ACKS = ["Got it.", "Will do.", "Ok, thanks.", "Copy that."];
+
+export const messagesActions = (set: SetState, get: GetState): Pick<Actions, "resolveEscalation" | "routeEscalationToSupport" | "sendDriverMessage" | "sendCarrierMessage" | "sendOwnerMessage"> => ({
   resolveEscalation: (id, approve, actor = "carrier", note) =>
     set((state) => {
-      const rc = rateConDecision(state, id, approve);
+      const rc = rateConDecision(state, id, approve) ?? takeOrWalk(state, id, approve);
       return {
       ...(rc ? { loads: rc.loads, trucks: rc.trucks } : {}),
       // An approval that's a step in an incident plan unblocks that plan: approved, the repair goes ahead;
@@ -80,7 +82,7 @@ export const messagesActions = (set: SetState, get: GetState): Pick<Actions, "re
       : askAi({
           role: "driver",
           question: content,
-          history: history.map((m) => ({ from: m.from === "driver" ? "user" : "ai", text: m.content })),
+          history: history.map((m) => ({ from: m.from === "driver" ? "user" : "ai", text: m.from === "owner" ? `(The owner wrote this to the driver, not you) ${m.content}` : m.content })),
           snapshot: driverSnapshot(before, driverId),
         });
 
@@ -133,6 +135,26 @@ export const messagesActions = (set: SetState, get: GetState): Pick<Actions, "re
         });
       }, 700 + Math.random() * 800);
     });
+  },
+
+  sendOwnerMessage: async (driverId, content) => {
+    const msg: DriverMessage = { id: uid("dm"), driverId, from: "owner", content, timestamp: new Date().toISOString(), byOwner: "the owner" };
+    set((state) => ({ driverMessages: [...state.driverMessages, msg] }));
+    if (get().session.mode === "demo") {
+      // The practice fleet's drivers answer like drivers do: short.
+      setTimeout(() => {
+        const reply: DriverMessage = { id: uid("dm"), driverId, from: "driver", content: OWNER_ACKS[Math.floor(Math.random() * OWNER_ACKS.length)], timestamp: new Date().toISOString() };
+        set((state) => ({ driverMessages: [...state.driverMessages, reply] }));
+      }, 2500);
+      return "app";
+    }
+    try {
+      const res = await fetch("/api/driver-message", { method: "POST", headers: { ...(await authHeader()), "content-type": "application/json" }, body: JSON.stringify({ id: msg.id, driverId, body: content }) });
+      const body = (await res.json().catch(() => ({}))) as { sent?: "app" | "sms" | "held" };
+      return res.ok && body.sent ? body.sent : "failed";
+    } catch {
+      return "failed";
+    }
   },
 
   sendCarrierMessage: (carrierId, content) => {

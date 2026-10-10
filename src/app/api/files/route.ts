@@ -4,8 +4,10 @@ import { checkStopDocument } from "@/lib/ai/doc-check";
 import { admin, dbConfigured } from "@/lib/agent/db";
 import { caller } from "@/lib/agent/user";
 
-const Kind = z.enum(["w9", "coi", "authority", "noa", "voided_check", "bol", "pod", "lumper_receipt", "other"]);
+const Kind = z.enum(["w9", "coi", "authority", "noa", "voided_check", "bol", "pod", "lumper_receipt", "receipt", "dvir_photo", "other"]);
 const STOP_DOCS = new Set(["bol", "pod", "lumper_receipt"]);
+/** What a driver photographs on the road that isn't tied to a stop: a receipt for an expense, an inspection defect. */
+const ROAD_PHOTOS = new Set(["receipt", "dvir_photo"]);
 const MAX = 10 * 1024 * 1024;
 const TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp", "image/gif", "image/heic"]);
 
@@ -37,12 +39,23 @@ export async function POST(request: Request) {
     const { data } = await who.db.from("loads").select("id, data").eq("id", loadId).eq("carrier_id", who.me.carrierId).maybeSingle();
     if (!data) return Response.json({ error: "not_found" }, { status: 404 });
     loadRef = (data.data as { referenceNumber?: string }).referenceNumber ?? "";
+  } else if (ROAD_PHOTOS.has(kind.data)) {
+    if (loadId) {
+      const { data } = await who.db.from("loads").select("id").eq("id", loadId).eq("carrier_id", who.me.carrierId).maybeSingle();
+      if (!data) return Response.json({ error: "not_found" }, { status: 404 });
+    }
   } else if (!office) return Response.json({ error: "office_only" }, { status: 403 });
 
   const bytes = Buffer.from(await file.arrayBuffer());
   let note: string | null = null;
   let status: "verified" | "check" = "verified";
   let amount: number | null = null;
+  // A receipt: what was paid, so the driver doesn't type it.
+  if (kind.data === "receipt" && aiConfigured()) {
+    const check = await checkStopDocument("receipt", bytes, file.type, loadRef).catch(() => null);
+    if (check?.amount && check.amount > 0 && check.amount < 5000) amount = Math.round(check.amount * 100) / 100;
+    if (check) note = check.note;
+  }
   if (STOP_DOCS.has(kind.data) && aiConfigured()) {
     const check = await checkStopDocument(kind.data as "bol" | "pod" | "lumper_receipt", bytes, file.type, loadRef).catch(() => null);
     if (check) {

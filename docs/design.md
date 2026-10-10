@@ -25,6 +25,10 @@ reads in a truck cab at noon.
   orange ring for waiting, and plain dots for green, black and grey. An urgent card (`AttentionCard tone="urgent"`)
   also says "Urgent" in red, has a red edge, and goes to the top of the list. The phone tab count is a filled red
   bubble when something is urgent, an orange ring when things are only waiting.
+- Urgent cards carry their answer when there is one ("Take it" / "Walk away"), so the owner decides on the card.
+- Contact is one tap wherever a load is open (`components/shared/contact-row.tsx`): Call, Text and Message the driver,
+  Call the broker. A destructive action (Cancel load) lives in the "…" menu, not out in the open.
+- A section shows three tabs at most so they fit a phone; more pages go in a switch under the tab (carrier layout).
 - Status never fills a block. Pills are grey with a mark (`lib/status.ts`, `components/ui/badge.tsx`); cards have no
   coloured stripes, and only an urgent card has a coloured border. The `*-soft` tokens are grey on purpose.
 - One black button per screen or card. Everything else is a grey button (`variant="secondary"`) or a plain link.

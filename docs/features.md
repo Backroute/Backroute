@@ -365,6 +365,38 @@ What the real version does today, and what it doesn't do yet. How to switch each
   spreadsheet, every file, and the rest as JSON; never saved passwords or keys) and can delete the account. Deleting
   cancels the subscription first, removes everything of theirs, and keeps only that the account existed and drivers'
   consent records. Support can do the same with `scripts/pilot-carrier.mjs export` and `delete`.
+- **Less time on the owner's screens:**
+  - **Urgent decisions answered on the card.** A broker under the floor shows the offer and what was asked, with
+    **Take it** (books at the broker's last offer) and **Walk away**. Urgent items go to the top of Needs you.
+  - **Home is shorter:** Needs you, today's stops and the trucks. The map, the call log, money and what Backroute did
+    fold under More (a call with a driver going on right now still shows).
+  - **Today's stops:** every pickup and delivery across the fleet in time order, each done, at the dock, on time or
+    late with its ETA (tomorrow's when nothing is on today).
+  - **Picking a load in one place:** the card that says a truck's choices are waiting opens them over itself. Empty
+    trucks show the real number of choices (it used to say "3" whatever the number).
+  - **Call or text from the load:** Call, Text and Message the driver, and Call the broker, on the load page and the
+    trip sheet. The load page starts with where the truck is, when the next stop is, and whether it's running late.
+    Cancel and Walk away moved into the "…" menu. Back goes to wherever the owner came from.
+  - **Writing a driver from the app:** Messages has a thread per driver with everything said to them, Backroute's
+    messages included. What the owner writes lands in the driver's app (marked "The office") and buzzes their phone;
+    without app notifications it goes as a text from the dispatch number with the company's name on it, or waits for
+    their YES to texts (`api/driver-message`, office only).
+  - **The load list goes by the next appointment**, and shows the driver and when the next stop is.
+  - **Money has three tabs** (Earnings with Lanes and Brokers inside, Getting paid, Costs & drivers) so they fit a phone.
+  - **Settings search:** type "rate", "home time", "QuickBooks" and the right tab opens on the right card. The "More"
+    tab is now "Company".
+- **Less time on the driver's phone:**
+  - **Paperwork with more than one page:** "Add a page" after the first photo; the pages go as one PDF.
+  - **Expenses start with the receipt:** one photo, the amount is read off it (checked by the driver), and the photo
+    goes with the expense so the owner can open it next to Approve.
+  - **Paperwork from the load page itself**, not only from Home.
+  - **Inspections:** a defect takes a note and a photo, and both reach the owner. A day with nothing wrong is one swipe
+    from the trip card ("All good"), after the walk-around.
+  - **"2 things for you" says what they are**, each a tap away.
+  - **"I'm late" asks how late** (15 min, 30, 1 h, 2 h) or hears it ("late, about 30 minutes"), and the broker gets that.
+  - **At the dock, the app asks "Mark arrived?"** when the phone is at the dock's exact spot (only with a street
+    address, on duty, location already allowed; nothing is marked until the driver says yes).
+  - **Time off from Home**, under when they're home next. All of it in the app's 7 languages.
 
 ## What it doesn't do yet
 

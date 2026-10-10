@@ -11,3 +11,16 @@ export function slideTypes(order: string[], current: string | undefined, target:
 
 export const FORWARD = ["nav-forward"];
 export const BACK = ["nav-back"];
+
+// Pages opened inside the app this visit. Back goes where the owner came from (Home, Today, a search) when there is
+// such a page, and to the section's list when the page was opened straight from a link or a notification.
+let steps = 0;
+let lastPath: string | null = null;
+
+/** Counts page changes; the portal layouts call it once. */
+export function noteNavigation(path: string) {
+  if (lastPath !== null && lastPath !== path) steps++;
+  lastPath = path;
+}
+
+export const cameFromInApp = () => steps > 0;

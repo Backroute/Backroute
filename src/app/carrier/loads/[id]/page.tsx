@@ -1,9 +1,9 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, ArrowRightLeft, Ban, Camera, Fuel, Gauge, Percent, Phone, Route, ShieldAlert, TrendingUp, FileText } from "lucide-react";
+import { AlertTriangle, ArrowLeft, MapPin, MoreHorizontal, ArrowRightLeft, Ban, Camera, Fuel, Gauge, Percent, Phone, Route, ShieldAlert, TrendingUp, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,11 @@ import { openFile } from "@/lib/cloud/files";
 import { BookingCard } from "@/components/cloud/booking-card";
 import type { Driver, LoadStage, Truck } from "@/lib/types";
 import { ViewTransition } from "react";
-import { BACK } from "@/lib/nav-direction";
+import { BACK, cameFromInApp } from "@/lib/nav-direction";
+import { ContactRow } from "@/components/shared/contact-row";
+import { TimeAgo } from "@/components/shared/time-ago";
+import { stopDates } from "@/lib/load-dates";
+import { useNow } from "@/lib/hooks";
 import { Lane } from "@/components/ui/lane";
 
 /** Cancellable once rate is locked in; once in transit the freight is already moving, so that's a
@@ -49,6 +53,40 @@ const REASSIGNABLE_STAGES: LoadStage[] = ["booked", "dispatched", "at_pickup"];
 
 const CANCEL_REASONS = ["Broker cancelled the load", "Receiver refused / detention dispute", "Freight not ready at pickup", "Rate dispute", "Other"];
 const DECLINE_REASONS = ["Broker won't move on rate", "Better option found elsewhere", "Lane no longer needed", "Other"];
+
+/** Where the truck is and when it's due next, first thing on the page: what the owner opens a load to find out. */
+function WhereNow({ load, truck, driverName }: { load: Load; truck?: Truck; driverName?: string }) {
+  const now = useNow();
+  if (!truck || !["dispatched", "at_pickup", "in_transit", "at_delivery", "booked", "rate_confirmed"].includes(load.stage)) return null;
+  const heading = ["in_transit", "at_delivery"].includes(load.stage) ? "delivery" : "pickup";
+  const when = now === null ? null : stopDates(load, now)[heading];
+  const place = heading === "pickup" ? `${load.lane.origin}, ${load.lane.originState}` : `${load.lane.destination}, ${load.lane.destState}`;
+  const at = load.stage === "at_pickup" || load.stage === "at_delivery";
+  return (
+    <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-700">
+      <MapPin className="h-3.5 w-3.5 text-ink-400" />
+      <span>
+        {truck.unitNumber}
+        {driverName ? ` · ${driverName}` : ""} {at ? "is at the" : "is in"}{" "}
+        <span className="font-medium text-ink-950">{at ? `${heading} dock` : truck.position?.description ?? `${truck.currentCity}, ${truck.currentState}`}</span>
+        {truck.position && !at && (
+          <span className="text-ink-400">
+            {" "}
+            (<TimeAgo iso={truck.position.at} />)
+          </span>
+        )}
+      </span>
+      {!at && (
+        <span className="text-ink-500">
+          · {heading === "pickup" ? "Pickup" : "Delivery"} {place}
+          {when?.relative || when?.date ? `, ${when.relative ?? when.date}` : ""}
+          {when?.time ? ` ${when.time}` : ""}
+        </span>
+      )}
+      {load.late?.stop === heading && <span className="font-medium text-[var(--accent-danger)]">· Running late, about {load.late.eta}</span>}
+    </p>
+  );
+}
 
 /** Which document a stage is still waiting on — same source of truth the driver's confirm button
  *  reads from, so this card's pending rows can never disagree with what actually triggers capture. */
@@ -75,6 +113,8 @@ export default function LoadDetailPage() {
   const [cancelling, setCancelling] = useState(false);
   const [declining, setDeclining] = useState(false);
   const [reassigning, setReassigning] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const router = useRouter();
 
   if (!load) {
     return (
@@ -96,9 +136,13 @@ export default function LoadDetailPage() {
       <ViewTransition name={`load-${load.id}`} share="morph" default="none">
       <div className="border-b border-line bg-white/70 px-4 py-6 sm:px-8 backdrop-blur-sm">
         <div className="flex items-center justify-between gap-3">
-          <Link href="/carrier/loads" transitionTypes={BACK} className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-500 hover:text-ink-950">
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to loads
-          </Link>
+          <button
+            type="button"
+            onClick={() => (cameFromInApp() ? router.back() : router.push("/carrier/loads", { transitionTypes: BACK }))}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-500 hover:text-ink-950"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Back
+          </button>
           <LiveDot label={aiDispatcherNote(load.stage)} />
         </div>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
@@ -112,12 +156,11 @@ export default function LoadDetailPage() {
           </div>
           <div className="flex items-center gap-3">
             <LoadScoreBadge score={load.score} size="xl" />
-            <div className="flex flex-col items-start gap-1.5">
-              <LoadStagePill stage={load.stage} className="!text-xs !px-3 !py-1.5" />
-              <Badge tone="info">Confidence {load.aiConfidence}%</Badge>
-            </div>
+            <LoadStagePill stage={load.stage} className="!text-xs !px-3 !py-1.5" />
           </div>
         </div>
+        <WhereNow load={load} truck={truck} driverName={driver?.name} />
+        <ContactRow driver={driver} broker={broker} className="mt-3" />
         {load.stage !== "cancelled" && (
           <div className="mt-4">
             {isTransitStage(load.stage) ? <TripStepper stage={load.stage} /> : <Progress value={load.progressPct} />}
@@ -139,7 +182,34 @@ export default function LoadDetailPage() {
             {load.tonuFee && <p className="mt-1 text-[var(--accent-warn)]">TONU fee of {formatCurrency(load.tonuFee)} invoiced to the broker.</p>}
           </div>
         )}
-        {CANCELLABLE_STAGES.includes(load.stage) && (
+        {(CANCELLABLE_STAGES.includes(load.stage) || load.stage === "negotiating") && !cancelling && !declining && (
+          <div className="relative mt-3">
+            <button
+              type="button"
+              aria-expanded={menu}
+              aria-label="More for this load"
+              onClick={() => setMenu((v) => !v)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-ink-500 hover:bg-ink-100 hover:text-ink-950"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+            {menu && (
+              <div className="absolute left-0 top-9 z-20 min-w-56 rounded-2xl border border-line bg-white p-1.5 shadow-lg" role="menu">
+                {CANCELLABLE_STAGES.includes(load.stage) && (
+                  <button type="button" role="menuitem" onClick={() => (setMenu(false), setCancelling(true))} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-[var(--accent-danger)] hover:bg-ink-50">
+                    <Ban className="h-3.5 w-3.5" /> Cancel load…
+                  </button>
+                )}
+                {load.stage === "negotiating" && (
+                  <button type="button" role="menuitem" onClick={() => (setMenu(false), setDeclining(true))} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-ink-800 hover:bg-ink-50">
+                    <Ban className="h-3.5 w-3.5" /> Walk away from negotiation…
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {CANCELLABLE_STAGES.includes(load.stage) && cancelling && (
           <div className="mt-4">
             {cancelling ? (
               <CancelForm
@@ -150,14 +220,10 @@ export default function LoadDetailPage() {
                   setCancelling(false);
                 }}
               />
-            ) : (
-              <Button size="sm" variant="danger" onClick={() => setCancelling(true)}>
-                <Ban className="h-3.5 w-3.5" /> Cancel load
-              </Button>
-            )}
+            ) : null}
           </div>
         )}
-        {load.stage === "negotiating" && (
+        {load.stage === "negotiating" && declining && (
           <div className="mt-4">
             {declining ? (
               <DeclineForm
@@ -167,11 +233,7 @@ export default function LoadDetailPage() {
                   setDeclining(false);
                 }}
               />
-            ) : (
-              <Button size="sm" variant="outline" onClick={() => setDeclining(true)}>
-                <Ban className="h-3.5 w-3.5" /> Walk away from negotiation
-              </Button>
-            )}
+            ) : null}
           </div>
         )}
       </div>

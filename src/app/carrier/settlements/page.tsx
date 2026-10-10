@@ -17,6 +17,7 @@ import { paymentStatus, type PaymentState } from "@/lib/payments";
 import { computeFactoringCommission } from "@/lib/commissions";
 import { downloadCsv } from "@/lib/csv-export";
 import { formatCurrency } from "@/lib/utils";
+import { openFile } from "@/lib/cloud/files";
 import type { Driver, Expense, Load, Truck } from "@/lib/types";
 import { Lane } from "@/components/ui/lane";
 import { StatusMark } from "@/components/ui/mark";
@@ -102,6 +103,20 @@ function ExpensesList({
                     </>
                   )}
                   {e.note || "No note"}
+                  {(e.receiptFileId || e.receiptPreview) && (
+                    <>
+                      {" · "}
+                      {e.receiptFileId ? (
+                        <button type="button" onClick={() => void openFile(e.receiptFileId!)} className="font-medium text-ink-700 underline-offset-2 hover:underline">
+                          See the receipt
+                        </button>
+                      ) : (
+                        <a href={e.receiptPreview} target="_blank" rel="noreferrer" className="font-medium text-ink-700 underline-offset-2 hover:underline">
+                          See the receipt
+                        </a>
+                      )}
+                    </>
+                  )}
                 </p>
               </div>
             </div>

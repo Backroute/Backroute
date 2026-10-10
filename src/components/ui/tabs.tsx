@@ -18,6 +18,8 @@ export function Tabs({
       {tabs.map((tab) => (
         <button
           key={tab.key}
+          type="button"
+          aria-pressed={active === tab.key}
           onClick={() => onChange(tab.key)}
           className={cn(
             "flex items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-medium transition-colors",

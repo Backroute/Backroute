@@ -795,6 +795,7 @@ export function generateWorld(seed = 20260916): World {
       createdAt: iso(-18),
       status: "open",
       complexity: "critical",
+      answers: { yes: "Take it", no: "Walk away" },
     },
     {
       id: rng.id("esc"),

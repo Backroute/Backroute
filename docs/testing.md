@@ -290,6 +290,13 @@ The code was run against local stand-ins that behave like the real services:
   - Each driver typed in at sign-up is texted the app link once, after the notice of who's texting, and can sign in with
     their phone (`real-e2e`). In practice mode the link waits; once the carrier is live the rounds send it, once
     (`sandbox-e2e`).
+  - The time-savers (19 checks in `ease-e2e`, 15 in `ease-unit`): the owner's message reaches the driver (a text with
+    the company's name when they have no app notifications; a driver can't send as the office); a receipt's amount is
+    read off its photo; defect photos are stored; today's stops show the late one with its ETA; Call/Text on a load;
+    Message opens that driver's thread; Money in three tabs; Settings search lands on the card; the driver's
+    things-for-you list, time off from Home, the office's message marked as such, and an expense that starts with the
+    receipt. The unit checks: minutes from what a driver says, Take it books at the broker's last offer, Walk away
+    frees the truck, and plans count as one choice.
   - Leaving (21 checks in `leave-e2e`): only the owner can download or delete. The download comes a page at a time
     (1,005 rows come back as 1,000 + 5), with every file, and never a saved website password or an ELD key. Deleting
     needs the company name typed exactly; if Stripe won't cancel the subscription nothing is deleted; once it does,
