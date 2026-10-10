@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/shared/portal-shell";
 import { useCarrierLoads, useCarrierTrucks, useBrokerMap, useDriverMap } from "@/lib/selectors";
 import { weekEarnings } from "@/lib/earnings";
 import { formatCurrency } from "@/lib/utils";
+import { StatusMark } from "@/components/ui/mark";
 
 export default function EarningsPage() {
   const loads = useCarrierLoads();
@@ -168,12 +169,12 @@ export default function EarningsPage() {
   );
 }
 
-// Numbers stay in ink, like the rest of the page; `tone` only adds a small dot next to the label.
+// Numbers stay in ink, like the rest of the page; `tone` only adds a small mark next to the label.
 function BentoTile({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "live" | "danger" }) {
   return (
     <section className="flex min-h-[7.5rem] flex-col justify-between rounded-3xl border border-line bg-white p-4">
       <p className="t-label flex items-center gap-1.5 text-ink-500">
-        {tone && <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${tone === "live" ? "bg-[var(--dot-live)]" : "bg-[var(--dot-danger)]"}`} />}
+        {tone && <StatusMark kind={tone === "live" ? "done" : "needs_you"} />}
         {label}
       </p>
       <div className="mt-2">

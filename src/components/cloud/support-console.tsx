@@ -12,6 +12,7 @@ import { signOut } from "@/lib/cloud/sync";
 import { handoffKind, PLAYBOOK, SLA_MINUTES } from "@/lib/support-playbooks";
 import type { Escalation } from "@/lib/types";
 import { cn, formatCurrency } from "@/lib/utils";
+import { StatusMark } from "@/components/ui/mark";
 
 interface QueueItem {
   carrier: { id: string; name: string; mc: string | null; ownerPhone: string | null; autonomy: string };
@@ -487,7 +488,7 @@ function SystemHealth() {
     return () => clearInterval(id);
   }, [load]);
   if (!checks) return <p className="text-sm text-ink-500">Checking…</p>;
-  const dot: Record<HealthCheck["level"], string> = { ok: "bg-[var(--dot-live)]", warn: "bg-[var(--dot-warn)]", down: "bg-[var(--dot-danger)]", off: "bg-ink-300" };
+  const mark = { ok: "done", warn: "waiting", down: "needs_you", off: "off" } as const;
   const word: Record<HealthCheck["level"], string> = { ok: "Working", warn: "Look at it", down: "Down", off: "Not set up" };
   const down = checks.filter((c) => c.level === "down").length;
   return (
@@ -498,7 +499,9 @@ function SystemHealth() {
       <div className="overflow-hidden rounded-2xl border border-line bg-white">
         {checks.map((c) => (
           <div key={c.key} className="flex items-start gap-3 border-b border-line px-4 py-3 last:border-0">
-            <span className={cn("mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full", dot[c.level])} aria-hidden />
+            <span className="mt-1 flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+              <StatusMark kind={mark[c.level]} />
+            </span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-ink-900">
                 {c.label} <span className="font-normal text-ink-500">· {word[c.level]}</span>

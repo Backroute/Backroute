@@ -16,9 +16,10 @@ import { computeDriverPay, FACTORING_FEE_PCT, payLabel } from "@/lib/settlements
 import { paymentStatus, type PaymentState } from "@/lib/payments";
 import { computeFactoringCommission } from "@/lib/commissions";
 import { downloadCsv } from "@/lib/csv-export";
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import type { Driver, Expense, Load, Truck } from "@/lib/types";
 import { Lane } from "@/components/ui/lane";
+import { StatusMark } from "@/components/ui/mark";
 
 const EXPENSE_CATEGORY_LABEL: Record<Expense["category"], string> = {
   lumper: "Lumper fee",
@@ -201,12 +202,9 @@ function PaymentsList({ loads, now }: { loads: Load[]; now: number | null }) {
             <ol className="mt-3 flex flex-col gap-2 border-t border-line pt-3">
               {p.steps.map((step) => (
                 <li key={step.label} className="flex gap-2.5 text-xs">
-                  <span
-                    className={cn(
-                      "mt-1 h-2 w-2 shrink-0 rounded-full",
-                      step.state === "done" ? "bg-[var(--dot-live)]" : step.state === "problem" ? "bg-[var(--dot-danger)]" : step.state === "current" ? "bg-[var(--dot-warn)]" : "bg-ink-200",
-                    )}
-                  />
+                  <span className="flex h-4 w-3.5 shrink-0 items-center justify-center">
+                    <StatusMark kind={step.state === "done" ? "done" : step.state === "problem" ? "needs_you" : step.state === "current" ? "waiting" : "off"} />
+                  </span>
                   <span>
                     <span className="font-medium text-ink-900">{step.label}</span>
                     {step.detail && <span className="text-ink-500"> · {step.detail}</span>}

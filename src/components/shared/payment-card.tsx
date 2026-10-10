@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useStore } from "@/lib/store";
 import { useNow } from "@/lib/hooks";
 import { paymentStatus } from "@/lib/payments";
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import type { Load } from "@/lib/types";
+import { StatusMark } from "@/components/ui/mark";
 
 /** Where the money for one delivered load is, step by step. */
 export function PaymentCard({ load }: { load: Load }) {
@@ -25,12 +26,9 @@ export function PaymentCard({ load }: { load: Load }) {
         <ol className="flex flex-col gap-2.5">
           {p.steps.map((step) => (
             <li key={step.label} className="flex gap-2.5 text-xs">
-              <span
-                className={cn(
-                  "mt-1 h-2 w-2 shrink-0 rounded-full",
-                  step.state === "done" ? "bg-[var(--dot-live)]" : step.state === "problem" ? "bg-[var(--dot-danger)]" : step.state === "current" ? "bg-[var(--dot-warn)]" : "bg-ink-200",
-                )}
-              />
+              <span className="flex h-4 w-3.5 shrink-0 items-center justify-center">
+                <StatusMark kind={step.state === "done" ? "done" : step.state === "problem" ? "needs_you" : step.state === "current" ? "waiting" : "off"} />
+              </span>
               <span>
                 <span className="block font-medium text-ink-900">{step.label}</span>
                 {step.detail && <span className="text-ink-500">{step.detail}</span>}

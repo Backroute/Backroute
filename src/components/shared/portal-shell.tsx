@@ -16,6 +16,8 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   badge?: number;
+  /** How the badge reads on the phone tab bar: a filled red count when something is urgent, an orange ring when it's only waiting. */
+  badgeTone?: "urgent" | "waiting";
   /** Other routes that belong to this section and light it up. */
   match?: string[];
 }
@@ -240,7 +242,12 @@ function BottomTabs({ navItems, pathname }: { navItems: NavItem[]; pathname: str
             </span>
             {item.label}
             {typeof item.badge === "number" && item.badge > 0 && (
-              <span className="absolute right-[calc(50%-1.6rem)] top-0.5 min-w-4 rounded-full bg-[var(--dot-danger)] px-1 text-center text-xs font-semibold leading-4 text-white">
+              <span
+                className={cn(
+                  "absolute right-[calc(50%-1.6rem)] top-0.5 min-w-4 rounded-full px-1 text-center text-xs font-semibold",
+                  item.badgeTone === "waiting" ? "border-2 border-[var(--dot-warn)] bg-white leading-3 text-ink-950" : "bg-[var(--dot-danger)] leading-4 text-white",
+                )}
+              >
                 {item.badge}
               </span>
             )}

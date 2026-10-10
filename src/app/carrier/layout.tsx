@@ -96,7 +96,7 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
   const activity = useStore((s) => s.activity).filter((e) => e.carrierId === carrier.id);
   // Only three kinds of things interrupt the owner: needs you, money, safety.
   const alerts = activity.filter(isAlert);
-  const needsYou = useNeedsYou().count;
+  const { count: needsYou, urgent } = useNeedsYou();
   const router = useRouter();
   // The number on the app's icon (home screen, dock): what's waiting for the owner.
   useAppBadge(needsYou);
@@ -107,7 +107,7 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
     if (books && !BOOKS_PAGES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) router.replace("/carrier/earnings");
   }, [books, pathname, router]);
   // One number in the whole app: what needs the owner, on Home. Loads, the bell and the status pill don't repeat it.
-  const navWithBadge = NAV.filter((n) => !books || BOOKS_NAV.has(n.href)).map((n) => (n.href === "/carrier" ? { ...n, badge: needsYou } : n));
+  const navWithBadge = NAV.filter((n) => !books || BOOKS_NAV.has(n.href)).map((n) => (n.href === "/carrier" ? { ...n, badge: needsYou, badgeTone: urgent ? ("urgent" as const) : ("waiting" as const) } : n));
 
   const paused = useStore((s) => !!s.settings.paused);
   const updateSettings = useStore((s) => s.actions.updateSettings);

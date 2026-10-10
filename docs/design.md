@@ -13,15 +13,20 @@ reads in a truck cab at noon.
 | Black and grey | Almost everything: text, numbers, icons, cards. Money is black, never green. Greys are Base's (#F3F3F3 panels, #E8E8E8 lines, #4B4B4B and #5E5E5E secondary text). | Text |
 | Black (`--action`, white in dark mode) | The thing to tap: the main button on a screen, a switch that's on. | Button |
 | Blue (`--link`, #276EF1) | Text links, keyboard focus, the "Best fit" tag and what kind of plan a card is. | Link or tag |
-| Red (`--accent-danger`) | Wrong right now: a breakdown, a missed pickup, a risky broker, a loss. | A small dot or the word |
-| Orange (`--accent-warn`) | Waiting on the owner or driver. | A small dot |
+| Red (`--accent-danger`) | Wrong right now: a breakdown, a missed pickup, a risky broker, a loss. | A filled circle with a "!", or the word |
+| Orange (`--accent-warn`) | Waiting on the owner or driver. | A ring (hollow) |
 | Green (`--accent-live`) | Done or paid. | A small dot or check |
 
 - Two strengths of each status colour. Dots and solid fills use the bright ones (`--dot-live` #06C167,
   `--dot-warn` #FC823A, `--dot-danger` #F83446). Small text uses the darker `--accent-*` versions, which keep the
   contrast.
-- Status never fills a block. Pills are grey with a dot (`lib/status.ts`, `components/ui/badge.tsx`); cards have no
-  coloured stripes or borders. The `*-soft` tokens are grey on purpose.
+- Red and orange never differ by colour alone: at dot size they look alike, and some owners are colour-blind. Every
+  status mark comes from `StatusMark` (`components/ui/mark.tsx`): a red filled circle with a "!" for needs you now, an
+  orange ring for waiting, and plain dots for green, black and grey. An urgent card (`AttentionCard tone="urgent"`)
+  also says "Urgent" in red, has a red edge, and goes to the top of the list. The phone tab count is a filled red
+  bubble when something is urgent, an orange ring when things are only waiting.
+- Status never fills a block. Pills are grey with a mark (`lib/status.ts`, `components/ui/badge.tsx`); cards have no
+  coloured stripes, and only an urgent card has a coloured border. The `*-soft` tokens are grey on purpose.
 - One black button per screen or card. Everything else is a grey button (`variant="secondary"`) or a plain link.
 - Dark panels (`.theme-ink`) and the best card (`.theme-invert`) flip the greys; inside them "white" is the panel's
   colour, so a light shape inside one uses a literal (`bg-[#ffffff]`) or the action token.

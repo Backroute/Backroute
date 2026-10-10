@@ -28,6 +28,7 @@ import {
   type DriverTripCardProps,
 } from "./driver-trip-card";
 import { Lane } from "@/components/ui/lane";
+import { StatusMark } from "@/components/ui/mark";
 
 /** The small, always-current trip card — Uber's collapsed sheet: where, when, how far along, and the one next
  *  step (with its button when it's the driver's to take). Tap it for everything else. */
@@ -209,7 +210,7 @@ export function TripDetails({
           <ol className="flex flex-col gap-3">
             {activity.map((e) => (
               <li key={e.id} className="flex gap-3">
-                <span className={cn("mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full", e.severity === "success" ? "bg-[var(--dot-live)]" : e.severity === "warning" ? "bg-[var(--dot-warn)]" : "bg-white/40")} />
+                {e.severity === "warning" ? <StatusMark kind="waiting" className="mt-1" /> : <span className={cn("mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full", e.severity === "success" ? "bg-[var(--dot-live)]" : "bg-white/40")} />}
                 <div className="min-w-0 flex-1">
                   <p className="text-sm">{e.message}</p>
                   <p className="text-xs text-white/50">{e.detail}</p>

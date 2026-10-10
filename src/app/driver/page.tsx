@@ -35,6 +35,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 import { Lane } from "@/components/ui/lane";
 import { stopDates } from "@/lib/load-dates";
 import { crewOf } from "@/lib/hos-plan";
+import { StatusMark } from "@/components/ui/mark";
 
 
 export default function DriverHomePage() {
@@ -176,7 +177,7 @@ export default function DriverHomePage() {
           )}
         </div>
         <p className="mt-1 flex items-center gap-2 text-sm text-ink-500">
-          <span className={cn("h-2 w-2 shrink-0 rounded-full", todoCount ? "bg-[var(--dot-warn)]" : "bg-[var(--dot-live)]")} />
+          <StatusMark kind={todoCount ? "waiting" : "done"} />
           {completedLoad
             ? t.delivered
             : todoCount === 0

@@ -41,8 +41,10 @@ export function useNeedsYou() {
   // Escalations already handed to Backroute Support are listed but no longer wait on the carrier.
   const waiting = escalations.filter((e) => e.status !== "with_support");
   const count = waiting.length + pendingTimeOff.length + offerGroups.length + driversAtRisk.length + lumperAsks.length;
+  // The part of it that can't wait: decisions only the owner can make now, and drivers at a dock waiting on money.
+  const urgent = waiting.filter((e) => e.complexity === "critical").length + lumperAsks.length;
   const listed = escalations.filter((e) => !e.incidentId);
-  return { escalations, listed, pendingTimeOff, lumperAsks, driversAtRisk, offerGroups, count, any: listed.length + pendingTimeOff.length + offerGroups.length + driversAtRisk.length + lumperAsks.length > 0 };
+  return { escalations, listed, pendingTimeOff, lumperAsks, driversAtRisk, offerGroups, count, urgent, any: listed.length + pendingTimeOff.length + offerGroups.length + driversAtRisk.length + lumperAsks.length > 0 };
 }
 
 // ── Set aside for later (a left swipe): this browser tab only, back next visit. ───────────────────────────────────
@@ -217,7 +219,7 @@ function toneOf(e: Escalation): AttentionTone {
 }
 
 export function NeedsYouList() {
-  const { listed, pendingTimeOff, lumperAsks, driversAtRisk, offerGroups, count, any } = useNeedsYou();
+  const { listed, pendingTimeOff, lumperAsks, driversAtRisk, offerGroups, count, urgent, any } = useNeedsYou();
   const loads = useCarrierLoads();
   const truckMap = useTruckMap();
   const driverMap = useDriverMap();
@@ -261,11 +263,6 @@ export function NeedsYouList() {
         >
           <AttentionCard tone={toneOf(e)}>
             {(truck || driver) && <TruckDriverChip truck={truck} driver={driver} className="mb-2" />}
-            {e.complexity === "critical" && e.status !== "with_support" && (
-              <Badge tone="danger" className="mb-1.5">
-                Your call
-              </Badge>
-            )}
             <SourceTag source={e.source} />
             <p className="text-sm leading-relaxed text-ink-800">{e.reason}</p>
             {e.suggestRule && signedIn ? (
@@ -353,12 +350,21 @@ export function NeedsYouList() {
         <h2 id="needs-you-title" className="t-section text-ink-950">
           Needs you
         </h2>
-        {count > 0 && <Badge tone="warning">{count}</Badge>}
+        {count > 0 && <Badge tone={urgent ? "danger" : "warning"}>{count}</Badge>}
         <span className="ml-auto hidden text-xs text-ink-400 [@media(pointer:coarse)]:inline">Swipe right to do it, left for later</span>
       </div>
       <BatchBar batches={batches} />
       <div className="grid gap-3 md:grid-cols-2">
         <AnimatePresence initial={false} mode="popLayout">
+          {/* Red first, whatever kind it is: a driver at a dock waiting on money, then decisions only the owner can make. */}
+          {lumperAsks.map((e) => (
+            <motion.div key={e.id} layout {...enter}>
+              <LumperAsk ask={e} driverName={driverMap.get(e.driverId)?.name ?? "Driver"} loadRef={loads.find((l) => l.id === e.loadId)?.referenceNumber} />
+            </motion.div>
+          ))}
+
+          {now.filter((e) => toneOf(e) === "urgent").map(card)}
+
           {offerGroups.map(([groupId, group]) => {
             const truck = group[0]?.truckId ? truckMap.get(group[0].truckId) : undefined;
             const driver = truck?.driverId ? driverMap.get(truck.driverId) : undefined;
@@ -387,7 +393,7 @@ export function NeedsYouList() {
             );
           })}
 
-          {now.map(card)}
+          {now.filter((e) => toneOf(e) !== "urgent").map(card)}
 
           {driversAtRisk.map(({ driver, view }) => (
             <motion.div key={driver.id} layout {...enter}>
@@ -402,12 +408,6 @@ export function NeedsYouList() {
                   </Button>
                 </div>
               </AttentionCard>
-            </motion.div>
-          ))}
-
-          {lumperAsks.map((e) => (
-            <motion.div key={e.id} layout {...enter}>
-              <LumperAsk ask={e} driverName={driverMap.get(e.driverId)?.name ?? "Driver"} loadRef={loads.find((l) => l.id === e.loadId)?.referenceNumber} />
             </motion.div>
           ))}
 

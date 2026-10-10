@@ -5,22 +5,20 @@ import { animate, motion, useMotionValue, useTransform, type PanInfo } from "fra
 import { Check, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/lib/feedback";
+import type { StatusKind } from "@/lib/status";
+import { StatusMark } from "@/components/ui/mark";
 
 /**
- * How much something needs the owner, shown the same way everywhere: a small dot on a plain card. Red needs a
- * decision now, orange is waiting on them, grey is for their information, green is done.
+ * How much something needs the owner, shown the same way everywhere: a small mark on a plain card. Red needs a
+ * decision now: a filled circle with a "!", a red edge and the word "Urgent", so it never rests on colour alone.
+ * Orange is waiting on them: a ring. Grey is for their information, green is done.
  */
 export type AttentionTone = "urgent" | "waiting" | "info" | "done";
 
-const DOT: Record<AttentionTone, string> = {
-  urgent: "bg-[var(--dot-danger)]",
-  waiting: "bg-[var(--dot-warn)]",
-  info: "bg-ink-300",
-  done: "bg-[var(--dot-live)]",
-};
+const MARK: Record<AttentionTone, StatusKind> = { urgent: "needs_you", waiting: "waiting", info: "off", done: "done" };
 
 const TONE_LABEL: Record<AttentionTone, string> = {
-  urgent: "Needs a decision now",
+  urgent: "Urgent",
   waiting: "Waiting on you",
   info: "For your information",
   done: "Done",
@@ -28,9 +26,15 @@ const TONE_LABEL: Record<AttentionTone, string> = {
 
 export function AttentionCard({ tone, className, children, ...props }: { tone: AttentionTone } & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("relative h-full overflow-hidden rounded-2xl border border-line bg-white p-4 pl-6", className)} {...props}>
-      <span aria-hidden className={cn("absolute left-2.5 top-[1.4rem] h-1.5 w-1.5 rounded-full", DOT[tone])} />
-      <span className="sr-only">{TONE_LABEL[tone]}. </span>
+    <div className={cn("relative h-full overflow-hidden rounded-2xl border bg-white p-4 pl-7", tone === "urgent" ? "border-[var(--accent-danger)]/50" : "border-line", className)} {...props}>
+      <span aria-hidden className="absolute left-2 top-[1.2rem] flex h-3.5 w-3.5 items-center justify-center">
+        <StatusMark kind={MARK[tone]} />
+      </span>
+      {tone === "urgent" ? (
+        <p className="mb-1.5 text-xs font-semibold text-[var(--accent-danger)]">{TONE_LABEL.urgent}</p>
+      ) : (
+        <span className="sr-only">{TONE_LABEL[tone]}. </span>
+      )}
       {children}
     </div>
   );
