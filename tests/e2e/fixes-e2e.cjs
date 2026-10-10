@@ -86,7 +86,7 @@ const emailsIn = (q) => db(`select count(*) from channel_messages where carrier_
   check("the email setup's live test shows it arrived, from the mailbox", status.body.emailSetup?.lastTest?.via === "gmail" && status.body.emailSetup?.lastTest?.from === "owner@titanfreight.test", JSON.stringify(status.body.emailSetup));
 
   // ── Gmail's forwarding code, sent to the Backroute address ────────────────
-  const hook = (email) => fetch(`${BASE}/api/channels/email?token=${process.env.EMAIL_WEBHOOK_TOKEN}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(email) });
+  const hook = (email) => fetch(`${BASE}/api/channels/email?token=email-hook-secret`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(email) });
   await hook({ MessageID: `fx-fwd-${Date.now()}`, From: "forwarding-noreply@google.com", FromFull: { Email: "forwarding-noreply@google.com" }, To: `abc123+${key}@inbound.postmarkapp.com`, MailboxHash: key, Subject: "(#481516234) Gmail Forwarding Confirmation - Receive Mail from owner@gmail.com", TextBody: "Confirmation code: 481516234\n\nhttps://mail-settings.google.com/mail/vf-abc123-xyz" });
   const st2 = await api(`/api/channels/status?carrier=${cid}`);
   check("Gmail's forwarding code shows in the setup as it arrives", st2.body.emailSetup?.gmailCode?.code === "481516234" && /^https:\/\/mail-settings\.google\.com\/mail\/vf-/.test(st2.body.emailSetup?.gmailCode?.link ?? ""), JSON.stringify(st2.body.emailSetup));

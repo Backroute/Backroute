@@ -5,7 +5,7 @@ import { StatusMark } from "@/components/ui/mark";
 import { useNow } from "@/lib/hooks";
 import { tripState } from "@/lib/trip-state";
 import type { Load } from "@/lib/types";
-import { cn, formatTime } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 /**
  * One truck on a load, in one line: who, where it's headed, how it's going, and a thin bar for how far along. Many
@@ -17,7 +17,7 @@ export function LiveLoadRow({ load, who, needsPreTrip, onOpen }: { load: Load; w
   const place = s.card === "booking" ? `${load.lane.origin} → ${load.lane.destination}` : s.card === "pickup" ? `${load.lane.origin}, ${load.lane.originState}` : `${load.lane.destination}, ${load.lane.destState}`;
   const late = load.late && load.late.stop === (s.card === "delivery" ? "delivery" : "pickup") ? load.late : null;
   const status = late
-    ? `Late · ETA ${formatTime(late.eta)}`
+    ? `Late · ETA ${late.eta}`
     : s.card === "booking"
       ? "Booking"
       : s.arrived

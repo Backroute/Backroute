@@ -297,7 +297,7 @@ The code was run against local stand-ins that behave like the real services:
     things-for-you list, time off from Home, the office's message marked as such, and an expense that starts with the
     receipt. The unit checks: minutes from what a driver says, Take it books at the broker's last offer, Walk away
     frees the truck, and plans count as one choice.
-  - The "fix everything" round (`fixes-e2e`, 45 in `fixes-unit`): the owner's Gmail connected through Google's sign-in
+  - The "fix everything" round (33 checks in `fixes-e2e`, 45 in `fixes-unit`; the whole suite: 930 checks, 40 suites, none failing): the owner's Gmail connected through Google's sign-in
     stand-in (a changed state turned away, the sign-in stored sealed), then read for freight mail only (the rate con in,
     a friend's note and a phone bill skipped, nothing taken twice); the owner's "Backroute test" and Gmail's forwarding
     code show in the setup and never reach the AI; disconnecting revokes. Every broker email answers to the carrier's
