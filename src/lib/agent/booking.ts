@@ -36,7 +36,7 @@ import { translateForDriver } from "../ai/translate";
 import { cantRun } from "../expiry";
 import { chainEnd, doneAt, LINED_UP_MAX, linedUp, reloadOutlook, reloadValue } from "./chain";
 import { isPartial, nextStop, type TripLoad } from "../trip-plan";
-import { newTrip, stopsLine, tripFit, tripWith, type TripFit } from "./trips";
+import { byRoad, newTrip, stopsLine, tripFit, tripWith, type TripFit } from "./trips";
 import { callDriverAbout } from "./driver-calls";
 import { bestAssignment } from "./match";
 import { learnedAsk } from "./ask-learning";
@@ -250,7 +250,9 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
     );
     // Riding along on a trip: what it costs is the miles it adds, not its own (the truck drives most of them anyway).
     if (fit.trip) {
-      const fuelCost = Math.round((Math.max(0, fit.trip.added) / fit.truck.mpg) * 3.9);
+      // By truck road when routing is set up (agent/trips byRoad); the estimate otherwise.
+      const trip = await byRoad(fit.trip, miles).catch(() => fit.trip!);
+      const fuelCost = Math.round((Math.max(0, trip.added) / fit.truck.mpg) * 3.9);
       const rate = base.targetRate;
       Object.assign(base, { fuelCost, deadheadMiles: 0, deadheadCost: 0, netProfit: Math.round(rate - fuelCost - base.commission) });
     }
@@ -515,8 +517,9 @@ export async function bookIt(ctx: CarrierContext, load: Load, rate?: number): Pr
     // On a load: this one is next, unless one is already next (then it waits behind it in the lineup, lib/agent/chain).
     // On a trip: the truck works the load at its next stop. A trip planned ahead waits behind the load the truck is on,
     // its first pickup next.
+    // Behind more of the lineup, the next booked load stays next.
     truckAfter = trip && joins?.after
-      ? { ...truck, trip, nextLoadId: nextStop({ trip }, ctx.loads)?.load.id ?? load.id }
+      ? { ...truck, trip, nextLoadId: joins.after === truck.currentLoadId ? (nextStop({ trip }, ctx.loads)?.load.id ?? load.id) : truck.nextLoadId }
       : trip
       ? { ...truck, trip, currentLoadId: nextStop({ trip }, ctx.loads)?.load.id ?? load.id, status: "on_load" }
       : free

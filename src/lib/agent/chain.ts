@@ -22,30 +22,36 @@ const pickupTime = (l: Load) => Date.parse(l.pickupAt ?? "") || Number.MAX_SAFE_
  * by pickup time. A booked load whose pickup is more than a day gone (never started, never cancelled) is left out, so
  * a forgotten one can't hold up the truck. On a multi-load trip (lib/trip-plan), the load at the trip's next stop is
  * the current one and the trip's other loads follow it, in the order they come off. A trip planned ahead (partials
- * after the full load the truck is on) follows that load.
+ * after a full load: the one the truck is on, or one lined up behind it) follows that load.
  */
 export function chainOf(loads: Load[], truck: Pick<Truck, "id" | "currentLoadId"> & { nextLoadId?: string | null; trip?: Truck["trip"] }, now = Date.now()): Load[] {
   const onTrip = truck.trip ? tripLoads(truck, loads) : [];
   const tripIds = new Set(onTrip.map((l) => l.id));
-  const stop = truck.trip ? nextStop(truck, loads) : null;
-  const current = tripAhead(truck, loads) ?? stop?.load ?? loads.find((l) => l.id === truck.currentLoadId && l.truckId === truck.id && ROLLING.has(l.stage));
+  const ahead = tripAhead(truck, loads);
+  const stop = truck.trip && !ahead ? nextStop(truck, loads) : null;
+  const rolling = loads.find((l) => l.id === truck.currentLoadId && l.truckId === truck.id && ROLLING.has(l.stage));
+  // A trip planned ahead waits behind a full load: the one the truck is on, or one lined up after it.
+  // (Between the loads before it, the truck's next one moves up like any lineup.)
+  const current = ahead ? (rolling && !tripIds.has(rolling.id) ? rolling : undefined) : (stop?.load ?? rolling);
   const dropAt = (l: Load) => truck.trip!.stops.findIndex((s) => s.loadId === l.id && s.kind === "delivery");
   const tripRest = onTrip.filter((l) => l !== current).sort((a, b) => dropAt(a) - dropAt(b));
   const waiting = loads.filter((l) => l !== current && !tripIds.has(l.id) && l.truckId === truck.id && WAITING.has(l.stage) && !(l.pickupAt && Date.parse(l.pickupAt) < now - DAY));
   const next = waiting.find((l) => l.id === truck.nextLoadId);
-  const rest = waiting.filter((l) => l !== next).sort((a, b) => pickupTime(a) - pickupTime(b));
-  return [...(current ? [current] : []), ...tripRest, ...(next ? [next] : []), ...rest];
+  const lineup = [...(next ? [next] : []), ...waiting.filter((l) => l !== next).sort((a, b) => pickupTime(a) - pickupTime(b))];
+  // The trip's stops come after the load it waits for; on a trip under way, right after the stop the truck is at.
+  const cut = ahead && ahead !== current ? lineup.indexOf(ahead) + 1 : 0;
+  return [...(current ? [current] : []), ...lineup.slice(0, cut), ...tripRest, ...lineup.slice(cut)];
 }
 
 /** The load the truck finishes on: the last lined up, or on a trip with nothing after it, the trip's last drop. */
 export function chainEnd(loads: Load[], truck: Truck, now = Date.now()): Load | undefined {
   const chain = chainOf(loads, truck, now);
   const onTrip = truck.trip ? new Set(tripLoads(truck, loads).map((l) => l.id)) : new Set<string>();
-  // The full load before a trip planned ahead isn't after it.
-  const ahead = tripAhead(truck, loads);
-  const after = chain.filter((l) => !onTrip.has(l.id) && l !== ahead);
-  if (after.length) return after[after.length - 1];
   if (!onTrip.size) return chain[chain.length - 1];
+  // What's lined up after the trip (the loads before a trip planned ahead aren't after it).
+  const lastOnTrip = chain.reduce((at, l, i) => (onTrip.has(l.id) ? i : at), -1);
+  const after = chain.slice(lastOnTrip + 1);
+  if (after.length) return after[after.length - 1];
   const lastDrop = [...truck.trip!.stops].reverse().find((s) => s.kind === "delivery" && onTrip.has(s.loadId));
   return chain.find((l) => l.id === lastDrop?.loadId) ?? chain[chain.length - 1];
 }
@@ -81,9 +87,10 @@ export function slotsFor(loads: Load[], truck: Truck, now = Date.now()): Pick<Tr
   const current = chain[0] ?? null;
   // A trip's other loads aren't "next": they're on the truck already. Next is what comes after the trip.
   const onTrip = truck.trip ? new Set(tripLoads(truck, loads).map((l) => l.id)) : new Set<string>();
-  // A trip planned ahead: its first pickup is next.
+  // A trip planned ahead right after the load the truck is on: its first pickup is next. Behind more of the lineup,
+  // the next booked load is.
   const ahead = tripAhead(truck, loads);
-  const next = (ahead ? nextStop(truck, loads)?.load : chain.find((l) => l !== current && !onTrip.has(l.id))) ?? null;
+  const next = (ahead && ahead === current ? nextStop(truck, loads)?.load : chain.find((l) => l !== current && !onTrip.has(l.id))) ?? null;
   return {
     currentLoadId: current?.id ?? null,
     nextLoadId: next?.id ?? null,

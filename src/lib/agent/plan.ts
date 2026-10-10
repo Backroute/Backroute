@@ -39,10 +39,17 @@ function planFor(ctx: Pick<CarrierContext, "loads" | "drivers">, truck: Truck, n
   } else if (current) lines.push(`Now: ${current.referenceNumber} to ${current.lane.destination}, ${current.lane.destState}, delivering ${at(current.deliveryAt, current.lane.destState, current.deliveryWindow)}.`);
   else if (truck.status !== "maintenance")
     lines.push(truck.repositionTo && Date.parse(truck.repositionTo.at) > now - 86400_000 ? `Empty, heading to ${truck.repositionTo.city}, ${truck.repositionTo.state} where the freight is.` : `Empty in ${truck.currentCity}, ${truck.currentState}.`);
+  // What comes next, in order: the loads lined up, with a trip planned ahead after the load it waits for (straight
+  // after the one the truck is on, or after one lined up behind it).
   const firstUp = ahead ? nextStop(truck, ctx.loads)?.load : undefined;
-  if (firstUp) lines.push(`Next: a trip of ${aheadLoads.length} partial${aheadLoads.length === 1 ? "" : "s"} (${aheadLoads.map((l) => l.referenceNumber).join(", ")}), first pickup ${firstUp.referenceNumber} in ${firstUp.lane.origin}, ${firstUp.lane.originState}, ${at(firstUp.pickupAt, firstUp.lane.originState, firstUp.pickupWindow)}.`);
-  if (next) lines.push(`${firstUp ? "Then" : "Next"}: ${next.referenceNumber}, ${next.lane.origin} → ${next.lane.destination}, picks up ${at(next.pickupAt, next.lane.originState, next.pickupWindow)}.`);
-  for (const then of lined.slice(1)) lines.push(`Then: ${then.referenceNumber}, ${then.lane.origin} → ${then.lane.destination}, picks up ${at(then.pickupAt, then.lane.originState, then.pickupWindow)}.`);
+  const tripLine = firstUp ? `a trip of ${aheadLoads.length} partial${aheadLoads.length === 1 ? "" : "s"} (${aheadLoads.map((l) => l.referenceNumber).join(", ")}), first pickup ${firstUp.referenceNumber} in ${firstUp.lane.origin}, ${firstUp.lane.originState}, ${at(firstUp.pickupAt, firstUp.lane.originState, firstUp.pickupWindow)}.` : null;
+  const upcoming: string[] = [];
+  if (tripLine && !lined.includes(ahead!)) upcoming.push(tripLine);
+  for (const l of lined) {
+    upcoming.push(`${l.referenceNumber}, ${l.lane.origin} → ${l.lane.destination}, picks up ${at(l.pickupAt, l.lane.originState, l.pickupWindow)}.`);
+    if (tripLine && l === ahead) upcoming.push(tripLine);
+  }
+  upcoming.forEach((line, i) => lines.push(`${i ? "Then" : "Next"}: ${line}`));
   if ((next || firstUp) && chasing) lines.push(`Also asking for ${chasing.lane.origin} → ${chasing.lane.destination} at $${(chasing.bookRequest?.ask ?? chasing.targetRate).toLocaleString()}, after that.`);
   else if (chasing) lines.push(`Next: asking ${chasing.lane.origin} → ${chasing.lane.destination} at $${(chasing.bookRequest?.ask ?? chasing.targetRate).toLocaleString()}, waiting on the broker.`);
   else if (truck.status !== "maintenance") {

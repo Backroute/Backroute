@@ -334,6 +334,8 @@ export interface TripStop {
 export interface Trip {
   id: string;
   stops: TripStop[];
+  /** A trip planned ahead: the booked load it starts after (the one the truck is on, or one lined up behind it). */
+  after?: string;
   /** When the order was last worked out. */
   at: string;
   /** Things the driver should know about the order: a load that has to be moved to get another out (a restack). */

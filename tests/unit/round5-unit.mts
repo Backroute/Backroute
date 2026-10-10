@@ -147,7 +147,7 @@ ok("...the trip's stops are the partials only (the full load isn't on it)", !!tr
 ok("ahead: no trip with nothing booked behind the full load (a single partial chains the usual way)", tripFit({ ...ctxF, loads: [F] }, { ...onFull, nextLoadId: null }, X, now) === null);
 const askingW = tripFit({ ...ctxF, loads: [F, { ...W, stage: "negotiating" }] }, { ...onFull, nextLoadId: null }, X, now);
 ok("ahead: two partials asked for at once behind a full load can make the trip", !!askingW && askingW.after === "f1" && askingW.order.length === 4, askingW && askingW.order);
-ok("ahead: not with a full load lined up behind it too", tripFit({ ...ctxF, loads: [F, W, { ...P("g2", lane("Austin", "TX", "Dallas", "TX", 195), { partial: undefined }), stage: "booked", pickupAt: iso(now + 40 * H) }] }, onFull, X, now) === null);
+ok("ahead: nothing to share yet behind a full load lined up after it (the first partial there is booked the usual way)", tripFit({ ...ctxF, loads: [F, W, { ...P("g2", lane("Austin", "TX", "Dallas", "TX", 195), { partial: undefined }), stage: "booked", pickupAt: iso(now + 40 * H) }] }, onFull, X, now) === null);
 const tAhead = { ...onFull, trip: tripX };
 const aheadLoads: any[] = [F, { ...W, tripId: tripX?.id }, { ...X, stage: "booked", tripId: tripX?.id }];
 const firstPick = tripX?.stops[0].loadId;
@@ -162,6 +162,33 @@ ok("ahead: a third partial joins the planned trip", !!fitY && fitY.after === "f1
 const dropped = aheadLoads.map((l) => (l.id === "f1" ? { ...l, stage: "delivered" } : l));
 const moved = slotsFor(dropped, { ...tAhead, currentLoadId: null }, now);
 ok("the full load delivered: the trip starts, the truck on its first pickup", moved.currentLoadId === firstPick && !!moved.trip && moved.status === "on_load", moved);
+
+// Partials planned behind more of the lineup: a full load booked after the one the truck is on, then the trip
+const G = { ...P("g1", lane("Houston", "TX", "San Antonio", "TX", 200), { partial: undefined }), stage: "booked", pickupAt: iso(now + 8 * H), deliveryAt: iso(now + 13 * H) };
+const W2 = P("w2", lane("San Antonio", "TX", "Austin", "TX", 80), { stage: "booked", pickupAt: iso(now + 16 * H) });
+const X2 = P("x2", lane("San Antonio", "TX", "Austin", "TX", 80), { stage: "offered", pickupAt: iso(now + 16.5 * H), partial: { feet: 10 } });
+const onLine = { ...truck, trip: undefined, currentLoadId: "f1", nextLoadId: "g1" };
+const ctxL = { loads: [F, G, W2], drivers: [{ id: "d1", hoursRemaining: 11 }] } as any;
+const fitL = tripFit(ctxL, onLine, X2, now);
+ok("behind the lineup: with a full load and then a partial booked after the one it's on, the next partial joins that partial, after the second full load", !!fitL && fitL.after === "g1" && fitL.order.length === 4, fitL && { after: fitL.after, order: fitL.order });
+ok("...planned from San Antonio, after that load delivers", !!fitL && fitL.run.etas[0] >= now + 13 * H, fitL && fitL.run.etas.map(iso));
+const tripL = fitL ? tripWith(ctxL, onLine, fitL) : null;
+ok("...the trip remembers the load it waits for", tripL?.after === "g1" && tripL.stops.length === 4 && !tripL.stops.some((x) => x.loadId === "f1" || x.loadId === "g1"), tripL);
+const tLine = { ...onLine, trip: tripL! };
+const lineLoads: any[] = [F, G, { ...W2, tripId: tripL?.id }, { ...X2, stage: "booked", tripId: tripL?.id }];
+const order = chainOf(lineLoads, tLine, now).map((l) => l.id);
+ok("...in the lineup: the load it's on, the next full load, then the trip", order[0] === "f1" && order[1] === "g1" && order.slice(2).sort().join() === "w2,x2", order);
+const sL = slotsFor(lineLoads, tLine, now);
+ok("...the next booked load is still next (not the trip's first pickup)", sL.currentLoadId === "f1" && sL.nextLoadId === "g1" && !!sL.trip, sL);
+ok("...three lined up (the two full loads and the trip), ending at the trip's last drop", linedUp(lineLoads, tLine, now) === 3 && chainEnd(lineLoads, tLine, now)?.id === tripL?.stops[3].loadId, { lined: linedUp(lineLoads, tLine, now), end: chainEnd(lineLoads, tLine, now)?.id });
+const afterF = lineLoads.map((l) => (l.id === "f1" ? { ...l, stage: "delivered" } : l));
+const sF = slotsFor(afterF, tLine, now);
+ok("the first full load delivered: the truck moves to the second, and the trip's first pickup is next", sF.currentLoadId === "g1" && sF.nextLoadId === tripL?.stops[0].loadId && !!sF.trip, sF);
+const afterG = afterF.map((l) => (l.id === "g1" ? { ...l, stage: "delivered" } : l));
+const sG = slotsFor(afterG, { ...tLine, currentLoadId: "g1" }, now);
+ok("the second delivered: the trip starts, the truck on its first pickup", sG.currentLoadId === tripL?.stops[0].loadId && !!sG.trip && sG.status === "on_load", sG);
+const cancelledG = lineLoads.map((l) => (l.id === "g1" ? { ...l, stage: "cancelled" } : l));
+ok("the load it waits for cancelled: the trip follows the load the truck is on instead", chainOf(cancelledG, tLine, now).map((l) => l.id).join() !== "" && slotsFor(cancelledG, tLine, now).nextLoadId === tripL?.stops[0].loadId, slotsFor(cancelledG, tLine, now));
 
 // Pricing a partial
 const fl = floorFor({ lane: { miles: 400 } as any, partial: { feet: 13 } }, { minRpm: 3 } as any);

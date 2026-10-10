@@ -314,6 +314,11 @@ The code was run against local stand-ins that behave like the real services:
     and under a second after; the owner's Home 1.26 MB the first time, most of it the map (277 kB, loaded after the
     page) and pages prefetched in the background. The built app still works offline (6 checks).
   - Backups: a dump restored into an empty database with every access rule, function and trigger (runbook).
+- **Partials behind the lineup, and by road** (9 more unit checks in `round5-unit`, 7 in `trip-road-unit`): a partial
+  booked after a second full load becomes a trip with the next one, planned from where that full load delivers; the
+  lineup reads the load it's on, the next full load, then the trip; each delivery moves the truck up; a cancelled
+  anchor hands the trip to the load the truck is on. With the HERE stand-in, a Little Rock partial on a Dallas to
+  Memphis trip is measured by road through every stop; a place it doesn't know, or no HERE key, keeps the estimate.
 - **Access rules:** 125 checks.
   - A stale copy saving one field of a load changes only that field.
   - What carriers cost to run is server-only.

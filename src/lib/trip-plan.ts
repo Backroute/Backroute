@@ -115,11 +115,19 @@ export function nextStop(truck: Pick<Truck, "trip">, loads: Load[]): { stop: Tri
 const BOOKED_OR_ROLLING = new Set<LoadStage>(["rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery"]);
 
 /**
- * A trip planned ahead: partials booked to share the trailer after the full load the truck is on now. Its stops start
- * when that load drops. Returns the load the truck is on, or null when the trip (if any) is the run the truck is on.
+ * A trip planned ahead: partials booked to share the trailer after a full load, the one the truck is on now or one
+ * lined up behind it (`trip.after`). Its stops start when that load drops. Returns the load it waits for, or null when
+ * the trip (if any) is the run the truck is on.
  */
 export function tripAhead(truck: Pick<Truck, "trip" | "currentLoadId">, loads: Load[]): Load | null {
-  if (!truck.trip || !truck.currentLoadId || truck.trip.stops.some((s) => s.loadId === truck.currentLoadId)) return null;
+  if (!truck.trip) return null;
+  if (truck.trip.after) {
+    const waits = loads.find((l) => l.id === truck.trip!.after);
+    if (waits && BOOKED_OR_ROLLING.has(waits.stage)) return waits;
+    // Delivered: the trip is under way. Cancelled: it follows whatever the truck is on, as below.
+    if (!waits || waits.stage === "delivered") return null;
+  }
+  if (!truck.currentLoadId || truck.trip.stops.some((s) => s.loadId === truck.currentLoadId)) return null;
   const on = loads.find((l) => l.id === truck.currentLoadId);
   return on && BOOKED_OR_ROLLING.has(on.stage) ? on : null;
 }
