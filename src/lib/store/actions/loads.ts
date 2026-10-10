@@ -7,6 +7,7 @@ import type { ActivityEvent, Load, VoiceCall } from "../../types";
 import { formatCurrencyShort, scheduleCallEnds, uid, withLiveCall } from "../support";
 import type { Actions, GetState, SetState } from "../state";
 import { updateCall } from "../../dispatch-calls";
+import { tonuFor } from "../../tonu";
 
 export const loadsActions = (set: SetState, get: GetState): Pick<Actions, "selectLoadOffer" | "saveRateConReading" | "setUpRealFleet" | "addToFleet" | "addLoad" | "requestBetterRate" | "cancelLoad" | "declineLoad" | "reassignTruck" | "requestOfferDetail" | "resolveOfferDetail" | "sendNegotiationInstruction" | "startBrokerCall" | "finishBrokerCall" | "logLoadVoiceCall" | "setDockAddress" | "setAiPaused"> => ({
   selectLoadOffer: (offerGroupId, loadId, actor, also) => {
@@ -125,7 +126,7 @@ export const loadsActions = (set: SetState, get: GetState): Pick<Actions, "selec
       if (!load) return {};
       const broker = state.brokers.find((b) => b.id === load.brokerId);
       const tonuEligible = load.stage === "dispatched" || load.stage === "at_pickup";
-      const tonuFee = tonuEligible ? 250 : 0;
+      const tonuFee = tonuEligible ? tonuFor(load, state.settings.tonuFee) : 0;
       const now = new Date().toISOString();
       // The driver hears it from dispatch before they roll up to a dock that isn't expecting them.
       const driver = state.drivers.find((d) => d.id === state.trucks.find((t) => t.id === load.truckId)?.driverId);

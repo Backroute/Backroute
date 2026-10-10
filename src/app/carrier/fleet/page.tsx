@@ -24,6 +24,8 @@ import { nextStop, tripLoads } from "@/lib/trip-plan";
 import { formatNumber } from "@/lib/utils";
 import type { HosStatus } from "@/lib/types";
 import { Lane } from "@/components/ui/lane";
+import { Switch } from "@/components/ui/switch";
+import { driverSeesLoadPay } from "@/lib/pay-view";
 
 /** A believable "GPS just pinged" freshness readout — deterministic per truck, ticks with the shared clock. */
 function pingSecondsAgo(id: string, now: number): number {
@@ -52,6 +54,8 @@ export default function FleetPage() {
   const flagged = useDriverRetention().filter((r) => r.view.level !== "good");
   const setRunType = useStore((s) => s.actions.setRunType);
   const setDriverPrefs = useStore((s) => s.actions.setDriverPrefs);
+  const setDriverSeesPay = useStore((s) => s.actions.setDriverSeesPay);
+  const ownerOperator = useStore((s) => !!s.settings.ownerOperator);
   const signedIn = useStore((s) => s.session.mode !== "demo");
 
   return (
@@ -153,6 +157,19 @@ export default function FleetPage() {
                     <a href={`tel:${driver.phone.replace(/[^\d+]/g, "")}`} aria-label={`Call ${driver.name}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-100 text-ink-600 hover:bg-ink-200">
                       <Phone className="h-3.5 w-3.5" />
                     </a>
+                  </div>
+                )}
+
+                {driver && !ownerOperator && (
+                  <div className="flex items-center justify-between gap-3 text-xs">
+                    <span className="text-ink-600">
+                      Sees what loads pay
+                      <span className="block text-ink-400">
+                        {driverSeesLoadPay(driver, false) ? "Rate and profit on their loads" : "Only their own pay"}
+                        {driver.seesLoadPay === undefined ? ` (${driver.payType === "percentage" ? "paid a percentage" : "not paid a percentage"})` : ""}
+                      </span>
+                    </span>
+                    <Switch checked={driverSeesLoadPay(driver, false)} onChange={(on) => setDriverSeesPay(driver.id, on)} label={`${driver.name} sees what loads pay`} />
                   </div>
                 )}
 

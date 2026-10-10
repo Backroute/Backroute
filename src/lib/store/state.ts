@@ -173,6 +173,8 @@ export interface StoreState {
     /** Duty status from the ELD (tappable in the demo). Sleeper and off duty hold every AI call. */
     setDutyStatus: (driverId: string, status: HosStatus) => void;
     setDriverPrefs: (driverId: string, prefs: DriverPrefs) => void;
+    /** The owner's call: whether this driver's app shows what loads pay the company (lib/pay-view). */
+    setDriverSeesPay: (driverId: string, on: boolean) => void;
     /** The driver asked the AI to call them and set up how it reaches them. */
     startSetupCall: (driverId: string) => void;
     /** The driver calls dispatch; the AI picks up straight away. */

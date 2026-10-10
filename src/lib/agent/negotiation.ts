@@ -1,6 +1,7 @@
 import type { AgentSettings } from "../store";
 import type { Load } from "../types";
 import { floorFor } from "./pricing";
+import { DEFAULT_TONU } from "../tonu";
 
 /**
  * How the AI haggles, the way a good dispatcher does, with every number decided here in code (never by the AI's
@@ -135,7 +136,7 @@ export function ourNumbers(req: Load["bookRequest"], fallbackAsk: number): numbe
 
 /** What a broker should put on the rate con besides the price: detention and TONU terms, in one line. */
 export function termsLine(settings: Pick<AgentSettings, "detentionPerHour" | "tonuFee">): string {
-  return `Please show detention at ${money(settings.detentionPerHour ?? 50)}/hour after 2 hours free, and TONU at ${money(settings.tonuFee ?? 150)}, on the rate con.`;
+  return `Please show detention at ${money(settings.detentionPerHour ?? 50)}/hour after 2 hours free, and TONU at ${money(settings.tonuFee ?? DEFAULT_TONU)}, on the rate con.`;
 }
 
 /** Our number when the broker asks what we need (or won't name one first): the standing ask and a reason. */

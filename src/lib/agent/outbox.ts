@@ -1,5 +1,6 @@
 import "server-only";
 import { canEmail, emailTo } from "../channels/out";
+import { inboundAddress } from "../channels/email";
 import type { Item } from "../cloud/rows";
 import type { DraftMessage, DraftPurpose, Escalation, Load, OwnerRule } from "../types";
 import { addActivity, filesById, logChannel, save, type CarrierContext } from "./db";
@@ -130,6 +131,18 @@ const WHAT: Record<DraftPurpose, string> = {
   ack: "Replied to",
 };
 
+/**
+ * Where the broker's answer goes. Every email leaves from one shared sending address, so without this a broker's
+ * reply (or the rate con they send back) would land there and never reach the carrier. It goes to the carrier's own
+ * Backroute address; a bill also goes to the owner's payments email, so accounts payable reaches a person too.
+ */
+export function replyTo(ctx: Pick<CarrierContext, "carrier" | "settings">, purpose: DraftPurpose | undefined): string | undefined {
+  const ours = ctx.carrier.inbound_key ? inboundAddress(ctx.carrier.inbound_key) : null;
+  const bill = purpose === "invoice" || purpose === "detention" || purpose === "layover" || purpose === "payment_reminder" || purpose === "tonu";
+  const list = [bill ? ctx.settings.remitEmail : null, ours].filter((a): a is string => !!a);
+  return list.length ? [...new Set(list)].join(", ") : undefined;
+}
+
 /** Sends a draft (now, or when the owner approves it) and records what it means for the load. */
 export async function deliver(ctx: CarrierContext, draft: DraftMessage, loadId: string | undefined, how: { auto?: boolean; approved?: boolean }) {
   const ids = (draft.attachments ?? []).map((a) => a.fileId);
@@ -140,7 +153,7 @@ export async function deliver(ctx: CarrierContext, draft: DraftMessage, loadId: 
     text: draft.body,
     fromName: ctx.carrier.name,
     inReplyTo: draft.inReplyTo,
-    replyTo: ctx.settings.remitEmail && (draft.purpose === "invoice" || draft.purpose === "detention" || draft.purpose === "layover") ? ctx.settings.remitEmail : undefined,
+    replyTo: replyTo(ctx, draft.purpose),
     attachments: files.map((f) => ({ name: f.name, contentType: f.content_type, content: f.data })),
   });
   await logChannel({

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Copy, Mail, MessageSquare, Minus, Phone, Sparkles, Sunset } from "lucide-react";
+import { Check, Mail, MessageSquare, Minus, Phone, Sparkles, Sunset } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { TimeAgo } from "@/components/shared/time-ago";
@@ -9,10 +9,12 @@ import { authHeader } from "@/lib/ai/client";
 import { formatPhone } from "@/lib/cloud/phone";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { EmailSetup, type EmailSetupStatus } from "./email-setup";
 
 interface Status {
   channels: { ai: boolean; server: boolean; sms: boolean; voice: boolean; email: boolean; dailyText: boolean; number: string | null };
   inboundEmail?: string | null;
+  emailSetup?: EmailSetupStatus;
   log?: { channel: "sms" | "voice" | "email"; direction: "in" | "out"; counterparty: string | null; body: string | null; created_at: string; data: { subject?: string }; provider_id?: string | null }[];
   outbound?: { channel: "sms" | "voice" | "email"; recipient: string; subject: string | null; body: string | null; status: "held" | "retry" | "gave_up"; data: { kind?: string }; created_at: string }[];
 }
@@ -30,7 +32,6 @@ export function ChannelsCard() {
   const practice = useStore((s) => !!s.settings.sandbox);
   const updateSettings = useStore((s) => s.actions.updateSettings);
   const [status, setStatus] = useState<Status | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -85,22 +86,7 @@ export function ChannelsCard() {
           ))}
         </ul>
 
-        {status?.inboundEmail && (
-          <div className="rounded-2xl bg-ink-50 px-4 py-3 text-xs text-ink-600">
-            <p>Give brokers this address, or forward rate cons to it. Backroute reads them and drafts replies for you to send.</p>
-            <button
-              type="button"
-              className="mt-1.5 flex items-center gap-1.5 font-medium text-ink-950"
-              onClick={() => {
-                void navigator.clipboard?.writeText(status.inboundEmail!);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1500);
-              }}
-            >
-              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />} {status.inboundEmail}
-            </button>
-          </div>
-        )}
+        {status?.inboundEmail && <EmailSetup address={status.inboundEmail} setup={status.emailSetup ?? null} onRefresh={refresh} />}
 
         <div>
           <p className="text-xs font-medium text-ink-700">Latest</p>

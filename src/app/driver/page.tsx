@@ -38,6 +38,7 @@ import { crewOf } from "@/lib/hos-plan";
 import { StatusMark } from "@/components/ui/mark";
 import { ArrivalPrompt } from "@/components/driver/arrival-prompt";
 import { TimeOffAsk } from "@/components/driver/time-off-ask";
+import { usePayView } from "@/lib/pay-view";
 
 
 const todoChip = "inline-flex min-h-9 items-center rounded-full bg-ink-100 px-3.5 py-1.5 text-xs font-semibold text-ink-900 hover:bg-ink-150";
@@ -128,6 +129,7 @@ export default function DriverHomePage() {
     : null;
 
   const homeTime = useHomeTime(driver, truck, currentLoad);
+  const pay = usePayView();
   const ownerWeek = useOwnerProfit(truck);
   const weekPay = weekEarnings(loads.filter((l) => l.truckId === truck?.id)).loads.reduce((s, l) => s + computeDriverPay(l, driver, !!truck?.secondDriverId), 0);
   // Hands-free by itself when the truck starts moving (and back when it stops), unless the driver closed it.
@@ -298,10 +300,14 @@ export default function DriverHomePage() {
               : "Rate locked. It becomes your current load the moment you deliver."}
           </p>
           <div className="mt-2.5 flex items-center gap-4 text-xs">
-            <span className="text-ink-500">Total offer <span className="font-semibold tabular text-ink-950">{formatCurrency(nextLoad.bookedRate ?? nextLoad.targetRate)}</span></span>
-            <span className="text-ink-500">Est. net <span className="font-semibold tabular text-ink-950">{formatCurrency(nextLoad.netProfit ?? 0)}</span></span>
+            {pay.sees ? (
+              <span className="text-ink-500">Total offer <span className="font-semibold tabular text-ink-950">{formatCurrency(nextLoad.bookedRate ?? nextLoad.targetRate)}</span></span>
+            ) : (
+              <span className="text-ink-500">Your pay <span className="font-semibold tabular text-ink-950">{formatCurrency(pay.yourPay(nextLoad))}</span></span>
+            )}
+            {pay.sees && <span className="text-ink-500">Est. net <span className="font-semibold tabular text-ink-950">{formatCurrency(nextLoad.netProfit ?? 0)}</span></span>}
           </div>
-          {nextLoad.stage === "negotiating" && (
+          {nextLoad.stage === "negotiating" && pay.sees && (
             <div className="mt-3">
               <CounterOfferButton load={nextLoad} onSubmit={(amount) => requestBetterRate(nextLoad.id, "driver", amount)} variant="text" />
             </div>

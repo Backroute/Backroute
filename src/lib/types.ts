@@ -178,6 +178,9 @@ export interface Driver {
   care?: { at: string; mood: "good" | "ok" | "bad"; note?: string; homeBy?: string };
   /** How the driver wants the AI dispatcher to reach them, set on a setup call or in Profile. */
   prefs?: DriverPrefs;
+  /** The owner's choice: the driver sees what a load pays the company (the broker's rate, the profit). Unset: drivers
+   *  paid a percentage of the load see it (their pay comes from it), others see only their own pay. */
+  seesLoadPay?: boolean;
   /** The dates their CDL and DOT medical card run out. */
   cdlExpires?: string;
   medCardExpires?: string;

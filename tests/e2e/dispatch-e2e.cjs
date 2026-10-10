@@ -100,6 +100,7 @@ const pmAfter = (i) => read("postmark").slice(i);
   const bookBody = await r.json();
   const bookMail = pmAfter(pm0).at(-1)?.body;
   check("owner picks it: book request emailed at $2,825, in the broker's thread", r.status === 200 && bookMail?.To === "loads@tql.test" && /Our rate is \$2,825 all in/.test(bookMail.TextBody) && bookMail.Headers?.[0]?.Value === offerMail, bookMail?.TextBody);
+  check("the broker's answer comes back to the carrier's Backroute address, not the shared sender", /^abc123\+[a-z0-9]+@inbound\.postmarkapp\.com$/.test(bookMail?.ReplyTo ?? ""), bookMail?.ReplyTo);
   check("load now negotiating, ask on record", load("TQL-5501").stage === "negotiating" && load("TQL-5501").bookRequest?.status === "sent" && bookBody.loads.some((l) => l.id === o1.id && l.stage === "negotiating"));
 
   // ── Haggling inside the rules, like a dispatcher ───────────────────────────
@@ -224,7 +225,7 @@ const pmAfter = (i) => read("postmark").slice(i);
     pdfOk = text.startsWith("1\n") && /Invoice number: INV-CFP-88213/.test(text) && /Total due \$1,850\.00/.test(text);
   } catch (e) { console.log(String(e).slice(0, 300)); }
   check("the invoice is a readable one-page PDF", pdfOk);
-  check("billing email on the invoice as reply-to", inv?.ReplyTo === "billing@titan.test");
+  check("the invoice's answers go to the billing email and the carrier's Backroute address", /^billing@titan\.test, abc123\+[a-z0-9]+@inbound\.postmarkapp\.com$/.test(inv?.ReplyTo ?? ""), inv?.ReplyTo);
   check("load shows the invoice sent", !!load("CFP-88213").invoice?.sentAt);
   const det = mails.find((m) => /^Detention/.test(m.Subject));
   check("detention claimed from the driver's times and the rate con's terms (4h on site, 3 free, $40/h)", !!det && /On site: 4h 00m, with 3 hours free, so 1h 00m billable at \$40\/hour: \$40\./.test(det.TextBody), det?.TextBody);

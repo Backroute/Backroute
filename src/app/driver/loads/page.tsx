@@ -13,11 +13,13 @@ import { ViewTransition } from "react";
 import { FORWARD } from "@/lib/nav-direction";
 import { Lane } from "@/components/ui/lane";
 import { crewOf } from "@/lib/hos-plan";
+import { usePayView } from "@/lib/pay-view";
 
 export default function DriverLoadsPage() {
   const driver = usePrimaryDriver();
   const trucks = useCarrierTrucks();
   const loads = useCarrierLoads();
+  const pay = usePayView();
   const brokers = useBrokerMap();
   const selectLoadOffer = useStore((s) => s.actions.selectLoadOffer);
   const requestOfferDetail = useStore((s) => s.actions.requestOfferDetail);
@@ -91,8 +93,14 @@ export default function DriverLoadsPage() {
                 </div>
                 <div className="mt-2.5 flex items-center justify-between gap-4 border-t border-line pt-2.5 text-xs">
                   <div className="flex items-center gap-4">
-                    <span className="text-ink-500">Total offer <span className="font-semibold tabular text-ink-950">{formatCurrency(load.bookedRate ?? load.targetRate)}</span></span>
-                    <span className="text-ink-500">Est. net <span className="font-semibold tabular text-ink-950">{formatCurrency(load.netProfit ?? 0)}</span></span>
+                    {pay.sees ? (
+                      <>
+                        <span className="text-ink-500">Total offer <span className="font-semibold tabular text-ink-950">{formatCurrency(load.bookedRate ?? load.targetRate)}</span></span>
+                        <span className="text-ink-500">Est. net <span className="font-semibold tabular text-ink-950">{formatCurrency(load.netProfit ?? 0)}</span></span>
+                      </>
+                    ) : (
+                      <span className="text-ink-500">Your pay <span className="font-semibold tabular text-ink-950">{formatCurrency(pay.yourPay(load))}</span></span>
+                    )}
                   </div>
                   {load.documents.length > 0 && (
                     <span className="text-ink-400">{load.documents.length} doc{load.documents.length === 1 ? "" : "s"}</span>

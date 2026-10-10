@@ -1,3 +1,4 @@
+import type { MailboxConfig } from "@/lib/agent/mailbox";
 import { z } from "zod";
 import { dbConfigured, loadContext } from "@/lib/agent/db";
 import { applyEld, EldError, readEld } from "@/lib/agent/eld";
@@ -59,6 +60,7 @@ export async function GET(request: Request) {
       ...(r.kind === "load_feed" || r.kind === "fuel_feed" || r.kind === "toll_feed" ? { name: (r.config as FeedConfig).name ?? null, host: new URL((r.config as FeedConfig).url).host } : {}),
       ...(r.kind.startsWith("board:") ? { name: (r.config as CustomBoardConfig).name } : {}),
       ...(r.kind === "truckstop" || r.kind === "dat" ? { postTrucks: !!(r.config as TruckstopConfig).postTrucks } : {}),
+      ...(r.kind === "gmail" || r.kind === "outlook" ? { name: (r.config as MailboxConfig).email, lastSync: (r.config as MailboxConfig).lastChecked ?? null } : {}),
       ...(r.kind === "quickbooks" ? { name: (r.config as QuickbooksConfig).companyName ?? null, lastSync: (r.config as QuickbooksConfig).lastSync ?? null } : {}),
     })),
   });

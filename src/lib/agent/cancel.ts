@@ -1,4 +1,5 @@
 import "server-only";
+import { tonuFor, tonuOnRateCon } from "../tonu";
 import { chainOf, slotsFor } from "./chain";
 import { cancelParking } from "./parking";
 import { toE164 } from "../cloud/phone";
@@ -21,21 +22,13 @@ import * as mail from "./templates";
  * from the offers still open.
  */
 
-const DEFAULT_TONU = 150;
 const ROLLING = new Set(["dispatched", "at_pickup"]);
-
-/** "TONU $250" on the rate con → 250. */
-function tonuOnRateCon(load: Load): number | null {
-  const text = [...(load.rateConReading?.finesAndFees ?? []), ...(load.rateConReading?.otherConcerns ?? []), load.rateConReading?.summary ?? ""].join(" ");
-  const m = text.match(/(?:tonu|truck ordered not used)[^$]{0,30}\$\s?(\d{2,4})/i);
-  return m ? Number(m[1]) : null;
-}
 
 export async function cancelLoad(ctx: CarrierContext, load: Load, reason: string, from: string): Promise<void> {
   if (["cancelled", "delivered", "in_transit", "at_delivery", "declined"].includes(load.stage)) return;
   const at = new Date().toISOString();
   const wasRolling = ROLLING.has(load.stage);
-  const tonu = wasRolling ? (tonuOnRateCon(load) ?? ctx.settings.tonuFee ?? DEFAULT_TONU) : 0;
+  const tonu = wasRolling ? tonuFor(load, ctx.settings.tonuFee) : 0;
   const cancelled: Load = { ...load, stage: "cancelled", cancellationReason: `Broker cancelled: ${reason}`, tonuFee: tonu || undefined, updatedAt: at };
   await save("loads", ctx.carrier.id, cancelled as unknown as Item);
   ctx.loads = ctx.loads.map((l) => (l.id === load.id ? cancelled : l));

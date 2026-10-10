@@ -30,6 +30,7 @@ import {
 import { Lane } from "@/components/ui/lane";
 import { StatusMark } from "@/components/ui/mark";
 import { QuickPreTrip } from "@/components/driver/quick-pretrip";
+import { usePayView } from "@/lib/pay-view";
 
 /** The small, always-current trip card — Uber's collapsed sheet: where, when, how far along, and the one next
  *  step (with its button when it's the driver's to take). Tap it for everything else. */
@@ -40,6 +41,7 @@ export function TripCompactCard({
   ...props
 }: DriverTripCardProps & { onOpen: () => void; showMap?: boolean; truckLabel?: string }) {
   const { load, needsPreTrip, viewer = "driver", driverName, onConfirm, onTripStep, onUpload } = props;
+  const pay = usePayView(viewer);
   const now = useNow();
   const s = tripState(load, now, needsPreTrip);
   const driver = viewer === "driver";
@@ -84,7 +86,7 @@ export function TripCompactCard({
             <p className="text-xs font-semibold uppercase tracking-wider text-white/50">
               {kicker}{load.lane.moveKind ? ` · ${phase}` : ` · ${load.referenceNumber}`}
             </p>
-            <p className="shrink-0 text-sm font-semibold tabular">{s.card === "booking" ? formatCurrency(load.bookedRate ?? load.targetRate) : s.drive}</p>
+            <p className="shrink-0 text-sm font-semibold tabular">{s.card === "booking" ? formatCurrency(pay.sees ? load.bookedRate ?? load.targetRate : pay.yourPay(load)) : s.drive}</p>
           </div>
           <p className="mt-0.5 truncate text-xl font-semibold tracking-tight">{place}</p>
           {truckLabel && <p className="mt-0.5 truncate text-xs text-white/55">{truckLabel}{!showMap ? ` · ${status}` : ""}</p>}
@@ -195,7 +197,8 @@ export function TripDetails({
   const now = useNow();
   const events = useStore((s) => s.activity).filter((e) => e.loadId === load.id);
   const rate = load.bookedRate ?? load.targetRate;
-  const activity = [...events, ...(events.length < 3 ? loadHistory(load, brokerName ?? "the broker", rate) : [])]
+  const pay = usePayView(props.viewer ?? "driver");
+  const activity = [...events, ...(events.length < 3 ? loadHistory(load, brokerName ?? "the broker", pay.sees ? rate : null) : [])]
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
     .slice(0, 10);
 
@@ -232,8 +235,14 @@ export function TripDetails({
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <Fact label="Broker" value={brokerName ?? "—"} />
           <Fact label="Reference" value={load.referenceNumber} />
-          <Fact label="Total rate" value={formatCurrency(rate)} />
-          <Fact label="Est. net" value={formatCurrency(load.netProfit ?? 0)} />
+          {pay.sees ? (
+            <>
+              <Fact label="Total rate" value={formatCurrency(rate)} />
+              <Fact label="Est. net" value={formatCurrency(load.netProfit ?? 0)} />
+            </>
+          ) : (
+            <Fact label="Your pay" value={formatCurrency(pay.yourPay(load))} />
+          )}
           <Fact label="Loaded miles" value={`${load.lane.miles} mi`} />
           <Fact label="Empty miles" value={`${load.deadheadMiles} mi`} />
           <Fact label="Equipment" value={load.equipmentType} />
@@ -320,7 +329,7 @@ type LogItem = { id: string; timestamp: string; message: string; detail: string;
 
 /** What the AI did on a load before this session started logging live events — rebuilt from the load's own
  *  record (the negotiation thread, broker calls, filed paperwork) so the log is never empty. */
-function loadHistory(load: DriverTripCardProps["load"], broker: string, rate: number): LogItem[] {
+function loadHistory(load: DriverTripCardProps["load"], broker: string, rate: number | null): LogItem[] {
   const items: LogItem[] = [
     { id: `${load.id}-found`, timestamp: load.createdAt, message: "Found and checked by Backroute", detail: `${load.score} match · via ${load.source}`, severity: "info" },
   ];
@@ -329,7 +338,7 @@ function loadHistory(load: DriverTripCardProps["load"], broker: string, rate: nu
       id: `${load.id}-neg`,
       timestamp: load.messages[load.messages.length - 1].timestamp,
       message: `Negotiated with ${broker}`,
-      detail: `${load.messages.length} message${load.messages.length === 1 ? "" : "s"} · ${formatCurrency(rate)}`,
+      detail: `${load.messages.length} message${load.messages.length === 1 ? "" : "s"}${rate === null ? "" : ` · ${formatCurrency(rate)}`}`,
       severity: "info",
     });
   }

@@ -1,9 +1,10 @@
 import { after } from "next/server";
 import { timingSafeEqual } from "crypto";
-import { carrierByInboundKey, dbConfigured, logChannel } from "@/lib/agent/db";
+import { carrierByInboundKey, dbConfigured } from "@/lib/agent/db";
+import { takeEmail, viaOf } from "@/lib/agent/inbox";
 import { handleInboundEmail } from "@/lib/agent/email";
 import { historyFromEmail, parseHistoryHash } from "@/lib/agent/history-docs";
-import { plainText, type InboundEmail } from "@/lib/channels/email";
+import type { InboundEmail } from "@/lib/channels/email";
 
 export const maxDuration = 120;
 
@@ -33,16 +34,8 @@ export async function POST(request: Request) {
     return Response.json({ ok: true, history: true });
   }
 
-  const from = (email.FromFull?.Email ?? email.From).toLowerCase();
-  const fresh = await logChannel({
-    carrierId: carrier.id,
-    channel: "email",
-    direction: "in",
-    providerId: email.MessageID,
-    counterparty: from,
-    body: plainText(email),
-    data: { subject: email.Subject, fromName: email.FromName, attachments: (email.Attachments ?? []).map((a) => a.Name) },
-  });
-  if (fresh) after(() => handleInboundEmail(carrier.id, email));
+  const domain = process.env.EMAIL_INBOUND_ADDRESS?.split("@")[1] ?? null;
+  const taken = await takeEmail(carrier.id, email, email.MessageID, viaOf(email, domain));
+  if (taken === "handle") after(() => handleInboundEmail(carrier.id, email));
   return Response.json({ ok: true });
 }

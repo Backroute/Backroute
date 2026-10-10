@@ -76,5 +76,16 @@ export QBO_AUTH_URL=http://localhost:3009/qbo/authorize
 export QBO_TOKEN_URL=http://localhost:3009/qbo/token
 export QBO_REVOKE_URL=http://localhost:3009/qbo/revoke
 export QBO_API_BASE=http://localhost:3009/qbo
+export GOOGLE_CLIENT_ID=g-id
+export GOOGLE_CLIENT_SECRET=g-secret
+export GOOGLE_AUTH_URL=http://localhost:3009/google/authorize
+export GOOGLE_TOKEN_URL=http://localhost:3009/google/token
+export GOOGLE_REVOKE_URL=http://localhost:3009/google/revoke
+export GMAIL_API_BASE=http://localhost:3009/google
+export MS_CLIENT_ID=ms-id
+export MS_CLIENT_SECRET=ms-secret
+export MS_AUTH_URL=http://localhost:3009/ms/authorize
+export MS_TOKEN_URL=http://localhost:3009/ms/token
+export GRAPH_API_BASE=http://localhost:3009/ms/graph
 # Made by tests/setup.sh: the push certificate, the website-password vault key and the push (VAPID) keys.
 [ -f "$T/.out/keys.sh" ] && source "$T/.out/keys.sh"

@@ -23,6 +23,7 @@ import { BACK } from "@/lib/nav-direction";
 import { Lane } from "@/components/ui/lane";
 import { DocumentSlot } from "@/components/shared/driver-trip-card";
 import { ReceiptCapture, type ReadReceipt } from "@/components/driver/receipt-capture";
+import { usePayView } from "@/lib/pay-view";
 
 const EXPENSE_CATEGORIES: { key: Expense["category"]; label: string }[] = [
   { key: "lumper", label: "Lumper fee" },
@@ -77,6 +78,7 @@ export default function DriverLoadDetailPage() {
   const [expenseAmount, setExpenseAmount] = useState("");
   const [expenseNote, setExpenseNote] = useState("");
   const [receipt, setReceipt] = useState<ReadReceipt | null>(null);
+  const pay = usePayView();
 
   if (!load) {
     return (
@@ -147,7 +149,7 @@ export default function DriverLoadDetailPage() {
 
         {isCurrent && (
           <div className="mt-5 flex flex-col gap-2">
-            {load.stage === "negotiating" && (
+            {load.stage === "negotiating" && pay.sees && (
               <CounterOfferButton load={load} onSubmit={(amount) => requestBetterRate(load.id, "driver", amount)} variant="dark" />
             )}
             {step && (
@@ -196,11 +198,17 @@ export default function DriverLoadDetailPage() {
         )}
       </SectionCard>
 
-      <SectionCard title="Rate & earnings" icon={DollarSign}>
+      <SectionCard title={pay.sees ? "Rate & earnings" : "Your pay"} icon={DollarSign}>
         <div className="flex flex-col gap-2.5">
-          <Row label="Total offer" value={formatCurrency(load.bookedRate ?? load.targetRate)} strong />
-          <Row label={load.bookedRate ? "Net profit" : "Est. net profit"} value={formatCurrency(load.netProfit ?? 0)} />
-          <Row label="Per mile" value={load.rpm ? `$${load.rpm.toFixed(2)}` : "—"} />
+          {pay.sees ? (
+            <>
+              <Row label="Total offer" value={formatCurrency(load.bookedRate ?? load.targetRate)} strong />
+              <Row label={load.bookedRate ? "Net profit" : "Est. net profit"} value={formatCurrency(load.netProfit ?? 0)} />
+              <Row label="Per mile" value={load.rpm ? `$${load.rpm.toFixed(2)}` : "—"} />
+            </>
+          ) : (
+            <Row label="Your pay for this load" value={formatCurrency(pay.yourPay(load))} strong />
+          )}
         </div>
       </SectionCard>
 

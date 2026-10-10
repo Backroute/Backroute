@@ -21,6 +21,7 @@ import type { Load, LoadDocument } from "@/lib/types";
 import { autoCrop, pagesToPdf } from "@/lib/doc-scan";
 import { QuickPreTrip } from "@/components/driver/quick-pretrip";
 import { Lane } from "@/components/ui/lane";
+import { usePayView } from "@/lib/pay-view";
 
 /** `file` goes to the server in a real account; the demo only keeps the name and a preview. */
 export type UploadedFile = { name: string; previewUrl?: string; file?: File };
@@ -66,6 +67,7 @@ export function waitingOn(s: TripState, driverName?: string): string {
 
 function BookingCard({ load, brokerName, viewer = "driver", onCall, onCounter }: DriverTripCardProps) {
   const rate = load.bookedRate ?? load.targetRate;
+  const pay = usePayView(viewer);
   const broker = brokerName ?? "the broker";
   const origin = `${load.lane.origin}, ${load.lane.originState}`;
   const destination = `${load.lane.destination}, ${load.lane.destState}`;
@@ -88,15 +90,19 @@ function BookingCard({ load, brokerName, viewer = "driver", onCall, onCounter }:
       <CompletionBar value={s.done} caption="Backroute is on it" />
 
       <ol className="mt-5">
-        <Step state="done" title="Found and scored" detail={`${load.score} match · ${formatCurrency(rate)} · est. net ${formatCurrency(load.netProfit ?? 0)}`} />
+        <Step
+          state="done"
+          title="Found and scored"
+          detail={pay.sees ? `${load.score} match · ${formatCurrency(rate)} · est. net ${formatCurrency(load.netProfit ?? 0)}` : `${load.score} match · your pay ${formatCurrency(pay.yourPay(load))}`}
+        />
         <Step
           state={locked ? "done" : "current"}
           title={locked ? "Rate locked" : "Negotiating the rate"}
-          detail={locked ? `${formatCurrency(rate)} with ${broker}` : `With ${broker} · asking ${formatCurrency(rate)}`}
+          detail={!pay.sees ? `With ${broker}` : locked ? `${formatCurrency(rate)} with ${broker}` : `With ${broker} · asking ${formatCurrency(rate)}`}
         >
           <div className="flex flex-wrap items-center gap-2">
             <BrokerCallRow load={load} brokerName={broker} contactName={contact} onCall={() => startBrokerCall(load.id)} />
-            {load.stage === "negotiating" && !load.liveCall && <CounterOfferButton load={load} onSubmit={onCounter} variant="dark" />}
+            {load.stage === "negotiating" && !load.liveCall && pay.sees && <CounterOfferButton load={load} onSubmit={onCounter} variant="dark" />}
           </div>
         </Step>
         <Step state={signed ? "done" : locked ? "current" : "todo"} title="Rate confirmation signed" detail={signed ? "Signed and filed" : undefined} />
@@ -351,6 +357,7 @@ export function DriverTripCompleteCard({
   const broker = useStore((st) => st.brokers.find((b) => b.id === load.brokerId));
   const factoringOn = useStore((st) => st.settings.enabledAddons.includes("factoring-ai"));
   const payment = paymentStatus(load, broker, factoringOn, Date.parse(load.updatedAt));
+  const pay = usePayView();
 
   function chooseNext() {
     onContinue();
@@ -378,9 +385,14 @@ export function DriverTripCompleteCard({
         <div className="flex items-end justify-between gap-3">
           <div>
             <p className="text-sm text-white/60">Delivered to {load.lane.destination}, {load.lane.destState}</p>
-            <p className="mt-0.5 text-4xl font-semibold tabular tracking-tight">{formatCurrency(load.netProfit ?? 0)}</p>
+            <p className="mt-0.5 text-4xl font-semibold tabular tracking-tight">{formatCurrency(pay.sees ? load.netProfit ?? 0 : pay.yourPay(load))}</p>
           </div>
-          <p className="pb-1 text-right text-xs text-white/50">Est. net<br />{formatCurrency(rate)} · {load.lane.miles} mi</p>
+          <p className="pb-1 text-right text-xs text-white/50">
+            {pay.sees ? "Est. net" : "Your pay"}
+            <br />
+            {pay.sees ? `${formatCurrency(rate)} · ` : ""}
+            {load.lane.miles} mi
+          </p>
         </div>
         <p className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/60">
           <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> POD checked</span>
@@ -751,13 +763,16 @@ function SealInput({ value, onSave }: { value?: string; onSave: (v: string) => v
 }
 
 function CardFooter({ load, rate, onCall }: { load: Load; rate: number; onCall: () => void }) {
+  const pay = usePayView();
   return (
     <div className="mt-5 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
       <Link href={`/driver/loads/${load.id}`} className="group min-w-0">
         <p className="flex items-center gap-1 text-sm font-semibold tabular">
-          {formatCurrency(rate)} <ChevronRight className="h-3.5 w-3.5 text-white/40 transition-transform group-hover:translate-x-0.5" />
+          {formatCurrency(pay.sees ? rate : pay.yourPay(load))} <ChevronRight className="h-3.5 w-3.5 text-white/40 transition-transform group-hover:translate-x-0.5" />
         </p>
-        <p className="truncate text-xs text-white/50">Est. net {formatCurrency(load.netProfit ?? 0)} · {load.lane.miles} mi · Load page</p>
+        <p className="truncate text-xs text-white/50">
+          {pay.sees ? `Est. net ${formatCurrency(load.netProfit ?? 0)}` : "Your pay"} · {load.lane.miles} mi · Load page
+        </p>
       </Link>
       <div className="flex shrink-0 items-center gap-2">
         <button onClick={onCall} aria-label="Call dispatch" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/15">

@@ -14,6 +14,7 @@ import { callBacks } from "./driver-calls";
 import { complianceReminders } from "./compliance";
 import { pullStatements } from "./costs";
 import { quickbooksRound } from "./quickbooks";
+import { mailboxRound } from "./mailbox";
 import { parkingReminders } from "./parking";
 import { makeContractLoads } from "./contracts";
 import { marksFor, type CarrierContext } from "./db";
@@ -64,6 +65,8 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   // Connections, in order: the ELD first (where trucks are, drivers' hours), then load feeds and load boards,
   // which search from where the trucks now are.
   const links = await integrationsFor(id);
+  // The owner's own mailbox first: a rate con or a broker's answer there is the most urgent thing to read.
+  done.push(...(await mailboxRound(ctx, links, now).catch((e) => (console.error("[rounds] mailbox failed", e), []))));
   for (const link of links.filter((l) => l.kind === "samsara" || l.kind === "motive")) {
     const kind = link.kind as "samsara" | "motive";
     try {

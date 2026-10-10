@@ -3,6 +3,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { Item } from "../cloud/rows";
 import type { Load } from "../types";
 import { save, storeFile, type CarrierContext } from "./db";
+import { tonuFor } from "../tonu";
 
 /**
  * Signing the broker's rate con, the way a dispatcher does before the truck rolls: the broker's own pages, then a
@@ -53,7 +54,7 @@ export async function signRateCon(ctx: CarrierContext, load: Load, original: Buf
   line(`${load.lane.origin}, ${load.lane.originState} to ${load.lane.destination}, ${load.lane.destState}`);
   line(`Pickup: ${load.pickupWindow}     Delivery: ${load.deliveryWindow}`);
   line(`Agreed rate: $${rate.toLocaleString("en-US")} all in`, { f: bold });
-  line(`Detention: $${ctx.settings.detentionPerHour ?? 50}/hour after 2 hours free. TONU: $${ctx.settings.tonuFee ?? 150}.`);
+  line(`Detention: $${ctx.settings.detentionPerHour ?? 50}/hour after 2 hours free. TONU: $${tonuFor(load, ctx.settings.tonuFee)}.`);
   line(`Carrier: ${ctx.carrier.name}${ctx.carrier.mc ? `, ${/mc/i.test(ctx.carrier.mc) ? ctx.carrier.mc : `MC ${ctx.carrier.mc}`}` : ""}`, { gap: 10 });
   line("Accepted and signed:", { gap: 24 });
   line(signer.name, { size: 22, f: script, gap: 8 });

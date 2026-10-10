@@ -7,7 +7,7 @@ import type { DispatchCall } from "../../types";
 import { answerCall, callDraftResult, callEvent, draftFrom, endCall, openingFor, patchCall, readersOf, replyToCall, textInstead, trFor } from "../calls";
 import type { Actions, SetState } from "../state";
 
-export const callsActions = (set: SetState): Pick<Actions, "answerDispatchCall" | "declineDispatchCall" | "replyDispatchCall" | "hangUpDispatchCall" | "setDutyStatus" | "setDriverPrefs" | "startSetupCall" | "startInboundCall" | "takeOverDispatchCall" | "ownerSayOnCall"> => ({
+export const callsActions = (set: SetState): Pick<Actions, "answerDispatchCall" | "declineDispatchCall" | "replyDispatchCall" | "hangUpDispatchCall" | "setDutyStatus" | "setDriverPrefs" | "setDriverSeesPay" | "startSetupCall" | "startInboundCall" | "takeOverDispatchCall" | "ownerSayOnCall"> => ({
   answerDispatchCall: (callId) =>
     set((state) => {
       const d = draftFrom(state);
@@ -46,6 +46,8 @@ export const callsActions = (set: SetState): Pick<Actions, "answerDispatchCall" 
 
   setDriverPrefs: (driverId, prefs) =>
     set((state) => ({ drivers: state.drivers.map((x) => (x.id === driverId ? { ...x, prefs: { ...x.prefs, ...prefs } } : x)) })),
+
+  setDriverSeesPay: (driverId, on) => set((state) => ({ drivers: state.drivers.map((x) => (x.id === driverId ? { ...x, seesLoadPay: on } : x)) })),
 
   startSetupCall: (driverId) =>
     set((state) => {

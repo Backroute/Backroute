@@ -2,7 +2,7 @@
 const http = require("http");
 const fs = require("fs");
 const log = (name, entry) => fs.appendFileSync(`${__dirname}/${name}.jsonl`, JSON.stringify(entry) + "\n");
-for (const f of ["claude", "twilio", "postmark", "fmcsa", "outside", "boards", "stripe", "push"]) fs.writeFileSync(`${__dirname}/${f}.jsonl`, "");
+for (const f of ["claude", "twilio", "postmark", "fmcsa", "outside", "boards", "stripe", "push", "mailbox"]) fs.writeFileSync(`${__dirname}/${f}.jsonl`, "");
 const body = (req) => new Promise((r) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => r(b)); });
 const reply = (res, obj) => { res.writeHead(200, { "content-type": "application/json", "request-id": "req_t" }); res.end(JSON.stringify(obj)); };
 const msg = (model, content, stop = "end_turn") => ({ id: "msg_" + Math.random().toString(36).slice(2), type: "message", role: "assistant", model, stop_reason: stop, stop_sequence: null, stop_details: null, content, usage: { input_tokens: 100, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 } });
@@ -449,6 +449,52 @@ http.createServer(async (req, res) => {
         { matchId: "M2", matchingAssetInfo: { origin: { city: "Memphis" } } },
       ] });
     if (u.pathname.endsWith("/posting/v2/assets")) return reply(res, { assetId: "A-" + b2.referenceId });
+  }
+  // Gmail and Outlook: Google's and Microsoft's sign-in, and one mailbox each. A test puts mail in with POST
+  // /mailbox/add {kind, from, fromName, subject, text, attachments: [{name, contentType, base64}]}.
+  if (u.pathname.startsWith("/google/") || u.pathname.startsWith("/ms/") || u.pathname.startsWith("/mailbox/")) {
+    const mb = (globalThis.__mailbox ??= { gmail: [], outlook: [], n: 1 });
+    const b64url = (b) => Buffer.from(b).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    if (u.pathname === "/mailbox/add") {
+      const m = JSON.parse((await body(req)) || "{}");
+      const id = "m" + mb.n++;
+      mb[m.kind].push({ id, at: Date.now(), ...m });
+      return reply(res, { id });
+    }
+    if (u.pathname === "/google/token" || u.pathname === "/ms/token") {
+      const f = new URLSearchParams(await body(req));
+      const g = u.pathname === "/google/token";
+      log("mailbox", { kind: "token", provider: g ? "gmail" : "outlook", grant: f.get("grant_type"), client: f.get("client_id"), redirect: f.get("redirect_uri") });
+      if (f.get("client_secret") !== (g ? "g-secret" : "ms-secret")) return deny();
+      if (f.get("grant_type") === "authorization_code") return f.get("code") === "good-code" ? reply(res, { access_token: (g ? "g" : "ms") + "-access", refresh_token: (g ? "g" : "ms") + "-refresh", expires_in: 3600 }) : (res.writeHead(400), res.end(JSON.stringify({ error: "invalid_grant" })));
+      if (f.get("refresh_token") === (g ? "g" : "ms") + "-refresh") return reply(res, { access_token: (g ? "g" : "ms") + "-access", expires_in: 3600 });
+      res.writeHead(400);
+      return res.end(JSON.stringify({ error: "invalid_grant" }));
+    }
+    if (u.pathname === "/google/revoke") return log("mailbox", { kind: "revoke" }), reply(res, {});
+    if (u.pathname.startsWith("/google/gmail/")) {
+      if (req.headers.authorization !== "Bearer g-access") return deny();
+      log("mailbox", { kind: "read", provider: "gmail", path: u.pathname, q: u.searchParams.get("q") });
+      if (u.pathname.endsWith("/profile")) return reply(res, { emailAddress: "owner@titanfreight.test", historyId: "100" });
+      const after = Number((u.searchParams.get("q") ?? "").match(/after:(\d+)/)?.[1] ?? 0) * 1000;
+      if (u.pathname.endsWith("/messages")) return reply(res, { messages: mb.gmail.filter((m) => m.at >= after).map((m) => ({ id: m.id })) });
+      const att = u.pathname.match(/messages\/(\w+)\/attachments\/(\d+)$/);
+      if (att) return reply(res, { data: b64url(Buffer.from(mb.gmail.find((m) => m.id === att[1]).attachments[Number(att[2])].base64, "base64")) });
+      const one = u.pathname.match(/messages\/(\w+)$/);
+      const m = one && mb.gmail.find((x) => x.id === one[1]);
+      if (!m) return deny();
+      return reply(res, { id: m.id, payload: { mimeType: "multipart/mixed", headers: [{ name: "From", value: `${m.fromName ?? ""} <${m.from}>` }, { name: "To", value: "owner@titanfreight.test" }, { name: "Subject", value: m.subject }, { name: "Message-ID", value: `<${m.id}@gmail.test>` }], parts: [{ mimeType: "text/plain", body: { data: b64url(m.text ?? "") } }, ...(m.attachments ?? []).map((a, i) => ({ mimeType: a.contentType, filename: a.name, body: { attachmentId: String(i), size: 100 } }))] } });
+    }
+    if (u.pathname.startsWith("/ms/graph/")) {
+      if (req.headers.authorization !== "Bearer ms-access") return deny();
+      log("mailbox", { kind: "read", provider: "outlook", path: u.pathname, filter: u.searchParams.get("$filter") });
+      if (u.pathname.endsWith("/v1.0/me")) return reply(res, { mail: "owner@titanfreight.test", userPrincipalName: "owner@titanfreight.test" });
+      const since = Date.parse((u.searchParams.get("$filter") ?? "").match(/ge (\S+)/)?.[1] ?? "1970-01-01");
+      if (u.pathname.endsWith("/inbox/messages")) return reply(res, { value: mb.outlook.filter((m) => m.at >= since).map((m) => ({ id: m.id, subject: m.subject, from: { emailAddress: { address: m.from, name: m.fromName } }, toRecipients: [{ emailAddress: { address: "owner@titanfreight.test" } }], body: { contentType: "text", content: m.text ?? "" }, internetMessageId: `<${m.id}@outlook.test>`, hasAttachments: !!m.attachments?.length })) });
+      const att = u.pathname.match(/messages\/(\w+)\/attachments$/);
+      if (att) return reply(res, { value: (mb.outlook.find((m) => m.id === att[1])?.attachments ?? []).map((a) => ({ "@odata.type": "#microsoft.graph.fileAttachment", name: a.name, contentType: a.contentType, contentBytes: a.base64, size: 100 })) });
+    }
+    return deny();
   }
   // QuickBooks Online: Intuit's sign-in (codes and rotating refresh tokens) and a tiny company that keeps what it's sent.
   if (u.pathname.startsWith("/qbo/")) {

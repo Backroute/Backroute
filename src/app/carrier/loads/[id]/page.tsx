@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowLeft, MapPin, MoreHorizontal, ArrowRightLeft, Ban, Camera, Fuel, Gauge, Percent, Phone, Route, ShieldAlert, TrendingUp, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +38,7 @@ import type { Driver, LoadStage, Truck } from "@/lib/types";
 import { ViewTransition } from "react";
 import { BACK, cameFromInApp } from "@/lib/nav-direction";
 import { ContactRow } from "@/components/shared/contact-row";
+import { tonuFor } from "@/lib/tonu";
 import { TimeAgo } from "@/components/shared/time-ago";
 import { stopDates } from "@/lib/load-dates";
 import { useNow } from "@/lib/hooks";
@@ -50,6 +51,20 @@ const TONU_STAGES: LoadStage[] = ["dispatched", "at_pickup"];
 /** Swappable up through at_pickup — once freight is actually moving with a truck, that's a mid-route
  *  problem (see incident reporting), not a reassignment. */
 const REASSIGNABLE_STAGES: LoadStage[] = ["booked", "dispatched", "at_pickup"];
+
+type Section = "why" | "deal" | "rateCon" | "docs" | "timeline" | "pay" | "rateProfit" | "expenses" | "assignment" | "stops";
+
+/**
+ * The page leads with what the load needs now. While it's being won, the broker talk and the money; once it's on a
+ * truck, the trip and its papers (the deal is history by then); once delivered, getting paid.
+ */
+function sectionOrder(stage: LoadStage): { main: Section[]; side: Section[] } {
+  if (stage === "delivered" || stage === "cancelled")
+    return { main: ["docs", "rateCon", "deal", "why"], side: ["pay", "rateProfit", "expenses", "timeline", "assignment", "stops"] };
+  if (isTransitStage(stage) || stage === "booked" || stage === "rate_confirmed")
+    return { main: ["docs", "stops", "rateCon", "deal", "why"], side: ["assignment", "timeline", "pay", "rateProfit", "expenses"] };
+  return { main: ["why", "deal", "rateCon", "docs"], side: ["rateProfit", "expenses", "timeline", "pay", "assignment", "stops"] };
+}
 
 const CANCEL_REASONS = ["Broker cancelled the load", "Receiver refused / detention dispute", "Freight not ready at pickup", "Rate dispute", "Other"];
 const DECLINE_REASONS = ["Broker won't move on rate", "Better option found elsewhere", "Lane no longer needed", "Other"];
@@ -114,6 +129,7 @@ export default function LoadDetailPage() {
   const [declining, setDeclining] = useState(false);
   const [reassigning, setReassigning] = useState(false);
   const [menu, setMenu] = useState(false);
+  const tonuSetting = useStore((s) => s.settings.tonuFee);
   const router = useRouter();
 
   if (!load) {
@@ -130,6 +146,251 @@ export default function LoadDetailPage() {
   const broker = brokers.get(load.brokerId);
   const truck = load.truckId ? trucks.get(load.truckId) : undefined;
   const driver = truck?.driverId ? drivers.get(truck.driverId) : undefined;
+
+  const why = (
+    <>
+      {real && <WhyCard load={load} />}
+        {real && <TeachAi load={load} />}
+    </>
+  );
+  const deal = (
+    <>
+      {real ? (
+          <BookingCard load={load} broker={broker} />
+        ) : (
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>Negotiation</CardTitle>
+              {broker && (
+                <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                  <p className="text-xs text-ink-500">{broker.company} · {broker.contact}</p>
+                  <BrokerTrustBadge broker={broker} />
+                </div>
+              )}
+            </div>
+            {load.stage === "negotiating" && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCalling(true)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-ink-700 hover:border-ink-300"
+                  aria-label="Call dispatch"
+                >
+                  <Phone className="h-4 w-4" />
+                </button>
+                <CounterOfferButton load={load} onSubmit={(amount) => requestBetterRate(load.id, "carrier", amount)} variant="outline" />
+              </div>
+            )}
+          </CardHeader>
+          <CardContent className="!pt-4">
+            {(load.liveCall || (load.stage === "negotiating" && !load.calls.length)) && (
+              <div className="theme-ink mb-4 rounded-2xl bg-ink-950 p-3 text-white">
+                <BrokerCallRow load={load} brokerName={broker?.company ?? "the broker"} contactName={broker?.contact} onCall={() => startBrokerCall(load.id)} />
+              </div>
+            )}
+            <NegotiationThread messages={load.messages} />
+            {load.calls.length > 0 && (
+              <div className="mt-4 flex flex-col gap-4">
+                {load.calls.map((call) => (
+                  <CallTranscript
+                    key={call.id}
+                    call={call}
+                    brokerName={broker?.company}
+                    title={call.transcript.some((l) => l.speaker === "driver" || l.speaker === "carrier") ? "Your call with dispatch" : "Voice Agent Call"}
+                  />
+                ))}
+              </div>
+            )}
+            {load.stage === "negotiating" && (
+              <div className="mt-4">
+                <NegotiationComposer onSend={(text) => sendNegotiationInstruction(load.id, "carrier", text)} />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        )}
+    </>
+  );
+  const rateCon = (
+    <>
+      <RateConCard load={load} />
+        <RateConReader load={load} broker={broker} />
+    </>
+  );
+  const docs = (
+    <>
+      <Card>
+          <CardHeader>
+            <CardTitle>Documents</CardTitle>
+          </CardHeader>
+          <CardContent className="!pt-3">
+            {(() => {
+              const step = STAGE_CONFIRM[load.stage];
+              const pendingType = step?.doc && !load.documents.some((d) => d.type === step.doc) ? step.doc : null;
+              if (load.documents.length === 0 && !pendingType) {
+                return <p className="text-sm text-ink-400">No documents generated yet.</p>;
+              }
+              return (
+                <div className="flex flex-col divide-y divide-line">
+                  {load.documents.map((doc) => (
+                    <div key={doc.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-100 text-ink-600">
+                          <FileText className="h-4 w-4" />
+                        </span>
+                        <div>
+                          <p className="text-sm font-medium text-ink-900">{doc.name}</p>
+                          <p className="text-xs text-ink-400">{doc.uploadedBy === "driver" ? "Uploaded by driver · " : ""}{formatDateTime(doc.generatedAt)}</p>
+                          {doc.aiNote && <p className={`mt-0.5 text-xs ${doc.flagged || doc.status === "failed" ? "text-[var(--accent-warn)]" : "text-ink-500"}`}>Checked: {doc.aiNote}</p>}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {doc.fileId && (
+                          <Button size="sm" variant="ghost" onClick={() => void openFile(doc.fileId!)}>
+                            Open
+                          </Button>
+                        )}
+                        <Badge tone={doc.status === "verified" && !doc.flagged ? "success" : "warning"}>{doc.flagged ? "check it" : doc.status}</Badge>
+                      </div>
+                    </div>
+                  ))}
+                  {pendingType && (
+                    <div className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-50 text-ink-400">
+                          <Camera className="h-4 w-4" />
+                        </span>
+                        <div>
+                          <p className="text-sm font-medium text-ink-700">{pendingDocLabel(pendingType)}</p>
+                          <p className="text-xs text-ink-400">Captured once the driver confirms {pendingType === "bol" ? "loaded" : "delivered"}.</p>
+                        </div>
+                      </div>
+                      <Badge tone="neutral">pending</Badge>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+    </>
+  );
+  const timeline = (
+    <>
+      <LoadTimeline load={load} brokerName={broker?.company} driverName={driver?.name} />
+    </>
+  );
+  const pay = (
+    <>
+      <PaymentCard load={load} />
+    </>
+  );
+  const rateProfit = (
+    <>
+      <Card>
+          <CardHeader>
+            <CardTitle>Rate & profit</CardTitle>
+          </CardHeader>
+          <CardContent className="!pt-3">
+            <div className="flex flex-col gap-3.5">
+              <Row label="Listed rate" value={formatCurrency(load.listedRate)} />
+              <Row label="Target rate" value={formatCurrency(load.targetRate)} />
+              <Row label="Booked rate" value={load.bookedRate ? formatCurrency(load.bookedRate) : "Pending"} strong />
+              <Row
+                label={load.bookedRate ? "Net profit" : "Est. net profit"}
+                value={load.netProfit ? formatCurrency(load.netProfit) : "Projecting…"}
+                tone={load.netProfit ? (load.netProfit > 0 ? "success" : "danger") : undefined}
+                strong
+              />
+              <Row label="Per mile" value={load.rpm ? `$${load.rpm.toFixed(2)}` : "—"} />
+            </div>
+          </CardContent>
+        </Card>
+    </>
+  );
+  const expenses = (
+    <>
+      <Card>
+          <CardHeader>
+            <CardTitle>Real-time expenses</CardTitle>
+          </CardHeader>
+          <CardContent className="!pt-3">
+            <div className="flex flex-col gap-3.5">
+              <IconRow icon={Route} label="Distance" value={`${load.lane.miles} mi`} />
+              <IconRow icon={Gauge} label="Empty miles" value={`${load.deadheadMiles} mi`} />
+              <IconRow icon={Fuel} label="Fuel cost" value={formatCurrency(load.fuelCost)} />
+              <IconRow icon={TrendingUp} label="Empty-mile cost" value={formatCurrency(load.deadheadCost)} />
+              <IconRow icon={TrendingUp} label="Tolls" value={formatCurrency(load.tollCost)} />
+              <IconRow icon={Percent} label="Backroute commission (2%)" value={formatCurrency(load.commission)} />
+              <div className="border-t border-line pt-3.5">
+                <Row
+                  label="Total expenses"
+                  value={formatCurrency(load.fuelCost + load.tollCost + load.deadheadCost + load.commission)}
+                  strong
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+    </>
+  );
+  const assignment = (
+    <>
+      {truck && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Assignment</CardTitle>
+              {REASSIGNABLE_STAGES.includes(load.stage) && !reassigning && (
+                <button
+                  onClick={() => setReassigning(true)}
+                  className="flex items-center gap-1.5 text-xs font-medium text-ink-500 hover:text-ink-950"
+                >
+                  <ArrowRightLeft className="h-3 w-3" /> Reassign
+                </button>
+              )}
+            </CardHeader>
+            <CardContent className="!pt-3">
+              <Row label="Truck" value={truck.unitNumber} />
+              <div className="mt-3.5">
+                <Row label="Driver" value={driver?.name ?? "Unassigned"} />
+              </div>
+              <div className="mt-3.5">
+                <Row label="Pickup" value={load.pickupWindow} />
+              </div>
+              <DockAddresses load={load} />
+              {reassigning && (
+                <ReassignForm
+                  currentTruckId={truck.id}
+                  trucks={carrierTrucks}
+                  drivers={drivers}
+                  onCancel={() => setReassigning(false)}
+                  onConfirm={(newTruckId) => {
+                    reassignTruck(load.id, newTruckId);
+                    setReassigning(false);
+                  }}
+                />
+              )}
+            </CardContent>
+          </Card>
+        )}
+    </>
+  );
+  const stops = (
+    <>
+      {load.stops && load.stops.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Stops</CardTitle>
+            </CardHeader>
+            <CardContent className="!pt-3">
+              <StopsTimeline load={load} />
+            </CardContent>
+          </Card>
+        )}
+    </>
+  );
+  const sections = { why, deal, rateCon, docs, timeline, pay, rateProfit, expenses, assignment, stops };
+  const layout = sectionOrder(load.stage);
 
   return (
     <div>
@@ -214,6 +475,7 @@ export default function LoadDetailPage() {
             {cancelling ? (
               <CancelForm
                 stage={load.stage}
+                tonu={tonuFor(load, tonuSetting)}
                 onCancel={() => setCancelling(false)}
                 onConfirm={(reason) => {
                   cancelLoad(load.id, reason);
@@ -240,218 +502,8 @@ export default function LoadDetailPage() {
       </ViewTransition>
 
       <div className="grid gap-6 px-4 py-6 sm:px-8 lg:grid-cols-3">
-        <div className="flex flex-col gap-6 lg:col-span-2">
-          {real && <WhyCard load={load} />}
-          {real && <TeachAi load={load} />}
-          {real ? (
-            <BookingCard load={load} broker={broker} />
-          ) : (
-          <Card>
-            <CardHeader>
-              <div>
-                <CardTitle>Negotiation</CardTitle>
-                {broker && (
-                  <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                    <p className="text-xs text-ink-500">{broker.company} · {broker.contact}</p>
-                    <BrokerTrustBadge broker={broker} />
-                  </div>
-                )}
-              </div>
-              {load.stage === "negotiating" && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setCalling(true)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-ink-700 hover:border-ink-300"
-                    aria-label="Call dispatch"
-                  >
-                    <Phone className="h-4 w-4" />
-                  </button>
-                  <CounterOfferButton load={load} onSubmit={(amount) => requestBetterRate(load.id, "carrier", amount)} variant="outline" />
-                </div>
-              )}
-            </CardHeader>
-            <CardContent className="!pt-4">
-              {(load.liveCall || (load.stage === "negotiating" && !load.calls.length)) && (
-                <div className="theme-ink mb-4 rounded-2xl bg-ink-950 p-3 text-white">
-                  <BrokerCallRow load={load} brokerName={broker?.company ?? "the broker"} contactName={broker?.contact} onCall={() => startBrokerCall(load.id)} />
-                </div>
-              )}
-              <NegotiationThread messages={load.messages} />
-              {load.calls.length > 0 && (
-                <div className="mt-4 flex flex-col gap-4">
-                  {load.calls.map((call) => (
-                    <CallTranscript
-                      key={call.id}
-                      call={call}
-                      brokerName={broker?.company}
-                      title={call.transcript.some((l) => l.speaker === "driver" || l.speaker === "carrier") ? "Your call with dispatch" : "Voice Agent Call"}
-                    />
-                  ))}
-                </div>
-              )}
-              {load.stage === "negotiating" && (
-                <div className="mt-4">
-                  <NegotiationComposer onSend={(text) => sendNegotiationInstruction(load.id, "carrier", text)} />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          )}
-
-          <RateConCard load={load} />
-          <RateConReader load={load} broker={broker} />
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Documents</CardTitle>
-            </CardHeader>
-            <CardContent className="!pt-3">
-              {(() => {
-                const step = STAGE_CONFIRM[load.stage];
-                const pendingType = step?.doc && !load.documents.some((d) => d.type === step.doc) ? step.doc : null;
-                if (load.documents.length === 0 && !pendingType) {
-                  return <p className="text-sm text-ink-400">No documents generated yet.</p>;
-                }
-                return (
-                  <div className="flex flex-col divide-y divide-line">
-                    {load.documents.map((doc) => (
-                      <div key={doc.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                        <div className="flex items-center gap-3">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-100 text-ink-600">
-                            <FileText className="h-4 w-4" />
-                          </span>
-                          <div>
-                            <p className="text-sm font-medium text-ink-900">{doc.name}</p>
-                            <p className="text-xs text-ink-400">{doc.uploadedBy === "driver" ? "Uploaded by driver · " : ""}{formatDateTime(doc.generatedAt)}</p>
-                            {doc.aiNote && <p className={`mt-0.5 text-xs ${doc.flagged || doc.status === "failed" ? "text-[var(--accent-warn)]" : "text-ink-500"}`}>Checked: {doc.aiNote}</p>}
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          {doc.fileId && (
-                            <Button size="sm" variant="ghost" onClick={() => void openFile(doc.fileId!)}>
-                              Open
-                            </Button>
-                          )}
-                          <Badge tone={doc.status === "verified" && !doc.flagged ? "success" : "warning"}>{doc.flagged ? "check it" : doc.status}</Badge>
-                        </div>
-                      </div>
-                    ))}
-                    {pendingType && (
-                      <div className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                        <div className="flex items-center gap-3">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-50 text-ink-400">
-                            <Camera className="h-4 w-4" />
-                          </span>
-                          <div>
-                            <p className="text-sm font-medium text-ink-700">{pendingDocLabel(pendingType)}</p>
-                            <p className="text-xs text-ink-400">Captured once the driver confirms {pendingType === "bol" ? "loaded" : "delivered"}.</p>
-                          </div>
-                        </div>
-                        <Badge tone="neutral">pending</Badge>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="flex flex-col gap-6">
-          <LoadTimeline load={load} brokerName={broker?.company} driverName={driver?.name} />
-          <PaymentCard load={load} />
-          <Card>
-            <CardHeader>
-              <CardTitle>Rate & profit</CardTitle>
-            </CardHeader>
-            <CardContent className="!pt-3">
-              <div className="flex flex-col gap-3.5">
-                <Row label="Listed rate" value={formatCurrency(load.listedRate)} />
-                <Row label="Target rate" value={formatCurrency(load.targetRate)} />
-                <Row label="Booked rate" value={load.bookedRate ? formatCurrency(load.bookedRate) : "Pending"} strong />
-                <Row
-                  label={load.bookedRate ? "Net profit" : "Est. net profit"}
-                  value={load.netProfit ? formatCurrency(load.netProfit) : "Projecting…"}
-                  tone={load.netProfit ? (load.netProfit > 0 ? "success" : "danger") : undefined}
-                  strong
-                />
-                <Row label="Per mile" value={load.rpm ? `$${load.rpm.toFixed(2)}` : "—"} />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Real-time expenses</CardTitle>
-            </CardHeader>
-            <CardContent className="!pt-3">
-              <div className="flex flex-col gap-3.5">
-                <IconRow icon={Route} label="Distance" value={`${load.lane.miles} mi`} />
-                <IconRow icon={Gauge} label="Empty miles" value={`${load.deadheadMiles} mi`} />
-                <IconRow icon={Fuel} label="Fuel cost" value={formatCurrency(load.fuelCost)} />
-                <IconRow icon={TrendingUp} label="Empty-mile cost" value={formatCurrency(load.deadheadCost)} />
-                <IconRow icon={TrendingUp} label="Tolls" value={formatCurrency(load.tollCost)} />
-                <IconRow icon={Percent} label="Backroute commission (2%)" value={formatCurrency(load.commission)} />
-                <div className="border-t border-line pt-3.5">
-                  <Row
-                    label="Total expenses"
-                    value={formatCurrency(load.fuelCost + load.tollCost + load.deadheadCost + load.commission)}
-                    strong
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {truck && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Assignment</CardTitle>
-                {REASSIGNABLE_STAGES.includes(load.stage) && !reassigning && (
-                  <button
-                    onClick={() => setReassigning(true)}
-                    className="flex items-center gap-1.5 text-xs font-medium text-ink-500 hover:text-ink-950"
-                  >
-                    <ArrowRightLeft className="h-3 w-3" /> Reassign
-                  </button>
-                )}
-              </CardHeader>
-              <CardContent className="!pt-3">
-                <Row label="Truck" value={truck.unitNumber} />
-                <div className="mt-3.5">
-                  <Row label="Driver" value={driver?.name ?? "Unassigned"} />
-                </div>
-                <div className="mt-3.5">
-                  <Row label="Pickup" value={load.pickupWindow} />
-                </div>
-                <DockAddresses load={load} />
-                {reassigning && (
-                  <ReassignForm
-                    currentTruckId={truck.id}
-                    trucks={carrierTrucks}
-                    drivers={drivers}
-                    onCancel={() => setReassigning(false)}
-                    onConfirm={(newTruckId) => {
-                      reassignTruck(load.id, newTruckId);
-                      setReassigning(false);
-                    }}
-                  />
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {load.stops && load.stops.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Stops</CardTitle>
-              </CardHeader>
-              <CardContent className="!pt-3">
-                <StopsTimeline load={load} />
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        <div className="flex flex-col gap-6 lg:col-span-2">{layout.main.map((k) => <Fragment key={k}>{sections[k]}</Fragment>)}</div>
+        <div className="flex flex-col gap-6">{layout.side.map((k) => <Fragment key={k}>{sections[k]}</Fragment>)}</div>
       </div>
 
       {calling && broker && (
@@ -506,7 +558,7 @@ function ReassignForm({
   );
 }
 
-function CancelForm({ stage, onCancel, onConfirm }: { stage: LoadStage; onCancel: () => void; onConfirm: (reason: string) => void }) {
+function CancelForm({ stage, tonu, onCancel, onConfirm }: { stage: LoadStage; tonu: number; onCancel: () => void; onConfirm: (reason: string) => void }) {
   const [reason, setReason] = useState(CANCEL_REASONS[0]);
   const tonuApplies = TONU_STAGES.includes(stage);
 
@@ -515,7 +567,7 @@ function CancelForm({ stage, onCancel, onConfirm }: { stage: LoadStage; onCancel
       {tonuApplies && (
         <p className="flex items-start gap-1.5 text-xs font-medium text-[var(--accent-warn)]">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          Truck already {stage === "at_pickup" ? "at pickup" : "dispatched"}. A {formatCurrency(250)} TONU fee will be invoiced to the broker.
+          Truck already {stage === "at_pickup" ? "at pickup" : "dispatched"}. A {formatCurrency(tonu)} TONU fee will be invoiced to the broker.
         </p>
       )}
       <label className="flex flex-col gap-1 text-xs text-ink-500">
