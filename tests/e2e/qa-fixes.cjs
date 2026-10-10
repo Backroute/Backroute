@@ -76,6 +76,8 @@ async function signIn(browser, sub, phone, width = 1280) {
 
   // This round: Home (setup, money), Settings → Basics, the driver's quick replies.
   await p.goto("http://localhost:3210/carrier", { waitUntil: "domcontentloaded" });
+  // Money sits under More on Home now (Home leads with Needs you, today's stops and the trucks).
+  await p.getByRole("button", { name: /^More: map, money/ }).click({ timeout: 60000 }).catch(() => {});
   await p.getByText("Money this week").waitFor({ timeout: 60000 }).catch(() => {});
   await p.screenshot({ path: `${S}/.out/ux-home.png`, fullPage: true });
   check("Home shows the week's money in plain numbers", (await p.getByText("Money this week").count()) === 1);
