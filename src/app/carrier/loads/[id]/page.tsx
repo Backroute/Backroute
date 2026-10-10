@@ -43,6 +43,9 @@ import { TimeAgo } from "@/components/shared/time-ago";
 import { stopDates } from "@/lib/load-dates";
 import { useNow } from "@/lib/hooks";
 import { Lane } from "@/components/ui/lane";
+import { hasSheet, LoadSheet } from "@/components/shared/load-sheet";
+import { DispatchChecklist } from "@/components/shared/dispatch-checklist";
+import { dispatchStops } from "@/lib/dispatch-checks";
 
 /** Cancellable once rate is locked in; once in transit the freight is already moving, so that's a
  *  claim situation, not a cancellation. Dispatched/at_pickup carry a TONU fee since the truck already committed. */
@@ -52,7 +55,7 @@ const TONU_STAGES: LoadStage[] = ["dispatched", "at_pickup"];
  *  problem (see incident reporting), not a reassignment. */
 const REASSIGNABLE_STAGES: LoadStage[] = ["booked", "dispatched", "at_pickup"];
 
-type Section = "why" | "deal" | "rateCon" | "docs" | "timeline" | "pay" | "rateProfit" | "expenses" | "assignment" | "stops";
+type Section = "sheet" | "why" | "deal" | "rateCon" | "docs" | "timeline" | "pay" | "rateProfit" | "expenses" | "assignment" | "stops";
 
 /**
  * The page leads with what the load needs now. While it's being won, the broker talk and the money; once it's on a
@@ -62,7 +65,7 @@ function sectionOrder(stage: LoadStage): { main: Section[]; side: Section[] } {
   if (stage === "delivered" || stage === "cancelled")
     return { main: ["docs", "rateCon", "deal", "why"], side: ["pay", "rateProfit", "expenses", "timeline", "assignment", "stops"] };
   if (isTransitStage(stage) || stage === "booked" || stage === "rate_confirmed")
-    return { main: ["docs", "stops", "rateCon", "deal", "why"], side: ["assignment", "timeline", "pay", "rateProfit", "expenses"] };
+    return { main: ["docs", "sheet", "stops", "rateCon", "deal", "why"], side: ["assignment", "timeline", "pay", "rateProfit", "expenses"] };
   return { main: ["why", "deal", "rateCon", "docs"], side: ["rateProfit", "expenses", "timeline", "pay", "assignment", "stops"] };
 }
 
@@ -358,8 +361,10 @@ export default function LoadDetailPage() {
                 <Row label="Pickup" value={load.pickupWindow} />
               </div>
               <DockAddresses load={load} />
+              {driver && ["booked", "rate_confirmed", "dispatched"].includes(load.stage) && <DispatchChecklist load={load} driver={driver} className="mt-3.5" />}
               {reassigning && (
                 <ReassignForm
+                  load={load}
                   currentTruckId={truck.id}
                   trucks={carrierTrucks}
                   drivers={drivers}
@@ -389,7 +394,8 @@ export default function LoadDetailPage() {
         )}
     </>
   );
-  const sections = { why, deal, rateCon, docs, timeline, pay, rateProfit, expenses, assignment, stops };
+  const sheet = hasSheet(load) ? <LoadSheet load={load} className="bg-white" /> : null;
+  const sections = { sheet, why, deal, rateCon, docs, timeline, pay, rateProfit, expenses, assignment, stops };
   const layout = sectionOrder(load.stage);
 
   return (
@@ -517,12 +523,14 @@ export default function LoadDetailPage() {
 }
 
 function ReassignForm({
+  load,
   currentTruckId,
   trucks,
   drivers,
   onCancel,
   onConfirm,
 }: {
+  load: Load;
   currentTruckId: string;
   trucks: Truck[];
   drivers: Map<string, Driver>;
@@ -530,6 +538,7 @@ function ReassignForm({
   onConfirm: (newTruckId: string) => void;
 }) {
   const available = trucks.filter((t) => t.id !== currentTruckId && t.status === "available");
+  const now = useNow();
 
   return (
     <div className="mt-3.5 flex flex-col gap-2 border-t border-line pt-3.5">
@@ -547,6 +556,9 @@ function ReassignForm({
               <div>
                 <p className="text-sm font-medium text-ink-900">{t.unitNumber}</p>
                 <p className="text-xs text-ink-400">{d?.name ?? "Unassigned"} · {t.currentCity}, {t.currentState}</p>
+                {d && now !== null && dispatchStops(load, d, now).map((c) => (
+                  <p key={c.key} className="text-xs text-[var(--accent-danger)]">{c.label}: {c.detail}</p>
+                ))}
               </div>
               <span className="text-xs font-medium text-ink-500">Move here</span>
             </button>

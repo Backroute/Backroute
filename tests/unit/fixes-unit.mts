@@ -5,6 +5,9 @@ import { driverSeesLoadPay } from "../../src/lib/pay-view.ts";
 import { replyTo } from "../../src/lib/agent/outbox.ts";
 import { isFreightMail, mailboxConnectUrl, readMailboxState } from "../../src/lib/agent/mailbox.ts";
 import { setupMail, viaOf } from "../../src/lib/agent/inbox.ts";
+import { dispatchChecks, dispatchStops, endorsementsNeeded } from "../../src/lib/dispatch-checks.ts";
+import { dockChange, stopFor } from "../../src/lib/agent/geofence.ts";
+import { sheetLine } from "../../src/lib/agent/booking.ts";
 
 let pass = 0, fail = 0;
 const ok = (label: string, c: boolean, x?: unknown) => { if (c) { pass++; console.log("PASS", label); } else { fail++; console.log("FAIL", label, x === undefined ? "" : JSON.stringify(x)); } };
@@ -61,6 +64,32 @@ ok("Gmail's forwarding code and link", g?.kind === "forward_confirm" && g.code =
 ok("a broker's email isn't setup mail", setupMail("loads@tql.test", "Load TQL-5501", "") === null);
 ok("sent to the Backroute address: direct", viaOf({ To: "abc123+k7@inbound.postmarkapp.com" } as any, "inbound.postmarkapp.com") === "direct");
 ok("forwarded from the owner's inbox: forward", viaOf({ To: "owner@gmail.com" } as any, "inbound.postmarkapp.com") === "forward");
+
+// Before dispatch: hours, cards good past delivery, endorsements.
+const NOW = Date.parse("2026-10-10T12:00:00Z");
+const run = (x: object = {}) => ({ lane: { miles: 500 }, equipmentType: "Dry Van", deliveryAt: "2026-10-12T18:00:00Z", rateConReading: null, ...x }) as any;
+const drv = (x: object = {}) => ({ hoursRemaining: 9, cdlExpires: "2027-05-01", medCardExpires: "2027-01-01", ...x }) as any;
+ok("a fine driver on a dry van: no stops", dispatchStops(run(), drv(), NOW).length === 0, dispatchChecks(run(), drv(), NOW));
+ok("a medical card that runs out before delivery stops it", dispatchStops(run(), drv({ medCardExpires: "2026-10-11" }), NOW).map((c) => c.key).join() === "medical");
+ok("an expired CDL stops it", /Expired/.test(dispatchStops(run(), drv({ cdlExpires: "2026-09-01" }), NOW)[0]?.detail ?? ""));
+ok("dates not on file: a heads-up, not a stop", dispatchStops(run(), drv({ cdlExpires: undefined }), NOW).length === 0 && dispatchChecks(run(), drv({ cdlExpires: undefined }), NOW).some((c) => c.key === "cdl" && !c.ok));
+ok("hazmat on the rate con needs H", endorsementsNeeded(run({ rateConReading: { specialInstructions: ["Hazmat placards required"] } })).join() === "H");
+ok("…a driver with H (or X) can run it, one without can't", dispatchStops(run({ hazmat: true }), drv({ endorsements: ["X"] }), NOW).length === 0 && dispatchStops(run({ hazmat: true }), drv({ endorsements: ["N"] }), NOW)[0]?.key === "H");
+ok("…endorsements not on file: a heads-up", dispatchStops(run({ hazmat: true }), drv(), NOW).length === 0);
+ok("out of hours on the 70-hour clock stops it", dispatchStops(run(), drv({ hos: { drive: 8, shift: 10, cycle: 2, at: "", source: "samsara" } }), NOW)[0]?.key === "cycle");
+
+// The ELD at the dock: arrive once inside 0.3 mi, leave once past 0.75 mi after arriving.
+ok("which dock: pickup until loaded, then delivery", stopFor("dispatched") === "pickup" && stopFor("in_transit") === "delivery" && stopFor("delivered") === null);
+ok("pulling into the lot: arrived", dockChange(undefined, "pickup", 0.1) === "arrived");
+ok("a mile out: nothing", dockChange(undefined, "pickup", 1) === null);
+ok("the driver already tapped arrived: the GPS doesn't change it", dockChange({ arrivedPickupAt: "x" }, "pickup", 0.1) === null);
+ok("driving out after arriving: left", dockChange({ arrivedPickupAt: "x" }, "pickup", 0.9) === "left");
+ok("idling at the gate: not left yet", dockChange({ arrivedPickupAt: "x" }, "pickup", 0.5) === null);
+
+// The driver's new-load text: the numbers and must-dos, never the rate.
+const line = sheetLine({ rateConReading: { pickupNumber: "PU-1", deliveryNumber: "PO-2", commodity: "Paper", pieces: "22 pallets", specialInstructions: ["Two load locks"], totalRate: 1850 } } as any) ?? "";
+ok("the sheet line has PU#, PO#, freight, must-dos", line === "Pickup # PU-1. Delivery # PO-2. Freight: Paper, 22 pallets. Must do: Two load locks.", line);
+ok("…and no money in it", !/\$|1,?850/.test(line));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

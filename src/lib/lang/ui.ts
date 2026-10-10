@@ -113,6 +113,31 @@ export interface UiText {
   newLoads: string;
   callMe: string;
   textMe: string;
+  sheet: string;
+  sheetPu: string;
+  sheetDel: string;
+  sheetFreight: string;
+  sheetMust: string;
+  sheetRefs: string;
+  sheetEmpty: string;
+  papers: string;
+  papersNote: string;
+  paperCab: string;
+  paperIns: string;
+  paperIfta: string;
+  paperAnnual: string;
+  paperMissing: string;
+  paperExpired: string;
+  paperShow: string;
+  scanDark: string;
+  scanBright: string;
+  scanBlurry: string;
+  scanFar: string;
+  scanGood: string;
+  scanTake: string;
+  scanFile: string;
+  scanNoCamera: string;
+  scanClose: string;
 }
 
 const en: UiText = {
@@ -237,6 +262,31 @@ const en: UiText = {
   newLoads: "New load options",
   callMe: "Call me",
   textMe: "Just text me",
+  sheet: "Load sheet",
+  sheetPu: "Pickup #",
+  sheetDel: "Delivery #",
+  sheetFreight: "Freight",
+  sheetMust: "Must do",
+  sheetRefs: "Other numbers",
+  sheetEmpty: "Fills in once the rate con is read.",
+  papers: "Truck papers",
+  papersNote: "For a roadside inspection: show the officer on your phone.",
+  paperCab: "Registration (cab card)",
+  paperIns: "Insurance card",
+  paperIfta: "IFTA license",
+  paperAnnual: "Annual inspection",
+  paperMissing: "Not added yet. Ask your carrier.",
+  paperExpired: "Expired",
+  paperShow: "Show",
+  scanDark: "Too dark. Find some light.",
+  scanBright: "Too much glare. Tilt the paper away from the light.",
+  scanBlurry: "Hold still…",
+  scanFar: "Get the whole page in.",
+  scanGood: "Looks good. Take it.",
+  scanTake: "Take photo",
+  scanFile: "Choose a file instead",
+  scanNoCamera: "No camera here. Choose a photo instead.",
+  scanClose: "Close",
 };
 
 const es: UiText = {
@@ -361,6 +411,31 @@ const es: UiText = {
   newLoads: "Opciones de cargas nuevas",
   callMe: "Llámame",
   textMe: "Solo mensaje",
+  sheet: "Hoja de carga",
+  sheetPu: "Núm. de recogida",
+  sheetDel: "Núm. de entrega",
+  sheetFreight: "Carga",
+  sheetMust: "Obligatorio",
+  sheetRefs: "Otros números",
+  sheetEmpty: "Se llena cuando se lee el rate con.",
+  papers: "Papeles del camión",
+  papersNote: "Para una inspección en carretera: muéstrelos al oficial en su teléfono.",
+  paperCab: "Registro (cab card)",
+  paperIns: "Tarjeta de seguro",
+  paperIfta: "Licencia IFTA",
+  paperAnnual: "Inspección anual",
+  paperMissing: "Aún no está. Pídaselo a su transportista.",
+  paperExpired: "Vencido",
+  paperShow: "Mostrar",
+  scanDark: "Muy oscuro. Busque luz.",
+  scanBright: "Mucho reflejo. Incline el papel lejos de la luz.",
+  scanBlurry: "No se mueva…",
+  scanFar: "Meta la hoja completa.",
+  scanGood: "Se ve bien. Tómela.",
+  scanTake: "Tomar foto",
+  scanFile: "Elegir un archivo",
+  scanNoCamera: "No hay cámara. Elija una foto.",
+  scanClose: "Cerrar",
 };
 
 const pa: UiText = {
@@ -485,6 +560,31 @@ const pa: UiText = {
   newLoads: "ਨਵੇਂ ਲੋਡ",
   callMe: "ਫ਼ੋਨ ਕਰੋ",
   textMe: "ਸਿਰਫ਼ ਮੈਸੇਜ",
+  sheet: "ਲੋਡ ਸ਼ੀਟ",
+  sheetPu: "ਪਿਕਅੱਪ #",
+  sheetDel: "ਡਿਲੀਵਰੀ #",
+  sheetFreight: "ਮਾਲ",
+  sheetMust: "ਜ਼ਰੂਰੀ",
+  sheetRefs: "ਹੋਰ ਨੰਬਰ",
+  sheetEmpty: "ਰੇਟ ਕਾਨ ਪੜ੍ਹਨ ਤੋਂ ਬਾਅਦ ਭਰ ਜਾਂਦੀ ਹੈ।",
+  papers: "ਟਰੱਕ ਦੇ ਕਾਗਜ਼",
+  papersNote: "ਸੜਕ ਕਿਨਾਰੇ ਜਾਂਚ ਲਈ: ਅਫ਼ਸਰ ਨੂੰ ਫ਼ੋਨ 'ਤੇ ਦਿਖਾਓ।",
+  paperCab: "ਰਜਿਸਟ੍ਰੇਸ਼ਨ (ਕੈਬ ਕਾਰਡ)",
+  paperIns: "ਬੀਮਾ ਕਾਰਡ",
+  paperIfta: "IFTA ਲਾਇਸੈਂਸ",
+  paperAnnual: "ਸਾਲਾਨਾ ਜਾਂਚ",
+  paperMissing: "ਅਜੇ ਨਹੀਂ ਜੋੜਿਆ। ਆਪਣੇ ਕੈਰੀਅਰ ਨੂੰ ਪੁੱਛੋ।",
+  paperExpired: "ਮਿਆਦ ਪੁੱਗ ਗਈ",
+  paperShow: "ਦਿਖਾਓ",
+  scanDark: "ਬਹੁਤ ਹਨੇਰਾ। ਰੋਸ਼ਨੀ ਲੱਭੋ।",
+  scanBright: "ਬਹੁਤ ਚਮਕ। ਕਾਗਜ਼ ਨੂੰ ਰੋਸ਼ਨੀ ਤੋਂ ਪਰੇ ਝੁਕਾਓ।",
+  scanBlurry: "ਹਿੱਲੋ ਨਾ…",
+  scanFar: "ਪੂਰਾ ਪੰਨਾ ਅੰਦਰ ਲਿਆਓ।",
+  scanGood: "ਠੀਕ ਲੱਗਦਾ ਹੈ। ਖਿੱਚੋ।",
+  scanTake: "ਫ਼ੋਟੋ ਖਿੱਚੋ",
+  scanFile: "ਫ਼ਾਈਲ ਚੁਣੋ",
+  scanNoCamera: "ਕੈਮਰਾ ਨਹੀਂ ਹੈ। ਫ਼ੋਟੋ ਚੁਣੋ।",
+  scanClose: "ਬੰਦ ਕਰੋ",
 };
 
 const hi: UiText = {
@@ -609,6 +709,31 @@ const hi: UiText = {
   newLoads: "नए लोड",
   callMe: "फ़ोन करें",
   textMe: "सिर्फ़ मैसेज",
+  sheet: "लोड शीट",
+  sheetPu: "पिकअप #",
+  sheetDel: "डिलीवरी #",
+  sheetFreight: "माल",
+  sheetMust: "ज़रूरी",
+  sheetRefs: "दूसरे नंबर",
+  sheetEmpty: "रेट कॉन पढ़ने के बाद भर जाती है।",
+  papers: "ट्रक के कागज़",
+  papersNote: "सड़क किनारे जांच के लिए: अफ़सर को फ़ोन पर दिखाएं।",
+  paperCab: "रजिस्ट्रेशन (कैब कार्ड)",
+  paperIns: "बीमा कार्ड",
+  paperIfta: "IFTA लाइसेंस",
+  paperAnnual: "सालाना जांच",
+  paperMissing: "अभी नहीं जोड़ा। अपने कैरियर से पूछें।",
+  paperExpired: "समय ख़त्म",
+  paperShow: "दिखाएं",
+  scanDark: "बहुत अंधेरा। रोशनी ढूंढें।",
+  scanBright: "बहुत चमक। कागज़ को रोशनी से दूर झुकाएं।",
+  scanBlurry: "हिलें नहीं…",
+  scanFar: "पूरा पन्ना अंदर लाएं।",
+  scanGood: "ठीक लग रहा है। खींचें।",
+  scanTake: "फ़ोटो खींचें",
+  scanFile: "फ़ाइल चुनें",
+  scanNoCamera: "कैमरा नहीं है। फ़ोटो चुनें।",
+  scanClose: "बंद करें",
 };
 
 const ru: UiText = {
@@ -733,6 +858,31 @@ const ru: UiText = {
   newLoads: "Новые грузы",
   callMe: "Звони",
   textMe: "Просто пиши",
+  sheet: "Лист груза",
+  sheetPu: "Номер погрузки",
+  sheetDel: "Номер выгрузки",
+  sheetFreight: "Груз",
+  sheetMust: "Обязательно",
+  sheetRefs: "Другие номера",
+  sheetEmpty: "Заполнится, когда прочитаем rate con.",
+  papers: "Документы на трак",
+  papersNote: "Для проверки на дороге: покажите офицеру на телефоне.",
+  paperCab: "Регистрация (cab card)",
+  paperIns: "Страховая карточка",
+  paperIfta: "Лицензия IFTA",
+  paperAnnual: "Ежегодный техосмотр",
+  paperMissing: "Ещё не добавлено. Спросите перевозчика.",
+  paperExpired: "Просрочено",
+  paperShow: "Показать",
+  scanDark: "Слишком темно. Найдите свет.",
+  scanBright: "Сильный блик. Наклоните лист от света.",
+  scanBlurry: "Не двигайтесь…",
+  scanFar: "Поместите весь лист.",
+  scanGood: "Хорошо. Снимайте.",
+  scanTake: "Сделать фото",
+  scanFile: "Выбрать файл",
+  scanNoCamera: "Камеры нет. Выберите фото.",
+  scanClose: "Закрыть",
 };
 
 const uk: UiText = {
@@ -857,6 +1007,31 @@ const uk: UiText = {
   newLoads: "Нові вантажі",
   callMe: "Дзвони",
   textMe: "Просто пиши",
+  sheet: "Лист вантажу",
+  sheetPu: "Номер завантаження",
+  sheetDel: "Номер вивантаження",
+  sheetFreight: "Вантаж",
+  sheetMust: "Обов'язково",
+  sheetRefs: "Інші номери",
+  sheetEmpty: "Заповниться, коли прочитаємо rate con.",
+  papers: "Документи на трак",
+  papersNote: "Для перевірки на дорозі: покажіть офіцеру на телефоні.",
+  paperCab: "Реєстрація (cab card)",
+  paperIns: "Страхова картка",
+  paperIfta: "Ліцензія IFTA",
+  paperAnnual: "Щорічний техогляд",
+  paperMissing: "Ще не додано. Запитайте перевізника.",
+  paperExpired: "Прострочено",
+  paperShow: "Показати",
+  scanDark: "Занадто темно. Знайдіть світло.",
+  scanBright: "Сильний відблиск. Нахиліть аркуш від світла.",
+  scanBlurry: "Не рухайтеся…",
+  scanFar: "Вмістіть увесь аркуш.",
+  scanGood: "Добре. Знімайте.",
+  scanTake: "Зробити фото",
+  scanFile: "Вибрати файл",
+  scanNoCamera: "Камери немає. Виберіть фото.",
+  scanClose: "Закрити",
 };
 
 const fr: UiText = {
@@ -981,6 +1156,31 @@ const fr: UiText = {
   newLoads: "Nouveaux voyages",
   callMe: "Appelle-moi",
   textMe: "Juste un texto",
+  sheet: "Fiche de charge",
+  sheetPu: "N° de ramassage",
+  sheetDel: "N° de livraison",
+  sheetFreight: "Marchandise",
+  sheetMust: "Obligatoire",
+  sheetRefs: "Autres numéros",
+  sheetEmpty: "Se remplit une fois le rate con lu.",
+  papers: "Papiers du camion",
+  papersNote: "Pour un contrôle routier : montrez-les à l'agent sur votre téléphone.",
+  paperCab: "Immatriculation (cab card)",
+  paperIns: "Carte d'assurance",
+  paperIfta: "Licence IFTA",
+  paperAnnual: "Inspection annuelle",
+  paperMissing: "Pas encore ajouté. Demandez à votre transporteur.",
+  paperExpired: "Expiré",
+  paperShow: "Montrer",
+  scanDark: "Trop sombre. Trouvez de la lumière.",
+  scanBright: "Trop de reflet. Inclinez la feuille loin de la lumière.",
+  scanBlurry: "Ne bougez pas…",
+  scanFar: "Cadrez toute la page.",
+  scanGood: "C'est bon. Prenez-la.",
+  scanTake: "Prendre la photo",
+  scanFile: "Choisir un fichier",
+  scanNoCamera: "Pas de caméra. Choisissez une photo.",
+  scanClose: "Fermer",
 };
 
 export const UI: Record<Lang, UiText> = { en, es, pa, hi, ru, uk, fr };

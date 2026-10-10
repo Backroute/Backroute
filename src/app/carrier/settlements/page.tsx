@@ -21,6 +21,7 @@ import { openFile } from "@/lib/cloud/files";
 import type { Driver, Expense, Load, Truck } from "@/lib/types";
 import { Lane } from "@/components/ui/lane";
 import { StatusMark } from "@/components/ui/mark";
+import { InvoiceActions } from "@/components/cloud/invoice-actions";
 
 const EXPENSE_CATEGORY_LABEL: Record<Expense["category"], string> = {
   lumper: "Lumper fee",
@@ -229,6 +230,7 @@ function PaymentsList({ loads, now }: { loads: Load[]; now: number | null }) {
               {p.factorDeclined && <li className="text-xs text-ink-500">{p.factorDeclined}, so Backroute invoiced them directly.</li>}
               {p.pendingExtras > 0 && <li className="text-xs text-ink-500">{formatCurrency(p.pendingExtras)} in extras is still waiting on the broker&apos;s OK and goes on a follow-up invoice.</li>}
             </ol>
+            <InvoiceActions load={load} />
           </details>
         ))}
       </div>

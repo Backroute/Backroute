@@ -10,6 +10,7 @@ import { PRIMARY_CARRIER_ID } from "@/lib/mock-data";
 import { dueWords, paperworkDue } from "@/lib/expiry";
 import { updateDriver, updateTruck } from "@/lib/back-office";
 import { formatDate } from "@/lib/utils";
+import type { Endorsement } from "@/lib/types";
 
 const dateInput = "h-8 rounded-lg border border-line bg-white px-2 text-xs tabular outline-none focus:border-ink-400";
 
@@ -17,6 +18,15 @@ const dateInput = "h-8 rounded-lg border border-line bg-white px-2 text-xs tabul
  * Every date that keeps a truck or driver legal, in one place: what's coming due (reminders go 30, 14 and 7 days
  * ahead), and the dates themselves to keep current.
  */
+
+/** What's on a CDL besides the class: the loads that need them won't go on a driver without (lib/dispatch-checks). */
+const ENDORSEMENTS: [Endorsement, string][] = [
+  ["H", "Hazmat"],
+  ["N", "Tanker"],
+  ["T", "Doubles/triples"],
+  ["X", "Hazmat + tanker"],
+  ["TWIC", "TWIC card (ports)"],
+];
 export function PaperworkCard() {
   const trucks = useCarrierTrucks();
   const demo = useStore((s) => s.session.mode === "demo");
@@ -94,6 +104,24 @@ export function PaperworkCard() {
                         Medical card
                         <input type="date" aria-label={`${d.name} medical card runs out`} className={dateInput} value={d.medCardExpires?.slice(0, 10) ?? ""} onChange={(e) => updateDriver(d.id, { medCardExpires: e.target.value || undefined })} />
                       </label>
+                    </span>
+                    <span className="flex w-full flex-wrap items-center gap-1.5 text-xs text-ink-500" role="group" aria-label={`${d.name} endorsements`}>
+                      Endorsements
+                      {ENDORSEMENTS.map(([e, label]) => {
+                        const on = !!d.endorsements?.includes(e);
+                        return (
+                          <button
+                            key={e}
+                            type="button"
+                            aria-pressed={on}
+                            title={label}
+                            onClick={() => updateDriver(d.id, { endorsements: on ? (d.endorsements ?? []).filter((x) => x !== e) : [...(d.endorsements ?? []), e] })}
+                            className={on ? "rounded-full bg-ink-950 px-2 py-0.5 font-medium text-white" : "rounded-full bg-ink-100 px-2 py-0.5 font-medium text-ink-700"}
+                          >
+                            {e}
+                          </button>
+                        );
+                      })}
                     </span>
                   </div>
                 ))}

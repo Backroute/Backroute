@@ -1,5 +1,6 @@
 "use client";
 
+import { TruckPapers } from "@/components/cloud/truck-papers";
 import Link from "next/link";
 import { Home, Link2, MapPin, Phone, Sparkles, Users } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
@@ -172,6 +173,8 @@ export default function FleetPage() {
                     <Switch checked={driverSeesLoadPay(driver, false)} onChange={(on) => setDriverSeesPay(driver.id, on)} label={`${driver.name} sees what loads pay`} />
                   </div>
                 )}
+
+                {signedIn && <TruckPapers truckId={truck.id} unit={truck.unitNumber} />}
 
                 {secondDriver && (
                   <div className="flex items-center gap-3">

@@ -1,7 +1,30 @@
 import { authHeader } from "../ai/client";
 import { enqueue, startQueue, whenSent, type Queued } from "./upload-queue";
 
-export type FileKind = "w9" | "coi" | "authority" | "noa" | "voided_check" | "bol" | "pod" | "lumper_receipt" | "receipt" | "dvir_photo" | "other";
+export type FileKind = "w9" | "coi" | "authority" | "noa" | "voided_check" | "bol" | "pod" | "lumper_receipt" | "receipt" | "dvir_photo" | TruckPaper | "other";
+
+/** What a driver shows at a roadside inspection: the truck's registration (cab card), insurance card, IFTA license and annual inspection. */
+export const TRUCK_PAPERS = ["cab_card", "insurance_card", "ifta_license", "annual_inspection"] as const;
+export type TruckPaper = (typeof TRUCK_PAPERS)[number];
+
+export interface PaperOnFile {
+  id: string;
+  kind: FileKind;
+  name: string;
+  expires_on: string | null;
+  created_at: string;
+  truck_id: string | null;
+}
+
+/** The papers on file: all of the carrier's for the office, the ones for their own truck for a driver. */
+export async function listPapers(): Promise<PaperOnFile[] | null> {
+  try {
+    const res = await fetch("/api/files", { headers: await authHeader() });
+    return res.ok ? ((await res.json()) as { files: PaperOnFile[] }).files : null;
+  } catch {
+    return null;
+  }
+}
 
 type Uploaded = { ok: true; id: string; status: "verified" | "check"; note: string | null; amount?: number | null } | { ok: false; reason: string; queued?: boolean };
 
@@ -13,12 +36,13 @@ const REASON: Record<string, string> = {
   not_found: "That load isn't on your truck.",
 };
 
-async function send(kind: string, file: Blob, name: string, extra: { loadId?: string; expiresOn?: string }): Promise<Uploaded & { network?: boolean }> {
+async function send(kind: string, file: Blob, name: string, extra: { loadId?: string; expiresOn?: string; truckId?: string }): Promise<Uploaded & { network?: boolean }> {
   const form = new FormData();
   form.set("file", file, name);
   form.set("kind", kind);
   if (extra.loadId) form.set("loadId", extra.loadId);
   if (extra.expiresOn) form.set("expiresOn", extra.expiresOn);
+  if (extra.truckId) form.set("truckId", extra.truckId);
   try {
     const res = await fetch("/api/files", { method: "POST", headers: await authHeader(), body: form, signal: AbortSignal.timeout(90_000) });
     const body = (await res.json().catch(() => ({}))) as { id?: string; status?: "verified" | "check"; note?: string | null; amount?: number | null; error?: string };
@@ -37,7 +61,7 @@ const sendQueued = async (q: Queued) => (await send(q.kind, q.blob, q.name, { lo
  * that can't go for lack of signal is kept on the phone and sent when it's back: `onQueued` is told, and the result
  * comes when it finally goes.
  */
-export async function uploadFile(kind: FileKind, file: File, extra: { loadId?: string; expiresOn?: string; onQueued?: () => void } = {}): Promise<Uploaded> {
+export async function uploadFile(kind: FileKind, file: File, extra: { loadId?: string; expiresOn?: string; truckId?: string; onQueued?: () => void } = {}): Promise<Uploaded> {
   startQueue(sendQueued);
   const offline = typeof navigator !== "undefined" && !navigator.onLine;
   const first = offline ? ({ ok: false, reason: "", network: true } as const) : await send(kind, file, file.name, extra);

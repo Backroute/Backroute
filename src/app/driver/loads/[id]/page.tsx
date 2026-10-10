@@ -24,6 +24,8 @@ import { Lane } from "@/components/ui/lane";
 import { DocumentSlot } from "@/components/shared/driver-trip-card";
 import { ReceiptCapture, type ReadReceipt } from "@/components/driver/receipt-capture";
 import { usePayView } from "@/lib/pay-view";
+import { LoadSheet } from "@/components/shared/load-sheet";
+import { useDriverUi } from "@/lib/lang/use-driver-ui";
 
 const EXPENSE_CATEGORIES: { key: Expense["category"]; label: string }[] = [
   { key: "lumper", label: "Lumper fee" },
@@ -79,6 +81,7 @@ export default function DriverLoadDetailPage() {
   const [expenseNote, setExpenseNote] = useState("");
   const [receipt, setReceipt] = useState<ReadReceipt | null>(null);
   const pay = usePayView();
+  const { t } = useDriverUi();
 
   if (!load) {
     return (
@@ -197,6 +200,8 @@ export default function DriverLoadDetailPage() {
           </div>
         )}
       </SectionCard>
+
+      <LoadSheet load={load} labels={t} />
 
       <SectionCard title={pay.sees ? "Rate & earnings" : "Your pay"} icon={DollarSign}>
         <div className="flex flex-col gap-2.5">

@@ -7,6 +7,7 @@ import { paymentStatus } from "@/lib/payments";
 import { formatCurrency } from "@/lib/utils";
 import type { Load } from "@/lib/types";
 import { StatusMark } from "@/components/ui/mark";
+import { InvoiceActions } from "@/components/cloud/invoice-actions";
 
 /** Where the money for one delivered load is, step by step. */
 export function PaymentCard({ load }: { load: Load }) {
@@ -41,6 +42,7 @@ export function PaymentCard({ load }: { load: Load }) {
           <span className="font-semibold tabular text-ink-950">{formatCurrency(p.payout)}</span>
         </div>
         {p.factorDeclined && <p className="mt-2 text-xs text-ink-500">{p.factorDeclined}, so Backroute invoiced them directly.</p>}
+        <InvoiceActions load={load} />
       </CardContent>
     </Card>
   );

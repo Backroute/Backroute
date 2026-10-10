@@ -182,55 +182,68 @@ export async function sendInvoices(ctx: CarrierContext): Promise<string[]> {
     if (!pod && load.stage !== "cancelled") continue; // The check-ins ask the driver for it.
     if (!(await claimMark(ctx.carrier.id, load.id, "invoice"))) continue;
     try {
-      const to = ctx.settings.factoringEmail ?? billTo(ctx, load);
-      const broker = brokerOf(ctx, load);
-      if (!to) {
-        await passToOwner(ctx, { reason: `${load.referenceNumber} delivered and the POD is in, but there's no email anywhere to bill ${broker?.company ?? "the broker"}. Add their email on the load and Backroute sends it.`, loadId: load.id, label: "Added", source: "email", to: "owner" });
-        continue;
-      }
-      const number = `INV-${load.referenceNumber}`.replace(/[^\w-]/g, "");
-      const lines = invoiceLines(load);
-      const amount = lines.reduce((s, l) => s + l.amount, 0);
-      const fileId = await storeFile(ctx.carrier.id, { kind: "invoice", name: `${number}.pdf`, contentType: "application/pdf", bytes: invoicePdf(ctx, load, number, lines), loadId: load.id });
-      const bol = load.documents.find((d) => d.type === "bol" && d.fileId);
-      const lumper = load.documents.find((d) => d.type === "lumper_receipt" && d.amount && d.fileId);
-      // Factoring: the whole submission packet the factor asks for, the way a dispatcher sends it: a schedule of
-      // accounts on top, the invoice, the (signed) rate con, the signed POD and BOL, and any receipts billed.
-      const factoring = !!ctx.settings.factoringEmail;
-      const rateCon = factoring ? (await latestFiles(ctx.carrier.id, ["rate_con_signed", "rate_con"], load.id)).sort((a, b) => (a.kind === "rate_con_signed" ? -1 : b.kind === "rate_con_signed" ? 1 : 0))[0] : undefined;
-      const schedule = factoring ? await storeFile(ctx.carrier.id, { kind: "factoring_schedule", name: `${number}-schedule.pdf`, contentType: "application/pdf", bytes: schedulePdf(ctx, load, number, amount), loadId: load.id }) : null;
-      if (factoring && !rateCon)
-        await passToOwner(ctx, { reason: `${load.referenceNumber}'s invoice packet went to your factoring company without the rate con (there's none on file). Send it to them, or upload it on the load, so they don't hold the advance.`, loadId: load.id, label: "Sent it", source: "email", to: "owner" });
-      const withInvoice: Load = { ...load, invoice: { number, amount, lines, draftedAt: new Date().toISOString() }, updatedAt: new Date().toISOString() };
-      await save("loads", ctx.carrier.id, withInvoice as unknown as Item);
-      ctx.loads = ctx.loads.map((l) => (l.id === load.id ? withInvoice : l));
-      const result = await sendOrQueue(ctx, {
-        purpose: factoring ? "factoring" : "invoice",
-        to,
-        subject: factoring ? `Invoice packet ${number}: ${brokerOf(ctx, load)?.company ?? "broker"}, load ${load.referenceNumber}` : mail.subjectFor(load, `Invoice ${number}`),
-        body: factoring ? mail.factoringEmail(ctx.carrier, ctx.settings, load, number, amount, brokerOf(ctx, load), !!rateCon) : mail.invoiceEmail(ctx.carrier, ctx.settings, load, number, amount, false, lines),
-        loadId: load.id,
-        amount,
-        attachments: [
-          ...(schedule ? [{ fileId: schedule, name: `${number}-schedule.pdf` }] : []),
-          { fileId, name: `${number}.pdf` },
-          ...(rateCon ? [{ fileId: rateCon.id, name: rateCon.name }] : []),
-          ...(pod ? [{ fileId: pod.fileId!, name: pod.name }] : []),
-          ...(bol ? [{ fileId: bol.fileId!, name: bol.name }] : []),
-          ...(lumper ? [{ fileId: lumper.fileId!, name: lumper.name }] : []),
-        ],
-        // A POD with something written on it (a shortage, damage, no signature) waits for the owner.
-        withinRules: !pod?.flagged,
-        rule: "invoice_noted_pod",
-        why: pod?.flagged ? `Invoice ${number} for ${load.referenceNumber} is ready, but check the POD first: ${pod.aiNote ?? "the AI saw a problem on it"}.` : `Invoice ${number} for ${load.referenceNumber}, $${amount.toLocaleString()}, is ready to send${pod ? " with the POD" : ""}.`,
-      });
-      done.push(`${load.referenceNumber}: invoice ${result}`);
+      const result = await sendInvoice(ctx, load, {});
+      if (result) done.push(`${load.referenceNumber}: invoice ${result}`);
     } catch (error) {
       console.error("[paperwork] invoice failed", load.id, error);
       await releaseMark(ctx.carrier.id, load.id, "invoice");
     }
   }
   return done;
+}
+
+/**
+ * Makes a load's invoice (or uses the one already made) and sends it with its papers: to the broker, or as the
+ * factoring packet. The owner can send it again from Getting paid, to another address (the broker's accounts payable)
+ * or to the factoring company; what they ask for goes at once.
+ */
+export async function sendInvoice(ctx: CarrierContext, load: Load, opts: { to?: string; factoring?: boolean; ownerAsked?: boolean }): Promise<"sent" | "queued" | null> {
+  const factoring = opts.factoring ?? !!ctx.settings.factoringEmail;
+  const to = opts.to ?? (factoring ? ctx.settings.factoringEmail : billTo(ctx, load)) ?? billTo(ctx, load);
+  const broker = brokerOf(ctx, load);
+  if (!to) {
+    await passToOwner(ctx, { reason: `${load.referenceNumber} delivered and the POD is in, but there's no email anywhere to bill ${broker?.company ?? "the broker"}. Add their email on the load and Backroute sends it.`, loadId: load.id, label: "Added", source: "email", to: "owner" });
+    return null;
+  }
+  const pod = load.documents.find((d) => d.type === "pod" && d.fileId && d.status === "verified");
+  const number = load.invoice?.number ?? `INV-${load.referenceNumber}`.replace(/[^\w-]/g, "");
+  const lines = load.invoice?.lines ?? invoiceLines(load);
+  const amount = load.invoice?.amount ?? lines.reduce((s, l) => s + l.amount, 0);
+  const fileId = (await latestFiles(ctx.carrier.id, ["invoice"], load.id))[0]?.id ?? (await storeFile(ctx.carrier.id, { kind: "invoice", name: `${number}.pdf`, contentType: "application/pdf", bytes: invoicePdf(ctx, load, number, lines), loadId: load.id }));
+  const bol = load.documents.find((d) => d.type === "bol" && d.fileId);
+  const lumper = load.documents.find((d) => d.type === "lumper_receipt" && d.amount && d.fileId);
+  // Factoring: the whole submission packet the factor asks for, the way a dispatcher sends it: a schedule of
+  // accounts on top, the invoice, the (signed) rate con, the signed POD and BOL, and any receipts billed.
+  const rateCon = factoring ? (await latestFiles(ctx.carrier.id, ["rate_con_signed", "rate_con"], load.id)).sort((a, b) => (a.kind === "rate_con_signed" ? -1 : b.kind === "rate_con_signed" ? 1 : 0))[0] : undefined;
+  const schedule = factoring ? await storeFile(ctx.carrier.id, { kind: "factoring_schedule", name: `${number}-schedule.pdf`, contentType: "application/pdf", bytes: schedulePdf(ctx, load, number, amount), loadId: load.id }) : null;
+  if (factoring && !rateCon)
+    await passToOwner(ctx, { reason: `${load.referenceNumber}'s invoice packet went to your factoring company without the rate con (there's none on file). Send it to them, or upload it on the load, so they don't hold the advance.`, loadId: load.id, label: "Sent it", source: "email", to: "owner" });
+  if (!load.invoice || load.invoice.fileId !== fileId) {
+    const withInvoice: Load = { ...load, invoice: { ...(load.invoice ?? { draftedAt: new Date().toISOString() }), number, amount, lines, fileId }, updatedAt: new Date().toISOString() };
+    await save("loads", ctx.carrier.id, withInvoice as unknown as Item);
+    ctx.loads = ctx.loads.map((l) => (l.id === load.id ? withInvoice : l));
+  }
+  return sendOrQueue(ctx, {
+    purpose: factoring ? "factoring" : "invoice",
+    to,
+    subject: factoring ? `Invoice packet ${number}: ${broker?.company ?? "broker"}, load ${load.referenceNumber}` : mail.subjectFor(load, `Invoice ${number}`),
+    body: factoring ? mail.factoringEmail(ctx.carrier, ctx.settings, load, number, amount, broker, !!rateCon) : mail.invoiceEmail(ctx.carrier, ctx.settings, load, number, amount, false, lines),
+    loadId: load.id,
+    amount,
+    attachments: [
+      ...(schedule ? [{ fileId: schedule, name: `${number}-schedule.pdf` }] : []),
+      { fileId, name: `${number}.pdf` },
+      ...(rateCon ? [{ fileId: rateCon.id, name: rateCon.name }] : []),
+      ...(pod ? [{ fileId: pod.fileId!, name: pod.name }] : []),
+      ...(bol ? [{ fileId: bol.fileId!, name: bol.name }] : []),
+      ...(lumper ? [{ fileId: lumper.fileId!, name: lumper.name }] : []),
+    ],
+    ownerAsked: opts.ownerAsked,
+    // A POD with something written on it (a shortage, damage, no signature) waits for the owner.
+    withinRules: !pod?.flagged,
+    rule: "invoice_noted_pod",
+    why: pod?.flagged ? `Invoice ${number} for ${load.referenceNumber} is ready, but check the POD first: ${pod.aiNote ?? "the AI saw a problem on it"}.` : `Invoice ${number} for ${load.referenceNumber}, $${amount.toLocaleString()}, is ready to send${pod ? " with the POD" : ""}.`,
+  });
 }
 
 // ─── Detention ───────────────────────────────────────────────────────────────
@@ -247,8 +260,11 @@ function detentionTerms(text: string | null | undefined): { perHour: number | nu
 function dwell(load: Load): { stop: "pickup" | "delivery"; arrived: string; left: string; minutes: number }[] {
   const c = load.tripChecklist;
   const out: { stop: "pickup" | "delivery"; arrived: string; left: string; minutes: number }[] = [];
-  if (c?.arrivedPickupAt && c.loadedAt) out.push({ stop: "pickup", arrived: c.arrivedPickupAt, left: c.loadedAt, minutes: Math.round((Date.parse(c.loadedAt) - Date.parse(c.arrivedPickupAt)) / 60000) });
-  if (c?.arrivedDeliveryAt && c.unloadedAt) out.push({ stop: "delivery", arrived: c.arrivedDeliveryAt, left: c.unloadedAt, minutes: Math.round((Date.parse(c.unloadedAt) - Date.parse(c.arrivedDeliveryAt)) / 60000) });
+  // Out of the gate is when the truck was released: the ELD's time leaving the lot when there is one, else the driver's tap.
+  const outP = c?.leftPickupAt ?? c?.loadedAt;
+  const outD = c?.leftDeliveryAt ?? c?.unloadedAt;
+  if (c?.arrivedPickupAt && outP && c.loadedAt) out.push({ stop: "pickup", arrived: c.arrivedPickupAt, left: outP, minutes: Math.round((Date.parse(outP) - Date.parse(c.arrivedPickupAt)) / 60000) });
+  if (c?.arrivedDeliveryAt && outD && c.unloadedAt) out.push({ stop: "delivery", arrived: c.arrivedDeliveryAt, left: outD, minutes: Math.round((Date.parse(outD) - Date.parse(c.arrivedDeliveryAt)) / 60000) });
   return out;
 }
 

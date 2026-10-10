@@ -184,6 +184,8 @@ export interface Driver {
   /** The dates their CDL and DOT medical card run out. */
   cdlExpires?: string;
   medCardExpires?: string;
+  /** The endorsements on their CDL (H hazmat, N tanker, T doubles/triples, X hazmat + tanker) and a TWIC card for ports. */
+  endorsements?: Endorsement[];
   /** How they're paid for tax: contractors (1099) get a 1099-NEC each January; employees (W-2) are payroll's. */
   taxForm?: "1099" | "w2";
   /** Taken out of each pay run (insurance, ELD, truck lease) unless "once", which comes out of the next one only. */
@@ -191,6 +193,8 @@ export interface Driver {
   /** Held back each pay run up to a cap and paid back when they leave: per run, the cap, and what's held so far. */
   escrow?: { perRun: number; cap: number; held: number };
 }
+
+export type Endorsement = "H" | "N" | "T" | "X" | "TWIC";
 
 /** Truck GPS apps only (lib/nav-apps): car apps route trucks onto roads they can't use. */
 export type NavApp = "sygic" | "copilot";
@@ -556,6 +560,11 @@ export interface TripChecklist {
   loadedAt?: string;
   unloadedAt?: string;
   sealNumber?: string;
+  /** When the truck drove out of the dock's lot, from the ELD: the "out" time for detention. */
+  leftPickupAt?: string;
+  leftDeliveryAt?: string;
+  /** Which of the times above came from the ELD's GPS rather than the driver's tap. */
+  fromEld?: ("arrivedPickupAt" | "leftPickupAt" | "arrivedDeliveryAt" | "leftDeliveryAt")[];
   /** Stops where the AI has already told the broker free time ran out. */
   detentionNoticeSent?: ("pickup" | "delivery")[];
 }
@@ -726,6 +735,8 @@ export interface Load {
    *  never to the middle of the city. */
   pickupAddress?: string;
   deliveryAddress?: string;
+  /** The docks' exact spots, found from their street addresses once (null: looked up, not found). */
+  dockPoints?: Partial<Record<"pickup" | "delivery", { lat: number; lon: number } | null>>;
   /** Real accounts: the truck won't make a stop on time (from the ELD): which, the new arrival, when everyone was told. */
   late?: { stop: "pickup" | "delivery"; eta: string; at: string };
   /** Real accounts: why the AI went for this load, or answered the broker the way it did, in plain words (lib/agent/why). */
@@ -1066,6 +1077,16 @@ export interface RateConPdfReading {
   shipperAddress?: string | null;
   receiverAddress?: string | null;
   appointmentNeeded?: "pickup" | "delivery" | "both" | "none";
+  /** What the docks ask the driver for: the pickup number (PU/PO/release #) and the delivery number (PO/appointment #). */
+  pickupNumber?: string | null;
+  deliveryNumber?: string | null;
+  /** Every other number printed for the load: BOL #, PO #, PRO #, seal #… */
+  referenceNumbers?: { label: string; value: string }[];
+  commodity?: string | null;
+  weightLbs?: number | null;
+  pieces?: string | null;
+  /** What the driver must do or bring: PPE, load locks, seal rules, check-in rules… */
+  specialInstructions?: string[];
   /** A refrigerated load's temperature terms, when the rate con has them. */
   reefer?: ReeferTerms | null;
   finesAndFees: string[];
@@ -1096,6 +1117,8 @@ export interface LoadInvoice {
   paidAt?: string;
   /** What the broker actually paid, when they said (it can be short). */
   paidAmount?: number;
+  /** The invoice PDF. */
+  fileId?: string;
   /** Payment reminders sent, oldest first. */
   remindedAt?: string[];
 }

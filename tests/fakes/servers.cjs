@@ -13,6 +13,8 @@ const READING = {
   paymentTerms: "Net 45", finesAndFees: ["$250 late fee per hour"], mismatches: [], otherConcerns: ["Tracking app required"],
   summary: "Rate con for Dallas to Memphis, $1,850. Detention is worse than usual.",
   shipper: null, receiver: null, shipperPhone: null, receiverPhone: null, appointmentNeeded: "none", reefer: null, shipperZip: null, receiverZip: null, shipperAddress: null, receiverAddress: null,
+  pickupNumber: "PU-55120", deliveryNumber: "PO 88213-A", referenceNumbers: [{ label: "BOL #", value: "BOL-7781" }], commodity: "Paper products", weightLbs: 38000, pieces: "22 pallets",
+  specialInstructions: ["Hard hat and vest at the shipper", "Two load locks"],
 };
 
 // Dates the stand-in reads off documents: "YYYY-MM-DDTHH:mm", some days from now.

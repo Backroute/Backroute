@@ -5,6 +5,7 @@ import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import { estimateMiles, guessEquipment, makeBroker, makeLoad } from "../fleet";
 import { NEW_LOAD, SLOW_DOCK } from "../channels/phrases";
+import { dispatchStops } from "../dispatch-checks";
 import { absoluteUrl } from "../channels/twilio";
 import { canCall, canText, textTo } from "../channels/out";
 import { formatAtStop, stopLocalToIso } from "../stop-time";
@@ -163,6 +164,8 @@ function worthOn(ctx: CarrierContext, l: Load, truck: Truck, deadhead: number, n
   const net = (l.netProfit ?? 0) + Math.round((l.deadheadMiles - deadhead) * 0.68);
   const reload = reloadValue(reloadOutlook(ctx.loads, l.lane.destination, l.lane.destState, l.equipmentType, now.getTime()).outlook);
   const driver = ctx.drivers.find((d) => d.id === truck.driverId);
+  // Never on a driver who can't legally run it: an expired card, a missing endorsement, out of hours for the week.
+  if (driver && dispatchStops(l, driver, now.getTime()).length) return null;
   if (!driver?.homeBase) return net + reload;
   const at = new Date(Math.max(now.getTime(), Date.parse(l.deliveryAt ?? l.pickupAt ?? "") || 0));
   const local = driver.runType === "local" || driver.runType === "intown";
@@ -533,6 +536,10 @@ export async function bookIt(ctx: CarrierContext, load: Load, rate?: number): Pr
     }
   }
   await addActivity(ctx.carrier.id, event({ type: "booked", loadId: load.id, message: `Booked: ${load.lane.origin} → ${load.lane.destination}`, detail: `${truck?.unitNumber ?? ""} · $${agreed.toLocaleString()}`, severity: "success" }));
+  // The dispatcher's checks on the driver it's going to: a stop is the owner's to sort before the truck rolls.
+  const assigned = ctx.drivers.find((d) => d.id === truck?.driverId);
+  const stops = assigned ? dispatchStops(booked, assigned, Date.now()) : [];
+  if (stops.length) await passToOwner(ctx, { reason: `${booked.referenceNumber} is on ${assigned!.name}'s truck, but: ${stops.map((c) => `${c.label}: ${c.detail}`).join(" ")} Swap the driver or sort it before pickup.`, loadId: load.id, label: "Sorted", source: "email", to: "owner" });
   if (newlyHard.length) await passToOwner(ctx, { reason: `Heads-up on ${load.referenceNumber}: ${newlyHard.map((w) => w.text).join(" ")}`, loadId: load.id, label: "Checked", source: "email", to: "owner" });
   // Riding along: the driver hears where it fits in the trip, and about any freight that has to be moved to get it out.
   const before = joins?.after ? ctx.loads.find((l) => l.id === joins.after) : undefined;
@@ -541,6 +548,19 @@ export async function bookIt(ctx: CarrierContext, load: Load, rate?: number): Pr
   // And a call, the way a dispatcher rings with the next load (one call for a plan booked together).
   await callDriverAbout(ctx, booked, "next_load").catch((e) => console.error("[booking] new-load call failed", e));
   return { load: booked, truck: truckAfter };
+}
+
+/** The load sheet in a line, for the driver's new-load text: the numbers the docks ask for and the must-dos. Never the rate. */
+export function sheetLine(load: Load): string | null {
+  const r = load.rateConReading;
+  if (!r) return null;
+  const parts = [
+    r.pickupNumber ? `Pickup # ${r.pickupNumber}.` : null,
+    r.deliveryNumber ? `Delivery # ${r.deliveryNumber}.` : null,
+    r.commodity ? `Freight: ${[r.commodity, r.pieces].filter(Boolean).join(", ")}.` : null,
+    r.specialInstructions?.length ? `Must do: ${r.specialInstructions.slice(0, 4).join("; ")}.` : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(" ") : null;
 }
 
 /** The driver's text about a new load, in their language. False when it couldn't go (no texting, no number, STOP). */
@@ -555,7 +575,7 @@ export async function textNewLoad(ctx: CarrierContext, load: Load, tripNote?: st
   // The shared record from every carrier on Backroute fills in docks this carrier hasn't been to.
   const slow = (await slowDocksAnywhere(ctx, load).catch(() => slowDocks(ctx.loads, load))).map((f) => SLOW_DOCK[lang]({ name: f.name, hours: (Math.round(f.avgMinutes / 30) / 2).toString() }));
   // What the driver should know before they go: the reefer setting, and what other drivers said about the docks.
-  const extra = [tripNote, reeferLine(load), ...(await tipsForLoad(load).catch(() => [])), ...(load.scheduleWarnings ?? []).filter((w) => !w.hard).map((w) => w.text)].filter(Boolean).join(" ");
+  const extra = [tripNote, sheetLine(load), reeferLine(load), ...(await tipsForLoad(load).catch(() => [])), ...(load.scheduleWarnings ?? []).filter((w) => !w.hard).map((w) => w.text)].filter(Boolean).join(" ");
   const text = [NEW_LOAD[lang]({
     ref: load.referenceNumber,
     from: `${load.lane.origin}, ${load.lane.originState}`,

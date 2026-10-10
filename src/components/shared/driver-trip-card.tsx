@@ -22,6 +22,8 @@ import { autoCrop, pagesToPdf } from "@/lib/doc-scan";
 import { QuickPreTrip } from "@/components/driver/quick-pretrip";
 import { Lane } from "@/components/ui/lane";
 import { usePayView } from "@/lib/pay-view";
+import { useDriverUi } from "@/lib/lang/use-driver-ui";
+import { hasSheet, LoadSheet, SHEET_EN } from "./load-sheet";
 
 /** `file` goes to the server in a real account; the demo only keeps the name and a preview. */
 export type UploadedFile = { name: string; previewUrl?: string; file?: File };
@@ -146,6 +148,7 @@ function PickupCard({ load, brokerName, truckCity, truckState, needsPreTrip, vie
         aside={!arrived ? s.drive : undefined}
       />
       <CompletionBar value={s.done / s.total} caption={s.ready ? (readOnly ? "Ready to roll" : "All set, swipe to start the trip") : `${Math.floor(s.done)} of ${s.total} done`} />
+      <TripSheet load={load} viewer={viewer} />
 
       <ol className="mt-5">
         {needsPreTrip && (
@@ -198,6 +201,13 @@ function PickupCard({ load, brokerName, truckCity, truckState, needsPreTrip, vie
   );
 }
 
+/** The rate con's numbers and must-dos on the trip card, in the driver's language. Nothing when the rate con had none. */
+function TripSheet({ load, viewer }: { load: Load; viewer: "driver" | "carrier" }) {
+  const { t } = useDriverUi();
+  if (!hasSheet(load)) return null;
+  return <LoadSheet load={load} tone="dark" labels={viewer === "driver" ? t : SHEET_EN} className="mt-4" />;
+}
+
 // ---------- Delivery ----------
 
 function DeliveryCard({ load, brokerName, upNext, viewer = "driver", driverName, onCall, onConfirm, onTripStep, onUpload, s }: DriverTripCardProps & { s: TripState }) {
@@ -225,6 +235,7 @@ function DeliveryCard({ load, brokerName, upNext, viewer = "driver", driverName,
         aside={!arrived ? s.drive : undefined}
       />
       <CompletionBar value={s.done / s.total} caption={s.ready ? (readOnly ? "Ready to close out" : "All set, swipe to complete") : `${Math.floor(s.done)} of ${s.total} done`} />
+      <TripSheet load={load} viewer={viewer} />
 
       <ol className="mt-5">
         <Step state={arrived ? "done" : "current"} title="Drive to the receiver" detail={arrived ? "Checked in" : s.drive} />

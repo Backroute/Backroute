@@ -15,6 +15,7 @@ import { complianceReminders } from "./compliance";
 import { pullStatements } from "./costs";
 import { quickbooksRound } from "./quickbooks";
 import { mailboxRound } from "./mailbox";
+import { eldDockTimes } from "./geofence";
 import { parkingReminders } from "./parking";
 import { makeContractLoads } from "./contracts";
 import { marksFor, type CarrierContext } from "./db";
@@ -76,6 +77,8 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
       await setStatus(id, kind, `Not working: ${e instanceof Error ? e.message : "error"}`);
     }
   }
+  // Pulling into and out of a dock's lot, from the ELD's GPS: the dock times for detention, and "arrived" for the driver.
+  if (links.some((l) => l.kind === "samsara" || l.kind === "motive")) done.push(...(await eldDockTimes(ctx, now).catch((e) => (console.error("[rounds] ELD dock times failed", e), []))));
   for (const link of links.filter((l) => l.kind === "load_feed")) {
     try {
       const cfg = link.config as FeedConfig;

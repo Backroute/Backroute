@@ -56,6 +56,13 @@ const Reading = z.object({
     })
     .nullable()
     .describe("For a refrigerated load: its temperature terms as printed. Null when the load isn't temperature-controlled or no temperature is given."),
+  pickupNumber: z.string().nullable().describe("The number the shipper asks the driver for at pickup (pickup #, PU #, PO #, release or order number), as printed; null if none."),
+  deliveryNumber: z.string().nullable().describe("The number the receiver asks for at delivery (delivery #, PO #, appointment or confirmation number), as printed; null if none."),
+  referenceNumbers: z.array(z.object({ label: z.string().describe("What it's called on the document: BOL #, PO #, PRO #, Customer ref, Seal #…"), value: z.string() })).describe("Every other reference number printed for the load, besides the broker's load number."),
+  commodity: z.string().nullable().describe("What the freight is (e.g. \"Paper products\", \"Frozen chicken\"), as printed; null if not on it."),
+  weightLbs: z.number().nullable().describe("The freight's weight in pounds (convert from kg), or null."),
+  pieces: z.string().nullable().describe("How many pallets, pieces or cases, as printed (e.g. \"22 pallets\"); null if not on it."),
+  specialInstructions: z.array(z.string()).describe("What the driver must do or bring, in short plain lines: PPE, load locks or straps, no double brokering, seal rules, tracking app, check-in rules, driver-assist or lumper, hazmat, team required. Empty if none."),
   appointmentNeeded: z.enum(["pickup", "delivery", "both", "none"]).describe("A stop the carrier still has to call to book an appointment for (e.g. 'call for appt', 'appointment required' with no time given); none if every stop has a time or is first come, first served."),
   finesAndFees: z.array(z.string()),
   mismatches: z.array(z.object({ item: z.string(), agreed: z.string(), onDoc: z.string(), serious: z.boolean() })),

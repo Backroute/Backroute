@@ -4,7 +4,10 @@ import { checkStopDocument } from "@/lib/ai/doc-check";
 import { admin, dbConfigured } from "@/lib/agent/db";
 import { caller } from "@/lib/agent/user";
 
-const Kind = z.enum(["w9", "coi", "authority", "noa", "voided_check", "bol", "pod", "lumper_receipt", "receipt", "dvir_photo", "other"]);
+const Kind = z.enum(["w9", "coi", "authority", "noa", "voided_check", "bol", "pod", "lumper_receipt", "receipt", "dvir_photo", "cab_card", "insurance_card", "ifta_license", "annual_inspection", "other"]);
+/** The papers a driver shows at a roadside inspection, for one truck or the whole fleet (lib/cloud/files TRUCK_PAPERS). */
+const TRUCK_PAPERS = ["cab_card", "insurance_card", "ifta_license", "annual_inspection"];
+const OFFICE_PAPERS = ["w9", "coi", "authority", "noa", "voided_check", ...TRUCK_PAPERS];
 const STOP_DOCS = new Set(["bol", "pod", "lumper_receipt"]);
 /** What a driver photographs on the road that isn't tied to a stop: a receipt for an expense, an inspection defect. */
 const ROAD_PHOTOS = new Set(["receipt", "dvir_photo"]);
@@ -27,6 +30,7 @@ export async function POST(request: Request) {
   const kind = Kind.safeParse(form?.get("kind"));
   const loadId = form?.get("loadId") ? String(form.get("loadId")) : null;
   const expiresOn = form?.get("expiresOn") ? String(form.get("expiresOn")) : null;
+  const truckId = form?.get("truckId") ? String(form.get("truckId")) : null;
   if (!(file instanceof File) || !kind.success) return Response.json({ error: "bad_request" }, { status: 400 });
   if (file.size > MAX) return Response.json({ error: "too_large" }, { status: 413 });
   if (!TYPES.has(file.type)) return Response.json({ error: "type" }, { status: 415 });
@@ -45,6 +49,11 @@ export async function POST(request: Request) {
       if (!data) return Response.json({ error: "not_found" }, { status: 404 });
     }
   } else if (!office) return Response.json({ error: "office_only" }, { status: 403 });
+  if (truckId) {
+    if (!TRUCK_PAPERS.includes(kind.data)) return Response.json({ error: "bad_request" }, { status: 400 });
+    const { data } = await who.db.from("trucks").select("id").eq("id", truckId).eq("carrier_id", who.me.carrierId).maybeSingle();
+    if (!data) return Response.json({ error: "not_found" }, { status: 404 });
+  }
 
   const bytes = Buffer.from(await file.arrayBuffer());
   let note: string | null = null;
@@ -71,22 +80,25 @@ export async function POST(request: Request) {
   }
   const { data: row, error } = await admin()
     .from("carrier_files")
-    .insert({ carrier_id: who.me.carrierId, kind: kind.data, load_id: loadId, name: file.name, content_type: file.type, size: file.size, data: bytes.toString("base64"), expires_on: expiresOn, note, uploaded_by: who.me.userId })
+    .insert({ carrier_id: who.me.carrierId, kind: kind.data, load_id: loadId, name: file.name, content_type: file.type, size: file.size, data: bytes.toString("base64"), expires_on: expiresOn, note, uploaded_by: who.me.userId, truck_id: truckId })
     .select("id")
     .single();
   if (error) return Response.json({ error: "save_failed" }, { status: 500 });
   return Response.json({ id: row.id, status, note, amount });
 }
 
-/** The carrier's own paperwork on file (not the file contents). Office only. */
+/**
+ * The carrier's own paperwork on file (not the file contents). The office sees all of it; a driver sees only the
+ * papers for their own truck (the access rules decide), to show at a roadside inspection.
+ */
 export async function GET(request: Request) {
   const who = await caller(request);
-  if (!who || who.me.role === "driver") return Response.json({ error: "sign_in" }, { status: 401 });
+  if (!who) return Response.json({ error: "sign_in" }, { status: 401 });
   const { data } = await who.db
     .from("carrier_files")
-    .select("id, kind, name, size, expires_on, created_at")
+    .select("id, kind, name, size, expires_on, created_at, truck_id")
     .eq("carrier_id", who.me.carrierId)
-    .in("kind", ["w9", "coi", "authority", "noa", "voided_check"])
+    .in("kind", who.me.role === "driver" ? TRUCK_PAPERS : OFFICE_PAPERS)
     .order("created_at", { ascending: false });
   return Response.json({ files: data ?? [] });
 }

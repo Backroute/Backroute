@@ -64,3 +64,19 @@ export async function answerDraft(escalationId: string, send: boolean, body?: st
     return "Couldn't do that. Check your connection and try again.";
   }
 }
+
+const INVOICE_REASON: Record<string, string> = {
+  email_off: "Email isn't switched on yet, so it can't be sent.",
+  no_factor: "Add your factoring company's email in Settings → Company first.",
+  no_address: "There's no email to send it to. Type the broker's billing address.",
+  not_sent: "That invoice hasn't gone out yet.",
+  already_paid: "That one is already marked paid.",
+  not_billable: "That load isn't ready to bill yet.",
+  sign_in: "Only the office can do that.",
+};
+
+/** One invoice, from Getting paid: send it again (to another address), send it to factoring, remind, or mark paid. */
+export async function invoiceAction(body: { action: "resend"; loadId: string; to?: string } | { action: "factor" | "remind"; loadId: string } | { action: "paid"; loadId: string; amount: number; paidOn?: string }): Promise<string | null> {
+  const r = await call("/api/agent/invoice", body);
+  return r.ok ? null : (INVOICE_REASON[r.error] ?? "Couldn't do that. Check your connection and try again.");
+}

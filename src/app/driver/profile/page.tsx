@@ -1,5 +1,6 @@
 "use client";
 
+import { PapersWallet } from "@/components/driver/papers-wallet";
 import { useState } from "react";
 import { CalendarClock, DollarSign, Home, Phone, Star, Users } from "lucide-react";
 import { CallSettingsCard, LanguageCard } from "@/components/shared/call-settings";
@@ -89,6 +90,8 @@ export default function DriverProfilePage() {
         <Progress value={(driver.hoursRemaining / 11) * 100} className="mt-2" />
         <p className="mt-1.5 text-xs text-ink-400">{driver.hoursRemaining.toFixed(1)} hours remaining today</p>
       </div>
+
+      <PapersWallet />
 
       <BusinessCard />
 
