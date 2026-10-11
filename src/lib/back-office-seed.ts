@@ -21,6 +21,16 @@ export function seedBackOffice(input: { trucks: Truck[]; drivers: Driver[]; load
       medCardExpires: day(i === 1 ? 12 : 180 + i * 29),
       taxForm: d.payType === "hourly" ? "w2" : "1099",
     };
+    // A few sample driving events from the ELD, one already talked through.
+    if (i === 0)
+      extra.safetyEvents = [
+        { id: `demo-se-${d.id}-1`, at: new Date(now - 26 * 3600_000).toISOString(), kind: "harsh_brake", label: "Harsh Brake", source: "demo" },
+        { id: `demo-se-${d.id}-2`, at: new Date(now - 4 * DAY).toISOString(), kind: "speeding", label: "Speeding 9 mph over", source: "demo", coached: { at: new Date(now - 3 * DAY).toISOString(), note: "Talked on the phone" } },
+      ];
+    if (i === 2) extra.safetyEvents = [{ id: `demo-se-${d.id}-1`, at: new Date(now - 2 * DAY).toISOString(), kind: "following", label: "Following distance", source: "demo" }];
+    // The driver file's yearly checks, one coming due.
+    extra.mvrAt = day(i === 0 ? -350 : -120 - i * 20);
+    extra.clearinghouseAt = day(-200 - i * 11);
     if (i === 0)
       Object.assign(extra, {
         deductions: [

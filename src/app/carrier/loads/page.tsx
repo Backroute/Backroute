@@ -10,7 +10,6 @@ import { Tabs } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadStagePill } from "@/components/shared/load-stage";
-import { TimeAgo } from "@/components/shared/time-ago";
 import { LoadScoreBadge } from "@/components/shared/load-score";
 import { NextLoadOffers } from "@/components/shared/next-load-offers";
 import { useCarrierLoads, useBrokerMap, useTruckMap, useDriverMap, usePrimaryCarrier, useCarrierTrucks } from "@/lib/selectors";
@@ -57,7 +56,7 @@ function nextStop(load: Load, now: number): { kind: "pickup" | "delivery"; when:
 }
 
 const GROUPS: { key: string; label: string; stages: LoadStage[] | "all" }[] = [
-  { key: "active", label: "Active", stages: ["sourced", "scoring", "offered", "negotiating", "rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery"] },
+  { key: "active", label: "Active", stages: ["negotiating", "rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery"] },
   { key: "offers", label: "Offers", stages: ["offered"] },
   { key: "negotiating", label: "Negotiating", stages: ["negotiating"] },
   { key: "booked", label: "Booked", stages: ["rate_confirmed", "booked"] },
@@ -112,6 +111,9 @@ export default function CarrierLoadsPage() {
     const n = now === null ? null : nextStop(load, now);
     return n ? `${n.kind === "pickup" ? "Pickup" : "Delivery"} ${n.when}` : null;
   };
+  // The column is only ever a stop and its time; a load with no stop ahead says why, never "11m ago".
+  const noNext = (load: Load) =>
+    load.stage === "delivered" ? "Delivered" : load.stage === "cancelled" ? "Cancelled" : load.stage === "declined" ? "Passed" : load.stage === "offered" ? "Pick one" : "Time not set";
 
   const offerGroups = useMemo(() => {
     if (group !== "offers") return [];
@@ -187,7 +189,7 @@ export default function CarrierLoadsPage() {
                           {driverOf(truck) ? ` · ${driverOf(truck)}` : ""}
                         </span>
                       )}
-                      <span className="ml-auto shrink-0 text-xs text-ink-500">{nextLabel(load) ?? <TimeAgo iso={load.updatedAt} />}</span>
+                      <span className="ml-auto shrink-0 text-xs text-ink-500">{nextLabel(load) ?? noNext(load)}</span>
                     </div>
                     <div className="mt-3 flex items-center gap-4 border-t border-line pt-3 text-xs">
                       <span className="text-ink-500">
@@ -221,7 +223,7 @@ export default function CarrierLoadsPage() {
                   <th className="px-5 py-3 font-medium">Truck</th>
                   <th className="px-5 py-3 font-medium text-right">Rate</th>
                   <th className="px-5 py-3 font-medium text-right">You keep</th>
-                  <th className="px-5 py-3 font-medium text-right">Next</th>
+                  <th className="px-5 py-3 font-medium text-right">Next stop</th>
                 </tr>
               </thead>
               <tbody>
@@ -252,7 +254,7 @@ export default function CarrierLoadsPage() {
                       <td className="px-5 py-3.5 text-right tabular">
                         {load.netProfit ? <span className={load.netProfit > 0 ? "text-ink-950" : "text-[var(--accent-danger)]"}>{formatCurrency(load.netProfit)}</span> : <span className="text-ink-300">—</span>}
                       </td>
-                      <td className="px-5 py-3.5 text-right text-xs text-ink-500">{nextLabel(load) ?? <TimeAgo iso={load.updatedAt} />}</td>
+                      <td className="px-5 py-3.5 text-right text-xs text-ink-500">{nextLabel(load) ?? noNext(load)}</td>
                     </tr>
                   );
                 })}

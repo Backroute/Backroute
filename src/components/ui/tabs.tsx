@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export function Tabs({
@@ -13,8 +14,26 @@ export function Tabs({
   onChange: (key: string) => void;
   className?: string;
 }) {
+  const row = useRef<HTMLDivElement>(null);
+  // On a phone the row can run past the edge: a fade on the side with more tabs says so, and the picked tab scrolls in.
+  const [more, setMore] = useState({ left: false, right: false });
+  useEffect(() => {
+    const el = row.current;
+    if (!el) return;
+    const look = () => setMore({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+    look();
+    el.querySelector<HTMLElement>('[aria-pressed="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    el.addEventListener("scroll", look, { passive: true });
+    window.addEventListener("resize", look);
+    return () => {
+      el.removeEventListener("scroll", look);
+      window.removeEventListener("resize", look);
+    };
+  }, [active, tabs.length]);
+
   return (
-    <div className={cn("flex items-center gap-1 overflow-x-auto no-scrollbar", className)}>
+    <div className={cn("relative", className)}>
+    <div ref={row} className="flex items-center gap-1 overflow-x-auto no-scrollbar">
       {tabs.map((tab) => (
         <button
           key={tab.key}
@@ -39,6 +58,9 @@ export function Tabs({
           )}
         </button>
       ))}
+    </div>
+      {more.left && <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[var(--background)] to-transparent" />}
+      {more.right && <span aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[var(--background)] to-transparent" />}
     </div>
   );
 }

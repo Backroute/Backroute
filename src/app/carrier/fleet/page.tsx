@@ -2,7 +2,8 @@
 
 import { TruckPapers } from "@/components/cloud/truck-papers";
 import Link from "next/link";
-import { Home, Link2, MapPin, Phone, Sparkles, Users } from "lucide-react";
+import { ChevronDown, ChevronRight, Home, Link2, MapPin, Phone, Sparkles, Users } from "lucide-react";
+import { safetySummary } from "@/lib/safety";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { AddTruckButton } from "@/components/cloud/add-truck";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,11 +14,9 @@ import { LoadStagePill } from "@/components/shared/load-stage";
 import { DriverCheckInCard, useDriverRetention } from "@/components/shared/driver-retention";
 import { emptiesAt, homeTimeLine, homeTimeTitle } from "@/components/shared/home-time";
 import { homeTimeStatus } from "@/lib/home";
-import { RUN_TYPE_DETAIL, RUN_TYPE_LABEL, RUN_TYPES } from "@/lib/run-types";
+import { RUN_TYPE_LABEL } from "@/lib/run-types";
 import { useStore } from "@/lib/store";
 import { payLabel } from "@/lib/settlements";
-import type { Lang, RunType } from "@/lib/types";
-import { LANGS } from "@/lib/lang";
 import { useCarrierTrucks, useDriverMap, useCarrierLoads, truckActiveLoads, truckLineup } from "@/lib/selectors";
 import { useNow } from "@/lib/hooks";
 import { ParkingReserve } from "@/components/driver/parking-reserve";
@@ -25,8 +24,6 @@ import { nextStop, tripLoads } from "@/lib/trip-plan";
 import { formatNumber } from "@/lib/utils";
 import type { HosStatus } from "@/lib/types";
 import { Lane } from "@/components/ui/lane";
-import { Switch } from "@/components/ui/switch";
-import { driverSeesLoadPay } from "@/lib/pay-view";
 
 /** A believable "GPS just pinged" freshness readout — deterministic per truck, ticks with the shared clock. */
 function pingSecondsAgo(id: string, now: number): number {
@@ -47,16 +44,15 @@ function minutesAgo(iso: string, now: number): string {
   return m < 1 ? "just now" : m < 60 ? `${m} min ago` : `${Math.round(m / 60)}h ago`;
 }
 
+/** Safety events from the last 30 days nobody has talked through yet. */
+const safetyOpen = (d: { safetyEvents?: import("@/lib/types").SafetyEvent[] }) => safetySummary(d.safetyEvents, Date.now()).uncoached;
+
 export default function FleetPage() {
   const trucks = useCarrierTrucks();
   const drivers = useDriverMap();
   const loads = useCarrierLoads();
   const now = useNow();
   const flagged = useDriverRetention().filter((r) => r.view.level !== "good");
-  const setRunType = useStore((s) => s.actions.setRunType);
-  const setDriverPrefs = useStore((s) => s.actions.setDriverPrefs);
-  const setDriverSeesPay = useStore((s) => s.actions.setDriverSeesPay);
-  const ownerOperator = useStore((s) => !!s.settings.ownerOperator);
   const signedIn = useStore((s) => s.session.mode !== "demo");
 
   return (
@@ -70,13 +66,25 @@ export default function FleetPage() {
           someone talked to them. Backroute can steer loads toward home and chase what drivers are owed. Pay, time off and the call are yours.
         </p>
         {flagged.length === 0 ? (
-          <p className="mt-3 rounded-2xl border border-line bg-white px-4 py-5 text-center text-sm text-ink-500">Every driver looks good this week.</p>
+          <p className="mt-3 rounded-2xl border border-line bg-white px-4 py-3 text-sm text-ink-500">Every driver looks good this week.</p>
         ) : (
-          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {flagged.map(({ driver, view }) => (
-              <DriverCheckInCard key={driver.id} driver={driver} view={view} />
-            ))}
-          </div>
+          // One line, so the trucks stay near the top; the cards open under it.
+          <details className="group mt-3 rounded-2xl border border-line bg-white">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm">
+              <span className="min-w-0">
+                <span className="font-medium text-ink-950">
+                  {flagged.length} driver{flagged.length === 1 ? "" : "s"} to check on
+                </span>
+                <span className="text-ink-500"> · {flagged.map(({ driver }) => driver.name.split(" ")[0]).join(", ")}</span>
+              </span>
+              <ChevronDown className="h-4 w-4 shrink-0 text-ink-400 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="grid gap-3 border-t border-line p-3 md:grid-cols-2 xl:grid-cols-3">
+              {flagged.map(({ driver, view }) => (
+                <DriverCheckInCard key={driver.id} driver={driver} view={view} />
+              ))}
+            </div>
+          </details>
         )}
       </section>
 
@@ -103,9 +111,10 @@ export default function FleetPage() {
                       {secondDriver && <Badge tone="info"><Users className="h-3 w-3" /> Team</Badge>}
                     </div>
                     <p className="text-xs text-ink-500">{truck.equipmentType} · {formatNumber(truck.odometer)} mi · {truck.mpg.toFixed(1)} mpg</p>
-                    <p className="mt-1 flex items-center gap-1 text-xs text-ink-400">
-                      <MapPin className="h-3 w-3" /> {truck.currentCity}, {truck.currentState}
-                      <span className="text-ink-300">·</span>
+                    <p className="mt-1 flex min-w-0 items-center gap-1 text-xs text-ink-600">
+                      <MapPin className="h-3 w-3 shrink-0" /> <span className="truncate">{truck.currentCity}, {truck.currentState}</span>
+                    </p>
+                    <p className="truncate pl-4 text-xs text-ink-400">
                       {!signedIn
                         ? `GPS via Samsara, ${now === null ? "just now" : `${pingSecondsAgo(truck.id, now)}s ago`}`
                         : truck.position
@@ -129,48 +138,19 @@ export default function FleetPage() {
                 {driver && (
                   <div className="flex items-center gap-3">
                     <Avatar name={driver.name} size="sm" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-ink-900">{driver.name}</p>
-                      <p className="truncate text-xs text-ink-400">{driver.phone}</p>
-                    </div>
-                    <select
-                      value={driver.runType}
-                      onChange={(e) => setRunType(driver.id, e.target.value as RunType)}
-                      aria-label={`How ${driver.name} runs`}
-                      title={RUN_TYPE_DETAIL[driver.runType]}
-                      className="rounded-full border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink-800 outline-none focus:border-ink-400"
-                    >
-                      {RUN_TYPES.map((t) => (
-                        <option key={t} value={t}>{RUN_TYPE_LABEL[t]}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={driver.prefs?.language ?? "en"}
-                      onChange={(e) => setDriverPrefs(driver.id, { language: e.target.value as Lang })}
-                      aria-label={`Language ${driver.name} talks in`}
-                      title="The language Backroute calls and texts this driver in. Their app screens are set separately in the driver app."
-                      className="rounded-full border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink-800 outline-none focus:border-ink-400"
-                    >
-                      {LANGS.map((l) => (
-                        <option key={l.code} value={l.code}>{l.native}</option>
-                      ))}
-                    </select>
-                    <a href={`tel:${driver.phone.replace(/[^\d+]/g, "")}`} aria-label={`Call ${driver.name}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-100 text-ink-600 hover:bg-ink-200">
+                    <Link href={`/carrier/fleet/driver/${driver.id}`} className="group min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-ink-900 group-hover:underline">{driver.name}</p>
+                      <p className="truncate text-xs text-ink-400">
+                        {RUN_TYPE_LABEL[driver.runType]}
+                        {safetyOpen(driver) ? ` · ${safetyOpen(driver)} safety event${safetyOpen(driver) === 1 ? "" : "s"} to talk through` : ""}
+                      </p>
+                    </Link>
+                    <a href={`tel:${driver.phone.replace(/[^\d+]/g, "")}`} aria-label={`Call ${driver.name}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink-100 text-ink-600 hover:bg-ink-200">
                       <Phone className="h-3.5 w-3.5" />
                     </a>
-                  </div>
-                )}
-
-                {driver && !ownerOperator && (
-                  <div className="flex items-center justify-between gap-3 text-xs">
-                    <span className="text-ink-600">
-                      Sees what loads pay
-                      <span className="block text-ink-400">
-                        {driverSeesLoadPay(driver, false) ? "Rate and profit on their loads" : "Only their own pay"}
-                        {driver.seesLoadPay === undefined ? ` (${driver.payType === "percentage" ? "paid a percentage" : "not paid a percentage"})` : ""}
-                      </span>
-                    </span>
-                    <Switch checked={driverSeesLoadPay(driver, false)} onChange={(on) => setDriverSeesPay(driver.id, on)} label={`${driver.name} sees what loads pay`} />
+                    <Link href={`/carrier/fleet/driver/${driver.id}`} aria-label={`${driver.name}: driver details`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100">
+                      <ChevronRight className="h-4 w-4" />
+                    </Link>
                   </div>
                 )}
 
@@ -183,7 +163,7 @@ export default function FleetPage() {
                       <p className="truncate text-sm font-medium text-ink-900">{secondDriver.name} <span className="text-ink-400">· co-driver</span></p>
                       <p className="truncate text-xs text-ink-400">{secondDriver.phone}</p>
                     </div>
-                    <a href={`tel:${secondDriver.phone.replace(/[^\d+]/g, "")}`} aria-label={`Call ${secondDriver.name}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-100 text-ink-600 hover:bg-ink-200">
+                    <a href={`tel:${secondDriver.phone.replace(/[^\d+]/g, "")}`} aria-label={`Call ${secondDriver.name}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink-100 text-ink-600 hover:bg-ink-200">
                       <Phone className="h-3.5 w-3.5" />
                     </a>
                   </div>

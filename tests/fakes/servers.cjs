@@ -383,6 +383,8 @@ http.createServer(async (req, res) => {
       if (!u.searchParams.get("after")) return reply(res, { data: [{ id: "1", name: "101", gps: { time: now, latitude: 32.7767, longitude: -96.797, reverseGeo: { formattedLocation: "1200 Main St, Dallas, TX 75201" } } }], pagination: { endCursor: "p2", hasNextPage: true } });
       return reply(res, { data: [{ id: "2", name: "Truck 102", gps: { time: now, latitude: eld.lat102 ?? 32.7555, longitude: eld.lon102 ?? -97.3308, reverseGeo: { formattedLocation: eld.where102 ?? "Fort Worth, TX" } } }, { id: "3", name: "999", gps: { time: now, latitude: 30, longitude: -90 } }], pagination: { endCursor: "", hasNextPage: false } });
     }
+    if (u.pathname.endsWith("/fleet/safety-events"))
+      return reply(res, { data: eld.safety === false ? [] : [{ id: "se-1", time: now, driver: { id: "d1", name: "Marcus Bell" }, vehicle: { name: "101" }, behaviorLabels: [{ label: "harshBrake", name: "Harsh Brake" }] }] });
     if (u.pathname.endsWith("/fleet/hos/clocks"))
       return reply(res, { data: [
         { driver: { id: "d1", name: "Marcus Bell" }, clocks: { drive: { driveRemainingDurationMs: (eld.marcusDrive ?? 6.5) * 3600000 }, shift: { shiftRemainingDurationMs: 9 * 3600000 }, cycle: { cycleRemainingDurationMs: 40 * 3600000 } }, currentDutyStatus: { hosStatusType: eld.marcusStatus ?? "driving" } },
@@ -392,6 +394,8 @@ http.createServer(async (req, res) => {
   if (u.pathname.startsWith("/motive/")) {
     if (req.headers["x-api-key"] !== "motive-good-key") return deny();
     if (u.pathname.endsWith("/v1/vehicle_locations")) return reply(res, { vehicles: [{ vehicle: { id: 23, number: "T-101", current_location: { lat: 35.1495, lon: -90.049, description: "Memphis, TN", located_at: now } } }], pagination: { per_page: 100, page_no: 1, total: 1 } });
+    if (u.pathname.endsWith("/v2/driver_performance_events"))
+      return reply(res, { driver_performance_events: [{ driver_performance_event: { id: 501, type: "speeding", start_time: now, driver: { first_name: "Marcus", last_name: "Bell" }, vehicle: { number: "T-101" } } }] });
     if (u.pathname.endsWith("/v1/available_time")) return reply(res, { users: [{ user: { id: 11, first_name: "Marcus", last_name: "Bell", duty_status: "off_duty", available_time: { drive: 39600, shift: 49200, cycle: 214800 } } }], pagination: { per_page: 100, page_no: 1, total: 1 } });
   }
   const inDays = (n, hhmm) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10) + "T" + hhmm;

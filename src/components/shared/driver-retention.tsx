@@ -55,7 +55,14 @@ export function DriverCheckInCard({ driver, view }: { driver: Driver; view: Rete
           <Avatar name={driver.name} size="sm" />
           <div>
             <p className="text-sm font-semibold text-ink-950">{driver.name}</p>
-            <p className="text-xs text-ink-500">{view.daysSinceCheckIn === null ? "No check-in on record yet" : `Talked ${view.daysSinceCheckIn === 0 ? "today" : `${view.daysSinceCheckIn} day${view.daysSinceCheckIn === 1 ? "" : "s"} ago`}`}</p>
+            {/* When "no check-in in N days" is already a warning below, it isn't said twice. */}
+            <p className="text-xs text-ink-500">
+              {view.signals.some((s) => s.text.startsWith("No check-in"))
+                ? driver.homeBase
+                : view.daysSinceCheckIn === null
+                  ? "No check-in on record yet"
+                  : `Talked ${view.daysSinceCheckIn === 0 ? "today" : `${view.daysSinceCheckIn} day${view.daysSinceCheckIn === 1 ? "" : "s"} ago`}`}
+            </p>
           </div>
         </div>
         <Badge tone={view.level === "at_risk" ? "danger" : view.level === "watch" ? "warning" : "success"}>

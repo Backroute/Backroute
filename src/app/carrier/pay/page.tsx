@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
+import { useCarrierLoads } from "@/lib/selectors";
+import { ExpensesList } from "@/components/owner/expenses-list";
 import { PRIMARY_CARRIER_ID } from "@/lib/mock-data";
 import { addAdvance, draftPayRuns, markPayRunPaid, updateDriver } from "@/lib/back-office";
 import { NEC_THRESHOLD, form1099Csv, form1099s, payRunsCsv, weekEnd, weekOf } from "@/lib/pay-runs";
@@ -30,6 +32,10 @@ export default function PayPage() {
   const drivers = useStore((s) => s.drivers).filter((d) => !demo || d.carrierId === PRIMARY_CARRIER_ID);
   const runs = useStore((s) => s.payRuns);
   const advances = useStore((s) => s.advances);
+  const expenses = useStore((s) => s.expenses);
+  const respondExpense = useStore((s) => s.actions.respondExpense);
+  const loads = useCarrierLoads();
+  const driverMap = new Map(drivers.map((d) => [d.id, d]));
   const [today] = useState(() => new Date().toISOString().slice(0, 10));
   const [period, setPeriod] = useState(() => weekOf(today));
   const [year, setYear] = useState(() => new Date().getUTCFullYear());
@@ -195,6 +201,18 @@ export default function PayPage() {
             {drivers.map((d) => (
               <DriverPaySetup key={d.id} driver={d} />
             ))}
+          </CardContent>
+        </Card>
+
+        <Card id="expenses">
+          <CardHeader>
+            <div>
+              <CardTitle>Driver expenses</CardTitle>
+              <CardDescription>What drivers paid out of pocket. Approved ones go on their next pay run.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="!pt-3">
+            <ExpensesList expenses={expenses} drivers={driverMap} loads={loads} onRespond={respondExpense} />
           </CardContent>
         </Card>
       </div>

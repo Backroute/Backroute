@@ -21,7 +21,6 @@ import { CommandPalette, type CommandGroup } from "@/components/shared/command-p
 import { NotificationToastHost } from "@/components/shared/notification-toast";
 import { AskHost } from "@/components/ui/ask-host";
 import { Avatar } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
 import { usePrimaryCarrier, useCarrierLoads } from "@/lib/selectors";
 import { InstallPrompt } from "@/components/shared/install-prompt";
@@ -204,14 +203,16 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
       footer={
         <>
         <CarrierSwitcher />
-        <div className="flex items-center gap-2.5 rounded-xl border border-line px-3 py-2.5">
+        {/* The whole name wraps to two lines instead of cutting off; the plan reads as a plan, not a bare word. */}
+        <Link href="/carrier/settings?tab=billing" className="flex items-start gap-2.5 rounded-xl border border-line px-3 py-2.5 hover:bg-ink-50">
           <Avatar name={carrier.name} size="sm" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-semibold text-ink-950">{carrier.name}</p>
-            <p className="truncate text-xs text-ink-400">{carrier.mc}</p>
+            <p className="line-clamp-2 text-xs font-semibold leading-snug text-ink-950" title={carrier.name}>{carrier.name}</p>
+            <p className="truncate text-xs text-ink-400">
+              {carrier.mc} · {carrier.plan} plan
+            </p>
           </div>
-          <Badge tone="dark">{carrier.plan}</Badge>
-        </div>
+        </Link>
         </>
       }
     >

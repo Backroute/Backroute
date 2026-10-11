@@ -9,8 +9,11 @@ export function Lane({ from, to, className }: { from: React.ReactNode; to: React
   return (
     <span className={cn("inline-flex min-w-0 flex-wrap items-center gap-x-[0.3em]", className)}>
       <span>{from}</span>
-      <ArrowRight aria-label="to" className="h-[0.9em] w-[0.9em] shrink-0 opacity-45" strokeWidth={2.75} />
-      <span>{to}</span>
+      {/* The arrow stays with where it goes: a long lane wraps before the arrow, never leaving it hanging at a line's end. */}
+      <span className="inline-flex items-center gap-x-[0.3em] whitespace-nowrap">
+        <ArrowRight aria-label="to" className="h-[0.9em] w-[0.9em] shrink-0 opacity-45" strokeWidth={2.75} />
+        <span>{to}</span>
+      </span>
     </span>
   );
 }

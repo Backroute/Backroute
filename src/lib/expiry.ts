@@ -13,7 +13,7 @@ type Stage = 30 | 14 | 7 | 0;
 interface PaperworkItem {
   /** Stable for this item and this due date: a renewed date is a new reminder cycle. */
   key: string;
-  kind: "registration" | "inspection" | "cdl" | "med_card" | "insurance" | "ifta_return" | "ifta_decals";
+  kind: "registration" | "inspection" | "cdl" | "med_card" | "mvr" | "clearinghouse" | "insurance" | "ifta_return" | "ifta_decals";
   /** "Truck T-104's registration", "Marcus Bell's medical card". */
   what: string;
   /** yyyy-mm-dd */
@@ -35,6 +35,8 @@ export function stageFor(days: number): Stage | null {
 }
 
 const dayOf = (iso: string) => iso.slice(0, 10);
+/** The same day a year later, yyyy-mm-dd. */
+export const yearAfter = (iso: string) => `${Number(iso.slice(0, 4)) + 1}${iso.slice(4, 10)}`;
 /** Whole days from today to the due day (calendar days, so yesterday is -1 whatever the hour). */
 const daysUntil = (due: string, now: number) => Math.round((Date.parse(`${dayOf(due)}T00:00:00Z`) - Date.parse(`${new Date(now).toISOString().slice(0, 10)}T00:00:00Z`)) / DAY);
 
@@ -71,6 +73,15 @@ export function paperworkDue(input: { trucks: Truck[]; drivers: Driver[]; insura
       add({ key: `cdl:${d.id}:${dayOf(d.cdlExpires)}`, kind: "cdl", what: `${d.name}'s CDL`, due: d.cdlExpires, driverId: d.id, todo: "They renew it at the DMV. No loads go to them once it runs out." });
     if (d.medCardExpires)
       add({ key: `med:${d.id}:${dayOf(d.medCardExpires)}`, kind: "med_card", what: `${d.name}'s medical card`, due: d.medCardExpires, driverId: d.id, todo: "Book a DOT physical with a registry examiner, then send the new card to the state." });
+    // The yearly checks in the driver's file, counted from the last time they were done.
+    if (d.mvrAt) {
+      const due = yearAfter(d.mvrAt);
+      add({ key: `mvr:${d.id}:${due}`, kind: "mvr", what: `${d.name}'s yearly driving record review`, due, driverId: d.id, todo: "Pull their MVR from the state, review it, and keep the signed review in their file." });
+    }
+    if (d.clearinghouseAt) {
+      const due = yearAfter(d.clearinghouseAt);
+      add({ key: `clearinghouse:${d.id}:${due}`, kind: "clearinghouse", what: `${d.name}'s yearly Clearinghouse query`, due, driverId: d.id, todo: "Run a limited query on the FMCSA Drug & Alcohol Clearinghouse (the driver gives consent once)." });
+    }
   }
   if (input.insuranceExpires)
     add({ key: `insurance:${dayOf(input.insuranceExpires)}`, kind: "insurance", what: "Your insurance certificate", due: input.insuranceExpires, todo: "Ask your agent for the renewed certificate (COI). Brokers check it before every load." });

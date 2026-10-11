@@ -55,7 +55,7 @@ export default function NegotiationsPage() {
 
   return (
     <div>
-      <PageHeader title="Negotiations" description={`${active.length} active`} />
+      <PageHeader title="Negotiating" description={`${active.length} active`} />
 
       <div className="px-4 py-6 sm:px-8">
         <div className="grid grid-cols-3 gap-4">

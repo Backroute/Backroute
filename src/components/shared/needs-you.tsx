@@ -265,6 +265,8 @@ export function NeedsYouList() {
   // Picking a truck's next load opens the choices over the card, not further down the page.
   const [picking, setPicking] = useState<string | null>(null);
   const batches = useBatches(listed, signedIn);
+  // A truck with several things waiting shows one card, with the rest folded under it.
+  const [openTrucks, setOpenTrucks] = useState<Set<string>>(new Set());
   if (!any) return null;
 
   // Most urgent first: decisions now, then what's waiting, then notes.
@@ -272,6 +274,45 @@ export function NeedsYouList() {
   const sorted = [...listed].sort((a, b) => rank[toneOf(a)] - rank[toneOf(b)]);
   const now = sorted.filter((e) => !later.has(e.id) && !waiting.has(e.id));
   const setAside = sorted.filter((e) => later.has(e.id));
+
+  const truckOf = (e: Escalation) => loads.find((l) => l.id === e.loadId)?.truckId ?? null;
+  /** One card per truck, the rest a tap away; things not tied to a truck stay as they are. */
+  function byTruck(list: Escalation[]) {
+    const groups = new Map<string, Escalation[]>();
+    const out: React.ReactNode[] = [];
+    for (const e of list) {
+      const t = truckOf(e);
+      if (!t) continue;
+      groups.set(t, [...(groups.get(t) ?? []), e]);
+    }
+    const shown = new Set<string>();
+    for (const e of list) {
+      const t = truckOf(e);
+      if (!t) {
+        out.push(card(e));
+        continue;
+      }
+      if (shown.has(t)) continue;
+      shown.add(t);
+      const all = groups.get(t)!;
+      const open = openTrucks.has(t);
+      out.push(...(open ? all : all.slice(0, 1)).map(card));
+      if (all.length > 1)
+        out.push(
+          <motion.div key={`more-${t}`} layout {...enter} className="md:col-span-2">
+            <button
+              type="button"
+              onClick={() => setOpenTrucks((s) => { const n = new Set(s); if (n.has(t)) n.delete(t); else n.add(t); return n; })}
+              aria-expanded={open}
+              className="w-full rounded-2xl border border-dashed border-line px-4 py-2.5 text-left text-xs font-medium text-ink-600 hover:text-ink-950"
+            >
+              {open ? `Show less for ${truckMap.get(t)?.unitNumber ?? "this truck"}` : `${all.length - 1} more for ${truckMap.get(t)?.unitNumber ?? "this truck"}`}
+            </button>
+          </motion.div>,
+        );
+    }
+    return out;
+  }
 
   function card(e: Escalation) {
     const load = loads.find((l) => l.id === e.loadId);
@@ -426,7 +467,7 @@ export function NeedsYouList() {
             );
           })}
 
-          {now.filter((e) => toneOf(e) !== "urgent").map(card)}
+          {byTruck(now.filter((e) => toneOf(e) !== "urgent"))}
 
           {driversAtRisk.map(({ driver, view }) => (
             <motion.div key={driver.id} layout {...enter}>

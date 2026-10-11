@@ -107,6 +107,8 @@ async function upload(kind, as, loadId) {
   await dp.goto(`${BASE}/driver`, { waitUntil: "domcontentloaded" });
   await dp.getByText(/Hi Ezra/).waitFor({ timeout: 120000 }).catch(() => {});
   check("driver Home lists what's for them, each a tap away", (await dp.getByRole("list", { name: "For you" }).getByRole("listitem").count()) >= 1, await dp.getByRole("list", { name: "For you" }).innerText().catch(() => "none"));
+  // Time off sits under Home's More, with home time and calls.
+  await dp.getByText(/^More: home time/).click();
   await dp.getByRole("button", { name: "Ask for time off" }).click();
   await dp.getByPlaceholder("Why (a few words)").fill("Family wedding");
   await dp.getByRole("button", { name: "Send to my carrier" }).click();

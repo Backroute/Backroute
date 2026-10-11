@@ -184,6 +184,12 @@ export interface Driver {
   /** The dates their CDL and DOT medical card run out. */
   cdlExpires?: string;
   medCardExpires?: string;
+  /** The driver qualification file: when the owner last pulled and reviewed their driving record (MVR, yearly under
+   *  49 CFR 391.25) and last ran the Drug & Alcohol Clearinghouse query (yearly limited query, 49 CFR 382.701). */
+  mvrAt?: string;
+  clearinghouseAt?: string;
+  /** Safety events the ELD's cameras and sensors logged (speeding, harsh braking...), newest first, last 60 days. */
+  safetyEvents?: SafetyEvent[];
   /** The endorsements on their CDL (H hazmat, N tanker, T doubles/triples, X hazmat + tanker) and a TWIC card for ports. */
   endorsements?: Endorsement[];
   /** How they're paid for tax: contractors (1099) get a 1099-NEC each January; employees (W-2) are payroll's. */
@@ -1260,4 +1266,16 @@ export interface Advance {
   at: string;
   /** The pay run it came out of. */
   repaidIn?: string;
+}
+
+/** One driving event from the ELD (Samsara safety events, Motive driver performance events), and whether it was coached. */
+export interface SafetyEvent {
+  id: string;
+  at: string;
+  kind: "speeding" | "harsh_brake" | "harsh_accel" | "harsh_turn" | "following" | "distracted" | "rolling_stop" | "collision" | "other";
+  /** The ELD's own label, kept as it said it. */
+  label: string;
+  unit?: string;
+  source: "samsara" | "motive" | "demo";
+  coached?: { at: string; note?: string };
 }

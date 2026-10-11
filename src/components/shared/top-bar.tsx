@@ -97,7 +97,7 @@ export function TopBar({
           className={cn(
             "flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm transition-colors",
             // Once the page's name moves up here, the search shrinks to its icon on a phone to make room.
-            compactTitle ? "w-auto shrink-0 sm:w-full sm:max-w-xs" : "w-full max-w-xs",
+            compactTitle ? "w-auto shrink-0 sm:w-full sm:max-w-xs lg:w-full" : "w-full max-w-xs",
             dark ? "border-white/15 text-white/40 hover:border-white/30" : "border-line text-ink-400 hover:border-ink-300",
           )}
         >
@@ -116,7 +116,8 @@ export function TopBar({
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.18 }}
               aria-hidden
-              className={cn("min-w-0 truncate text-[15px] font-semibold", dark ? "text-white" : "text-ink-950")}
+              // Phones only: on a desktop the page's own header is right there, so a second copy up here just echoes it.
+              className={cn("min-w-0 truncate text-[15px] font-semibold lg:hidden", dark ? "text-white" : "text-ink-950")}
             >
               {compactTitle}
             </motion.span>

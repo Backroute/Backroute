@@ -163,7 +163,7 @@ const emailsIn = (q) => db(`select count(*) from channel_messages where carrier_
   const dpage = await dp.locator("main, body").first().innerText().catch(() => "");
   check("the driver's load sheet has the numbers the docks ask for", /PU-55120/.test(dsheet) && /BOL-7781/.test(dsheet), dsheet);
   check("…and a per-mile driver sees their pay, not what the load pays", /Your pay/.test(dpage) && !/\$1,850/.test(dpage), dpage.slice(0, 300));
-  await dp.goto(`${BASE}/driver/profile`, { waitUntil: "domcontentloaded" });
+  await dp.goto(`${BASE}/driver/profile?tab=truck`, { waitUntil: "domcontentloaded" });
   await dp.getByRole("region", { name: "Truck papers" }).waitFor({ timeout: 90000 }).catch(() => {});
   await dp.getByRole("button", { name: "Show" }).first().waitFor({ timeout: 30000 }).catch(() => {});
   const papers = await dp.getByRole("region", { name: "Truck papers" }).innerText().catch(() => "");

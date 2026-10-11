@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUpRight, ClipboardCheck, Link2, MapPin, Navigation, Phone } from "lucide-react";
+import { ArrowDown, ArrowUpRight, ChevronDown, ClipboardCheck, Link2, MapPin, Navigation, Phone } from "lucide-react";
+import { usePagesText } from "@/lib/lang/pages-ui";
 import { DrivingMode } from "@/components/shared/driving-mode";
 import { CallStatusLine } from "@/components/shared/call-settings";
 import { useDriverUi } from "@/lib/lang/use-driver-ui";
@@ -46,6 +47,7 @@ const todoChip = "inline-flex min-h-9 items-center rounded-full bg-ink-100 px-3.
 export default function DriverHomePage() {
   const driver = usePrimaryDriver();
   const { t, solo } = useDriverUi();
+  const p = usePagesText();
   const trucks = useCarrierTrucks();
   const loads = useCarrierLoads();
   const brokers = useBrokerMap();
@@ -249,7 +251,7 @@ export default function DriverHomePage() {
           <QuickReplies stage={tripProps.load.stage} onSent={(text) => setSentNote(text)} />
           {truck && <RoadTools load={tripProps.load} truck={truck} driver={driver} />}
           {truck?.trip && <TripStops truck={truck} loads={loads} hrefFor={(id) => `/driver/loads/${id}`} />}
-          <TripSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Trip details">
+          <TripSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title={p.home.tripDetails}>
             <TripDetails {...tripProps} autoPick={autoPick} onAutoPick={toggleAutoPick} loadHref={`/driver/loads/${tripProps.load.id}`} />
           </TripSheet>
         </>
@@ -257,10 +259,10 @@ export default function DriverHomePage() {
         <div className="flex flex-col items-center gap-3 rounded-3xl border border-line p-6 text-center">
           {hasOffers ? (
             <p className="flex items-center gap-1.5 text-sm font-medium text-ink-800">
-              No active load. Pick your next one below <ArrowDown className="h-4 w-4" />
+              {p.home.noLoadPick} <ArrowDown className="h-4 w-4" />
             </p>
           ) : (
-            <p className="text-sm text-ink-500">No load right now. Backroute is finding your next one.</p>
+            <p className="text-sm text-ink-500">{p.home.noLoadFinding}</p>
           )}
           <button onClick={callDispatch} className="flex items-center gap-1.5 rounded-full border border-line px-4 py-2 text-xs font-medium text-ink-700">
             <Phone className="h-3.5 w-3.5" /> {t.callDispatch}
@@ -271,14 +273,9 @@ export default function DriverHomePage() {
       {completedLoad && <QuickReplies stage={null} onSent={(text) => setSentNote(text)} />}
       {sentNote && (
         <p className="-mt-2 text-xs text-ink-600" role="status">
-          Sent to dispatch: &ldquo;{sentNote}&rdquo;
+          {p.home.sent(sentNote)}
         </p>
       )}
-
-      {homeTime && <HomeTimeCard status={homeTime} />}
-      <TimeOffAsk />
-
-      <CallStatusLine driver={driver} />
 
       {nextLoad && !completedLoad && (
         <div className="rounded-3xl border border-line p-5">
@@ -287,7 +284,7 @@ export default function DriverHomePage() {
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-info-soft text-[var(--accent-info)]">
                 <Link2 className="h-3.5 w-3.5" />
               </span>
-              <span className="text-xs font-medium uppercase tracking-wider text-ink-400">Up next</span>
+              <span className="text-xs font-medium uppercase tracking-wider text-ink-400">{p.home.upNext}</span>
             </div>
             <LoadScoreBadge score={nextLoad.score} size="sm" />
           </div>
@@ -296,16 +293,16 @@ export default function DriverHomePage() {
           </p>
           <p className="mt-0.5 text-xs text-ink-500">
             {nextLoad.stage === "negotiating" || nextLoad.stage === "scoring" || nextLoad.stage === "sourced"
-              ? "Negotiating the rate now"
-              : "Rate locked. It becomes your current load the moment you deliver."}
+              ? p.home.negotiatingNow
+              : p.home.lockedNote}
           </p>
           <div className="mt-2.5 flex items-center gap-4 text-xs">
             {pay.sees ? (
-              <span className="text-ink-500">Total offer <span className="font-semibold tabular text-ink-950">{formatCurrency(nextLoad.bookedRate ?? nextLoad.targetRate)}</span></span>
+              <span className="text-ink-500">{p.home.pays} <span className="font-semibold tabular text-ink-950">{formatCurrency(nextLoad.bookedRate ?? nextLoad.targetRate)}</span></span>
             ) : (
-              <span className="text-ink-500">Your pay <span className="font-semibold tabular text-ink-950">{formatCurrency(pay.yourPay(nextLoad))}</span></span>
+              <span className="text-ink-500">{p.home.yourPay} <span className="font-semibold tabular text-ink-950">{formatCurrency(pay.yourPay(nextLoad))}</span></span>
             )}
-            {pay.sees && <span className="text-ink-500">Est. net <span className="font-semibold tabular text-ink-950">{formatCurrency(nextLoad.netProfit ?? 0)}</span></span>}
+            {pay.sees && <span className="text-ink-500">{p.home.net} <span className="font-semibold tabular text-ink-950">{formatCurrency(nextLoad.netProfit ?? 0)}</span></span>}
           </div>
           {nextLoad.stage === "negotiating" && pay.sees && (
             <div className="mt-3">
@@ -313,13 +310,13 @@ export default function DriverHomePage() {
             </div>
           )}
           {lineup.filter((l) => l.id !== nextLoad.id).length > 0 && (
-            <ol className="mt-3 flex flex-col gap-1.5 border-t border-line pt-3 text-xs" aria-label="Then">
+            <ol className="mt-3 flex flex-col gap-1.5 border-t border-line pt-3 text-xs" aria-label={p.home.then}>
               {lineup
                 .filter((l) => l.id !== nextLoad.id)
                 .map((l) => (
                   <li key={l.id} className="flex items-center justify-between gap-2">
                     <span className="text-ink-500">
-                      Then <span className="font-medium text-ink-900"><Lane from={l.lane.origin} to={l.lane.destination} /></span>
+                      {p.home.then} <span className="font-medium text-ink-900"><Lane from={l.lane.origin} to={l.lane.destination} /></span>
                     </span>
                     <span className="shrink-0 text-ink-500">{(now !== null && stopDates(l, now).pickup.date) || l.pickupWindow}</span>
                   </li>
@@ -333,10 +330,10 @@ export default function DriverHomePage() {
         <div id="next-load" className="scroll-mt-4">
           <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3">
             <div>
-              <p className="text-sm font-medium text-ink-950">Pick for me</p>
-              <p className="text-xs text-ink-500">Books the best fit now and every time after.</p>
+              <p className="text-sm font-medium text-ink-950">{p.home.pickForMe}</p>
+              <p className="text-xs text-ink-500">{p.home.pickForMeNote}</p>
             </div>
-            <Switch checked={autoPick} onChange={toggleAutoPick} label="Pick my next load for me" />
+            <Switch checked={autoPick} onChange={toggleAutoPick} label={p.home.pickForMe} />
           </div>
           <NextLoadOffers
             bleed
@@ -350,27 +347,38 @@ export default function DriverHomePage() {
         </div>
       )}
 
-      {truck && (
-        <Link href="/driver/loads" className="flex items-center justify-between rounded-2xl border border-line px-4 py-3.5 text-sm text-ink-700">
-          <span className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-ink-400" /> {truck.currentCity}, {truck.currentState}
-          </span>
-          <span className="flex items-center gap-1 text-ink-950">
-            Load history <ArrowUpRight className="h-3.5 w-3.5" />
-          </span>
-        </Link>
-      )}
-
-      {truck && (
-        <Link href="/driver/inspection" className="flex items-center justify-between rounded-2xl border border-line px-4 py-3.5 text-sm text-ink-700">
-          <span className="flex items-center gap-2">
-            <ClipboardCheck className="h-4 w-4 text-ink-400" /> Inspections today
-          </span>
-          <span className="flex items-center gap-1 text-xs text-ink-950">
-            Pre-trip {dvirDoneToday ? "✓" : "due"} · Post-trip {postTripDoneToday ? "✓" : "end of day"} <ArrowUpRight className="h-3.5 w-3.5" />
-          </span>
-        </Link>
-      )}
+      {/* Everything that isn't the trip or the next load folds under one line, so Home stays a screen or two long. */}
+      <details className="group rounded-2xl border border-line">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-ink-800">
+          {p.home.more}
+          <ChevronDown className="h-4 w-4 shrink-0 text-ink-400 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="flex flex-col gap-4 border-t border-line p-4">
+          {homeTime && <HomeTimeCard status={homeTime} />}
+          <TimeOffAsk />
+          <CallStatusLine driver={driver} />
+          {truck && (
+            <Link href="/driver/inspection" className="flex items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3.5 text-sm text-ink-700">
+              <span className="flex items-center gap-2">
+                <ClipboardCheck className="h-4 w-4 text-ink-400" /> {p.home.inspections}
+              </span>
+              <span className="flex items-center gap-1 text-right text-xs text-ink-950">
+                {p.home.inspectionLine(dvirDoneToday, postTripDoneToday)} <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
+              </span>
+            </Link>
+          )}
+          {truck && (
+            <Link href="/driver/loads" className="flex items-center justify-between rounded-2xl border border-line px-4 py-3.5 text-sm text-ink-700">
+              <span className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-ink-400" /> {truck.currentCity}, {truck.currentState}
+              </span>
+              <span className="flex items-center gap-1 text-ink-950">
+                {p.home.history} <ArrowUpRight className="h-3.5 w-3.5" />
+              </span>
+            </Link>
+          )}
+        </div>
+      </details>
 
       {showDriving && currentLoad && truck && (
         <DrivingMode

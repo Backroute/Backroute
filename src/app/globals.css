@@ -604,3 +604,29 @@ body {
   outline-offset: 4px;
   border-radius: 8px;
 }
+
+/* Reading: bigger text and higher contrast, chosen per device in the driver app (Profile → App). Text sizes are in rem,
+ * so scaling the root scales the whole app. */
+:root[data-text="large"] {
+  font-size: 112.5%;
+}
+:root[data-text="xl"] {
+  font-size: 125%;
+}
+:root[data-contrast="high"] {
+  --ink-300: #6b6b6b;
+  --ink-400: #4a4a4a;
+  --ink-500: #363636;
+  --ink-600: #262626;
+  --line: #a8a8a8;
+}
+:root[data-theme="dark"][data-contrast="high"] {
+  --ink-300: #a3a3a3;
+  --ink-400: #c4c4c4;
+  --ink-500: #d9d9d9;
+  --ink-600: #ebebeb;
+  --line: #5c5c5c;
+}
+:root[data-contrast="high"] .theme-ink [class*="text-white/"] {
+  color: rgb(255 255 255 / 0.92);
+}

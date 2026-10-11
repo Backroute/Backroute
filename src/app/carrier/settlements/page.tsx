@@ -1,147 +1,42 @@
 "use client";
 
-import { useState } from "react";
-import { CheckCircle2, Clock, Download, X } from "lucide-react";
+import { CheckCircle2, Clock, Download } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
-import { Tabs } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { StatTile } from "@/components/ui/stat-tile";
-import { useBrokerMap, useCarrierLoads, useDriverMap, useTruckMap } from "@/lib/selectors";
+import { useBrokerMap, useCarrierLoads } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { useNow } from "@/lib/hooks";
-import { computeDriverPay, FACTORING_FEE_PCT, payLabel } from "@/lib/settlements";
+import { FACTORING_FEE_PCT } from "@/lib/settlements";
 import { paymentStatus, type PaymentState } from "@/lib/payments";
 import { computeFactoringCommission } from "@/lib/commissions";
 import { downloadCsv } from "@/lib/csv-export";
 import { formatCurrency } from "@/lib/utils";
-import { openFile } from "@/lib/cloud/files";
-import type { Driver, Expense, Load, Truck } from "@/lib/types";
+import type { Load } from "@/lib/types";
 import { Lane } from "@/components/ui/lane";
 import { StatusMark } from "@/components/ui/mark";
 import { InvoiceActions } from "@/components/cloud/invoice-actions";
 
-const EXPENSE_CATEGORY_LABEL: Record<Expense["category"], string> = {
-  lumper: "Lumper fee",
-  detention: "Detention",
-  parking: "Parking",
-  scale: "Scale ticket",
-  other: "Other",
-};
 
 export default function SettlementsPage() {
   const loads = useCarrierLoads();
-  const drivers = useDriverMap();
-  const trucks = useTruckMap();
   const now = useNow();
-  const expenses = useStore((s) => s.expenses);
-  const respondExpense = useStore((s) => s.actions.respondExpense);
-  const [tab, setTab] = useState<"payments" | "driver-pay" | "expenses">("payments");
-
   const delivered = loads.filter((l) => l.stage === "delivered");
-  const pendingExpenseCount = expenses.filter((e) => e.status === "pending").length;
 
   return (
     <div>
-      <PageHeader title="Settlements" description={`${delivered.length} delivered loads`} />
+      {/* The page is named as the menu names it. Driver pay and expenses live under Costs & drivers, not here too. */}
+      <PageHeader title="Getting paid" description={`${delivered.length} delivered load${delivered.length === 1 ? "" : "s"}: who owes what, and when it's due`} />
 
       <div className="px-4 py-6 sm:px-8">
-        <Tabs
-          tabs={[
-            { key: "payments", label: "Payments", count: delivered.length },
-            { key: "driver-pay", label: "Driver pay", count: delivered.length },
-            { key: "expenses", label: "Expenses", count: pendingExpenseCount || undefined },
-          ]}
-          active={tab}
-          onChange={(k) => setTab(k as "payments" | "driver-pay" | "expenses")}
-        />
-
-        <div className="mt-5">
-          {tab === "payments" && <PaymentsList loads={delivered} now={now} />}
-          {tab === "driver-pay" && <DriverPayList loads={delivered} drivers={drivers} trucks={trucks} />}
-          {tab === "expenses" && <ExpensesList expenses={expenses} drivers={drivers} loads={loads} onRespond={respondExpense} />}
-        </div>
+        <PaymentsList loads={delivered} now={now} />
       </div>
     </div>
   );
 }
 
-function ExpensesList({
-  expenses,
-  drivers,
-  loads,
-  onRespond,
-}: {
-  expenses: Expense[];
-  drivers: Map<string, Driver>;
-  loads: Load[];
-  onRespond: (id: string, approve: boolean) => void;
-}) {
-  if (expenses.length === 0) {
-    return <EmptyState text="No expenses submitted yet. Driver-fronted costs like lumper fees or detention show up here." />;
-  }
-  const loadMap = new Map(loads.map((l) => [l.id, l]));
-  const sorted = [...expenses].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-  return (
-    <div className="flex flex-col gap-2">
-      {sorted.map((e) => {
-        const driver = drivers.get(e.driverId);
-        const load = e.loadId ? loadMap.get(e.loadId) : undefined;
-        return (
-          <div key={e.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-white p-4">
-            <div className="flex items-center gap-3">
-              <Avatar name={driver?.name ?? "Driver"} size="sm" />
-              <div>
-                <p className="text-sm font-medium text-ink-950">{EXPENSE_CATEGORY_LABEL[e.category]} · {driver?.name ?? "Driver"}</p>
-                <p className="text-xs text-ink-400">
-                  {load && (
-                    <>
-                      <Lane from={load.lane.origin} to={load.lane.destination} />
-                      {" · "}
-                    </>
-                  )}
-                  {e.note || "No note"}
-                  {(e.receiptFileId || e.receiptPreview) && (
-                    <>
-                      {" · "}
-                      {e.receiptFileId ? (
-                        <button type="button" onClick={() => void openFile(e.receiptFileId!)} className="font-medium text-ink-700 underline-offset-2 hover:underline">
-                          See the receipt
-                        </button>
-                      ) : (
-                        <a href={e.receiptPreview} target="_blank" rel="noreferrer" className="font-medium text-ink-700 underline-offset-2 hover:underline">
-                          See the receipt
-                        </a>
-                      )}
-                    </>
-                  )}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold tabular text-ink-950">{formatCurrency(e.amount)}</span>
-              {e.status === "pending" ? (
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="primary" onClick={() => onRespond(e.id, true)}>
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Approve
-                  </Button>
-                  <Button size="sm" variant="danger" onClick={() => onRespond(e.id, false)}>
-                    <X className="h-3.5 w-3.5" /> Deny
-                  </Button>
-                </div>
-              ) : (
-                <Badge tone={e.status === "approved" ? "success" : "danger"}>{e.status}</Badge>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 function EmptyState({ text }: { text: string }) {
   return <p className="py-12 text-center text-sm text-ink-400">{text}</p>;
@@ -252,70 +147,3 @@ const PAYMENT_TONE: Record<PaymentState, "success" | "warning" | "danger" | "neu
   overdue: "danger",
   paid: "success",
 };
-
-function DriverPayList({ loads, drivers, trucks }: { loads: Load[]; drivers: Map<string, Driver>; trucks: Map<string, Truck> }) {
-  if (loads.length === 0) return <EmptyState text="No delivered loads yet. Pay statements appear the moment a load delivers." />;
-
-  const rows = loads
-    .flatMap((l) => {
-      const truck = l.truckId ? trucks.get(l.truckId) : undefined;
-      if (!truck) return [];
-      const isTeam = !!truck.secondDriverId;
-      const primary = truck.driverId ? drivers.get(truck.driverId) : undefined;
-      const second = truck.secondDriverId ? drivers.get(truck.secondDriverId) : undefined;
-      return [
-        primary ? { load: l, driver: primary, pay: computeDriverPay(l, primary, isTeam) } : null,
-        second ? { load: l, driver: second, pay: computeDriverPay(l, second, isTeam) } : null,
-      ];
-    })
-    .filter((r): r is { load: Load; driver: Driver; pay: number } => r !== null);
-
-  const totalPay = rows.reduce((s, r) => s + r.pay, 0);
-
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-center justify-end">
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() =>
-            downloadCsv(
-              `settlements-driver-pay-${new Date().toISOString().slice(0, 10)}.csv`,
-              ["Driver", "Lane", "Reference", "Pay Type", "Pay Rate", "Pay"],
-              rows.map((r) => [
-                r.driver.name,
-                `${r.load.lane.origin} → ${r.load.lane.destination}`,
-                r.load.referenceNumber,
-                r.driver.payType,
-                r.driver.payRate,
-                r.pay,
-              ]),
-            )
-          }
-        >
-          <Download className="h-3.5 w-3.5" /> Export CSV
-        </Button>
-      </div>
-
-      <Card><CardContent><StatTile label="Total driver pay" value={formatCurrency(totalPay)} sublabel={`${rows.length} loads`} /></CardContent></Card>
-
-      <div className="flex flex-col gap-2">
-        {rows.map(({ load, driver, pay }) => (
-          <div key={`${load.id}-${driver.id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-white p-4">
-            <div className="flex items-center gap-3">
-              <Avatar name={driver.name} size="sm" />
-              <div>
-                <p className="text-sm font-medium text-ink-950">{driver.name}</p>
-                <p className="text-xs text-ink-400"><Lane from={load.lane.origin} to={load.lane.destination} /> · {load.referenceNumber}</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-semibold tabular text-ink-950">{formatCurrency(pay)}</p>
-              <p className="text-xs text-ink-400">{payLabel(driver)}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}

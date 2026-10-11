@@ -21,6 +21,7 @@ import { makeContractLoads } from "./contracts";
 import { marksFor, type CarrierContext } from "./db";
 import { forCarrier } from "./scope";
 import { applyEld, checkCalls, lateNotices, readEld } from "./eld";
+import { applySafety, readSafety } from "./safety";
 import { pullFeed, readFeed } from "./feeds";
 import { integrationsFor, setStatus, type EldConfig, type FeedConfig } from "./integrations";
 import { chasePayments } from "./money";
@@ -72,6 +73,9 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
     const kind = link.kind as "samsara" | "motive";
     try {
       const applied = await applyEld(ctx, kind, await readEld(kind, (link.config as EldConfig).apiKey));
+      // Safety events come along with the positions; a plan without them (or an outage there) doesn't stop the rest.
+      const events = await readSafety(kind, (link.config as EldConfig).apiKey, now).then((r) => applySafety(ctx, r, now)).catch(() => 0);
+      if (events) done.push(`${events} new safety event${events === 1 ? "" : "s"} from ${kind === "samsara" ? "Samsara" : "Motive"}`);
       await setStatus(id, kind, `Connected · ${applied.trucks} trucks, ${applied.drivers} drivers updated`);
     } catch (e) {
       await setStatus(id, kind, `Not working: ${e instanceof Error ? e.message : "error"}`);

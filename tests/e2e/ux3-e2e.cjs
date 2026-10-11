@@ -227,7 +227,7 @@ async function signIn(browser, { width = 1280 } = {}) {
   // ── Offline: a change made with no signal survives the app being closed, and goes when it's back ──
   const voice = () => db(`select coalesce(data->'prefs'->>'hosVoice', 'unset') from drivers where carrier_id = '${cid}' and id = 'u3-d1'`);
   db(`update drivers set data = data #- '{prefs,hosVoice}' where carrier_id = '${cid}' and id = 'u3-d1'`);
-  await dp.goto(`${BASE}/driver/profile`, { waitUntil: "domcontentloaded" });
+  await dp.goto(`${BASE}/driver/profile?tab=calls`, { waitUntil: "domcontentloaded" });
   const sw = dp.getByRole("switch", { name: "Hours heads-ups out loud" });
   await sw.waitFor({ timeout: 120000 });
   await sleep(2500);
