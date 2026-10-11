@@ -110,6 +110,9 @@ export interface UiText {
   dontSend: string;
   avoidNJ: string;
   avoidCA: string;
+  avoidCities: string;
+  avoidCitiesHint: string;
+  noTouch: string;
   newLoads: string;
   callMe: string;
   textMe: string;
@@ -259,6 +262,9 @@ const en: UiText = {
   dontSend: "Don't send me to",
   avoidNJ: "New Jersey / NYC",
   avoidCA: "California",
+  avoidCities: "Cities you won't go to",
+  avoidCitiesHint: "Like Chicago, Atlanta",
+  noTouch: "No touch freight (I don't load or unload)",
   newLoads: "New load options",
   callMe: "Call me",
   textMe: "Just text me",
@@ -408,6 +414,9 @@ const es: UiText = {
   dontSend: "No me mandes a",
   avoidNJ: "Nueva Jersey / NYC",
   avoidCA: "California",
+  avoidCities: "Ciudades a las que no vas",
+  avoidCitiesHint: "Por ejemplo: Chicago, Atlanta",
+  noTouch: "Sin carga a mano (no cargo ni descargo)",
   newLoads: "Opciones de cargas nuevas",
   callMe: "Llámame",
   textMe: "Solo mensaje",
@@ -557,6 +566,9 @@ const pa: UiText = {
   dontSend: "ਮੈਨੂੰ ਇੱਥੇ ਨਾ ਭੇਜੋ",
   avoidNJ: "ਨਿਊ ਜਰਸੀ / NYC",
   avoidCA: "ਕੈਲੀਫੋਰਨੀਆ",
+  avoidCities: "ਸ਼ਹਿਰ ਜਿੱਥੇ ਤੁਸੀਂ ਨਹੀਂ ਜਾਂਦੇ",
+  avoidCitiesHint: "ਜਿਵੇਂ Chicago, Atlanta",
+  noTouch: "ਹੱਥ ਨਾਲ ਮਾਲ ਨਹੀਂ (ਮੈਂ ਲੋਡ ਜਾਂ ਅਨਲੋਡ ਨਹੀਂ ਕਰਦਾ)",
   newLoads: "ਨਵੇਂ ਲੋਡ",
   callMe: "ਫ਼ੋਨ ਕਰੋ",
   textMe: "ਸਿਰਫ਼ ਮੈਸੇਜ",
@@ -706,6 +718,9 @@ const hi: UiText = {
   dontSend: "मुझे यहाँ मत भेजो",
   avoidNJ: "न्यू जर्सी / NYC",
   avoidCA: "कैलिफ़ोर्निया",
+  avoidCities: "शहर जहाँ आप नहीं जाते",
+  avoidCitiesHint: "जैसे Chicago, Atlanta",
+  noTouch: "हाथ से माल नहीं (मैं लोड या अनलोड नहीं करता)",
   newLoads: "नए लोड",
   callMe: "फ़ोन करें",
   textMe: "सिर्फ़ मैसेज",
@@ -855,6 +870,9 @@ const ru: UiText = {
   dontSend: "Не отправляй меня в",
   avoidNJ: "Нью-Джерси / NYC",
   avoidCA: "Калифорнию",
+  avoidCities: "Города, куда вы не ездите",
+  avoidCitiesHint: "Например: Chicago, Atlanta",
+  noTouch: "Без ручной погрузки (сам не гружу и не выгружаю)",
   newLoads: "Новые грузы",
   callMe: "Звони",
   textMe: "Просто пиши",
@@ -1004,6 +1022,9 @@ const uk: UiText = {
   dontSend: "Не відправляй мене в",
   avoidNJ: "Нью-Джерсі / NYC",
   avoidCA: "Каліфорнію",
+  avoidCities: "Міста, куди ви не їздите",
+  avoidCitiesHint: "Наприклад: Chicago, Atlanta",
+  noTouch: "Без ручного вантаження (сам не вантажу й не розвантажую)",
   newLoads: "Нові вантажі",
   callMe: "Дзвони",
   textMe: "Просто пиши",
@@ -1153,6 +1174,9 @@ const fr: UiText = {
   dontSend: "Envoie-moi pas au",
   avoidNJ: "New Jersey / NYC",
   avoidCA: "Californie",
+  avoidCities: "Villes où vous n'allez pas",
+  avoidCitiesHint: "Par exemple : Chicago, Atlanta",
+  noTouch: "Pas de manutention (je ne charge ni ne décharge)",
   newLoads: "Nouveaux voyages",
   callMe: "Appelle-moi",
   textMe: "Juste un texto",

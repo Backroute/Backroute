@@ -38,6 +38,9 @@ const systemText = (b) => (Array.isArray(b.system) ? b.system.map((x) => x.text)
 const offer = (o) => ({ loadNumber: null, originCity: null, originState: null, destinationCity: null, destinationState: null, pickup: null, delivery: null, pickupLocal: null, deliveryLocal: null, equipment: null, rate: null, miles: null, weight: null, notes: null, partial: null, pallets: null, lengthFeet: null, stackable: null, palletHeightIn: null, ...o });
 function brokerMail(text) {
   const base = { kind: "other", offers: [], brokerRate: null, agreedToOurRate: false, loadNumber: null, contactName: "Kim", brokerCompany: null, brokerMc: null, brokerPhone: null, payments: [], cancelReason: null, brokerRpm: null, question: null, language: "en", changeKind: null, changePlaces: [], appointmentStop: null, appointmentLocal: null, appointmentConfirmation: null };
+  // A test can put the offers it wants in fakes/offers.json (each filled out like the reader does); removed by the test.
+  const own = `${__dirname}/offers.json`;
+  if (fs.existsSync(own)) return { ...base, kind: "load_offers", offers: JSON.parse(fs.readFileSync(own, "utf8")).map(offer) };
   // Signatures the tests use: a real broker, and someone posing as one.
   if (/MC 555001/i.test(text)) Object.assign(base, { brokerCompany: "Acme Freight", brokerMc: "MC 555001", brokerPhone: "(312) 555-0142", contactName: "Rosa" });
   if (/MC 999999/i.test(text)) Object.assign(base, { brokerCompany: "Acme Freight", brokerMc: "MC 999999", contactName: "Bob" });
@@ -221,7 +224,7 @@ http.createServer(async (req, res) => {
       const outcome = /\b(po|purchase order|pallets?|weight)\b.*\?/i.test(text) ? "question" : /\b(can't|cannot|broker has to|online|portal|no appointments)\b/i.test(text) ? "no" : when ? "set" : "unclear";
       return reply(res, msg(b.model, [{ type: "text", text: JSON.stringify({ outcome, time: outcome === "set" ? when : null, confirmation: text.match(/confirmation (?:number )?#?(\w+)/i)?.[1] ?? null, asks: outcome === "question" ? "the PO number" : null }) }]));
     }
-    if (sys.includes("repair shop said")) return reply(res, msg(b.model, [{ type: "text", text: JSON.stringify({ canHelp: /\b(no|can't|cannot|booked)\b/i.test(text) ? "no" : /\b(yes|sure|can)\b/i.test(text) ? "yes" : "unclear", eta: text.match(/(\d+ (?:minutes|hours?))/)?.[1] ?? null }) }]));
+    if (sys.includes("repair shop said")) return reply(res, msg(b.model, [{ type: "text", text: JSON.stringify({ canHelp: /\b(no|can't|cannot|booked)\b/i.test(text) ? "no" : /\b(yes|sure|can)\b/i.test(text) ? "yes" : "unclear", eta: text.match(/(\d+ (?:minutes|hours?))/)?.[1] ?? null, estimate: text.match(/\$\s?([\d,]+)/) ? Number(text.match(/\$\s?([\d,]+)/)[1].replace(/,/g, "")) : null }) }]));
     if (sys.includes("trucking paperwork") && /QkxVUlJZ/.test(text)) return reply(res, msg(b.model, [{ type: "text", text: JSON.stringify({ ...DOC_CHECK, signed: false, readable: "unreadable", retakeTip: "Hold the phone steady over the page with the flash on, and get all four corners in.", note: "Too blurry to read the signature or the numbers.", amount: null }) }]));
     if (sys.includes("trucking paperwork") && /something a truck driver paid/.test(text)) return reply(res, msg(b.model, [{ type: "text", text: JSON.stringify({ ...DOC_CHECK, amount: 42.5, note: "Parking receipt, $42.50 paid." }) }]));
     if (sys.includes("trucking paperwork")) return reply(res, msg(b.model, [{ type: "text", text: JSON.stringify(/lumper receipt/.test(text) ? { ...DOC_CHECK, amount: 185, note: "Lumper receipt, $185 paid." } : /U0hPUlQ/.test(text) ? { ...DOC_CHECK, exceptions: ["2 cases short"], note: "Receiver wrote a shortage.", amount: null } : { ...DOC_CHECK, amount: null }) }]));

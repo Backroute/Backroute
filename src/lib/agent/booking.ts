@@ -9,7 +9,7 @@ import { dispatchStops } from "../dispatch-checks";
 import { absoluteUrl } from "../channels/twilio";
 import { canCall, canText, textTo } from "../channels/out";
 import { formatAtStop, stopLocalToIso } from "../stop-time";
-import type { Broker, Load, Truck } from "../types";
+import type { Broker, Load, ScheduleWarning, Truck } from "../types";
 import type { OfferReading } from "./broker-mail";
 import { addActivity, claimMark, logChannel, save, saveDriverMessage, type CarrierContext } from "./db";
 import { answerBrokerQuestion, event, passToOwner, tellOwner, uid } from "./dispatcher";
@@ -32,6 +32,7 @@ import * as mail from "./templates";
 import { tipsForLoad } from "./facility-notes";
 import { addWhy, whyBook, withWhy } from "./why";
 import { hardProblem, scheduleWarnings } from "./schedule";
+import { askPremiums, betterTwin, driverWontRun, gearMissing, hazmatText, MAX_PREMIUM, redFlags, repostOf, repostPremium, twinOf, withPremium } from "./judgment";
 import { reeferLine } from "./reefer";
 import { translateForDriver } from "../ai/translate";
 import { cantRun } from "../expiry";
@@ -111,8 +112,8 @@ export function bestTruck(ctx: CarrierContext, o: LoadAsk, skip?: Set<string>, o
 }
 
 /** A load as the AI weighs it for a truck. A partial carries itself along, to be planned into a trip (lib/trip-plan). */
-type LoadAsk = { equipment: Load["equipmentType"]; originCity: string; originState: string; destinationState: string; pickupAt: number | null; miles: number; trip?: TripLoad };
-const askOf = (l: Load): LoadAsk => ({ equipment: l.equipmentType, originCity: l.lane.origin, originState: l.lane.originState, destinationState: l.lane.destState, pickupAt: l.pickupAt ? Date.parse(l.pickupAt) : null, miles: l.lane.miles, ...(isPartial(l) ? { trip: l } : {}) });
+type LoadAsk = { equipment: Load["equipmentType"]; originCity: string; originState: string; destinationState: string; destinationCity?: string; notes?: string; pickupAt: number | null; miles: number; trip?: TripLoad };
+const askOf = (l: Load): LoadAsk => ({ equipment: l.equipmentType, originCity: l.lane.origin, originState: l.lane.originState, destinationState: l.lane.destState, destinationCity: l.lane.destination, ...(l.offerNotes ? { notes: l.offerNotes } : {}), pickupAt: l.pickupAt ? Date.parse(l.pickupAt) : null, miles: l.lane.miles, ...(isPartial(l) ? { trip: l } : {}) });
 
 /** Whether this truck can take the load, and the empty miles to it if so (null: it can't). */
 function fitFor(ctx: CarrierContext, truck: Truck, o: LoadAsk, opts: { planned?: boolean } = {}): number | null {
@@ -130,6 +131,9 @@ function fitDetail(ctx: CarrierContext, truck: Truck, o: LoadAsk, opts: { planne
   if (cantRun(truck, ctx.drivers.find((d) => d.id === truck.driverId), Date.now())) return null;
   // States the driver said they won't run into.
   if (ctx.drivers.find((d) => d.id === truck.driverId)?.prefs?.avoidStates?.includes(o.destinationState)) return null;
+  // Cities they avoid, touch freight they said no to (lib/agent/judgment), and gear the truck doesn't carry.
+  if (driverWontRun(ctx.drivers.find((d) => d.id === truck.driverId), { originCity: o.originCity, destinationCity: o.destinationCity ?? "", notes: o.notes })) return null;
+  if (gearMissing(truck, o.notes).length) return null;
   // A partial on the way: it joins the truck's trip when there's room and time for it (lib/agent/trips), along with
   // any other partial the AI is asking for on this truck. Not with a full load being asked for.
   if (o.trip && !ctx.loads.some((l) => l.truckId === truck.id && l.stage === "negotiating" && !isPartial(l))) {
@@ -189,6 +193,31 @@ function matchFleet(ctx: CarrierContext, loads: Load[], now = new Date()): { loa
 }
 
 /**
+ * A load we already have, posted again: counted (a broker reposting is short of trucks, so the ask goes up a little),
+ * and a higher rate is kept. One we walked away from that now pays at least the owner's lowest comes back as an offer,
+ * so the AI can ask again. A feed read every round isn't a repost unless the rate changed. Returns the load when it
+ * came back.
+ */
+async function notePosting(ctx: CarrierContext, prior: Load, rate: number | null, fromFeed: boolean): Promise<Load | null> {
+  if (!["offered", "declined"].includes(prior.stage)) return null;
+  const r = repostOf(prior, rate);
+  if (fromFeed && !r.higher) return null;
+  const floor = floorFor(prior, ctx.settings);
+  const back = prior.stage === "declined" && r.higher && floor !== null && rate! >= floor && !prior.cancellationReason;
+  const next: Load = {
+    ...prior,
+    repostCount: r.count,
+    ...(r.higher ? { listedRate: rate!, targetRate: Math.max(prior.targetRate, rate!) } : {}),
+    ...(back ? { stage: "offered" as const, premium: undefined, bookRequest: undefined } : {}),
+    updatedAt: new Date().toISOString(),
+  };
+  if (back) Object.assign(next, addWhy(next, `Posted again at $${rate!.toLocaleString("en-US")}, up from $${(prior.listedRate || 0).toLocaleString("en-US")}: worth asking again.`));
+  await save("loads", ctx.carrier.id, next as unknown as Item);
+  ctx.loads = ctx.loads.map((l) => (l.id === next.id ? next : l));
+  return back ? next : null;
+}
+
+/**
  * Loads a broker emailed: each one that fits a truck becomes an offer on the owner's dashboard. On "Within my rules"
  * or full autopilot, the AI asks to book the best one for each truck if it pays at least the owner's lowest rate.
  */
@@ -204,12 +233,22 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
   for (const o of offers) {
     if (!o.originCity || !o.originState || !o.destinationCity || !o.destinationState) continue;
     const equipment = guessEquipment(o.equipment) ?? "Dry Van";
-    if (o.loadNumber && ctx.loads.some((l) => l.brokerId === broker.id && l.referenceNumber.toLowerCase() === o.loadNumber!.toLowerCase())) continue;
+    const byNumber = o.loadNumber ? ctx.loads.find((l) => l.brokerId === broker.id && l.referenceNumber.toLowerCase() === o.loadNumber!.toLowerCase()) : undefined;
+    if (byNumber) {
+      const back = await notePosting(ctx, byNumber, o.rate, !!sender.feed);
+      if (back) added.push(back);
+      continue;
+    }
     const pickupAt = stopLocalToIso(o.pickupLocal, o.originState);
     const deliveryAt = stopLocalToIso(o.deliveryLocal, o.destinationState);
     // The same load again (a feed read every round, a broker resending their list): once is enough.
     const same = (l: Load) => l.brokerId === broker.id && l.lane.origin.toLowerCase() === o.originCity!.toLowerCase() && l.lane.destination.toLowerCase() === o.destinationCity!.toLowerCase() && (l.pickupAt ?? null) === (pickupAt ?? null);
-    if (!o.loadNumber && ctx.loads.some(same)) continue;
+    const again = o.loadNumber ? undefined : ctx.loads.find(same);
+    if (again) {
+      const back = await notePosting(ctx, again, o.rate, !!sender.feed);
+      if (back) added.push(back);
+      continue;
+    }
     if (pickupAt && Date.parse(pickupAt) < Date.now()) continue; // Already gone.
     // Truck routing (real road miles) when it's set up, the built-in estimate otherwise.
     const miles = o.miles ?? (await route({ city: o.originCity, state: o.originState }, { city: o.destinationCity, state: o.destinationState }))?.miles ?? estimateMiles({ city: o.originCity, state: o.originState }, { city: o.destinationCity, state: o.destinationState });
@@ -220,7 +259,7 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
       : undefined;
     const lane = { origin: o.originCity, originState: o.originState, destination: o.destinationCity, destState: o.destinationState, miles, marketRpm: 0 };
     const asTrip: TripLoad | undefined = partial ? { id: `offer-${o.loadNumber ?? added.length}`, referenceNumber: o.loadNumber ?? "the new load", lane, equipmentType: equipment, weight: o.weight ?? 0, pickupAt: pickupAt ?? undefined, deliveryAt: deliveryAt ?? undefined, partial } : undefined;
-    const fit = bestTruck(ctx, { equipment, originCity: o.originCity, originState: o.originState, destinationState: o.destinationState, pickupAt: pickupAt ? Date.parse(pickupAt) : null, miles, ...(asTrip ? { trip: asTrip } : {}) });
+    const fit = bestTruck(ctx, { equipment, originCity: o.originCity, originState: o.originState, destinationState: o.destinationState, destinationCity: o.destinationCity, ...(o.notes ? { notes: o.notes } : {}), pickupAt: pickupAt ? Date.parse(pickupAt) : null, miles, ...(asTrip ? { trip: asTrip } : {}) });
     if (!fit) continue;
 
     const posted = o.rate ?? 0;
@@ -271,11 +310,30 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
       ...(market ? { market: { rpm: market.rpm, high: market.high, source: market.source } } : {}),
       ...(sender.from ? { brokerContactEmail: sender.from } : {}),
       ...(sender.feed ? {} : { offerEmail: { subject: sender.subject, messageId: sender.messageId } }),
+      ...(o.notes ? { offerNotes: o.notes.slice(0, 600) } : {}),
+      ...(hazmatText(o.notes) ? { hazmat: true } : {}),
     };
     // A holiday, a dock that's closed then, or too little time to drive it: noted on the offer; a hard one keeps the
     // AI from asking for it on its own.
-    const warnings = await scheduleWarnings(load, fit.truck, ctx.carrier.id, ctx.drivers.find((d) => d.id === fit.truck.driverId), undefined, ctx.loads).catch(() => []);
+    const warnings = await scheduleWarnings(load, fit.truck, ctx.carrier.id, ctx.drivers.find((d) => d.id === fit.truck.driverId), undefined, ctx.loads).catch((): ScheduleWarning[] => []);
+    // Too good to be true, or asking for money first: the owner looks before anything is asked.
+    for (const text of redFlags({ rate: posted || null, miles, notes: o.notes }, market)) warnings.push({ hard: true, text });
     if (warnings.length) load.scheduleWarnings = warnings;
+    // The same freight from another broker: the better one is asked for, the other set aside with a note.
+    const twin = twinOf(ctx.loads, { brokerId: broker.id, originCity: o.originCity, destinationCity: o.destinationCity, pickupAt });
+    if (twin) {
+      load.twinId = twin.id;
+      const better = betterTwin(load, twin, ctx.brokers);
+      const worse = better.id === load.id ? twin : load;
+      const name = (l: Load) => ctx.brokers.find((b) => b.id === l.brokerId)?.company ?? (l.id === load.id ? broker.company : "another broker");
+      const note: ScheduleWarning = { hard: true, text: `Same freight as ${better.referenceNumber || "another post"} from ${name(better)} at $${(better.listedRate || better.targetRate).toLocaleString("en-US")}, which pays ${better.listedRate === worse.listedRate ? "faster" : "more"}: Backroute asks for that one.` };
+      if (worse.id === load.id) load.scheduleWarnings = [...(load.scheduleWarnings ?? []), note];
+      else if (twin.stage === "offered") {
+        const marked: Load = { ...twin, twinId: load.id, scheduleWarnings: [...(twin.scheduleWarnings ?? []).filter((w) => !w.text.startsWith("Same freight as")), note], updatedAt: new Date().toISOString() };
+        await save("loads", ctx.carrier.id, marked as unknown as Item);
+        ctx.loads = ctx.loads.map((x) => (x.id === marked.id ? marked : x));
+      } else load.scheduleWarnings = [...(load.scheduleWarnings ?? []), { hard: true, text: `Same freight as ${twin.referenceNumber} from ${name(twin)}, which Backroute is already asking for.` }];
+    }
     await save("loads", ctx.carrier.id, load as unknown as Item);
     ctx.loads.unshift(load);
     added.push(load);
@@ -344,6 +402,17 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
     if (credit.surchargePct && !load.surchargePct) {
       ask = Math.round((ask * (1 + credit.surchargePct / 100)) / 25) * 25;
       load = { ...load, surchargePct: credit.surchargePct };
+    }
+  }
+  // What a dispatcher asks extra for: a weekend pickup, a load that has to go today, hazmat, high-value or touch
+  // freight, a broker posting it again (lib/agent/judgment). Once per load, and never on the owner's own number.
+  if (!how.byOwner && !load.premium && ctx.settings.askPremiums !== false) {
+    const p = askPremiums({ pickupAt: load.pickupAt, originState: load.lane.originState, hazmat: load.hazmat, notes: load.offerNotes, commodity: load.commodity }, Date.now());
+    const r = repostPremium(load.repostCount ?? 0);
+    const factor = Math.min(MAX_PREMIUM, p.factor * r.factor);
+    if (factor > 1) {
+      ask = withPremium(ask, { factor, reasons: [] });
+      load = { ...load, premium: { pct: Math.round((factor - 1) * 100), reasons: [...p.reasons, ...r.reasons] } };
     }
   }
   // Why this load, at this price, for this truck: kept on the load, and shown with anything waiting for the owner.

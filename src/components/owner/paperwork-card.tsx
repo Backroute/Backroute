@@ -9,6 +9,7 @@ import { useCarrierTrucks } from "@/lib/selectors";
 import { PRIMARY_CARRIER_ID } from "@/lib/mock-data";
 import { dueWords, paperworkDue } from "@/lib/expiry";
 import { updateDriver, updateTruck } from "@/lib/back-office";
+import { GEAR } from "@/lib/agent/judgment";
 import { formatDate } from "@/lib/utils";
 import type { Endorsement } from "@/lib/types";
 
@@ -84,6 +85,25 @@ export function PaperworkCard() {
                         Inspection
                         <input type="date" aria-label={`${t.unitNumber} inspection due`} className={dateInput} value={t.nextInspectionDue?.slice(0, 10) ?? ""} onChange={(e) => e.target.value && updateTruck(t.id, { nextInspectionDue: new Date(`${e.target.value}T12:00:00Z`).toISOString() })} />
                       </label>
+                    </span>
+                    {/* What the truck carries: a load that needs gear it doesn't have isn't booked on it (lib/agent/judgment). */}
+                    <span className="flex w-full flex-wrap items-center gap-1.5 text-xs text-ink-500" role="group" aria-label={`${t.unitNumber} gear`}>
+                      Gear on board
+                      {GEAR.map((g) => {
+                        const on = !!t.gear?.includes(g.id);
+                        return (
+                          <button
+                            key={g.id}
+                            type="button"
+                            aria-pressed={on}
+                            onClick={() => updateTruck(t.id, { gear: on ? (t.gear ?? []).filter((x) => x !== g.id) : [...(t.gear ?? []), g.id] })}
+                            className={on ? "rounded-full bg-ink-950 px-2 py-0.5 font-medium text-white" : "rounded-full bg-ink-100 px-2 py-0.5 font-medium text-ink-700"}
+                          >
+                            {g.label}
+                          </button>
+                        );
+                      })}
+                      {!t.gear?.length && <span className="text-ink-400">Not listed: loads aren&apos;t checked for gear.</span>}
                     </span>
                   </div>
                 ))}

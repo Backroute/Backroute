@@ -43,6 +43,9 @@ const sub = "aaaaaaaa-0000-0000-0000-000000000001", phone = "12145550100";
   await p.waitForTimeout(4000);
   const cid = db(`select carrier_id from members where user_id = '${sub}'`);
   fs.writeFileSync(S + "/fakes/carrier.txt", cid);
+  // The suites after this check exact asks on loads picked up on whatever day they run: premiums for a weekend pickup
+  // would make those numbers depend on the day. dispatcher-e2e turns them back on to test them.
+  db(`update carriers set settings = settings || '{"askPremiums":false}'::jsonb where id = '${cid}'`);
   check("owner phone saved on the carrier", db(`select owner_phone from carriers where id = '${cid}'`) === "12145550100");
   check("exactly the typed trucks saved", db(`select string_agg(unit_number, ',' order by unit_number) from trucks where carrier_id = '${cid}'`) === "101,102");
   check("drivers saved with phones", db(`select string_agg(phone_last10, ',' order by phone_last10) from drivers where carrier_id = '${cid}'`) === "2145550148,9725550163");

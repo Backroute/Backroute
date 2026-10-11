@@ -21,13 +21,31 @@ function signature(carrier: CarrierRow, settings: Pick<AgentSettings, "remitEmai
 export const subjectFor = (l: Load, what?: string) => `${what ? `${what}: ` : ""}Load ${l.referenceNumber} · ${l.lane.origin}, ${l.lane.originState} → ${l.lane.destination}, ${l.lane.destState}`;
 
 /** Asking to book a load. `truckAt` is where the truck is, as a dispatcher would say it ("empty in Dallas, TX"). */
+/**
+ * The one reason a dispatcher gives with a higher number, from what made the AI ask more (lib/agent/judgment). A
+ * broker reposting the load isn't said back to them.
+ */
+function askReason(load: Load): string {
+  const r = load.premium?.reasons ?? [];
+  const said = [
+    r.includes("weekend pickup") ? "a weekend pickup" : null,
+    r.some((x) => x.startsWith("picks up within")) ? "short notice" : null,
+    r.includes("hazmat") ? "hazmat" : null,
+    r.includes("high-value freight") ? "high-value freight" : null,
+    r.includes("driver handles the freight") ? "driver assist" : null,
+  ].filter(Boolean) as string[];
+  if (!said.length) return "";
+  const list = said.length === 1 ? said[0] : `${said.slice(0, -1).join(", ")} and ${said.at(-1)}`;
+  return ` That's for ${list}.`;
+}
+
 export function bookRequest(carrier: CarrierRow, settings: AgentSettings, load: Load, ask: number, toName?: string, truckAt?: string, record?: string | null) {
   const equipment = load.equipmentType.toLowerCase();
   return `${hello(toName)}
 
 Can we get ${load.referenceNumber}, ${lane(load)}, picking up ${when(load.pickupWindow)}? ${truckAt ? `Our ${equipment} is ${truckAt} and ready for it.` : `We have a ${equipment} ready for it.`}
 
-Our rate is ${money(ask)} all in. ${termsLine(settings)}${record ? `
+Our rate is ${money(ask)} all in.${askReason(load)} ${termsLine(settings)}${record ? `
 
 ${record}` : ""}
 

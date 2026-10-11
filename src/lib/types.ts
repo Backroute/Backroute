@@ -233,6 +233,10 @@ export interface DriverPrefs {
   noCallsBefore?: number;
   /** States the driver won't take loads into (e.g. NJ for the NYC area). */
   avoidStates?: string[];
+  /** Cities the driver won't pick up or deliver in ("New York", "Los Angeles"). */
+  avoidCities?: string[];
+  /** The driver won't load or unload freight by hand (driver assist, touch freight). */
+  noTouchFreight?: boolean;
   /** New-load options by phone call, or just a text. */
   newLoads?: "call" | "text";
   /** Where calls and texts go: the app, or a regular phone call and SMS for drivers who won't use an app. */
@@ -290,6 +294,9 @@ export interface ParkingReservation {
   status: "booked" | "cancelled";
 }
 
+/** Gear a truck can carry that a load may ask for (lib/agent/judgment). */
+export type TruckGear = "tarps" | "straps" | "chains" | "load_locks" | "pallet_jack" | "liftgate" | "ppe";
+
 export interface Truck {
   id: string;
   unitNumber: string;
@@ -303,6 +310,8 @@ export interface Truck {
   currentCity: string;
   currentState: string;
   homeBase: string;
+  /** The gear the owner says this truck carries. Unset: not listed, so loads aren't checked against it. */
+  gear?: TruckGear[];
   /** Real accounts with an ELD connected: where the truck actually is, and when that was read. */
   position?: { lat: number; lon: number; at: string; description?: string; source: "samsara" | "motive" | "geotab" };
   /** Real accounts: the AI's plan for this truck (now, next, home time), refreshed every dispatch round. */
@@ -401,7 +410,7 @@ export interface Roadside {
   /** Index of the shop the AI is calling (or last called). */
   calling: number;
   /** The shop that said yes. */
-  found?: { shop: string; phone: string; eta: string | null };
+  found?: { shop: string; phone: string; eta: string | null; estimate?: number; okayed?: boolean };
   /** Every shop said no or didn't answer. */
   exhausted?: boolean;
   /** The AI moved on to heavy-duty towing after the repair shops. */
@@ -717,6 +726,14 @@ export interface Load {
   /** What's in the trailer, as the broker said it. */
   commodity?: string;
   hazmat?: boolean;
+  /** The posting's own notes (gear, touch freight, special asks), as the broker wrote them. */
+  offerNotes?: string;
+  /** Times the broker posted this same load again after we first saw it (they're short of trucks). */
+  repostCount?: number;
+  /** Asked this much more for the load, and why (weekend pickup, hazmat, posted again; lib/agent/judgment). */
+  premium?: { pct: number; reasons: string[] };
+  /** The same freight offered by another broker: that load's id. The AI asks for the better paying one. */
+  twinId?: string;
   /** Appointment times (or first come, first served), as the broker said them on the phone. */
   appointmentNote?: string;
   /** Who at the broker to email about this load (from their email or the rate con). */

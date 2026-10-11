@@ -26,6 +26,10 @@ export interface ReportCard {
   askedOwner: number;
   /** The carrier's own history from before (imported loads): what a mile paid then, to compare. */
   before: { rpm: number; loads: number } | null;
+  /** Of the things Backroute asked the owner to OK (a message, a move), how many they said yes to. */
+  approvals: { yes: number; of: number } | null;
+  /** Revenue by truck over the period: the best and the least, to see that no driver is left with the scraps. */
+  spread: { top: number; bottom: number; trucks: number } | null;
 }
 
 const DAY = 86400_000;
@@ -71,6 +75,12 @@ export function reportCard(loads: Load[], escalations: Escalation[], now: number
   const past = loads.filter((l) => l.imported && (l.bookedRate ?? 0) > 0 && l.lane.miles > 0);
   const pastMiles = past.reduce((s, l) => s + l.lane.miles, 0);
   const cents = avg(marketed.map((l) => (l.bookedRate! / l.lane.miles - l.market!.rpm) * 100));
+  // The owner's answers to what Backroute asked them to OK: a yes means it judged right.
+  const answered = escalations.filter((e) => e.resolvedBy === "carrier" && typeof e.approved === "boolean" && Date.parse(e.resolvedAt ?? e.createdAt) >= since && Date.parse(e.resolvedAt ?? e.createdAt) <= now);
+  // Revenue per truck, for trucks that ran at least one load.
+  const perTruck = new Map<string, number>();
+  for (const l of delivered) if (l.truckId) perTruck.set(l.truckId, (perTruck.get(l.truckId) ?? 0) + (l.invoice?.amount ?? l.bookedRate ?? 0));
+  const truckRevenue = [...perTruck.values()].sort((a, b) => b - a);
   return {
     days,
     delivered: delivered.length,
@@ -86,5 +96,34 @@ export function reportCard(loads: Load[], escalations: Escalation[], now: number
     emptyHours: gaps.length ? Math.round(avg(gaps)! * 10) / 10 : null,
     askedOwner: asked,
     before: past.length >= 5 ? { rpm: Math.round((past.reduce((s, l) => s + (l.bookedRate ?? 0), 0) / pastMiles) * 100) / 100, loads: past.length } : null,
+    approvals: answered.length ? { yes: answered.filter((e) => e.approved).length, of: answered.length } : null,
+    spread: truckRevenue.length >= 2 ? { top: Math.round(truckRevenue[0]), bottom: Math.round(truckRevenue.at(-1)!), trucks: truckRevenue.length } : null,
   };
+}
+
+/** One thing full autopilot should have earned first, and whether it has. */
+export interface ReadyCheck {
+  label: string;
+  met: boolean;
+  /** Where it stands now, in a few words. */
+  now: string;
+}
+
+/**
+ * Before the owner hands over everything: what Backroute has to have shown on "Within my rules" first, the way you'd
+ * watch a new dispatcher for a few weeks. Enough loads booked by itself, the owner agreeing with what it asked,
+ * deliveries on time, and rates at or over the market where that's known. It's advice, not a lock: the owner decides.
+ */
+export function fullModeReady(r: ReportCard): { ready: boolean; checks: ReadyCheck[] } {
+  const checks: ReadyCheck[] = [
+    { label: "10 loads booked by Backroute and delivered", met: r.bookedByAi >= 10 && r.delivered >= 10, now: `${Math.min(r.bookedByAi, r.delivered)} so far` },
+    {
+      label: "You said yes to 9 in 10 of its asks",
+      met: !!r.approvals && r.approvals.of >= 10 && r.approvals.yes / r.approvals.of >= 0.9,
+      now: r.approvals ? `${r.approvals.yes} of ${r.approvals.of}` : "nothing asked yet",
+    },
+    { label: "9 in 10 deliveries on time", met: !!r.onTime && r.onTime.of >= 5 && r.onTime.share >= 0.9, now: r.onTime ? `${Math.round(r.onTime.share * 100)}% of ${r.onTime.of}` : "no appointments yet" },
+    { label: "At or over the market rate", met: !r.vsMarket || r.vsMarket.cents >= 0, now: r.vsMarket ? `${r.vsMarket.cents >= 0 ? "+" : ""}${r.vsMarket.cents}¢ a mile` : "no market data (not counted)" },
+  ];
+  return { ready: checks.every((c) => c.met), checks };
 }

@@ -231,7 +231,7 @@ export async function handleBreakdown(ctx: CarrierContext, driver: Driver, detai
 // ─── The call to the shop ────────────────────────────────────────────────────
 
 export function shopCallOpening(ctx: CarrierContext, truck: Truck, r: Roadside): string {
-  return `Hi, this is the AI dispatcher for ${ctx.carrier.name}, a trucking company. This call is transcribed. We have a ${truck.equipmentType.toLowerCase()} semi broken down near ${r.where}: ${r.details}. Can you send someone out or take it in today, and about how soon?`;
+  return `Hi, this is the AI dispatcher for ${ctx.carrier.name}, a trucking company. This call is transcribed. We have a ${truck.equipmentType.toLowerCase()} semi broken down near ${r.where}: ${r.details}. Can you send someone out or take it in today, about how soon, and roughly what it would cost?`;
 }
 
 export const SHOP_VOICEMAIL = (ctx: CarrierContext) => `Hi, this is the AI dispatcher for ${ctx.carrier.name}. We have a semi broken down near you. Our driver will call you directly. Thanks.`;
@@ -239,6 +239,7 @@ export const SHOP_VOICEMAIL = (ctx: CarrierContext) => `Hi, this is the AI dispa
 const ShopAnswer = z.object({
   canHelp: z.enum(["yes", "no", "unclear"]),
   eta: z.string().nullable().describe("How soon they said, in their words (e.g. 'about 90 minutes', 'tomorrow morning'), or null."),
+  estimate: z.number().nullable().optional().describe("The price they gave in dollars (the top of a range), or null if they didn't give one."),
 });
 
 async function readShopAnswer(said: string): Promise<z.infer<typeof ShopAnswer>> {
@@ -267,10 +268,15 @@ async function shopCallTurn(ctx: CarrierContext, truck: Truck, said: string): Pr
   const driver = ctx.drivers.find((d) => d.id === r.driverId);
   const answer = await readShopAnswer(said);
   if (answer.canHelp === "yes" && shop && driver) {
-    await saveRoadside(ctx, truck, { ...r, found: { shop: shop.name, phone: shop.phone, eta: answer.eta } });
+    // The owner's repair limit (Settings → Basics): a quote under it is okayed on the call; over it, or no price, waits for them.
+    const limit = ctx.settings.repairLimit ?? 0;
+    const okayed = answer.estimate != null && answer.estimate > 0 && limit > 0 && answer.estimate <= limit;
+    await saveRoadside(ctx, truck, { ...r, found: { shop: shop.name, phone: shop.phone, eta: answer.eta, ...(answer.estimate != null ? { estimate: answer.estimate } : {}), ...(okayed ? { okayed: true } : {}) } });
+    if (answer.estimate != null && !okayed)
+      await raise(ctx, { reason: `${shop.name} can fix truck ${truck.unitNumber}${answer.eta ? ` (${answer.eta})` : ""} for about $${answer.estimate.toLocaleString("en-US")}${limit ? `, over your $${limit.toLocaleString("en-US")} limit` : ""}. Call them at ${shop.phone} to approve it.`, loadId: r.loadId, label: "Approved", source: "voice", to: "owner" });
     await textDriver(ctx, driver, SHOP_CAN_HELP[driver.prefs?.language ?? "en"]({ shop: shop.name, phone: shop.phone, eta: answer.eta }), "roadside_found");
     await addActivity(ctx.carrier.id, event({ type: "incident", loadId: r.loadId, message: `${shop.name} can help truck ${truck.unitNumber}`, detail: `${answer.eta ?? "time not given"} · the driver has their number`, severity: "success" }));
-    return { reply: `Thank you. Our driver, ${driver.name.split(" ")[0]}, will call you in a minute to set it up and give you the exact spot. The owner will approve the bill.`, hangUp: true };
+    return { reply: `Thank you. Our driver, ${driver.name.split(" ")[0]}, will call you in a minute to set it up and give you the exact spot. ${okayed ? `You're approved up to $${answer.estimate!.toLocaleString("en-US")}; anything more, call the owner first.` : "The owner will approve the bill."}`, hangUp: true };
   }
   if (answer.canHelp === "no") {
     const moved = await nextShop(ctx, truck);

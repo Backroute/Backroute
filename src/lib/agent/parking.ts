@@ -1,4 +1,5 @@
 import "server-only";
+import { toE164 } from "../cloud/phone";
 import { hosNow, whereHoursEnd } from "../hos-clock";
 import { cityCoords, distanceMiles, type LatLng } from "../trip-geo";
 import type { ActivityEvent, Driver, Expense, Load, ParkingReservation, ParkingSpot, Truck } from "../types";
@@ -112,9 +113,9 @@ export async function reserveParking(ctx: CarrierContext, truck: Truck, spot: Pa
   await addActivity(ctx.carrier.id, event({ type: "expense", message: `Parking reserved for ${truck.unitNumber}`, detail: `${spot.name}, ${spot.address} · $${spot.price} · ${askedBy === "owner" ? "you asked" : `${driver?.name.split(" ")[0] ?? "the driver"} asked`}`, severity: "success" }));
   if (textDriver && driver?.phone && !driver.prefs?.smsOptOut) {
     const text = parkingText(reservation, spot.address);
-    const sid = await textTo(ctx.carrier, driver.phone, text);
+    const sid = await textTo(ctx.carrier, toE164(driver.phone) ?? driver.phone, text);
     await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: new Date().toISOString(), channel: "sms", ai: true }, "/driver");
-    await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: driver.phone, body: text, data: { kind: "parking" } });
+    await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: toE164(driver.phone) ?? driver.phone, body: text, data: { kind: "parking" } });
   }
   return reservation;
 }
@@ -158,9 +159,9 @@ export async function parkingReminders(ctx: CarrierContext, now: number): Promis
     const driver = ctx.drivers.find((d) => d.id === truck.driverId);
     if (!driver?.phone || driver.prefs?.smsOptOut || !(await claimMark(ctx.carrier.id, `parking:${r.id}`, "reminder"))) continue;
     const text = `Your parking tonight: ${r.place}, ${r.address}. Confirmation ${r.confirmation}.${r.checkIn ? ` ${r.checkIn}` : ""}`;
-    const sid = await textTo(ctx.carrier, driver.phone, text);
+    const sid = await textTo(ctx.carrier, toE164(driver.phone) ?? driver.phone, text);
     await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: new Date(now).toISOString(), channel: "sms", ai: true }, "/driver");
-    await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: driver.phone, body: text, data: { kind: "parking_reminder" } });
+    await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: toE164(driver.phone) ?? driver.phone, body: text, data: { kind: "parking_reminder" } });
     done.push(`Parking reminder to ${driver.name.split(" ")[0]}`);
   }
   return done;

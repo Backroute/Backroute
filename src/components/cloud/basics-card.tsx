@@ -1,5 +1,6 @@
 "use client";
 
+import { FullReady } from "@/components/owner/full-ready";
 import { Help } from "@/components/ui/help";
 import type { HelpKey } from "@/lib/help";
 import { useState } from "react";
@@ -79,6 +80,7 @@ export function BasicsCard() {
 
       <Question n={3} help="autopilot" q="How much can Backroute do without asking?" hint="It always stays inside your numbers above.">
         <AutopilotControl />
+        <FullReady />
         <div className="mt-3">
           <p className="flex items-center gap-1 text-xs font-medium text-ink-700">
             Time to stop Backroute&apos;s emails to brokers before they go <Help topic="undo" />

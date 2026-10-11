@@ -28,6 +28,7 @@ export function whyBook(ctx: Pick<CarrierContext, "trucks" | "drivers" | "broker
     lines.push(`${parts.join("; ")}.`);
   }
   if (load.surchargePct) lines.push(`Asked ${load.surchargePct}% more because this broker is slow to pay.`);
+  if (load.premium?.pct) lines.push(`Asked ${load.premium.pct}% more: ${load.premium.reasons.join(", ")}.`);
   // Empty miles to get there.
   const truck = ctx.trucks.find((t) => t.id === load.truckId);
   if (truck) lines.push(`${Math.round(load.deadheadMiles)} empty miles to the pickup for truck ${truck.unitNumber}${truck.currentCity ? ` from ${truck.currentCity}, ${truck.currentState}` : ""}.`);

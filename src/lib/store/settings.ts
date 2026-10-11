@@ -34,6 +34,10 @@ export interface AgentSettings {
   fuelPrices?: FuelPrices;
   /** Who the carrier factors with ("RTS Financial"), shown in Settings → Integrations. */
   factoringCompany?: string;
+  /** Repairs on the road the AI may okay with the shop without asking, in dollars. Unset or 0: the owner approves every one. */
+  repairLimit?: number;
+  /** Ask more for a weekend pickup, short notice, hazmat, high-value or touch freight, and a load posted again. On unless turned off. */
+  askPremiums?: boolean;
   /** What the owner wants each truck to gross in a week: the report card measures against it. */
   weeklyGoal?: number;
   /** Real accounts: the AI texts drivers before pickup and delivery, and follows up. On unless turned off. */

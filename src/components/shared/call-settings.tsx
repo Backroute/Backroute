@@ -172,6 +172,27 @@ export function CallSettingsCard({ driver }: { driver: Driver }) {
           );
         })}
       </div>
+      <label className="mt-2 flex flex-col gap-1 text-xs font-medium text-ink-800">
+        {t.avoidCities}
+        <input
+          key={(prefs.avoidCities ?? []).join(",")}
+          defaultValue={(prefs.avoidCities ?? []).join(", ")}
+          placeholder={t.avoidCitiesHint}
+          onBlur={(e) => {
+            const cities = [...new Set(e.target.value.split(/[,;\n]/).map((c) => c.trim()).filter(Boolean))].slice(0, 12);
+            if (cities.join(",") !== (prefs.avoidCities ?? []).join(",")) setDriverPrefs(driver.id, { avoidCities: cities });
+          }}
+          className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-normal outline-none focus:border-ink-400"
+        />
+      </label>
+      <button
+        type="button"
+        aria-pressed={!!prefs.noTouchFreight}
+        onClick={() => setDriverPrefs(driver.id, { noTouchFreight: !prefs.noTouchFreight })}
+        className={cn("mt-2 rounded-full border px-3 py-1.5 text-xs font-medium", prefs.noTouchFreight ? "border-ink-950 bg-ink-950 text-white" : "border-line text-ink-600")}
+      >
+        {t.noTouch}
+      </button>
 
       <p className="mt-4 text-xs font-medium text-ink-800">{t.newLoads}</p>
       <div className="mt-1.5 grid grid-cols-2 gap-1.5" role="radiogroup" aria-label={t.newLoads}>

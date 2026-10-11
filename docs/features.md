@@ -501,6 +501,36 @@ What the real version does today, and what it doesn't do yet. How to switch each
   - `npm run check:live` (scripts/go-live-check.mjs) also checks the QuickBooks and Xero key pairs, that the encryption
     key is there for Xero, Geotab and direct deposit, and `SHARE_LINK_SECRET`.
 
+- **Dispatcher judgment (lib/agent/judgment):**
+  - **Asks more when a load is harder, and says why:** a weekend pickup at the dock (+5%), a pickup within 6 hours
+    (+6%), hazmat (+10%), high-value freight (+5%), driver-assist or touch freight (+4%), a load the broker keeps
+    reposting (+3%, +6% from the third post). Never more than 18% together, never under the owner's lowest. The book
+    request gives the broker the one reason ("That's for high-value freight."); the load's why shows it; a switch in
+    Settings turns it off.
+  - **Holds loads that look like scams:** a rate 1.6× the market or more (or over $7 a mile on a long load with no
+    market data), or a post asking the carrier to pay a fee, deposit, wire or gift card first. Offered with a warning;
+    never asked for on its own.
+  - **The same freight from two brokers:** same lane, pickups within three hours: the better paying one (or, on a tie,
+    the faster payer) is asked for, the other set aside with a note naming it.
+  - **Reposted loads:** a load posted again is the same load, counted; posted again higher after Backroute passed on it,
+    it comes back as an offer with the new rate, so it can be asked for again.
+  - **A driver's no-go cities and touch freight:** set on the driver's profile or just said to the AI in a text or call
+    ("I don't go to Chicago", "no more driver unload"); loads that break them aren't put on that truck.
+  - **A truck's gear:** listed per truck on Compliance → Paperwork (tarps, straps, chains, load locks, pallet jack,
+    liftgate, safety gear); a load whose notes ask for gear the truck doesn't carry isn't put on it. Unlisted, nothing
+    is checked.
+  - **A rate con for another load number:** when the broker gave us the number, a rate con naming a different one is
+    sent back for a corrected one before the truck goes; one that names another of our loads is matched to that load.
+  - **A quiet ELD on a load:** after two hours with no location while the driver's on duty, one text asks where they
+    are; the owner sees it.
+  - **Repairs it can okay:** the AI asks a shop for a rough price; under the owner's limit (Settings) it okays the repair
+    on the call, over it the owner is asked with the shop's number.
+  - **Measured like a dispatcher:** the report card adds how often the owner said yes to what it asked and the split
+    between trucks; Basics shows what full autopilot should be earned with (10 loads delivered, 9 in 10 yeses, 9 in 10
+    on time, at or over the market), as advice, not a lock.
+  - Fixed: texts from the late-truck, stopped-truck and parking checks went to the driver's number as typed
+    ("(214) 555-0148"); every text now goes out in the +1 form.
+
 ## What it doesn't do yet
 
 The AI now does the day-to-day work of a dispatcher by email, text and phone. What's still out of its reach, or needs something from outside:

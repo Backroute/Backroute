@@ -57,9 +57,9 @@ async function handle(carrierId: string, email: InboundEmail) {
 
   const broker = ctx.brokers.find((b) => b.email?.toLowerCase() === from);
   const byRef = (ref?: string | null) => (ref ? ctx.loads.find((l) => l.referenceNumber.toLowerCase() === ref.toLowerCase()) : undefined);
+  const named = ctx.loads.find((l) => !!l.referenceNumber && haystack.includes(l.referenceNumber.toLowerCase()));
   let load: Load | undefined =
-    ctx.loads.find((l) => haystack.includes(l.referenceNumber.toLowerCase())) ??
-    (broker ? ctx.loads.filter((l) => l.brokerId === broker.id && ACTIVE.has(l.stage)).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0] : undefined);
+    named ?? (broker ? ctx.loads.filter((l) => l.brokerId === broker.id && ACTIVE.has(l.stage)).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0] : undefined);
 
   const notes: string[] = [];
   // Someone posing as a broker (a lookalike address, or already marked high risk) gets no automatic note: support
@@ -92,9 +92,20 @@ async function handle(carrierId: string, email: InboundEmail) {
       }
       // A rate con names its own load number: use it to find the load, then check the terms against that load.
       let reading = firstPass;
-      if (!load && byRef(firstPass.loadNumber)) {
-        load = byRef(firstPass.loadNumber)!;
+      // Found only as this broker's latest load, but the rate con names another of ours: that one.
+      const other = byRef(firstPass.loadNumber);
+      if (other && (!load || (!named && other.id !== load.id))) {
+        load = other;
         reading = await readRateConPdf(Buffer.from(pdf.Content, "base64"), agreedTerms(load, ctx.brokers.find((b) => b.id === load!.brokerId)), isPhoto(pdf) ? pdf.ContentType : "application/pdf");
+      }
+      // A load number the broker emailed us with their offer and a different one on the rate con: worth a corrected
+      // rate con before the truck goes, since the dock and the invoice go by it. A board's posting ID or a number the
+      // office typed is only noted.
+      const sameRef = (a: string, b: string) => a.replace(/[^a-z0-9]/gi, "").toLowerCase() === b.replace(/[^a-z0-9]/gi, "").toLowerCase();
+      if (load && reading.loadNumber && load.referenceNumber && !sameRef(load.referenceNumber, reading.loadNumber) && !reading.mismatches.some((m) => /load (number|#)/i.test(m.item))) {
+        // Only a number the broker emailed us: a load board's posting ID is usually not the broker's own load number.
+        const theirs = !!load.offerEmail;
+        reading = { ...reading, mismatches: [...reading.mismatches, { item: "Load number", agreed: load.referenceNumber, onDoc: reading.loadNumber, serious: theirs }] };
       }
       if (load) {
         // Kept on the load: it's signed from, and the factoring company wants it with the invoice.

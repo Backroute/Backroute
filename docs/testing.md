@@ -334,6 +334,15 @@ The code was run against local stand-ins that behave like the real services:
     the weekly goal in Basics is saved, and the report card on Money compares to it, without the word AI. The unit
     checks: the report card's numbers (line haul against market, "not yet" where there's nothing), a multi-page PDF
     with page numbers, a trusted domain passing, and links stopped by time to the millisecond.
+  - Dispatcher judgment (19 checks in `dispatcher-e2e`, 41 in `dispatcher-unit`; the whole suite: 1,005 checks, 42 suites, none failing): high-value freight asked 5% more with
+    the reason in the email and the why (and none with the switch off); a rate far over what freight pays and a post
+    asking for a fee held with warnings; the same load from two brokers, the cheaper set aside; a load reposted higher
+    after a pass offered again as the same load; a driver's no-go city and a truck without the tarps a load needs; a
+    rate con naming another load number sent back; the ELD quiet three hours on a load (one text, not one a round);
+    the readiness marks and the repair limit in Settings. The unit checks: premiums at the dock's own weekday, the cap,
+    the words for touch, hazmat and high-value freight, scam flags, gear, twins, reposts, the quiet ELD, approvals,
+    the split between trucks and the readiness marks. The older suites run with premiums off (a weekend pickup would
+    make their exact numbers depend on the day).
 - **Ready for real traffic:**
   - Crash reporting (11 checks in `errors-e2e`, 7 unit checks): an error in a browser or on the server is counted by
     kind (the same error on two loads is one kind), never with the page's query; a crashed page reports what it

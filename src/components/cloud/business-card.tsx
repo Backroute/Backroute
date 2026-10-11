@@ -105,6 +105,34 @@ export function BusinessCard() {
           </div>
           <Switch checked={settings.checkIns !== false} onChange={(v) => updateSettings({ checkIns: v })} label="Check-ins with drivers" />
         </div>
+        <div className="flex items-center justify-between gap-4 border-t border-line pt-4">
+          <div>
+            <p className="text-sm font-medium text-ink-900">Ask more when a load is harder</p>
+            <p className="text-xs text-ink-500">A weekend pickup, a pickup within hours, hazmat, high-value or driver-assist freight, or a load the broker keeps reposting: Backroute asks a bit more and tells the broker why. Never more than 18% together, never under your lowest.</p>
+          </div>
+          <Switch checked={settings.askPremiums !== false} onChange={(v) => updateSettings({ askPremiums: v })} label="Ask more when a load is harder" />
+        </div>
+        <div className="flex items-center justify-between gap-4 border-t border-line pt-4">
+          <div>
+            <p className="text-sm font-medium text-ink-900">Repairs Backroute can okay</p>
+            <p className="text-xs text-ink-500">On a breakdown, Backroute asks the shop for a price. Under this, it okays the repair on the call so the truck moves sooner; over it, or with no price, the shop calls you. Empty: you approve every repair.</p>
+          </div>
+          <label className="flex shrink-0 items-center gap-1 text-sm text-ink-800">
+            $
+            <input
+              aria-label="Repairs Backroute can okay, in dollars"
+              inputMode="numeric"
+              key={settings.repairLimit ?? "none"}
+              defaultValue={settings.repairLimit ?? ""}
+              placeholder="0"
+              onBlur={(e) => {
+                const n = Math.round(Number(e.target.value.replace(/[^\d.]/g, "")));
+                updateSettings({ repairLimit: Number.isFinite(n) && n > 0 ? Math.min(n, 25000) : undefined });
+              }}
+              className="w-24 rounded-xl border border-line bg-white px-3 py-2 text-sm tabular outline-none focus:border-ink-500"
+            />
+          </label>
+        </div>
       </CardContent>
     </Card>
   );

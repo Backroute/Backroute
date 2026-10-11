@@ -1,4 +1,5 @@
 import "server-only";
+import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import { roadMiles, roughCoords } from "../trip-geo";
 import { formatAtStop } from "../stop-time";
@@ -312,6 +313,7 @@ export async function lateNotices(ctx: CarrierContext, now: number, opts: { emai
     // reached through the ones before it (lib/agent/trips).
     const ahead = truck?.trip && load.tripId === truck.trip.id && truck.currentLoadId !== load.id ? tripEtas(ctx, truck, now)?.get(`${load.id}:${stop}`) : undefined;
     if (truck && (!truck.trip || truck.currentLoadId === load.id) && (await stoppedCheck(ctx, load, truck, driver, now))) done.push(`${load.referenceNumber}: checked on the driver (truck stopped)`);
+    if (truck && (!truck.trip || truck.currentLoadId === load.id) && (await silentCheck(ctx, load, truck, driver, now))) done.push(`${load.referenceNumber}: asked the driver where they are (ELD quiet)`);
     const seen = truck && ahead === undefined ? await etaWithReasons(truck, driver, city, state, now) : null;
     const eta = ahead ?? seen?.at ?? (truck ? etaTo(truck, driver, city, state, now) : null);
     const because = seen?.reasons.length ? ` (${seen.reasons.join("; ")})` : "";
@@ -368,9 +370,9 @@ export async function lateNotices(ctx: CarrierContext, now: number, opts: { emai
 async function textDriver(ctx: CarrierContext, driver: Driver, english: string, log: { kind: string; loadId: string }, now: number) {
   if (!driver.phone || driver.prefs?.smsOptOut) return;
   const text = await translateForDriver(english, driver.prefs?.language ?? "en").catch(() => english);
-  const sid = await textTo(ctx.carrier, driver.phone, text);
+  const sid = await textTo(ctx.carrier, toE164(driver.phone) ?? driver.phone, text);
   await saveDriverMessage(ctx.carrier.id, { id: `dm-${now.toString(36)}${Math.random().toString(36).slice(2, 6)}`, driverId: driver.id, from: "ai", content: text, timestamp: new Date(now).toISOString(), channel: "sms", ai: true }, "/driver/messages");
-  await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: driver.phone, body: text, data: log });
+  await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: toE164(driver.phone) ?? driver.phone, body: text, data: log });
 }
 
 /**
@@ -385,6 +387,29 @@ async function stoppedCheck(ctx: CarrierContext, load: Load, truck: Truck, drive
   if (driver) await textDriver(ctx, driver, `Checking in: the truck's been stopped about ${hours} near ${where}. Everything OK? Reply if you need anything (a shop, parking, more time at the dock).`, { kind: "stopped_check", loadId: load.id }, now);
   await addActivity(ctx.carrier.id, event({ type: "check_call", loadId: load.id, message: `Truck ${truck.unitNumber} stopped ${hours} near ${where}`, detail: `${load.referenceNumber} · not at a stop, driver on duty. Backroute texted ${driver?.name.split(" ")[0] ?? "the driver"} to check in.`, severity: "warning" }));
   return true;
+}
+
+/**
+ * The ELD has stopped reporting a truck that's on a load (the tablet's unplugged, the cell signal's gone, the account
+ * lapsed): after two hours, the driver gets one short text asking where they are, and the owner sees it. Their reply
+ * goes to the AI like any text. Once per silence, and only while the driver's on duty or their status is unknown.
+ */
+async function silentCheck(ctx: CarrierContext, load: Load, truck: Truck, driver: Driver | undefined, now: number): Promise<boolean> {
+  const quiet = eldQuiet(truck, driver, now);
+  if (quiet === null || !(await claimMark(ctx.carrier.id, load.id, `eld_silent:${truck.position!.at}`))) return false;
+  const last = truck.position!.description ?? `${truck.currentCity}, ${truck.currentState}`;
+  if (driver) await textDriver(ctx, driver, `Quick check on ${load.referenceNumber}: your ELD hasn't sent a location in about ${quiet} hours (last near ${last}). Where are you now? A city or exit is fine.`, { kind: "eld_silent", loadId: load.id }, now);
+  await addActivity(ctx.carrier.id, event({ type: "check_call", loadId: load.id, message: `Truck ${truck.unitNumber}'s ELD quiet for ${quiet} hours`, detail: `${load.referenceNumber} · last seen near ${last}. Backroute asked ${driver?.name.split(" ")[0] ?? "the driver"} where they are; if the tablet stays off, check it's plugged in and logged in.`, severity: "warning" }));
+  return true;
+}
+
+/** Hours since the ELD last placed a truck, when that's two or more and the driver isn't off duty; else null. */
+export function eldQuiet(truck: Pick<Truck, "position">, driver: Pick<Driver, "hosStatus"> | undefined, now: number): number | null {
+  if (!truck.position?.at) return null;
+  const hours = (now - Date.parse(truck.position.at)) / HOUR;
+  if (hours < 2 || hours > 72) return null;
+  if (driver?.hosStatus === "off_duty" || driver?.hosStatus === "sleeper") return null;
+  return Math.round(hours);
 }
 
 /** Whether a driver can legally get a truck to a pickup in time, from the ELD's clocks. True when there's no ELD data. */

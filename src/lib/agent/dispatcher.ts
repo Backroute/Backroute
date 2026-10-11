@@ -216,6 +216,34 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: Talk, effects
       },
     }),
     betaZodTool({
+      name: "set_driver_preference",
+      description:
+        "A standing rule the driver gives about which loads they'll run, said in passing or asked: a state or city they won't go to, or that they won't load or unload freight by hand (touch freight, driver assist). Backroute stops booking such loads for them. Use remove to take one back ('I'll do Chicago again').",
+      inputSchema: z.object({
+        avoidState: z.string().length(2).optional().describe("Two-letter state they won't go to, e.g. NJ."),
+        avoidCity: z.string().max(60).optional().describe("A city they won't pick up or deliver in, e.g. Chicago."),
+        noTouchFreight: z.boolean().optional().describe("True: no touch freight. False: they'll do it again."),
+        remove: z.boolean().optional().describe("True to take the state or city back off their list."),
+      }),
+      run: async ({ avoidState, avoidCity, noTouchFreight, remove }) => {
+        const fresh = ctx.drivers.find((d) => d.id === driver.id) ?? driver;
+        const p = fresh.prefs ?? {};
+        const st = avoidState?.toUpperCase();
+        const toggle = (list: string[] | undefined, v: string | undefined) => {
+          if (!v) return list;
+          const rest = (list ?? []).filter((x) => x.toLowerCase() !== v.toLowerCase());
+          return remove ? rest : [...rest, v].slice(-12);
+        };
+        const prefs = { ...p, avoidStates: toggle(p.avoidStates, st), avoidCities: toggle(p.avoidCities, avoidCity?.trim()), ...(noTouchFreight !== undefined ? { noTouchFreight } : {}) };
+        const next: Driver = { ...fresh, prefs };
+        await save("drivers", ctx.carrier.id, next as unknown as Item);
+        ctx.drivers = ctx.drivers.map((d) => (d.id === next.id ? next : d));
+        effects.done.push("Updated which loads the driver runs");
+        const what = [st && `${remove ? "back on" : "no more"} ${st}`, avoidCity && `${remove ? "back on" : "no more"} ${avoidCity}`, noTouchFreight !== undefined && (noTouchFreight ? "no touch freight" : "touch freight is fine")].filter(Boolean).join(", ");
+        return `Saved: ${what}. Backroute won't book against it.`;
+      },
+    }),
+    betaZodTool({
       name: "note_facility",
       description:
         "Something the driver says about a shipper or receiver on their load that the next driver going there should know: which gate or door, how check-in works, parking, rules (PPE, no overnight parking, lumper), how long they keep trucks, or its hours. Write it as a short tip about the place, in English, with no names or phone numbers.",

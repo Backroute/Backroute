@@ -5,6 +5,7 @@ import { emailConfigured, sendEmail, type Attachment } from "./email";
 import { canCallOut, startCall, twilioConfigured } from "./twilio";
 import { sendText } from "./texting";
 import { recipientPolicy, type Recipient } from "../consent";
+import { toE164 } from "../cloud/phone";
 
 /**
  * The one way a text, email or call leaves Backroute for a carrier. Everything the AI (or support) sends goes through
@@ -70,6 +71,8 @@ function retriable(e: unknown): boolean {
  * Backroute's own texts to its support team. `media` (a public link) goes along on WhatsApp: a spoken answer.
  */
 export async function textTo(c: Sender | null, to: string, body: string, opts: { media?: string[] } = {}): Promise<string> {
+  // A number as the office typed it ("(214) 555-0148") goes out in the +1 form texting needs.
+  to = to.startsWith("whatsapp:") ? to : (toE164(to) ?? to);
   if (c && sandboxed(c)) return keep(c, { channel: "sms", recipient: to, body, status: "held" });
   // Who this is to decides how it goes (lib/consent): the first-text notice, a hold for their yes, or the app instead.
   const policy: Recipient | null = c ? await recipientPolicy(c.id, to).catch((e) => (console.error("[out] consent check failed", e), null)) : null;

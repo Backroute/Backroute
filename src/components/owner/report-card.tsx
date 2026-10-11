@@ -30,7 +30,8 @@ export function ReportCardPanel() {
     { label: "Days to get paid", value: r.daysToPaid !== null ? String(r.daysToPaid) : "Not yet" },
     { label: "On time", value: r.onTime ? pct(r.onTime.share) : "Not yet", note: r.onTime ? `of ${r.onTime.of} deliveries with an appointment` : undefined },
     { label: "Empty between loads", value: r.emptyHours !== null ? `${r.emptyHours} h` : "Not yet", note: "From one delivery to the next pickup, on average" },
-    { label: "Times it asked you", value: String(r.askedOwner) },
+    { label: "Times it asked you", value: String(r.askedOwner), note: r.approvals ? `You said yes to ${r.approvals.yes} of ${r.approvals.of}` : undefined },
+    ...(r.spread ? [{ label: "Split between trucks", value: `${formatCurrency(r.spread.bottom)} – ${formatCurrency(r.spread.top)}`, note: `Least and most a truck made, of ${r.spread.trucks}` }] : []),
   ];
   const weekly = goal && trucks ? goal * trucks : null;
   return (
