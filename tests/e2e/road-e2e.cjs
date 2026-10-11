@@ -39,6 +39,9 @@ const escalation = (like) => db(`select status || '|' || coalesce(data->>'comple
 const H = 3600000;
 const iso = (ms) => new Date(Date.now() + ms).toISOString();
 
+// A rate con as the reader leaves it, with the terms a test needs.
+const reading = (detention, finesAndFees = []) => ({ fileName: "ratecon.pdf", readAt: new Date().toISOString(), isRateCon: true, broker: "Roadline Logistics", brokerMc: "771555", loadNumber: null, totalRate: 2000, pickup: null, delivery: null, equipment: "Dry Van", detention, paymentTerms: "Net 30", finesAndFees, otherConcerns: [], mismatches: [], summary: "" });
+
 function makeLoad(id, ref, truckId, stage, extra) {
   db(`delete from loads where carrier_id = '${cid}' and id = '${id}'`);
   const data = { id, stage, referenceNumber: ref, truckId, brokerId: "rd-broker", brokerContactEmail: BROKER_MAIL, bookedRate: 2000, imported: false, extraClaims: [], tripChecklist: {}, updatedAt: new Date().toISOString(), ...extra };
@@ -57,9 +60,11 @@ function makeLoad(id, ref, truckId, stage, extra) {
   const t101 = truckBy("101"), t102 = truckBy("102");
   db(`update drivers set data = jsonb_set(data, '{prefs}', coalesce(data->'prefs', '{}'::jsonb) || '{"smsOptOut":false,"language":"en"}'::jsonb) where carrier_id = '${cid}' and id = '${t101.driverId}'`);
   db(`update trucks set data = data - 'roadside' where carrier_id = '${cid}'`);
+  // A run before this one left its once-only marks on the same load ids.
+  db(`delete from agent_marks where carrier_id = '${cid}' and load_id like 'rd-%'`);
 
   // ── Extra pay ─────────────────────────────────────────────────────────────
-  makeLoad("rd-1", "RD-1", t101.id, "in_transit", { rateConReading: { detention: "$50/hr after 2 hours", finesAndFees: ["Tarp pay $100 when required"], otherConcerns: [], summary: "" } });
+  makeLoad("rd-1", "RD-1", t101.id, "in_transit", { rateConReading: reading("$50/hr after 2 hours", ["Tarp pay $100 when required"]) });
   setTruck("101", { currentLoadId: "rd-1", status: "on_load", currentCity: "Waco", currentState: "TX", position: null });
   let p0 = read("postmark").length;
   await sms(MARCUS, "tarped it at the shipper this morning, took an hour");
@@ -107,13 +112,15 @@ function makeLoad(id, ref, truckId, stage, extra) {
   // ── A breakdown that won't be fixed today ─────────────────────────────────
   makeLoad("rd-2", "RD-2", t101.id, "in_transit", {});
   setTruck("101", { currentLoadId: "rd-2", status: "on_load", currentCity: "Waco", currentState: "TX", roadside: { at: iso(-4 * H), driverId: t101.driverId, loadId: "rd-2", details: "No power", where: "I-35 near Waco, TX", shops: [], calling: -1, exhausted: true } });
-  setTruck("102", { currentLoadId: null, nextLoadId: null, status: "available", currentCity: "Dallas", currentState: "TX", position: null });
+  // 102 is the reefer; for a repower it has to pull the same trailer type, so it's a van for this part.
+  const t102type = t102.equipmentType;
+  setTruck("102", { equipmentType: "Dry Van", currentLoadId: null, nextLoadId: null, status: "available", currentCity: "Dallas", currentState: "TX", position: null });
   db(`delete from agent_marks where carrier_id = '${cid}' and (kind like 'recovery:%' or kind like 'hotel:%')`);
   p0 = read("postmark").length;
   let t0 = read("twilio").length;
   await cron();
   const repower = escalation("RD-2 is stuck with truck 101%");
-  check("the owner is offered a repower with the closest free truck", /Truck \S+ \(.+\) is free \d+ miles away in .+, [A-Z]{2}: send it to take the trailer/.test(repower), repower);
+  check("the owner is offered a repower with the closest free truck", /Truck 102 \(.+\) is free \d+ miles away in Dallas, TX: send it to take the trailer/.test(repower), repower);
   mail = mails(p0, /^Breakdown update: Load RD-2/)[0];
   check("...the broker hears the load won't move soon, and what we can do", !!mail && /send another of our trucks, about \d+ miles away/.test(mail.TextBody), mail?.TextBody?.slice(0, 300));
   const hotel = read("twilio").slice(t0).find((x) => x.params.To === MARCUS && /Hotels near you/.test(x.params.Body ?? ""));
@@ -124,10 +131,11 @@ function makeLoad(id, ref, truckId, stage, extra) {
   check("...each once", mails(p0, /^Breakdown update/).length === 0 && !read("twilio").slice(t0).some((x) => x.params.To === MARCUS && /Hotels near you/.test(x.params.Body ?? "")));
   db(`update trucks set data = data - 'roadside' where carrier_id = '${cid}'`);
   setTruck("101", { currentLoadId: null, status: "available" });
+  setTruck("102", { equipmentType: t102type });
   db(`update loads set stage = 'delivered', data = data || '{"stage":"delivered"}'::jsonb where carrier_id = '${cid}' and id in ('rd-1', 'rd-2')`);
 
   // ── Free time runs out at the dock ────────────────────────────────────────
-  const terms = { rateConReading: { detention: "$50/hr after 2 hours free", finesAndFees: [], otherConcerns: [], summary: "" } };
+  const terms = { rateConReading: reading("$50/hr after 2 hours free") };
   makeLoad("rd-3", "RD-3", t102.id, "at_delivery", { ...terms, deliveryAt: iso(-3 * H), tripChecklist: { arrivedDeliveryAt: iso(-3.2 * H) } });
   setTruck("102", { currentLoadId: "rd-3", status: "on_load" });
   p0 = read("postmark").length;

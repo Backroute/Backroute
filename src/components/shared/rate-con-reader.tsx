@@ -25,7 +25,9 @@ export function RateConReader({ load, broker }: { load: Load; broker: Broker | u
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const reading = load.rateConReading;
+  // Older or partial readings (typed in, or from before a field existed) may lack the lists.
+  const raw = load.rateConReading;
+  const reading = raw ? { ...raw, mismatches: raw.mismatches ?? [], finesAndFees: raw.finesAndFees ?? [], otherConcerns: raw.otherConcerns ?? [] } : raw;
 
   async function read(file: File) {
     if (file.type && file.type !== "application/pdf") return setError("That isn't a PDF. Upload the rate con the broker sent as a PDF.");
