@@ -3,7 +3,7 @@ import { z } from "zod";
 import { dbConfigured, loadContext } from "@/lib/agent/db";
 import { applyEld, EldError, readEld } from "@/lib/agent/eld";
 import { FeedError, readFeed } from "@/lib/agent/feeds";
-import { integrationsFor, removeIntegration, saveIntegration, setStatus, type CustomBoardConfig, type EldConfig, type FeedConfig, type IntegrationKind, type StatementConfig, type TruckstopConfig } from "@/lib/agent/integrations";
+import { auditChange, integrationsFor, removeIntegration, saveIntegration, setStatus, type CustomBoardConfig, type EldConfig, type FeedConfig, type IntegrationKind, type StatementConfig, type TruckstopConfig } from "@/lib/agent/integrations";
 import { boardFor } from "@/lib/agent/boards";
 import { importStatementText, readStatement, StatementError } from "@/lib/agent/costs";
 import { datConfigured } from "@/lib/agent/boards/dat";
@@ -16,6 +16,9 @@ import { xeroConfigured, type XeroConfig } from "@/lib/agent/xero";
 import type { PayoutsConfig } from "@/lib/agent/payouts";
 import { vaultConfigured } from "@/lib/portal/vault";
 import { overLimit, tooMany } from "@/lib/rate-limit";
+
+const NAMES: Record<string, string> = { samsara: "Samsara", motive: "Motive", geotab: "Geotab", load_feed: "a load feed", fuel_feed: "a fuel card statement", toll_feed: "a toll statement", truckstop: "Truckstop", dat: "DAT", payouts: "direct deposit" };
+const nameOf = (kind: string) => NAMES[kind] ?? (kind.startsWith("board:") ? `the ${kind.slice(6)} board` : kind);
 
 const Custom = z.object({
   name: z.string().trim().min(2).max(40),
@@ -83,6 +86,11 @@ export async function POST(request: Request) {
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "bad_request", reason: "Check the address and the key." }, { status: 400 });
   const b = parsed.data;
+  // Each connection made goes in the owner's Changes log.
+  const connected = async (status: string) => {
+    await auditChange(who.me.carrierId, who.me.role, "Connected", b.kind === "board" ? b.config.name : nameOf(b.kind), who.me.userId);
+    return Response.json({ ok: true, status });
+  };
   try {
     if (b.kind === "truckstop" || b.kind === "dat" || b.kind === "board") {
       const kind = b.kind === "board" ? (`board:${b.config.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}` as const) : b.kind;
@@ -93,7 +101,7 @@ export async function POST(request: Request) {
         // The carrier's side is saved; searching starts when Backroute's agreement with the board is in place.
         const status = "Saved · waiting on Backroute's agreement with this board";
         await saveIntegration(who.me.carrierId, kind, config, status);
-        return Response.json({ ok: true, status });
+        return connected(status);
       }
       // A test search from where the carrier's first truck is, so a wrong ID shows now rather than later.
       const ctx = await loadContext(who.me.carrierId);
@@ -101,7 +109,7 @@ export async function POST(request: Request) {
       const found = truck ? await board.search({ originCity: truck.currentCity, originState: truck.currentState, radius: 150, availableFrom: new Date().toISOString(), equipment: truck.equipmentType }) : [];
       const status = `Connected · test search found ${found.length} load${found.length === 1 ? "" : "s"} near ${truck?.currentCity ?? "your trucks"}`;
       await saveIntegration(who.me.carrierId, kind, config, status);
-      return Response.json({ ok: true, status });
+      return connected(status);
     }
     if (b.kind === "fuel_feed" || b.kind === "toll_feed") {
       // Read once now, so a wrong address or key shows here; the lines found are imported right away.
@@ -111,14 +119,14 @@ export async function POST(request: Request) {
       const r = ctx ? await importStatementText(ctx, b.kind === "fuel_feed" ? "fuel" : "toll", text) : { read: 0, matched: 0 };
       const status = `Connected · ${r.read} line${r.read === 1 ? "" : "s"} read, ${r.matched} on a load`;
       await saveIntegration(who.me.carrierId, b.kind, cfg, status);
-      return Response.json({ ok: true, status });
+      return connected(status);
     }
     if (b.kind === "load_feed") {
       const cfg: FeedConfig = { url: b.url, format: b.format, headerName: b.headerName || undefined, headerValue: b.headerValue || undefined, name: b.name || "Load feed" };
       const rows = await readFeed(cfg);
       const status = `Connected · ${rows.length} usable load${rows.length === 1 ? "" : "s"} in it now`;
       await saveIntegration(who.me.carrierId, "load_feed", cfg, status);
-      return Response.json({ ok: true, status });
+      return connected(status);
     }
     if (b.kind === "geotab") {
       // Signed in and read once now, so a wrong database or password shows here; the password is kept sealed.
@@ -128,7 +136,7 @@ export async function POST(request: Request) {
       const applied = ctx ? await applyEld(ctx, "geotab", { vehicles, clocks: [] }) : { trucks: 0, drivers: 0, unmatched: [] };
       const status = `Connected · ${applied.trucks} truck${applied.trucks === 1 ? "" : "s"} matched${applied.unmatched.length ? `; not matched: ${applied.unmatched.slice(0, 5).join(", ")}` : ""} · hours come from Geotab's HOS app`;
       await saveIntegration(who.me.carrierId, "geotab", { ...cfg, ...(server ? { server } : {}) } as never, status);
-      return Response.json({ ok: true, status });
+      return connected(status);
     }
     if (b.kind !== "samsara" && b.kind !== "motive") return Response.json({ error: "bad_request" }, { status: 400 });
     const data = await readEld(b.kind, b.apiKey);
@@ -136,7 +144,7 @@ export async function POST(request: Request) {
     const applied = ctx ? await applyEld(ctx, b.kind, data) : { trucks: 0, drivers: 0, unmatched: [] };
     const status = `Connected · ${applied.trucks} truck${applied.trucks === 1 ? "" : "s"} and ${applied.drivers} driver${applied.drivers === 1 ? "" : "s"} matched${applied.unmatched.length ? `; not matched: ${applied.unmatched.slice(0, 5).join(", ")}` : ""}`;
     await saveIntegration(who.me.carrierId, b.kind, { apiKey: b.apiKey }, status);
-    return Response.json({ ok: true, status });
+    return connected(status);
   } catch (e) {
     const reason = e instanceof EldError || e instanceof FeedError || e instanceof BoardError || e instanceof StatementError ? e.message : "Couldn't connect.";
     return Response.json({ ok: false, reason }, { status: 422 });
@@ -196,5 +204,6 @@ export async function DELETE(request: Request) {
   const kind = z.union([z.enum(["samsara", "motive", "geotab", "load_feed", "fuel_feed", "toll_feed", "truckstop", "dat", "payouts"]), z.string().regex(/^board:[a-z0-9_-]{1,40}$/)]).safeParse(new URL(request.url).searchParams.get("kind"));
   if (!kind.success) return Response.json({ error: "bad_request" }, { status: 400 });
   await removeIntegration(who.me.carrierId, kind.data as IntegrationKind);
+  await auditChange(who.me.carrierId, who.me.role, "Disconnected", nameOf(kind.data), who.me.userId);
   return Response.json({ ok: true });
 }

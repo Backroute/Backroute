@@ -23,6 +23,8 @@ export default function TrackPage() {
   const demo = demoLoad ? { load: demoLoad, truck: trucks.find((t) => t.id === demoLoad.truckId), carrier: carriers.find((c) => c.id === demoLoad.carrierId)?.name ?? "Sample carrier" } : null;
   const [view, setView] = useState<TrackView | null>(null);
   const [state, setState] = useState<"loading" | "ok" | "gone">("loading");
+  // The carrier's MC, so the receiver or shipper can check who's hauling it.
+  const [mc, setMc] = useState<string | null>(null);
 
   useEffect(() => {
     if (demoId) return;
@@ -31,7 +33,9 @@ export default function TrackPage() {
       const res = await fetch(`/api/track?t=${encodeURIComponent(token)}`, { cache: "no-store" }).catch(() => null);
       if (stop) return;
       if (res?.ok) {
-        setView((await res.json()) as TrackView);
+        const body = (await res.json()) as TrackView & { mc?: string | null };
+        setView(body);
+        setMc(body.mc ?? null);
         setState("ok");
       } else if (res && res.status !== 429) setState("gone");
     };
@@ -50,6 +54,7 @@ export default function TrackPage() {
         <>
           <p className="text-sm text-ink-500">
             Tracking from <span className="font-medium text-ink-900">{shown.carrier}</span>
+            {mc && !demo && ` · ${/^mc/i.test(mc) ? mc : `MC ${mc}`}`}
             {demo && " · sample"}
           </p>
           <TrackPanel view={shown} />

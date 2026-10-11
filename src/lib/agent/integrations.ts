@@ -74,6 +74,15 @@ export async function saveIntegration(carrierId: string, kind: IntegrationKind, 
   if (error) throw error;
 }
 
+/**
+ * A line in the owner's Changes log (Settings → Security) for a connection made, changed or removed. Status updates
+ * from the rounds aren't logged; people's changes are. A failed write never stops the change itself.
+ */
+export async function auditChange(carrierId: string, who: string, action: string, target?: string, userId?: string) {
+  const { error } = await admin().from("audit_log").insert({ carrier_id: carrierId, who, action, target: target ?? null, user_id: userId ?? null });
+  if (error) console.error("[audit] couldn't log", action, error.message);
+}
+
 export async function setStatus(carrierId: string, kind: IntegrationKind, status: string) {
   await admin().from("carrier_integrations").update({ status, checked_at: new Date().toISOString() }).eq("carrier_id", carrierId).eq("kind", kind);
 }

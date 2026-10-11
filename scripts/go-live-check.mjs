@@ -122,7 +122,8 @@ if (has("PORTAL_VAULT_KEY")) {
   if (bytes !== 32) fail(`PORTAL_VAULT_KEY must be 32 random bytes (openssl rand -base64 32); this one is ${bytes} bytes`);
   else ok("PORTAL_VAULT_KEY is 32 bytes");
   if (has("PORTAL_VAULT_KEY_OLD")) warn("PORTAL_VAULT_KEY_OLD is set: remove it once saved logins have moved to the new key");
-} else if (has("PORTAL_WORKER_SECRET") || has("QBO_CLIENT_ID")) fail("PORTAL_VAULT_KEY isn't set: broker website logins and QuickBooks can't be stored");
+} else if (has("PORTAL_WORKER_SECRET") || has("QBO_CLIENT_ID") || has("XERO_CLIENT_ID")) fail("PORTAL_VAULT_KEY isn't set: broker website logins, QuickBooks and Xero can't be stored");
+else warn("No PORTAL_VAULT_KEY: Geotab, driver direct deposit and broker website logins stay off (each needs something kept encrypted)");
 if (has("PORTAL_WORKER_SECRET")) longSecret("PORTAL_WORKER_SECRET");
 if (has("VOICE_SERVER_URL")) {
   if (!/^wss:\/\//.test(env.VOICE_SERVER_URL) && !/localhost/.test(env.VOICE_SERVER_URL)) fail("VOICE_SERVER_URL must start with wss://");
@@ -134,6 +135,12 @@ if (has("STRIPE_SECRET_KEY")) {
   if (env.STRIPE_SECRET_KEY.startsWith("sk_test_")) warn("STRIPE_SECRET_KEY is a test key: nobody will actually be charged");
   need(["STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_PER_TRUCK"], "billing");
 } else warn("No Stripe: carriers aren't billed");
+if (has("QBO_CLIENT_ID") !== has("QBO_CLIENT_SECRET")) fail("QuickBooks needs both QBO_CLIENT_ID and QBO_CLIENT_SECRET");
+if (has("XERO_CLIENT_ID") !== has("XERO_CLIENT_SECRET")) fail("Xero needs both XERO_CLIENT_ID and XERO_CLIENT_SECRET");
+if (has("GEOTAB_API_BASE")) warn("GEOTAB_API_BASE is set: that's for tests only; Geotab's own address is used without it");
+// Tracking and shipper links: their own secret, so changing it ends every link without touching the database key.
+if (has("SHARE_LINK_SECRET")) longSecret("SHARE_LINK_SECRET");
+else warn("No SHARE_LINK_SECRET: tracking links are signed with a key made from the service key (works; set one so you can end every link at once)");
 if (env.QBO_ENV === "sandbox") warn("QBO_ENV=sandbox: QuickBooks connects to Intuit's test companies only");
 
 // Settings that only make sense while testing.

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { admin, carrierById, dbConfigured } from "@/lib/agent/db";
-import { readShareToken, shareToken } from "@/lib/agent/share-link";
+import { readShareToken, shareToken, stopped } from "@/lib/agent/share-link";
+import { save } from "@/lib/agent/db";
+import type { Item } from "@/lib/cloud/rows";
 import { caller } from "@/lib/agent/user";
 import { clientIp, overLimit, tooMany } from "@/lib/rate-limit";
 import { trackView } from "@/lib/track-view";
@@ -16,10 +18,14 @@ export async function POST(request: Request) {
   if (!dbConfigured()) return Response.json({ error: "not_set_up" }, { status: 503 });
   const who = await caller(request);
   if (!who || who.me.role === "driver") return Response.json({ error: "sign_in" }, { status: 401 });
-  const body = z.object({ brokerId: z.string().min(1).max(80) }).safeParse(await request.json().catch(() => null));
+  const body = z.object({ brokerId: z.string().min(1).max(80), stop: z.boolean().optional() }).safeParse(await request.json().catch(() => null));
   if (!body.success) return Response.json({ error: "bad_request" }, { status: 400 });
-  const { data } = await admin().from("records").select("id").eq("carrier_id", who.me.carrierId).eq("kind", "broker").eq("id", body.data.brokerId).maybeSingle();
+  const { data } = await admin().from("records").select("id, data").eq("carrier_id", who.me.carrierId).eq("kind", "broker").eq("id", body.data.brokerId).maybeSingle();
   if (!data) return Response.json({ error: "not_found" }, { status: 404 });
+  if (body.data.stop) {
+    await save("records", who.me.carrierId, { ...(data.data as Broker), shareOffAt: new Date().toISOString() } as unknown as Item, "broker");
+    return Response.json({ ok: true });
+  }
   const base = (process.env.PUBLIC_BASE_URL ?? new URL(request.url).origin).replace(/\/$/, "");
   return Response.json({ url: `${base}/shipper/${shareToken("shipper", who.me.carrierId, body.data.brokerId, Date.now() + 180 * DAY)}` });
 }
@@ -31,7 +37,7 @@ export async function GET(request: Request) {
   if (!link) return Response.json({ error: "expired" }, { status: 404 });
   const db = admin();
   const broker = (await db.from("records").select("data").eq("carrier_id", link.carrierId).eq("kind", "broker").eq("id", link.id).maybeSingle()).data?.data as Broker | undefined;
-  if (!broker) return Response.json({ error: "expired" }, { status: 404 });
+  if (!broker || stopped(link, broker.shareOffAt)) return Response.json({ error: "expired" }, { status: 404 });
   const since = new Date(Date.now() - 60 * DAY).toISOString();
   const { data: rows } = await db.from("loads").select("data").eq("carrier_id", link.carrierId).filter("data->>brokerId", "eq", link.id).gte("updated_at", since).order("updated_at", { ascending: false }).limit(100);
   const loads = (rows ?? []).map((r) => r.data as Load);
@@ -44,6 +50,7 @@ export async function GET(request: Request) {
     {
       customer: broker.company,
       carrier: carrier?.name ?? "The carrier",
+      mc: carrier?.mc ?? null,
       loads: loads
         .map((l) => {
           const view = trackView(l, truckOf(l.truckId), carrier?.name ?? "", now);

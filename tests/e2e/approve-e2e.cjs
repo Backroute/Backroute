@@ -28,6 +28,9 @@ const sub = "aaaaaaaa-0000-0000-0000-000000000001", phone = "12145550100";
   const before = await drafts.count();
   const idx = await drafts.evaluateAll((els) => els.findIndex((e) => e.value.includes("thanks for the rate con")));
   const box = drafts.nth(idx);
+  // A truck with several things waiting shows one and folds the rest: open them all.
+  for (const more of await p.getByRole("button", { name: / more for / }).all()) await more.click().catch(() => {});
+  await p.waitForTimeout(300);
   const home = await p.locator("main").innerText();
   check("draft shows in Needs you, marked as email", home.includes("Backroute wrote a reply for you to check") && /By email/i.test(home));
   check("breakdown from the call shows, marked as a call", /On a call/i.test(home) && home.includes("Marcus Bell (breakdown)"));

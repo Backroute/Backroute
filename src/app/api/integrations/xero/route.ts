@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { dbConfigured, loadContext } from "@/lib/agent/db";
-import { integrationsFor, removeIntegration, setStatus } from "@/lib/agent/integrations";
+import { auditChange, integrationsFor, removeIntegration, setStatus } from "@/lib/agent/integrations";
 import { disconnectXero, syncXero, xeroConfigured, xeroConnectUrl, type XeroConfig } from "@/lib/agent/xero";
 import { caller } from "@/lib/agent/user";
 import { overLimit, tooMany } from "@/lib/rate-limit";
@@ -50,5 +50,6 @@ export async function DELETE(request: Request) {
   const row = (await integrationsFor(who.me.carrierId)).find((r) => r.kind === "xero");
   if (row) await disconnectXero(who.me.carrierId, row.config as unknown as XeroConfig).catch(() => 0);
   await removeIntegration(who.me.carrierId, "xero");
+  await auditChange(who.me.carrierId, who.me.role, "Disconnected", "Xero", who.me.userId);
   return Response.json({ ok: true });
 }

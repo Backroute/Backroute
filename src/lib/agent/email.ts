@@ -5,7 +5,7 @@ import { readRateConPdf } from "../ai/rate-con-reader";
 import { messageIdHeader, plainText, type InboundEmail } from "../channels/email";
 import { agreedTerms } from "../rate-con-terms";
 import type { Item } from "../cloud/rows";
-import type { Load, RateConPdfReading } from "../types";
+import type { Escalation, Load, RateConPdfReading } from "../types";
 import { addActivity, claimMark, loadContext, save, storeFile, threadWith } from "./db";
 import { brokerEmailDraft, event, passToOwner, tellOwner } from "./dispatcher";
 import { readBrokerEmail } from "./broker-mail";
@@ -13,7 +13,7 @@ import { answerRateReply, bookIt, offersFromEmail, requestBooking, type Sender }
 import { sendOrQueue } from "./outbox";
 import * as mail from "./templates";
 import { sendSetupPacket } from "./paperwork";
-import { contactMoved, doubleBrokered, lookalikeOf, paymentScam } from "./fraud";
+import { claimedDomain, contactMoved, doubleBrokered, lookalikeOf, paymentScam } from "./fraud";
 import { checkBroker } from "./brokers";
 import { cancelLoad } from "./cancel";
 import { recordPayments } from "./money";
@@ -120,7 +120,7 @@ async function handle(carrierId: string, email: InboundEmail) {
         // rate con; the owner is told. A real mix-up gets fixed by their answer; a double broker gets nothing.
         if (double) {
           const known = onLoad!.email && onLoad!.email.toLowerCase() !== from ? onLoad!.email : load.brokerContactEmail;
-          await passToOwner(ctx, {
+          const held = await passToOwner(ctx, {
             reason: doubled
               ? `Possible double brokering on ${load.referenceNumber}. ${doubled} Backroute didn't book it and asked ${onLoad!.company} at the address you already had to send a rate con from their own company.`
               : `Held ${load.referenceNumber}: ${moved} Backroute didn't book it or change anything, and asked ${onLoad!.company}${known ? ` at ${known}` : ""} to confirm it's from them.`,
@@ -130,6 +130,13 @@ async function handle(carrierId: string, email: InboundEmail) {
             to: "owner",
             brokerId: onLoad!.id,
           });
+          // A new address that's really theirs is one tap: from then on it's treated as theirs. Double brokering isn't.
+          const domain = moved ? claimedDomain(from, reading.brokerEmail) : undefined;
+          if (domain) {
+            const asked: Escalation = { ...held, answers: { yes: `Trust ${domain}`, no: "Keep holding" }, decision: { kind: "trust_sender", brokerId: onLoad!.id, domain } };
+            await save("escalations", carrierId, asked as unknown as Item);
+            ctx.escalations = ctx.escalations.map((x) => (x.id === asked.id ? asked : x));
+          }
           if (known && (await claimMark(carrierId, load.id, "double_ask")))
             await sendOrQueue(ctx, {
               purpose: "ack",
@@ -138,7 +145,7 @@ async function handle(carrierId: string, email: InboundEmail) {
               subject: mail.subjectFor(load, "Rate con"),
               body: doubled
                 ? `Hi${onLoad!.contact ? ` ${onLoad!.contact}` : ""},\n\nWe got a rate con for ${load.referenceNumber} from ${from} that shows a different broker (${reading.brokerMc ?? "another MC"}), not ${onLoad!.company}. We won't run it as is. If the load is yours, please send the rate con from ${onLoad!.company}.\n\nThanks,\n${ctx.carrier.name}`
-                : `Hi${onLoad!.contact ? ` ${onLoad!.contact}` : ""},\n\nWe got a rate con for ${load.referenceNumber} from ${from}, which isn't the address we have for ${onLoad!.company}. Before we run it, could you send it from your usual address, or confirm the new one here?\n\nThanks,\n${ctx.carrier.name}`,
+                : `Hi${onLoad!.contact ? ` ${onLoad!.contact}` : ""},\n\nWe got a rate con for ${load.referenceNumber} ${reading.brokerEmail ? `that names ${reading.brokerEmail}` : `from ${from}`}, which isn't an address we have for ${onLoad!.company}. Before we run it, could you confirm it's yours by replying here, or send it from your usual address?\n\nThanks,\n${ctx.carrier.name}`,
               loadId: load.id,
               withinRules: true,
               why: `Ask ${onLoad!.company} to confirm ${load.referenceNumber}?`,

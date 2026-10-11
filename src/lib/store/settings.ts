@@ -34,6 +34,8 @@ export interface AgentSettings {
   fuelPrices?: FuelPrices;
   /** Who the carrier factors with ("RTS Financial"), shown in Settings → Integrations. */
   factoringCompany?: string;
+  /** What the owner wants each truck to gross in a week: the report card measures against it. */
+  weeklyGoal?: number;
   /** Real accounts: the AI texts drivers before pickup and delivery, and follows up. On unless turned off. */
   checkIns?: boolean;
   autonomy: Autonomy;

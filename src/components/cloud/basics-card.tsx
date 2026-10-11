@@ -18,7 +18,7 @@ const UNDO = [
 ];
 
 /**
- * The five things that decide how the AI dispatches, as plain questions on one screen. Everything else is under
+ * The things that decide how the AI dispatches (and the goal it's measured by), as plain questions on one screen. Everything else is under
  * More. Each answer saves as soon as it's given.
  */
 export function BasicsCard() {
@@ -28,6 +28,7 @@ export function BasicsCard() {
   const drivers = useCarrierDrivers();
   const [rpm, setRpm] = useState(settings.minRpm ? settings.minRpm.toFixed(2) : "");
   const [miles, setMiles] = useState(String(settings.maxDeadhead ?? 300));
+  const [goal, setGoal] = useState(settings.weeklyGoal ? String(settings.weeklyGoal) : "");
   const [saved, setSaved] = useState<string | null>(null);
   const field = "w-28 rounded-xl border border-line bg-white px-3 py-2.5 text-base tabular outline-none focus:border-ink-500 sm:py-2 sm:text-sm";
   const ok = (what: string) => setSaved(what);
@@ -142,6 +143,32 @@ export function BasicsCard() {
             <Switch checked={settings.weeklyReview !== false} onChange={(on) => updateSettings({ weeklyReview: on })} label="Monday review" />
           </Row>
         </div>
+      </Question>
+
+      <Question n={6} help="weeklyGoal" q="What should each truck gross in a week?" hint="Optional. The report card on Money measures each week against it.">
+        <label className="flex items-center gap-2 text-sm text-ink-800">
+          $
+          <input
+            aria-label="Weekly goal per truck"
+            className={field}
+            inputMode="numeric"
+            placeholder="6000"
+            value={goal}
+            onChange={(e) => setGoal(e.target.value.replace(/[^\d]/g, ""))}
+            onBlur={() => {
+              const n = Number(goal);
+              if (!goal) {
+                updateSettings({ weeklyGoal: undefined });
+                return ok("Weekly goal cleared");
+              }
+              if (n >= 500 && n <= 50000) {
+                updateSettings({ weeklyGoal: n });
+                ok("Weekly goal saved");
+              }
+            }}
+          />
+          a truck
+        </label>
       </Question>
 
       {saved && (

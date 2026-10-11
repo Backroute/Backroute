@@ -11,7 +11,9 @@ import type { Driver } from "@/lib/types";
  */
 export function FirstLanguagePick({ driver }: { driver: Driver }) {
   const setDriverPrefs = useStore((s) => s.actions.setDriverPrefs);
-  if (driver.prefs?.langPicked || driver.prefs?.appLanguage) return null;
+  // A driver who's already run loads with us, or whose language the owner set, isn't new: no question.
+  const seasoned = useStore((s) => s.loads.some((l) => l.stage === "delivered" && s.trucks.some((t) => t.id === l.truckId && t.driverId === driver.id)));
+  if (seasoned || driver.prefs?.langPicked || driver.prefs?.appLanguage || (driver.prefs?.language && driver.prefs.language !== "en")) return null;
   return (
     <section aria-label="Language" className="rounded-2xl border border-line p-4">
       <p className="flex items-center gap-1.5 text-sm font-semibold text-ink-950">

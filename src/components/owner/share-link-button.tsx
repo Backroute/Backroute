@@ -15,9 +15,11 @@ export function ShareLinkButton({ kind, id, label, email, subject }: { kind: "tr
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   async function make() {
     setErr(null);
+    setNote(null);
     if (demo) return show(`${window.location.origin}/${kind}/demo-${id}`);
     setBusy(true);
     const res = await fetch(`/api/${kind}`, { method: "POST", headers: { "content-type": "application/json", ...(await authHeader()) }, body: JSON.stringify(kind === "track" ? { loadId: id } : { brokerId: id }) }).catch(() => null);
@@ -26,6 +28,21 @@ export function ShareLinkButton({ kind, id, label, email, subject }: { kind: "tr
     if (body?.url) show(body.url);
     else setErr("Couldn't make the link. Try again.");
   }
+  async function stop() {
+    setErr(null);
+    setNote(null);
+    if (demo) {
+      setUrl(null);
+      return setNote("Stopped. Links sent before now don't open any more.");
+    }
+    setBusy(true);
+    const res = await fetch(`/api/${kind}`, { method: "POST", headers: { "content-type": "application/json", ...(await authHeader()) }, body: JSON.stringify(kind === "track" ? { loadId: id, stop: true } : { brokerId: id, stop: true }) }).catch(() => null);
+    setBusy(false);
+    if (res?.ok) {
+      setUrl(null);
+      setNote("Stopped. Links sent before now don't open any more.");
+    } else setErr("Couldn't stop them. Try again.");
+  }
   function show(u: string) {
     setUrl(u);
     void navigator.clipboard?.writeText(u).then(() => setCopied(true), () => setCopied(false));
@@ -33,9 +50,14 @@ export function ShareLinkButton({ kind, id, label, email, subject }: { kind: "tr
 
   return (
     <div className="flex flex-col gap-1.5">
-      <button type="button" onClick={() => void make()} disabled={busy} className="inline-flex w-fit items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink-800 hover:bg-ink-50">
-        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />} {label}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => void make()} disabled={busy} className="inline-flex w-fit items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink-800 hover:bg-ink-50">
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />} {label}
+        </button>
+        <button type="button" onClick={() => void stop()} disabled={busy} className="text-xs font-medium text-ink-500 underline hover:text-ink-950">
+          Stop sharing
+        </button>
+      </div>
       {url && (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <input readOnly value={url} aria-label="Link" onFocus={(e) => e.target.select()} className="min-w-0 flex-1 rounded-full border border-line bg-ink-50 px-3 py-1.5 text-ink-700" />
@@ -48,6 +70,11 @@ export function ShareLinkButton({ kind, id, label, email, subject }: { kind: "tr
             </a>
           )}
         </div>
+      )}
+      {note && (
+        <p className="text-xs text-ink-600" role="status">
+          {note}
+        </p>
       )}
       {err && <p className="text-xs text-[var(--accent-danger)]">{err}</p>}
     </div>

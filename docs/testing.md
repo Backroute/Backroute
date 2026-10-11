@@ -326,6 +326,14 @@ The code was run against local stand-ins that behave like the real services:
     the price file and fuel plan, scale limits, the tracking view (town only, no stale ETA, nothing about money), signed
     share links (expired or changed ones refused), a broker's address changing (DocuSign judged by the printed email),
     pay statements, trip reports, and a well-formed PDF.
+  - Before real carriers (21 checks in `prelaunch-e2e`, 25 in `prelaunch-unit`): a known broker's rate con naming a new
+    company address is held with "Trust" and "Keep holding", the broker asked at the address on file; Trust adds the
+    address and the next rate con from it goes through, while another new address is still held. A tracking link shows
+    the carrier's MC; Stop sharing (the office only) ends links sent before it, and a new one opens; the same for a
+    shipper's page. Connections, disconnections and bank changes are in the Changes log with who. In the browser:
+    the weekly goal in Basics is saved, and the report card on Money compares to it, without the word AI. The unit
+    checks: the report card's numbers (line haul against market, "not yet" where there's nothing), a multi-page PDF
+    with page numbers, a trusted domain passing, and links stopped by time to the millisecond.
 - **Ready for real traffic:**
   - Crash reporting (11 checks in `errors-e2e`, 7 unit checks): an error in a browser or on the server is counted by
     kind (the same error on two loads is one kind), never with the page's query; a crashed page reports what it

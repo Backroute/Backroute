@@ -2,6 +2,8 @@ import { z } from "zod";
 import { dbConfigured } from "@/lib/agent/db";
 import { payoutsFor, removeDriverBank, saveCompany, saveDriverBank, weekFile } from "@/lib/agent/payouts";
 import { caller } from "@/lib/agent/user";
+import { auditChange } from "@/lib/agent/integrations";
+import { pushToOffice } from "@/lib/push";
 import { vaultConfigured } from "@/lib/portal/vault";
 import { overLimit, tooMany } from "@/lib/rate-limit";
 
@@ -59,7 +61,11 @@ export async function POST(request: Request) {
   if (!parsed.success) return Response.json({ error: "bad_request", reason: "Check the numbers." }, { status: 400 });
   const b = parsed.data;
   const problem = "company" in b ? await saveCompany(o.who.me.carrierId, b.company) : await saveDriverBank(o.who.me.carrierId, b.driverId, b);
-  return problem ? Response.json({ error: "invalid", reason: problem }, { status: 422 }) : Response.json({ ok: true });
+  if (problem) return Response.json({ error: "invalid", reason: problem }, { status: 422 });
+  const what = "company" in b ? "Changed the bank driver pay comes from" : "Changed a driver's bank account";
+  await auditChange(o.who.me.carrierId, o.who.me.role, what, "company" in b ? b.company.bankName : b.driverId, o.who.me.userId);
+  await pushToOffice(o.who.me.carrierId, { title: "Bank details changed", body: `${what}. If this wasn't you, sign out other devices in Settings → Security now.`, url: "/carrier/settings?tab=integrations&open=direct-deposit", tag: `bank-${Date.now()}` }).catch(() => 0);
+  return Response.json({ ok: true });
 }
 
 export async function DELETE(request: Request) {
@@ -68,5 +74,6 @@ export async function DELETE(request: Request) {
   const driverId = new URL(request.url).searchParams.get("driverId");
   if (!driverId) return Response.json({ error: "bad_request" }, { status: 400 });
   await removeDriverBank(o.who.me.carrierId, driverId);
+  await auditChange(o.who.me.carrierId, o.who.me.role, "Removed a driver's bank account", driverId, o.who.me.userId);
   return Response.json({ ok: true });
 }

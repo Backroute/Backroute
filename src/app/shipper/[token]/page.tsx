@@ -13,6 +13,8 @@ type Row = TrackView & { invoice: { number: string; amount: number; sentAt: stri
 interface Portal {
   customer: string;
   carrier: string;
+  /** The carrier's MC number, when it's on file. */
+  mc?: string | null;
   loads: Row[];
 }
 
@@ -77,6 +79,7 @@ export default function ShipperPage() {
           <header>
             <p className="text-sm text-ink-500">
               {portal.carrier}
+              {portal.mc && ` · ${/^mc/i.test(portal.mc) ? portal.mc : `MC ${portal.mc}`}`}
               {demoId && " · sample"}
             </p>
             <h1 className="mt-1 text-2xl font-semibold text-ink-950">{portal.customer}&apos;s loads</h1>

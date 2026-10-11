@@ -66,6 +66,10 @@ export interface Broker {
   tier: "preferred" | "standard" | "watch";
   /** Broker Shield AI: FMCSA authority check before the AI will negotiate with them. */
   authorityVerified: boolean;
+  /** The owner stopped this customer's page links: any made before this no longer open. */
+  shareOffAt?: string;
+  /** Other email domains the owner confirmed are really this broker's (a held rate con, "Trust this address"). */
+  trustedDomains?: string[];
   /** Real accounts: the broker's MC number, and what the FMCSA check found and when. */
   mc?: string;
   legalName?: string;
@@ -705,6 +709,8 @@ export interface Load {
   tracking?: { app: string | null; link: string | null; askedAt: string; acceptedAt?: string };
   /** Real accounts: pickup and delivery appointment times, for check-ins and detention. */
   pickupAt?: string;
+  /** The owner stopped this load's tracking links: any made before this no longer open. */
+  shareOffAt?: string;
   /** Live load (the driver waits while it's loaded) or drop and hook (leave an empty trailer, take a loaded one). */
   pickupType?: "live" | "drop_hook";
   deliveryAt?: string;
@@ -868,7 +874,9 @@ export interface Escalation {
   /** The AI noticed the owner keeps approving this kind of email unchanged, and offers to stop asking. */
   suggestRule?: OwnerRule;
   /** A yes/no the AI acts on once the owner answers (lib/agent/decisions): yes does it, no leaves it. */
-  decision?: { kind: "reposition"; truckId: string; city: string; state: string; miles: number; doneAt?: string };
+  decision?:
+    | { kind: "reposition"; truckId: string; city: string; state: string; miles: number; doneAt?: string }
+    | { kind: "trust_sender"; brokerId: string; domain: string; doneAt?: string };
   /** How the owner answered a yes/no: true for yes. */
   approved?: boolean;
   /** A two-way call the owner answers right on the card (a broker under the floor: "Take it" or "Walk away").

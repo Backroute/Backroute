@@ -9,6 +9,7 @@ import { weekEarnings } from "@/lib/earnings";
 import { formatCurrency } from "@/lib/utils";
 import { StatusMark } from "@/components/ui/mark";
 import { MoneySource, type SourceRow } from "@/components/owner/money-source";
+import { ReportCardPanel } from "@/components/owner/report-card";
 import type { Load } from "@/lib/types";
 
 export default function EarningsPage() {
@@ -196,6 +197,7 @@ export default function EarningsPage() {
         </div>
 
         <MoneyCharts loads={loads} trucks={trucks} drivers={driverMap} />
+        <ReportCardPanel />
       </div>
     </div>
   );

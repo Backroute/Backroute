@@ -481,6 +481,26 @@ What the real version does today, and what it doesn't do yet. How to switch each
   - **New accounts see what each page is for:** Fleet, Earnings and Brokers say what will be there and the one step
     that fills them.
 
+- **Before real carriers:**
+  - **Trust this address:** a held rate con from a broker's new address comes with two answers, "Trust <domain>" and
+    "Keep holding". Trust adds the domain to that broker, so later rate cons from it go through; any other new address
+    is still held. Double brokering (a different MC) never gets this button. The broker is asked at the address on
+    file, quoting the address the rate con names.
+  - **Report card** on Money → Earnings: the last 30 days judged the way an owner judges a dispatcher: loads delivered
+    (and who booked them), revenue and rate a loaded mile (against the carrier's own imported history when there is
+    some), line haul against the market, extra pay billed, invoices out within a day, days to get paid, on time,
+    hours empty between loads, and how often it asked. A number with nothing behind it says "Not yet", never 0.
+  - **Weekly goal** per truck, question 6 in Settings → Basics (optional); the report card compares to it.
+  - **Stop sharing** next to each tracking and shipper link: every link sent before it stops opening; a new one works.
+    `SHARE_LINK_SECRET` (optional) signs the links, so changing it ends all of them at once.
+  - **The carrier's MC** shows on the tracking page and the shipper page, so a receiver can check who's hauling.
+  - **Changes log:** connecting or disconnecting a service, and changing bank details for driver pay, are written to
+    Settings → Security → Changes with who did it. A bank change also alerts the office's phones.
+  - **Statements and trip reports run to more pages** when long, numbered "Page 1 of 2".
+  - The language question isn't shown to a driver who's already delivered a load or whose language the owner set.
+  - `npm run check:live` (scripts/go-live-check.mjs) also checks the QuickBooks and Xero key pairs, that the encryption
+    key is there for Xero, Geotab and direct deposit, and `SHARE_LINK_SECRET`.
+
 ## What it doesn't do yet
 
 The AI now does the day-to-day work of a dispatcher by email, text and phone. What's still out of its reach, or needs something from outside:

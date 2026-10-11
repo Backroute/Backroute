@@ -1,5 +1,10 @@
 /** The "?" next to settings (components/ui/help): what each one does, in two plain lines, with an example. */
 export const HELP = {
+  weeklyGoal: {
+    title: "Weekly goal per truck",
+    what: "What you want each truck to gross in a week. The report card on Money and the Monday review show how close each week came. It doesn't change what Backroute books: your lowest rate and empty miles do that.",
+    example: "At $6,000 a truck and 3 trucks, the week's goal is $18,000.",
+  },
   minRpm: {
     title: "Lowest rate per loaded mile",
     what: "Backroute never asks for, counters at, or agrees to less than this per loaded mile. A broker who won't come up to it gets a polite pass.",

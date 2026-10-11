@@ -1,6 +1,6 @@
 import "server-only";
 import type { Item } from "../cloud/rows";
-import type { Escalation } from "../types";
+import type { Broker, Escalation } from "../types";
 import { save, type CarrierContext } from "./db";
 import { noticeDecisions } from "./learning";
 import { moveTruck } from "./reposition";
@@ -20,6 +20,15 @@ export async function actOnDecision(ctx: CarrierContext, e: Escalation): Promise
       const busy = !truck || truck.currentLoadId || ctx.loads.some((l) => l.truckId === d.truckId && ["negotiating", "booked", "rate_confirmed", "dispatched", "at_pickup", "in_transit", "at_delivery"].includes(l.stage));
       if (truck && !busy) await moveTruck(ctx, truck, d, `You said yes: truck ${truck.unitNumber} heads to ${d.city}, ${d.state}.`, Date.now());
       done = { ...e, decision: { ...d, doneAt: new Date().toISOString() }, resolutionNote: busy ? "The truck got a load first, so it stays." : `Sent toward ${d.city}, ${d.state}.` };
+    }
+    if (d.kind === "trust_sender") {
+      const broker = ctx.brokers.find((b) => b.id === d.brokerId);
+      if (broker && !broker.trustedDomains?.includes(d.domain)) {
+        const next: Broker = { ...broker, trustedDomains: [...(broker.trustedDomains ?? []), d.domain] };
+        await save("records", ctx.carrier.id, next as unknown as Item, "broker");
+        ctx.brokers = ctx.brokers.map((b) => (b.id === next.id ? next : b));
+      }
+      done = { ...e, decision: { ...d, doneAt: new Date().toISOString() }, resolutionNote: `${d.domain} is trusted for ${broker?.company ?? "this broker"} from now on. A rate con from it goes through; this one can be sent again or uploaded on the load.` };
     }
   } else done = { ...e, decision: { ...d, doneAt: new Date().toISOString() } };
   await save("escalations", ctx.carrier.id, done as unknown as Item);

@@ -79,7 +79,7 @@ function Settings() {
   // A real account manages who can sign in; the demo keeps its sample team.
   const signedIn = useStore((s) => s.session.mode !== "demo");
   const [inviteEmail, setInviteEmail] = useState("");
-  // A real account opens on the five questions that matter; the demo, on everything.
+  // A real account opens on the few questions that matter; the demo, on everything.
   // A link can open a tab (?tab=general). The owner's own pick holds until a link asks for another one.
   const router = useRouter();
   const asked = useSearchParams().get("tab");

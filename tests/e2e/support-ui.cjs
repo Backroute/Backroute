@@ -66,8 +66,9 @@ async function signIn(browser, sub, phone) {
   await o.goto("http://localhost:3210/carrier/settings?tab=integrations", { waitUntil: "domcontentloaded" });
   await o.locator("#set-integrations").getByText(/\d+ connected/).waitFor({ timeout: 180000 }).catch(() => {});
   const conn = await o.locator("#set-integrations").innerText();
+  // Each row: name, what it says, then its state. Motive is linked by now; the boards are listed whatever their state.
   const shows = (name) => new RegExp(`\\n${name}\\n[^\\n]+\\n(Connected|Saved|Not working)`).test(conn);
-  check("Settings → Integrations shows what's connected, never the keys", shows("Motive \\(KeepTruckin\\)") && shows("Truckstop") && shows("DAT") && !/motive-good-key|feed-secret|b123-key/.test(conn), conn.slice(0, 300));
+  check("Settings → Integrations shows what's connected, never the keys", shows("Motive \\(KeepTruckin\\)") && /\nTruckstop\n/.test(conn) && /\nDAT[^\n]*\n/.test(conn) && !/motive-good-key|feed-secret|b123-key/.test(conn), conn.match(/Motive[\s\S]{0,120}/)?.[0] ?? conn.slice(0, 300));
   await o.screenshot({ path: `${S}/.out/ui-connections.png`, fullPage: true });
   await o.goto("http://localhost:3210/carrier/settings?tab=general", { waitUntil: "domcontentloaded" });
   await o.getByText("Your rules").waitFor({ timeout: 120000 }).catch(() => {});

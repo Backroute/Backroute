@@ -58,12 +58,18 @@ const PLATFORMS = /(^|\.)(docusign\.(net|com)|echosign\.com|adobesign\.com|adobe
  * (caught above), not free mail (many small brokers use it), not their own subdomain. Brokers rarely change domains;
  * someone who has learned a load number and wants the freight or the payment does. Returns why, or null.
  */
-export function contactMoved(from: string, broker: Broker | undefined, printed?: string | null): string | null {
-  const theirs = broker?.email?.split("@")[1]?.toLowerCase();
+export function claimedDomain(from: string, printed?: string | null): string | undefined {
   const sender = from.split("@")[1]?.toLowerCase();
   const onDoc = printed?.split("@")[1]?.toLowerCase().trim();
-  const dom = onDoc || (sender && !PLATFORMS.test(sender) ? sender : undefined);
+  return onDoc || (sender && !PLATFORMS.test(sender) ? sender : undefined);
+}
+
+export function contactMoved(from: string, broker: Broker | undefined, printed?: string | null): string | null {
+  const theirs = broker?.email?.split("@")[1]?.toLowerCase();
+  const onDoc = printed?.split("@")[1]?.toLowerCase().trim();
+  const dom = claimedDomain(from, printed);
   if (!dom || !theirs || FREE.test(dom) || FREE.test(theirs)) return null;
+  if (broker?.trustedDomains?.includes(dom)) return null;
   if (dom === theirs || dom.endsWith(`.${theirs}`) || theirs.endsWith(`.${dom}`)) return null;
   return `${broker!.company}'s rate con ${onDoc ? `names ${printed}` : `came from ${from}`}, not their usual ${theirs}.`;
 }
