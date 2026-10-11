@@ -443,6 +443,10 @@ export default function LoadDetailPage() {
             {isTransitStage(load.stage) ? <TripStepper stage={load.stage} /> : <Progress value={load.progressPct} />}
           </div>
         )}
+        {load.stage === "offered" && truck && <KeepForTruck load={load} unit={truck.unitNumber} />}
+        {load.stage === "declined" && load.almost && (
+          <p className="mt-4 rounded-xl bg-ink-100 px-3.5 py-2.5 text-xs font-medium text-ink-500">Set aside: {load.almost.why}. It comes back as an offer if a truck fits before the pickup.</p>
+        )}
         {load.aiPaused && (
           <p className="mt-4 flex items-center gap-1.5 rounded-xl bg-warn-soft px-3.5 py-2.5 text-xs font-medium text-[var(--accent-warn)]">
             <ShieldAlert className="h-3.5 w-3.5" /> Backroute support has paused this load while they take a look.
@@ -728,6 +732,20 @@ function IconRow({ icon: Icon, label, value }: { icon: typeof Route; label: stri
         <Icon className="h-3.5 w-3.5" /> {label}
       </span>
       <span className="tabular text-sm font-medium text-ink-950">{value}</span>
+    </div>
+  );
+}
+
+/** The owner keeps an offer for its truck: the AI won't pass on it, move it to another truck, or let it expire. */
+function KeepForTruck({ load, unit }: { load: Load; unit: string }) {
+  const keep = useStore((s) => s.actions.keepForTruck);
+  const kept = !!load.keptFor;
+  return (
+    <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-line px-3.5 py-2.5">
+      <p className="text-xs text-ink-600">{kept ? `Kept for truck ${unit}: Backroute won't pass on it or give it to another truck.` : `Keep this one for truck ${unit}, whatever else comes in.`}</p>
+      <button type="button" aria-pressed={kept} onClick={() => keep(load.id, !kept)} className={"shrink-0 rounded-full px-3 py-1.5 text-xs font-medium " + (kept ? "bg-ink-950 text-white" : "border border-line text-ink-800")}>
+        {kept ? "Kept" : "Keep for this truck"}
+      </button>
     </div>
   );
 }

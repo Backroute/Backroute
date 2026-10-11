@@ -80,6 +80,8 @@ export interface Broker {
   avgDaysToPay: number;
   /** Share of detention claims the broker actually paid. */
   detentionPaidPct: number;
+  /** When the AI last emailed them that a truck is free (lib/agent/capacity): loads they send back are bids for it. */
+  capacityAskedAt?: string;
   /** Loads the broker cancelled on carriers after booking, last 90 days. */
   cancellations90d: number;
   /** Real accounts: the broker said they won't deal with an AI on the phone: the AI works with them by email only. */
@@ -312,6 +314,8 @@ export interface Truck {
   carrierId: string;
   equipmentType: EquipmentType;
   status: "available" | "on_load" | "maintenance";
+  /** Can run power only: pull the shipper's trailer when its own is dropped or it has none. */
+  powerOnly?: boolean;
   currentCity: string;
   currentState: string;
   homeBase: string;
@@ -780,6 +784,14 @@ export interface Load {
   /** Extra pay for work beyond the haul the driver reported (tarping, driver assist, a scale, a redelivery, miles
    *  out of route, reefer fuel), claimed from the broker and billed on the invoice (lib/agent/extras). */
   extraClaims?: ExtraClaim[];
+  /** The owner booked this offer over the one the AI ranked first: what was different, to learn from (lib/choice). */
+  ownerPick?: { at: string; overAi: boolean; lessDeadhead?: boolean };
+  /** The owner kept this offer for a truck: never set aside, moved to another truck or expired before its pickup. */
+  keptFor?: string;
+  /** Didn't fit a truck when it came in, but nearly did: kept, and offered if it fits after the plan changes. */
+  almost?: { truckId: string; why: string; at: string };
+  /** A power-only load: the shipper's trailer, pulled by a tractor without its own (lib/choice powerOnly). */
+  powerOnly?: boolean;
   /** Something went wrong with the freight itself: refused at delivery, not what the paperwork says, stolen (lib/agent/extras). */
   exception?: { kind: LoadExceptionKind; at: string; details: string; brokerToldAt?: string };
   /** Real accounts: the last distance from the truck to the stop it's heading for, from the ELD, to catch a wrong turn. */

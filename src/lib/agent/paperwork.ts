@@ -386,7 +386,8 @@ export async function expireOffers(ctx: CarrierContext, now: number): Promise<nu
   let n = 0;
   for (const load of ctx.loads) {
     if (load.stage !== "offered") continue;
-    const stale = Date.parse(load.createdAt) < now - 24 * HOUR || (load.pickupAt && Date.parse(load.pickupAt) < now);
+    // An offer the owner kept for a truck stays until its pickup passes.
+    const stale = load.keptFor ? !!load.pickupAt && Date.parse(load.pickupAt) < now : Date.parse(load.createdAt) < now - 24 * HOUR || (load.pickupAt && Date.parse(load.pickupAt) < now);
     if (!stale) continue;
     const gone: Load = { ...load, stage: "declined", updatedAt: new Date(now).toISOString() };
     await save("loads", ctx.carrier.id, gone as unknown as Item);

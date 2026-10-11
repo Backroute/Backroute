@@ -571,6 +571,31 @@ What the real version does today, and what it doesn't do yet. How to switch each
   - **The evening before:** a text the evening before a pickup day with where and when, how far the truck is, when to
     leave, and the 10-hour break if the clock is low (EVENING_HOURS, default 6-9 PM at the truck).
 
+- **How it chooses (lib/choice):**
+  - **Profit for the time:** each load is weighed by its profit less the hours it ties the truck up (waiting for the
+    pickup, the docks as this carrier's trucks have known them, the miles) at what the carrier's trucks net an hour
+    (from five or more delivered loads in 90 days). So a load tomorrow carries a day of waiting, and a slow dock costs
+    its hours.
+  - **Dead time:** a Friday afternoon, weekend or day-before-a-holiday delivery into a weak market counts the hours
+    until 6 AM on the next working day (half of them where the market is fair).
+  - **Paid sooner:** about 1% of the rate a month for a broker who pays faster than 30 days (and the same less for a
+    slower one), never more than 2%.
+  - **Fair shares:** a truck behind the fleet's weekly average gets good loads first (5% of the gap, up to $150).
+  - **What the owner's picks teach:** when the owner books an offer other than the AI's first choice, the broker they
+    chose (up to $150 a broker) and, after three picks with fewer empty miles, empty miles count 50 cents more each.
+  - **Kept for a truck:** the owner can keep an offer for its truck from the load page: it isn't set aside, moved to
+    another truck or expired before its pickup, and it's asked for first.
+  - **Nearly fits:** a load no truck can take now, but one nearly can (up to 100 miles over the empty-mile limit, or the
+    truck busy), is kept aside and comes back as an offer, with a note, when a truck fits.
+  - **Power only:** loads posted as power only are offered to tractors the owner marks as able to pull the shipper's
+    trailer (Compliance → Paperwork).
+  - **Bids for a free truck:** brokers who answered our "truck is free" email are bidding for it; the ones not chosen
+    hear a short, polite no the same day.
+  - **Slow docks on the offer:** a dock this carrier's trucks have waited at for hours is noted on the offer before
+    anything is booked.
+  - **More reasons to ask more** (inside the 18% cap): no detention pay (+3%), a dead reload market at delivery (+4%),
+    a broker who often short-pays extras (+2%).
+
 ## What it doesn't do yet
 
 The AI now does the day-to-day work of a dispatcher by email, text and phone. What's still out of its reach, or needs something from outside:

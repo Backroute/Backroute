@@ -149,6 +149,8 @@ export interface StoreState {
     setDockAddress: (loadId: string, stop: "pickup" | "delivery", address: string) => void;
     /** Live load or drop and hook at the shipper: the driver's pickup steps follow it. */
     setPickupType: (loadId: string, type: "live" | "drop_hook") => void;
+    /** The owner keeps an offer for its truck (lib/choice): never passed on, moved or expired before the pickup. */
+    keepForTruck: (loadId: string, keep: boolean) => void;
     opsOverrideRate: (loadId: string, amount: number) => void;
     /** Ops manually re-tiers a broker — after investigating a complaint, a false-positive fraud flag,
      *  whatever the automated score missed. Same "internal action, visible to the carrier" transparency

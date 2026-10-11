@@ -8,6 +8,7 @@ import { shareFacilityVisits } from "./network";
 import { isBoard, runBoards } from "./boards";
 import { followUpByPhone } from "./broker-call";
 import { offerCapacity } from "./capacity";
+import { revisitAlmost } from "./booking";
 import { trackHomeTime, weeklyCare } from "./care";
 import { runCheckins } from "./checkins";
 import { callBacks } from "./driver-calls";
@@ -116,6 +117,8 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   }
   done.push(...(await runBoards(ctx, links.filter((l) => isBoard(l.kind)), now, (row, status) => setStatus(id, row.kind, status))));
   done.push(...(await offerCapacity(ctx, now)));
+  // Loads that nearly fit earlier, looked at again now that trucks have moved (lib/agent/booking).
+  done.push(...(await revisitAlmost(ctx, now)));
   done.push(...(await actOnDecisions(ctx)));
   done.push(...(await suggestRepositions(ctx, now)));
   done.push(...(await complianceReminders(ctx, now)));

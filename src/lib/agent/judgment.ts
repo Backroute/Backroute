@@ -181,6 +181,12 @@ export function situationPremiums(o: {
   slowDockHours?: number | null;
   deadheadMiles?: number;
   loadedMiles?: number;
+  /** The posting or rate con says no detention: waiting is unpaid, so it's priced in. */
+  noDetention?: boolean;
+  /** How easy it is to reload where it delivers: a dead market is a headhaul, priced like one. */
+  reload?: "strong" | "fair" | "weak";
+  /** How often this broker pays the extras it's billed (lib/choice extrasPaidPct). */
+  extrasPaidPct?: number | null;
 }): Premium & { deadheadDollars: number } {
   const reasons: string[] = [];
   let pct = 0;
@@ -199,6 +205,18 @@ export function situationPremiums(o: {
   if (o.slowDockHours && o.slowDockHours >= 3) {
     pct += 4;
     reasons.push(`a dock that keeps trucks about ${o.slowDockHours} hours`);
+  }
+  if (o.noDetention) {
+    pct += 3;
+    reasons.push("no detention pay");
+  }
+  if (o.reload === "weak") {
+    pct += 4;
+    reasons.push("hard to reload where it delivers");
+  }
+  if (o.extrasPaidPct != null && o.extrasPaidPct < 50) {
+    pct += 2;
+    reasons.push("broker often short-pays extras");
   }
   // Empty miles worth paying for: a long run to the pickup, compared to the load itself.
   const dh = o.deadheadMiles ?? 0;

@@ -43,6 +43,8 @@ import { byRoad, newTrip, stopsLine, tripFit, tripWith, type TripFit } from "./t
 import { callDriverAbout } from "./driver-calls";
 import { bestAssignment } from "./match";
 import { learnedAsk } from "./ask-learning";
+import { deadHours, extrasPaidPct, fairnessNudge, hoursTiedUp, netPerHour, noDetention, ownerLeanings, payerEdge, powerOnly, weekGross } from "../choice";
+import { dockHoursFor } from "./facilities";
 
 /**
  * Booking by email, the way a small carrier's dispatcher does it: loads brokers send in are matched to a truck that
@@ -86,9 +88,38 @@ async function brokerFor(ctx: CarrierContext, email: string, name: string, compa
  */
 async function setAsideOthers(ctx: CarrierContext, chosen: Load, at: string, together: string[] = []) {
   // Partials may ride along; loads booked together as a plan (back to back) are kept for each other.
-  const keep = (l: Load) => (isPartial(chosen) && isPartial(l)) || together.includes(l.id);
+  // ...and an offer the owner kept for a truck stays until they let it go.
+  const keep = (l: Load) => (isPartial(chosen) && isPartial(l)) || together.includes(l.id) || !!l.keptFor;
   ctx.loads = ctx.loads.map((l) => (l.id === chosen.id ? chosen : l.offerGroupId && l.offerGroupId === chosen.offerGroupId && l.stage === "offered" && !keep(l) ? { ...l, stage: "declined" as const, updatedAt: at } : l));
-  for (const l of ctx.loads) if (l.offerGroupId === chosen.offerGroupId && l.id !== chosen.id && l.stage === "declined" && l.updatedAt === at) await save("loads", ctx.carrier.id, l as unknown as Item);
+  const passed = ctx.loads.filter((l) => l.offerGroupId === chosen.offerGroupId && l.id !== chosen.id && l.stage === "declined" && l.updatedAt === at);
+  for (const l of passed) await save("loads", ctx.carrier.id, l as unknown as Item);
+  await declineBids(ctx, chosen, passed);
+}
+
+/**
+ * Brokers who answered our "truck is free" email are bidding for that truck: the ones not taken hear a short, polite
+ * no the same day, so they don't hold the load for us (once a day per broker). Board and mass-mailed loads don't.
+ */
+async function declineBids(ctx: CarrierContext, chosen: Load, passed: Load[]) {
+  const day = new Date().toISOString().slice(0, 10);
+  for (const l of passed) {
+    const b = ctx.brokers.find((x) => x.id === l.brokerId);
+    const to = l.brokerContactEmail ?? b?.email;
+    if (!b?.capacityAskedAt || !to || !l.offerEmail || b.id === chosen.brokerId) continue;
+    if (Date.parse(b.capacityAskedAt) < Date.now() - 2 * 86400_000 || Date.parse(l.createdAt) < Date.parse(b.capacityAskedAt)) continue;
+    if (!(await claimMark(ctx.carrier.id, `broker:${b.id}`, `covered:${day}`))) continue;
+    await sendOrQueue(ctx, {
+      purpose: "ack",
+      to,
+      toName: b.contact || undefined,
+      subject: /^re:/i.test(l.offerEmail.subject) ? l.offerEmail.subject : `Re: ${l.offerEmail.subject}`,
+      body: `Hi${b.contact ? ` ${b.contact}` : ""},\n\nThanks for sending ${l.referenceNumber ? `${l.referenceNumber} ` : ""}(${l.lane.origin}, ${l.lane.originState} to ${l.lane.destination}, ${l.lane.destState}). We've covered that truck for now, so please don't hold it for us. We'll reach out next time we have one open near ${l.lane.origin}.\n\nThanks,\n${ctx.carrier.name}`,
+      inReplyTo: l.offerEmail.messageId,
+      loadId: l.id,
+      withinRules: true,
+      why: `Tell ${b.company} we've covered the truck they sent ${l.referenceNumber || "a load"} for?`,
+    });
+  }
 }
 
 /** A truck with nothing on it right now: no load it's hauling or heading to. */
@@ -113,8 +144,50 @@ export function bestTruck(ctx: CarrierContext, o: LoadAsk, skip?: Set<string>, o
 }
 
 /** A load as the AI weighs it for a truck. A partial carries itself along, to be planned into a trip (lib/trip-plan). */
-type LoadAsk = { equipment: Load["equipmentType"]; originCity: string; originState: string; destinationState: string; destinationCity?: string; notes?: string; pickupAt: number | null; miles: number; trip?: TripLoad };
-const askOf = (l: Load): LoadAsk => ({ equipment: l.equipmentType, originCity: l.lane.origin, originState: l.lane.originState, destinationState: l.lane.destState, destinationCity: l.lane.destination, ...(l.offerNotes ? { notes: l.offerNotes } : {}), pickupAt: l.pickupAt ? Date.parse(l.pickupAt) : null, miles: l.lane.miles, ...(isPartial(l) ? { trip: l } : {}) });
+type LoadAsk = { equipment: Load["equipmentType"]; powerOnly?: boolean; originCity: string; originState: string; destinationState: string; destinationCity?: string; notes?: string; pickupAt: number | null; miles: number; trip?: TripLoad };
+const askOf = (l: Load): LoadAsk => ({ equipment: l.equipmentType, ...(l.powerOnly ? { powerOnly: true } : {}), originCity: l.lane.origin, originState: l.lane.originState, destinationState: l.lane.destState, destinationCity: l.lane.destination, ...(l.offerNotes ? { notes: l.offerNotes } : {}), pickupAt: l.pickupAt ? Date.parse(l.pickupAt) : null, miles: l.lane.miles, ...(isPartial(l) ? { trip: l } : {}) });
+
+/**
+ * A truck that nearly fits a load no truck can take now: the right trailer and a driver who'd run it, but up to 100
+ * miles over the empty-mile limit, or busy with loads lined up or one it's asking for. Hard noes (the driver's no-go
+ * places, gear, lanes the owner won't run, a blocked day) aren't near misses.
+ */
+function nearMiss(ctx: CarrierContext, o: LoadAsk): { truck: Truck; deadhead: number; why: string } | null {
+  const max = ctx.settings.maxDeadhead ?? MAX_DEADHEAD;
+  let best: { truck: Truck; deadhead: number; why: string } | null = null;
+  for (const truck of ctx.trucks) {
+    if (!truck.driverId || truck.status === "maintenance" || (o.powerOnly ? !truck.powerOnly : truck.equipmentType !== o.equipment)) continue;
+    const driver = ctx.drivers.find((d) => d.id === truck.driverId);
+    if (driver?.prefs?.avoidStates?.includes(o.destinationState) || driverWontRun(driver, { originCity: o.originCity, destinationCity: o.destinationCity ?? "", notes: o.notes })) continue;
+    if (gearMissing(truck, o.notes).length || laneAvoided(ctx.settings.avoidLanes, o) || dayBlocked(truck.blockedDays, o.pickupAt, o.miles)) continue;
+    const last = chainEnd(ctx.loads, truck);
+    const from = last ? { city: last.lane.destination, state: last.lane.destState } : { city: truck.currentCity, state: truck.currentState };
+    const deadhead = Math.round(estimateMiles(from, { city: o.originCity, state: o.originState }) ?? 999);
+    if (deadhead > max + 100) continue;
+    const busy = !!last || ctx.loads.some((l) => l.truckId === truck.id && l.stage === "negotiating");
+    const why = deadhead > max ? `truck ${truck.unitNumber} was ${deadhead} empty miles away, over your ${max}-mile limit` : busy ? `truck ${truck.unitNumber} was busy with other loads` : `truck ${truck.unitNumber} couldn't make the pickup time`;
+    if (!best || deadhead < best.deadhead) best = { truck, deadhead, why };
+  }
+  return best;
+}
+
+/**
+ * Loads that nearly fit when they came in, looked at again each round: one that fits a truck now (it freed up, or
+ * moved closer) comes back as an offer, with a note saying why it's back. Only while the pickup is still ahead.
+ */
+export async function revisitAlmost(ctx: CarrierContext, now: number): Promise<string[]> {
+  const done: string[] = [];
+  for (const l of ctx.loads) {
+    if (l.stage !== "declined" || !l.almost || !l.pickupAt || Date.parse(l.pickupAt) < now + 3 * HOUR || Date.parse(l.createdAt) < now - 2 * 86400_000) continue;
+    const fit = bestTruck(ctx, askOf(l));
+    if (!fit) continue;
+    const back: Load = addWhy({ ...l, stage: "offered", truckId: fit.truck.id, offerGroupId: `offers-${fit.truck.id}`, deadheadMiles: Math.round(fit.deadhead), almost: undefined, updatedAt: new Date(now).toISOString() }, `Nearly fit when it came in (${l.almost.why}); it fits truck ${fit.truck.unitNumber} now.`);
+    await save("loads", ctx.carrier.id, back as unknown as Item);
+    ctx.loads = ctx.loads.map((x) => (x.id === back.id ? back : x));
+    done.push(`${l.referenceNumber || l.lane.origin}: back as an offer for ${fit.truck.unitNumber}`);
+  }
+  return done;
+}
 
 /** Whether this truck can take the load, and the empty miles to it if so (null: it can't). */
 function fitFor(ctx: CarrierContext, truck: Truck, o: LoadAsk, opts: { planned?: boolean } = {}): number | null {
@@ -126,7 +199,9 @@ function fitFor(ctx: CarrierContext, truck: Truck, o: LoadAsk, opts: { planned?:
  * less than nothing when the truck drives that way anyway), or a load that goes after what's lined up.
  */
 function fitDetail(ctx: CarrierContext, truck: Truck, o: LoadAsk, opts: { planned?: boolean } = {}): { miles: number; trip?: TripFit } | null {
-  if (!truck.driverId || truck.equipmentType !== o.equipment || truck.status === "maintenance") return null;
+  if (!truck.driverId || truck.status === "maintenance") return null;
+  // Power only: any tractor the owner marked able to pull the shipper's trailer; otherwise the trailer type matches.
+  if (o.powerOnly ? !truck.powerOnly : truck.equipmentType !== o.equipment) return null;
   // Can't legally run: an inspection or plates past due, a critical engine fault, a driver whose CDL or medical card
   // ran out (lib/expiry). No load goes on it; the owner was reminded ahead of time.
   if (cantRun(truck, ctx.drivers.find((d) => d.id === truck.driverId), Date.now())) return null;
@@ -170,8 +245,20 @@ function fitDetail(ctx: CarrierContext, truck: Truck, o: LoadAsk, opts: { planne
  * this truck's empty miles, less what reloading where it ends will likely cost. Null: not on this truck.
  */
 function worthOn(ctx: CarrierContext, l: Load, truck: Truck, deadhead: number, now: Date): number | null {
-  const net = (l.netProfit ?? 0) + Math.round((l.deadheadMiles - deadhead) * 0.68);
-  const reload = reloadValue(reloadOutlook(ctx.loads, l.lane.destination, l.lane.destState, l.equipmentType, now.getTime()).outlook);
+  // Kept by the owner for a truck: only that truck, and ahead of anything else it could take.
+  if (l.keptFor) return l.keptFor === truck.id ? 1_000_000 : null;
+  const outlook = reloadOutlook(ctx.loads, l.lane.destination, l.lane.destState, l.equipmentType, now.getTime()).outlook;
+  const leanings = ownerLeanings(ctx.loads);
+  const net = (l.netProfit ?? 0) + Math.round((l.deadheadMiles - deadhead) * (0.68 + leanings.deadheadPerMile));
+  // Beyond the money on the load (lib/choice): the hours it ties the truck up (waiting for the pickup, the docks as
+  // this carrier has known them, the miles) and dead time after a Friday or holiday delivery, at what the carrier's
+  // trucks net an hour; getting paid sooner; sharing good loads across trucks; brokers the owner keeps choosing.
+  const perHour = netPerHour(ctx.loads, now.getTime()) ?? 0;
+  const hours = hoursTiedUp({ now: now.getTime(), pickupAt: l.pickupAt ? Date.parse(l.pickupAt) : null, miles: l.lane.miles, deadhead, dockHours: dockHoursFor(ctx.loads, l) });
+  const idle = deadHours(l.deliveryAt, l.lane.destState, outlook);
+  const broker = ctx.brokers.find((b) => b.id === l.brokerId);
+  const extras = payerEdge(l.targetRate, broker?.avgDaysToPay) + fairnessNudge(truck.id, weekGross(ctx.loads, now.getTime()), ctx.trucks) + (leanings.brokers.get(l.brokerId) ?? 0) - Math.round((hours + idle) * perHour);
+  const reload = reloadValue(outlook) + extras;
   const driver = ctx.drivers.find((d) => d.id === truck.driverId);
   // Never on a driver who can't legally run it: an expired card, a missing endorsement, out of hours for the week.
   if (driver && dispatchStops(l, driver, now.getTime()).length) return null;
@@ -184,6 +271,18 @@ function worthOn(ctx: CarrierContext, l: Load, truck: Truck, deadhead: number, n
   const nowState = homeTimeStatus(driver, truck.currentCity, truck.currentState, now).state;
   if (driver.homePriority || nowState === "head_home" || nowState === "late") return 1_000_000 - (after.hoursHome ?? 999) * 1000 + net / 1000;
   return net + reload;
+}
+
+/** Of the offers in the owner's pick's group, the one the AI ranks first, compared with the pick. */
+function ownerPickOf(ctx: CarrierContext, pick: Load): NonNullable<Load["ownerPick"]> {
+  const at = new Date().toISOString();
+  const truck = ctx.trucks.find((t) => t.id === pick.truckId);
+  const group = ctx.loads.filter((l) => l.stage === "offered" && l.offerGroupId && l.offerGroupId === pick.offerGroupId && !l.keptFor);
+  if (!truck || group.length < 2) return { at, overAi: false };
+  const now = new Date();
+  const ranked = group.map((l) => ({ l, v: worthOn(ctx, l, truck, l.deadheadMiles, now) ?? -Infinity })).sort((a, b) => b.v - a.v);
+  const top = ranked[0].l;
+  return top.id === pick.id ? { at, overAi: false } : { at, overAi: true, ...(pick.deadheadMiles < top.deadheadMiles - 25 ? { lessDeadhead: true } : {}) };
 }
 
 /**
@@ -238,6 +337,7 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
   for (const o of offers) {
     if (!o.originCity || !o.originState || !o.destinationCity || !o.destinationState) continue;
     const equipment = guessEquipment(o.equipment) ?? "Dry Van";
+    const po = powerOnly(o.equipment) || powerOnly(o.notes);
     const byNumber = o.loadNumber ? ctx.loads.find((l) => l.brokerId === broker.id && l.referenceNumber.toLowerCase() === o.loadNumber!.toLowerCase()) : undefined;
     if (byNumber) {
       const back = await notePosting(ctx, byNumber, o.rate, !!sender.feed);
@@ -264,7 +364,11 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
       : undefined;
     const lane = { origin: o.originCity, originState: o.originState, destination: o.destinationCity, destState: o.destinationState, miles, marketRpm: 0 };
     const asTrip: TripLoad | undefined = partial ? { id: `offer-${o.loadNumber ?? added.length}`, referenceNumber: o.loadNumber ?? "the new load", lane, equipmentType: equipment, weight: o.weight ?? 0, pickupAt: pickupAt ?? undefined, deliveryAt: deliveryAt ?? undefined, partial } : undefined;
-    const fit = bestTruck(ctx, { equipment, originCity: o.originCity, originState: o.originState, destinationState: o.destinationState, destinationCity: o.destinationCity, ...(o.notes ? { notes: o.notes } : {}), pickupAt: pickupAt ? Date.parse(pickupAt) : null, miles, ...(asTrip ? { trip: asTrip } : {}) });
+    const ask0: LoadAsk = { equipment, ...(po ? { powerOnly: true } : {}), originCity: o.originCity, originState: o.originState, destinationState: o.destinationState, destinationCity: o.destinationCity, ...(o.notes ? { notes: o.notes } : {}), pickupAt: pickupAt ? Date.parse(pickupAt) : null, miles, ...(asTrip ? { trip: asTrip } : {}) };
+    // No truck now, but one nearly fits (a bit too far, or busy): kept aside, and offered if the plan changes.
+    const exact = bestTruck(ctx, ask0);
+    const near = exact ? null : nearMiss(ctx, ask0);
+    const fit = exact ?? (near ? { truck: near.truck, deadhead: near.deadhead } : null);
     if (!fit) continue;
 
     const posted = o.rate ?? 0;
@@ -317,12 +421,21 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
       ...(sender.feed ? {} : { offerEmail: { subject: sender.subject, messageId: sender.messageId } }),
       ...(o.notes ? { offerNotes: o.notes.slice(0, 600) } : {}),
       ...(hazmatText(o.notes) ? { hazmat: true } : {}),
+      ...(po ? { powerOnly: true } : {}),
     };
+    if (near) {
+      const aside: Load = { ...load, stage: "declined", almost: { truckId: near.truck.id, why: near.why, at: new Date().toISOString() } };
+      await save("loads", ctx.carrier.id, aside as unknown as Item);
+      ctx.loads.unshift(aside);
+      continue;
+    }
     // A holiday, a dock that's closed then, or too little time to drive it: noted on the offer; a hard one keeps the
     // AI from asking for it on its own.
     const warnings = await scheduleWarnings(load, fit.truck, ctx.carrier.id, ctx.drivers.find((d) => d.id === fit.truck.driverId), undefined, ctx.loads).catch((): ScheduleWarning[] => []);
     // Too good to be true, or asking for money first: the owner looks before anything is asked.
     for (const text of redFlags({ rate: posted || null, miles, notes: o.notes }, market)) warnings.push({ hard: true, text });
+    // A dock this carrier's trucks have waited at for hours: the owner sees it before anything is booked.
+    for (const f of slowDocks(ctx.loads, load)) warnings.push({ hard: false, text: `${f.name} usually keeps trucks about ${Math.round(f.avgMinutes / 30) / 2} hours (${f.visits} visits).` });
     if (warnings.length) load.scheduleWarnings = warnings;
     // The same freight from another broker: the better one is asked for, the other set aside with a note.
     const twin = twinOf(ctx.loads, { brokerId: broker.id, originCity: o.originCity, destinationCity: o.destinationCity, pickupAt });
@@ -394,6 +507,8 @@ export async function offersFromEmail(ctx: CarrierContext, offers: OfferReading[
 export async function requestBooking(ctx: CarrierContext, load: Load, ask: number, how: { byRules?: boolean; byOwner?: boolean; callFirst?: boolean; together?: string[] }) {
   // An account whose trial ended unpaid (with billing required) books nothing new; what's booked keeps running.
   if (await holdForBilling(ctx, load.id)) return "queued" as const;
+  // The owner picked this one: was it the one the AI would have, and if not, what was different (lib/choice).
+  if (how.byOwner && !load.ownerPick) load = { ...load, ownerPick: ownerPickOf(ctx, load) };
   let broker = ctx.brokers.find((b) => b.id === load.brokerId);
   // Their credit, before asking: too weak and the AI doesn't book on its own; slow to pay and it asks a bit more.
   if (broker && !how.byOwner) {
@@ -424,6 +539,9 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
       slowDockHours: slow ? Math.round(slow.avgMinutes / 30) / 2 : null,
       deadheadMiles: load.deadheadMiles,
       loadedMiles: load.lane.miles,
+      noDetention: noDetention(load.offerNotes) || noDetention(load.rateConReading?.detention),
+      reload: reloadOutlook(ctx.loads, load.lane.destination, load.lane.destState, load.equipmentType, Date.now()).outlook,
+      extrasPaidPct: broker ? extrasPaidPct(ctx.loads, broker.id) : null,
     });
     const factor = Math.min(MAX_PREMIUM, p.factor * r.factor * sit.factor);
     const reasons = [...p.reasons, ...r.reasons, ...sit.reasons];

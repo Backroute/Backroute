@@ -105,6 +105,16 @@ export function PaperworkCard() {
                       })}
                       {!t.gear?.length && <span className="text-ink-400">Not listed: loads aren&apos;t checked for gear.</span>}
                     </span>
+                    {/* Power only: the tractor can pull a shipper's trailer, so power-only loads are offered for it (lib/choice). */}
+                    <button
+                      type="button"
+                      aria-pressed={!!t.powerOnly}
+                      aria-label={`${t.unitNumber} can run power only`}
+                      onClick={() => updateTruck(t.id, { powerOnly: !t.powerOnly })}
+                      className={"self-start rounded-full px-2 py-0.5 text-xs font-medium " + (t.powerOnly ? "bg-ink-950 text-white" : "bg-ink-100 text-ink-700")}
+                    >
+                      Power only: pulls the shipper&apos;s trailer
+                    </button>
                   </div>
                 ))}
               </div>

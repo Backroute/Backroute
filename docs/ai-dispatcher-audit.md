@@ -10,10 +10,10 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 
 | Status | Items |
 |---|---|
-| Done | 326 |
-| Partly | 98 |
-| To build | 44 |
-| Needs real accounts | 21 |
+| Done | 344 |
+| Partly | 83 |
+| To build | 39 |
+| Needs real accounts | 23 |
 | Needs people | 11 |
 
 
@@ -21,7 +21,7 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 
 | # | Item | Status | Note |
 |---|---|---|---|
-| 1 | Search every connected board for each truck at the same moment. | Partly | Boards searched each round per truck; real boards need agreements |
+| 1 | Search every connected board for each truck at the same moment. | Needs real accounts | Each board searched for each truck every round; searching all boards needs each board's agreement and keys |
 | 2 | Start searching 36 hours before a truck delivers, not only when empty. | Done | Searches for trucks delivering within a day and a half |
 | 3 | Search from where the truck will be, not where it is. | Done | Searches from where the truck will be empty |
 | 4 | Widen the search radius step by step when nothing fits. | Done | A search that finds nothing widens to 250, then up to 350 miles (within the owner's deadhead) |
@@ -39,33 +39,33 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 16 | Take posts down the moment a truck is booked. | Needs real accounts | Post removal needs each board's delete endpoint, which isn't public; not guessed |
 | 17 | Answer broker calls about posted trucks on the first ring. | Done | Broker calls about posted trucks reach the AI |
 | 18 | Search for partial loads that fit leftover trailer space. | Done | Partials planned into trips |
-| 19 | Search for power-only loads when the trailer is free. | To build | Power-only loads not matched |
-| 20 | Keep a list of loads that almost fit, in case the plan changes. | To build | No "almost fits" list kept |
+| 19 | Search for power-only loads when the trailer is free. | Done | Power-only loads offered to tractors the owner marks as able to pull the shipper's trailer |
+| 20 | Keep a list of loads that almost fit, in case the plan changes. | Done | Loads that nearly fit (100 miles over the limit, or the truck busy) kept aside and offered when a truck fits |
 
 ## 2. Choosing the right load (21–40)
 
 | # | Item | Status | Note |
 |---|---|---|---|
-| 21 | Score each load by profit per hour, not just per mile. | Partly | Per-hour pay shown in the load's why (with dock hours); the choice still ranks by mile and net |
+| 21 | Score each load by profit per hour, not just per mile. | Done | Each load weighed by profit less the hours it ties the truck up, at what the carrier's trucks net an hour |
 | 22 | Count empty miles to pickup at the real cost per mile. | Done | Empty miles costed in net profit |
 | 23 | Count how hard it is to reload where the load delivers. | Done | Reload outlook where the load ends |
-| 24 | Count dock wait time from history at that shipper. | Partly | Slow docks told to the driver, not counted in the choice |
+| 24 | Count dock wait time from history at that shipper. | Done | Dock hours from the carrier's own visits counted in the hours a load takes |
 | 25 | Count tolls on the route. | Partly | Toll estimate on loads; real tolls from statements |
 | 26 | Count fuel at the carrier's real card price. | Done | Fuel plan at the card's price |
-| 27 | Count weekend and holiday dead time. | Partly | Holidays flagged; weekend dead time not counted |
+| 27 | Count weekend and holiday dead time. | Done | Dead time after a Friday afternoon, weekend or pre-holiday delivery counted where the market is weak or fair |
 | 28 | Count the driver's hours left. | Done | Hours checked against the ELD |
 | 29 | Count whether the driver makes home on time. | Done | Home time checked before every load |
 | 30 | Skip loads the truck can't legally carry (weight, hazmat, height). | Done | Endorsements, weight and hazmat checked before dispatch |
 | 31 | Skip loads that need gear the truck lacks (straps, tarps, load locks). | Done | Truck gear checked (judgment) |
 | 32 | Skip brokers the owner blocked. | Done | Blocked brokers aren't booked |
-| 33 | Prefer brokers who pay fast. | Partly | Slow payers priced up; fast payers not preferred in the choice |
-| 34 | Prefer shippers with short dock times. | Partly | A slow dock is priced into the ask (+4%); not yet a tie-breaker in the choice |
+| 33 | Prefer brokers who pay fast. | Done | Brokers who pay sooner preferred (about 1% of the rate a month, up to 2%) |
+| 34 | Prefer shippers with short dock times. | Done | Slow docks cost hours in the choice and are priced into the ask |
 | 35 | Compare two loads in a row against one long load. | Done | Plans compare back-to-back loads with long runs |
-| 36 | Compare a load today against a better one tomorrow. | To build | No today-vs-tomorrow comparison |
+| 36 | Compare a load today against a better one tomorrow. | Done | A load tomorrow is weighed with the day of waiting it costs, against today's |
 | 37 | Explain in one line why it picked this load. | Done | Why-lines on every load |
 | 38 | Show the runner-up and why it lost. | Done | Next-best offer named in the why |
 | 39 | Never pick a load under the owner's lowest rate. | Done | Never under the owner's lowest |
-| 40 | Learn which loads the owner would have picked instead. | Partly | Learns from approvals; not from which offer the owner picked |
+| 40 | Learn which loads the owner would have picked instead. | Done | When the owner books an offer over the AI's first choice, the broker and fewer empty miles are learned |
 
 ## 3. Pricing and market knowledge (41–60)
 
@@ -77,13 +77,13 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 44 | Know the carrier's own past pay on each lane. | Done | Lane history pricing |
 | 45 | Know seasonal swings (produce, holidays, quarter end). | Needs real accounts | Needs a year of market data |
 | 46 | Know which days of the week pay more on a lane. | Done | Weekday edge from the carrier's own loads: a day paying 8%+ more asks 4% more |
-| 47 | Know reefer, flatbed and van gaps on the same lane. | Partly | Market by equipment when the rate service gives it |
+| 47 | Know reefer, flatbed and van gaps on the same lane. | Needs real accounts | Market by equipment comes from the rate service when it gives it; needs a live rate subscription |
 | 48 | Price extra stops correctly. | Done | Extra stops priced |
-| 49 | Price detention terms into the ask. | Partly | Detention terms asked for, not priced into the ask |
+| 49 | Price detention terms into the ask. | Done | No detention pay on the post or rate con asks 3% more |
 | 50 | Price slow-paying brokers higher. | Done | Slow payers asked more |
 | 51 | Price weekend pickups higher. | Done | Weekend pickup premium |
 | 52 | Price last-minute loads higher. | Done | Short-notice premium |
-| 53 | Price headhaul and backhaul differently. | Partly | Reload outlook used in the choice, not the price |
+| 53 | Price headhaul and backhaul differently. | Done | A load into a dead reload market (a headhaul) asks 4% more |
 | 54 | Price hazmat and high-value freight higher. | Done | Hazmat and high-value premium |
 | 55 | Price team loads for team speed. | Done | Team premium |
 | 56 | Price partial loads per foot of trailer. | Done | Partials priced by trailer share |
@@ -113,8 +113,8 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 75 | Never promise what the truck can't do. | Done | Never promises a truck the data doesn't show |
 | 76 | Confirm the agreed number in writing. | Done | Confirms in writing |
 | 77 | Catch a broker changing the number in a later email. | Done | Rate con checked against what was agreed |
-| 78 | Handle several brokers bidding for the same truck. | Partly | Fleet matching picks one; several bids on one truck not compared |
-| 79 | Pick the best offer and decline the rest politely. | Partly | Others set aside; no polite decline sent |
+| 78 | Handle several brokers bidding for the same truck. | Done | Brokers who answered our free-truck email are bids; the best is chosen across them |
+| 79 | Pick the best offer and decline the rest politely. | Done | The others hear a short, polite no the same day |
 | 80 | Keep the whole email thread on the load. | Done | Thread kept on the load |
 
 ## 5. Negotiating by phone (81–100)
@@ -179,7 +179,7 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 126 | Re-plan when a driver asks for time off. | Partly | Time off noted; plan not rebuilt |
 | 127 | Line up the reload before delivery. | Done | Reload lined up before delivery |
 | 128 | Chain loads to finish near home on home day. | Done | Ends near home on home day |
-| 129 | Avoid sending a truck into a dead market on Friday. | Partly | Reload outlook; Friday not special |
+| 129 | Avoid sending a truck into a dead market on Friday. | Done | Friday deliveries into dead markets cost the weekend in the choice |
 | 130 | Reposition empty trucks toward strong markets. | Done | Repositions empty trucks |
 | 131 | Pay attention to the 70-hour clock across the week. | Done | 70-hour clock |
 | 132 | Plan the 34-hour restart at home or a good spot. | Partly | 34-hour restart planned, not where |
@@ -187,7 +187,7 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 134 | Plan maintenance into slow days. | Done | Service due and the truck's next free day in the reminders |
 | 135 | Plan inspections before they expire. | Done | Inspection reminders |
 | 136 | Show the week's plan as one simple timeline per truck. | Partly | Plan lines and lineup; no timeline view |
-| 137 | Let the owner lock a load into the plan. | To build | Owner can't lock a load into the plan |
+| 137 | Let the owner lock a load into the plan. | Done | Owner keeps an offer for a truck: never set aside, moved or expired before pickup, asked for first |
 | 138 | Let the owner block a day for a truck. | Done | Owner blocks days per truck on the Fleet page; loads running into them are skipped |
 | 139 | Show expected weekly revenue per truck. | Partly | This week's money per truck, not expected |
 | 140 | Show expected weekly empty miles per truck. | Partly | Empty miles this week, not expected |
@@ -233,7 +233,7 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 170 | Know religious and family days off. | Partly | Time off and remembered notes |
 | 171 | Ask drivers new preferences in plain conversation. | Done | Asked and remembered in conversation |
 | 172 | Remember preferences said in passing. | Done | Said in passing (remember, preferences) |
-| 173 | Balance good loads fairly across drivers. | Partly | Split shown; not balanced in the choice |
+| 173 | Balance good loads fairly across drivers. | Done | A truck behind the fleet's weekly average gets good loads first (5% of the gap, up to $150) |
 | 174 | Track promised home time and keep it. | Done | Home time tracked |
 | 175 | Tell the driver early if home time is at risk. | Partly | Owner told; driver not told early |
 | 176 | Offer the driver a choice when two loads are close. | Done | Driver can pick between offers |
@@ -288,7 +288,7 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 215 | Collect dock tips from drivers after each visit. | Done | Tips collected |
 | 216 | Share dock tips with the next driver going there. | Done | Tips shared |
 | 217 | Track average wait time per dock. | Done | Wait per dock |
-| 218 | Warn the owner about slow docks before booking. | Partly | Driver told; owner not before booking |
+| 218 | Warn the owner about slow docks before booking. | Done | Slow docks shown on the offer before anything is booked |
 | 219 | Charge more for slow docks. | Done | Slow docks priced into the ask |
 | 220 | Keep a dock directory per carrier. | Partly | Facility memory; no directory page |
 
@@ -388,7 +388,7 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 295 | Claim out-of-route miles. | Done | Out-of-route miles claimed at the rate con's or the load's own rate a mile |
 | 296 | Follow up on unpaid extras. | Partly | Invoices followed up; extras not separately |
 | 297 | Track which brokers pay extras. | Partly | Detention paid % per broker |
-| 298 | Price slow payers of extras higher next time. | To build | Slow payers of extras not priced |
+| 298 | Price slow payers of extras higher next time. | Done | Brokers who short-pay extras are asked 2% more |
 | 299 | Share extras with drivers on their pay. | Done | Driver's share of extra pay for their work on the pay run |
 | 300 | Show the owner how much extra money it recovered. | Done | Report card extras |
 

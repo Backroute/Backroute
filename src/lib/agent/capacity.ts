@@ -1,10 +1,12 @@
 import "server-only";
 import { assessBroker } from "../broker-policy";
+import type { Broker } from "../types";
 import { homeTimeStatus } from "../home";
 import { canEmail } from "../channels/out";
 import { formatAtStop } from "../stop-time";
 import { whereTrucksFree } from "./boards";
-import { claimMark, type CarrierContext } from "./db";
+import { claimMark, save, type CarrierContext } from "./db";
+import type { Item } from "../cloud/rows";
 import { sendOrQueue } from "./outbox";
 import * as mail from "./templates";
 
@@ -49,6 +51,10 @@ export async function offerCapacity(ctx: CarrierContext, now: number): Promise<s
         withinRules: true,
         why: `Tell ${b.company} truck ${truck.unitNumber} will be free in ${q.originCity}, ${q.originState}?`,
       });
+      // What they send back is a bid for this truck: the ones not taken get a polite no (lib/agent/booking).
+      const asked: Broker = { ...b, capacityAskedAt: new Date(now).toISOString() };
+      await save("records", ctx.carrier.id, asked as unknown as Item, "broker");
+      ctx.brokers = ctx.brokers.map((x) => (x.id === b.id ? asked : x));
       sent++;
     }
     if (sent) done.push(`Truck ${truck.unitNumber}: told ${sent} broker${sent === 1 ? "" : "s"} it's free in ${q.originCity}`);
