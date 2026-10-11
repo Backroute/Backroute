@@ -12,12 +12,14 @@ import { QuickReplies } from "@/components/shared/quick-replies";
 import { DictateButton } from "@/components/shared/dictate";
 import { truckActiveLoads, useCarrierLoads, useCarrierTrucks } from "@/lib/selectors";
 import { LargeTitle } from "@/components/ui/large-title";
+import { usePagesText } from "@/lib/lang/pages-ui";
 
 export default function DriverMessagesPage() {
   const driver = usePrimaryDriver();
   const messages = useStore((s) => s.driverMessages).filter((m) => m.driverId === driver.id);
   const sendMessage = useStore((s) => s.actions.sendDriverMessage);
   const [value, setValue] = useState("");
+  const p = usePagesText();
   const startInboundCall = useStore((s) => s.actions.startInboundCall);
   const endRef = useRef<HTMLDivElement>(null);
   const truck = useCarrierTrucks().find((t) => t.id === driver.truckId);
@@ -40,13 +42,13 @@ export default function DriverMessagesPage() {
     <div className="flex h-full flex-col">
       <div className="flex items-start justify-between px-5">
         <div>
-          <LargeTitle className="font-display text-2xl text-ink-950">Dispatch</LargeTitle>
-          <p className="text-xs text-ink-500">Available 24/7 · responds in seconds</p>
+          <LargeTitle className="font-display text-2xl text-ink-950">{p.msg.title}</LargeTitle>
+          <p className="text-xs text-ink-500">{p.msg.sub}</p>
         </div>
         <button
           onClick={() => startInboundCall(driver.id)}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink-100 text-ink-700"
-          aria-label="Call dispatch"
+          aria-label={p.msg.call}
         >
           <Phone className="h-4 w-4" />
         </button>
@@ -56,12 +58,12 @@ export default function DriverMessagesPage() {
         {messages.map((m) => (
           <div key={m.id} className={cn("flex", m.from === "driver" ? "justify-end" : "justify-start")}>
             <div className={cn("max-w-[80%] rounded-2xl px-4 py-2.5 text-sm", m.from === "driver" ? "bg-ink-950 text-white rounded-br-sm" : "bg-ink-100 text-ink-900 rounded-bl-sm")}>
-              {m.from === "owner" && <p className="mb-0.5 text-xs font-semibold text-ink-700">The office</p>}
+              {m.from === "owner" && <p className="mb-0.5 text-xs font-semibold text-ink-700">{p.msg.office}</p>}
               <p className="leading-relaxed">{m.content}</p>
               <p className={cn("mt-1 flex items-center gap-1.5 text-xs", m.from === "driver" ? "text-white/70" : "text-ink-500")}>
                 <TimeAgo iso={m.timestamp} />
                 {m.ai && <LiveAiMark />}
-                {m.channel === "sms" && <MessageSquare className="h-2.5 w-2.5" aria-label="By text" />}
+                {m.channel === "sms" && <MessageSquare className="h-2.5 w-2.5" aria-label={p.msg.byText} />}
               </p>
             </div>
           </div>
@@ -76,13 +78,13 @@ export default function DriverMessagesPage() {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          placeholder="Ask about your load, detention, or anything else…"
+          placeholder={p.msg.placeholder}
           className="min-w-0 flex-1 rounded-full border border-line bg-ink-50/60 px-4 py-2.5 text-sm outline-none focus:border-ink-400"
         />
         <DictateButton lang={driver.prefs?.language ?? driver.prefs?.appLanguage ?? "en"} onText={(t) => setValue((v) => (v.trim() ? `${v.trim()} ${t}` : t))} />
         <button
           onClick={handleSend}
-          aria-label="Send"
+          aria-label={p.msg.send}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink-950 text-white disabled:bg-ink-300"
           disabled={!value.trim()}
         >

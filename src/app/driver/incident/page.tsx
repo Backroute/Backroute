@@ -9,12 +9,13 @@ import { usePrimaryDriver, useCarrierTrucks } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import type { IncidentType } from "@/lib/types";
 import { LargeTitle } from "@/components/ui/large-title";
+import { usePagesText } from "@/lib/lang/pages-ui";
 
-const TYPES: { key: IncidentType; label: string; icon: typeof Wrench; desc: string }[] = [
-  { key: "breakdown", label: "Breakdown", icon: Wrench, desc: "Mechanical issue, need roadside help" },
-  { key: "accident", label: "Accident", icon: AlertTriangle, desc: "Collision or safety incident" },
-  { key: "delay", label: "Running late", icon: Clock, desc: "Traffic, detention, or appointment slip" },
-  { key: "weather", label: "Weather", icon: CloudRain, desc: "Storm, snow, or road closure" },
+const TYPES: { key: IncidentType; icon: typeof Wrench }[] = [
+  { key: "breakdown", icon: Wrench },
+  { key: "accident", icon: AlertTriangle },
+  { key: "delay", icon: Clock },
+  { key: "weather", icon: CloudRain },
 ];
 
 export default function ReportIncidentPage() {
@@ -23,6 +24,7 @@ export default function ReportIncidentPage() {
   const trucks = useCarrierTrucks();
   const truck = trucks.find((t) => t.id === driver.truckId);
   const reportIncident = useStore((s) => s.actions.reportIncident);
+  const p = usePagesText();
 
   const [type, setType] = useState<IncidentType | null>(null);
   const [note, setNote] = useState("");
@@ -43,12 +45,8 @@ export default function ReportIncidentPage() {
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-ink-950 text-white">
           <AlertTriangle className="h-6 w-6" />
         </div>
-        <p className="font-display text-xl text-ink-950">Dispatch is on it</p>
-        <p className="text-sm text-ink-500">
-          {type === "accident"
-            ? "Notifying the broker, working the checklist, and looping in a live safety specialist. Check Home for live status."
-            : "Notifying the broker and working the checklist. Check Home for live status."}
-        </p>
+        <p className="font-display text-xl text-ink-950">{p.inc.onIt}</p>
+        <p className="text-sm text-ink-500">{type === "accident" ? p.inc.sentAccident : p.inc.sent}</p>
       </div>
     );
   }
@@ -56,23 +54,23 @@ export default function ReportIncidentPage() {
   return (
     <div className="flex flex-col gap-5 px-5">
       <button onClick={() => router.back()} className="flex items-center gap-1.5 text-xs font-medium text-ink-500">
-        <ArrowLeft className="h-3.5 w-3.5" /> Back
+        <ArrowLeft className="h-3.5 w-3.5" /> {p.inc.back}
       </button>
 
       <div>
-        <LargeTitle className="font-display text-2xl text-ink-950">Report an issue</LargeTitle>
-        <p className="mt-1 text-sm text-ink-500">Tell us what&apos;s going on. Backroute takes it from here.</p>
+        <LargeTitle className="font-display text-2xl text-ink-950">{p.inc.title}</LargeTitle>
+        <p className="mt-1 text-sm text-ink-500">{p.inc.sub}</p>
       </div>
 
       <button
         onClick={() => startInboundCall(driver.id)}
         className="flex items-center justify-center gap-2 rounded-2xl border border-line py-3 text-sm font-medium text-ink-700"
       >
-        <Phone className="h-4 w-4" /> Call dispatch instead
+        <Phone className="h-4 w-4" /> {p.inc.callInstead}
       </button>
 
       <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-wider text-ink-300">
-        <span className="h-px flex-1 bg-line" /> or type it in <span className="h-px flex-1 bg-line" />
+        <span className="h-px flex-1 bg-line" /> {p.inc.orType} <span className="h-px flex-1 bg-line" />
       </div>
 
       <div className="flex flex-col gap-2.5">
@@ -89,8 +87,8 @@ export default function ReportIncidentPage() {
               <t.icon className="h-4 w-4" />
             </span>
             <span>
-              <span className="block text-sm font-medium">{t.label}</span>
-              <span className={cn("block text-xs", type === t.key ? "text-white/60" : "text-ink-500")}>{t.desc}</span>
+              <span className="block text-sm font-medium">{p.inc.types[t.key][0]}</span>
+              <span className={cn("block text-xs", type === t.key ? "text-white/60" : "text-ink-500")}>{p.inc.types[t.key][1]}</span>
             </span>
           </button>
         ))}
@@ -99,13 +97,13 @@ export default function ReportIncidentPage() {
       <textarea
         value={note}
         onChange={(e) => setNote(e.target.value)}
-        placeholder="Anything else the dispatcher should know? (optional)"
+        placeholder={p.inc.notePlaceholder}
         rows={3}
         className="rounded-2xl border border-line bg-ink-50/60 p-3.5 text-sm outline-none focus:border-ink-400"
       />
 
       <Button size="lg" disabled={!type} onClick={handleSubmit}>
-        Send to dispatch
+        {p.inc.send}
       </Button>
 
     </div>

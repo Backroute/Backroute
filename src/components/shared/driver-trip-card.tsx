@@ -25,6 +25,7 @@ import { Lane } from "@/components/ui/lane";
 import { usePayView } from "@/lib/pay-view";
 import { useDriverUi } from "@/lib/lang/use-driver-ui";
 import { hasSheet, LoadSheet, SHEET_EN } from "./load-sheet";
+import { driveWords, TRIP_EN, useTripText, type TripText } from "@/lib/lang/trip-ui";
 
 /** `file` goes to the server in a real account; the demo only keeps the name and a preview. */
 export type UploadedFile = { name: string; previewUrl?: string; file?: File };
@@ -71,7 +72,8 @@ export function waitingOn(s: TripState, driverName?: string): string {
 function BookingCard({ load, brokerName, viewer = "driver", onCall, onCounter }: DriverTripCardProps) {
   const rate = load.bookedRate ?? load.targetRate;
   const pay = usePayView(viewer);
-  const broker = brokerName ?? "the broker";
+  const w = useTripText(viewer);
+  const broker = brokerName ?? w.theBroker;
   const origin = `${load.lane.origin}, ${load.lane.originState}`;
   const destination = `${load.lane.destination}, ${load.lane.destState}`;
   const from = cityCoords(load.lane.origin, load.lane.originState);
@@ -86,39 +88,39 @@ function BookingCard({ load, brokerName, viewer = "driver", onCall, onCounter }:
     <CardShell>
       {from && to && (
         <MapHeader from={from} to={to} laneKey={`${origin}|${destination}`} progress={0} showTruck={false}>
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-white/70" /> Booking
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-white/70" /> {w.booking}
         </MapHeader>
       )}
-      <CardHeading kicker="Booking" reference={load.referenceNumber} title={<Lane from={load.lane.origin} to={load.lane.destination} />} sub={`Pickup ${load.pickupWindow} · ${load.lane.miles} mi`} />
-      <CompletionBar value={s.done} caption="Backroute is on it" />
+      <CardHeading kicker={w.booking} reference={load.referenceNumber} title={<Lane from={load.lane.origin} to={load.lane.destination} />} sub={w.pickupAt(load.pickupWindow, load.lane.miles)} />
+      <CompletionBar value={s.done} caption={w.onIt} />
 
       <ol className="mt-5">
         <Step
           state="done"
-          title="Found and scored"
-          detail={pay.sees ? `${load.score} match · ${formatCurrency(rate)} · est. net ${formatCurrency(load.netProfit ?? 0)}` : `${load.score} match · your pay ${formatCurrency(pay.yourPay(load))}`}
+          title={w.foundScored}
+          detail={pay.sees ? w.scoreOwner(load.score, formatCurrency(rate), formatCurrency(load.netProfit ?? 0)) : w.scoreMine(load.score, formatCurrency(pay.yourPay(load)))}
         />
         <Step
           state={locked ? "done" : "current"}
-          title={locked ? "Rate locked" : "Negotiating the rate"}
-          detail={!pay.sees ? `With ${broker}` : locked ? `${formatCurrency(rate)} with ${broker}` : `With ${broker} · asking ${formatCurrency(rate)}`}
+          title={locked ? w.rateLocked : w.negotiating}
+          detail={!pay.sees ? w.withBroker(broker) : locked ? w.lockedWith(formatCurrency(rate), broker) : w.asking(broker, formatCurrency(rate))}
         >
           <div className="flex flex-wrap items-center gap-2">
             <BrokerCallRow load={load} brokerName={broker} contactName={contact} onCall={() => startBrokerCall(load.id)} />
             {load.stage === "negotiating" && !load.liveCall && pay.sees && <CounterOfferButton load={load} onSubmit={onCounter} variant="dark" />}
           </div>
         </Step>
-        <Step state={signed ? "done" : locked ? "current" : "todo"} title="Rate confirmation signed" detail={signed ? "Signed and filed" : undefined} />
+        <Step state={signed ? "done" : locked ? "current" : "todo"} title={w.rcSigned} detail={signed ? w.signedFiled : undefined} />
         <Step
           state={signed ? "current" : "todo"}
-          title={viewer === "driver" ? "Dispatch to you" : "Dispatch to the driver"}
-          detail={viewer === "driver" ? "Your pickup card opens the moment you're dispatched." : "The driver gets their pickup card the moment it's dispatched."}
+          title={viewer === "driver" ? w.dispatchYou : "Dispatch to the driver"}
+          detail={viewer === "driver" ? w.dispatchYouNote : "The driver gets their pickup card the moment it's dispatched."}
           last
         />
       </ol>
 
       <p className="mt-4 rounded-2xl bg-white/5 px-4 py-3 text-sm text-white/70">
-        {viewer === "driver" ? "Nothing to do. Backroute books it and sends you to pickup." : "Nothing to do. Backroute books it and dispatches the driver."}
+        {viewer === "driver" ? w.nothingToDo : "Nothing to do. Backroute books it and dispatches the driver."}
       </p>
       {viewer === "driver" && <CardFooter load={load} rate={rate} onCall={onCall} />}
     </CardShell>
@@ -129,6 +131,8 @@ function BookingCard({ load, brokerName, viewer = "driver", onCall, onCounter }:
 
 function PickupCard({ load, brokerName, truckCity, truckState, needsPreTrip, viewer = "driver", driverName, onCall, onConfirm, onTripStep, onSeal, onUpload, s }: DriverTripCardProps & { s: TripState }) {
   const readOnly = viewer === "carrier";
+  const w = useTripText(viewer);
+  const drive = driveWords(w, s);
   const rate = load.bookedRate ?? load.targetRate;
   const originPt = cityCoords(load.lane.origin, load.lane.originState);
   const start = pickupLegStart(load, truckCity, truckState);
@@ -138,44 +142,44 @@ function PickupCard({ load, brokerName, truckCity, truckState, needsPreTrip, vie
     <CardShell>
       {start && originPt && (
         <MapHeader from={start} to={originPt} progress={arrived ? 1 : s.legP} showTruck={arrived || s.located}>
-          <LiveDot /> {arrived ? "At the shipper" : "Heading to pickup"}
+          <LiveDot /> {arrived ? w.atShipper : w.toPickup}
         </MapHeader>
       )}
       <CardHeading
-        kicker="Pickup"
+        kicker={w.pickup}
         reference={load.referenceNumber}
         title={`${load.lane.origin}, ${load.lane.originState}`}
         sub={`${load.pickupWindow}${brokerName ? ` · ${brokerName}` : ""}`}
-        aside={!arrived ? s.drive : undefined}
+        aside={!arrived ? drive : undefined}
       />
-      <CompletionBar value={s.done / s.total} caption={s.ready ? (readOnly ? "Ready to roll" : "All set, swipe to start the trip") : `${Math.floor(s.done)} of ${s.total} done`} />
+      <CompletionBar value={s.done / s.total} caption={s.ready ? (readOnly ? "Ready to roll" : w.readyStart) : w.nDone(Math.floor(s.done), s.total)} />
       <TripSheet load={load} viewer={viewer} />
 
       <ol className="mt-5">
         {needsPreTrip && (
-          <Step state="current" title="Pre-trip inspection" detail={readOnly ? "The driver's daily inspection is still due." : "Required before you roll today."}>
+          <Step state="current" title={w.preTrip} detail={readOnly ? "The driver's daily inspection is still due." : w.preTripNote}>
             {!readOnly && (
               <div className="flex flex-wrap items-center gap-2">
-                <InspectionLink kind="pre_trip">Start pre-trip</InspectionLink>
+                <InspectionLink kind="pre_trip">{w.startPreTrip}</InspectionLink>
                 <QuickPreTrip />
               </div>
             )}
           </Step>
         )}
-        <Step state={arrived ? "done" : "current"} title="Drive to the shipper" detail={arrived ? "Checked in" : s.drive} />
-        <Step state={loaded ? "done" : arrived ? "current" : "todo"} title="Get loaded" detail={loaded ? "Loaded" : `${load.equipmentType} · ${load.weight.toLocaleString()} lbs`}>
+        <Step state={arrived ? "done" : "current"} title={w.driveShipper} detail={arrived ? w.checkedIn : drive} />
+        <Step state={loaded ? "done" : arrived ? "current" : "todo"} title={w.getLoaded} detail={loaded ? w.loaded : `${load.equipmentType} · ${load.weight.toLocaleString()} lbs`}>
           {arrived && (
             <div className="flex flex-col items-start gap-2">
-              <DockTimer load={load} brokerName={brokerName} />
-              {!loaded && !readOnly && <PillButton onClick={() => onTripStep(load.id, "loaded")}>I&apos;m loaded</PillButton>}
+              <DockTimer load={load} brokerName={brokerName} viewer={viewer} />
+              {!loaded && !readOnly && <PillButton onClick={() => onTripStep(load.id, "loaded")}>{w.imLoaded}</PillButton>}
             </div>
           )}
         </Step>
-        <Step state={bolDone ? "done" : arrived && loaded ? "current" : "todo"} title="Upload the signed BOL" last={!arrived}>
-          {arrived && <DocumentSlot doc={bol} label="Photo of BOL" readOnly={readOnly} pagesKey={`${load.id}:bol`} onFile={(f) => onUpload(load.id, "bol", f)} />}
+        <Step state={bolDone ? "done" : arrived && loaded ? "current" : "todo"} title={w.uploadBol} last={!arrived}>
+          {arrived && <DocumentSlot doc={bol} label={w.photoOf("BOL")} readOnly={readOnly} pagesKey={`${load.id}:bol`} onFile={(f) => onUpload(load.id, "bol", f)} />}
         </Step>
         {arrived && (
-          <Step state={load.tripChecklist?.sealNumber ? "done" : "todo"} title="Seal number" optional last>
+          <Step state={load.tripChecklist?.sealNumber ? "done" : "todo"} title={w.seal} optional={w.optional} last>
             {readOnly ? (
               <p className="text-xs text-white/60">{load.tripChecklist?.sealNumber ?? "Not recorded yet"}</p>
             ) : (
@@ -189,13 +193,13 @@ function PickupCard({ load, brokerName, truckCity, truckState, needsPreTrip, vie
         {readOnly ? (
           <WaitingOn text={waitingOn(s, driverName)} />
         ) : !arrived ? (
-          <SwipeToConfirm label="Swipe when you arrive" onConfirm={() => onConfirm(load.id)} />
+          <SwipeToConfirm label={w.swipeArrive} onConfirm={() => onConfirm(load.id)} />
         ) : (
-          <SwipeToConfirm label="Swipe to start the trip" disabledLabel={lockReason(s, "BOL", needsPreTrip)} onConfirm={() => onConfirm(load.id)} />
+          <SwipeToConfirm label={w.swipeStart} disabledLabel={lockReason(s, "BOL", needsPreTrip, w)} onConfirm={() => onConfirm(load.id)} />
         )}
       </div>
       <p className="mt-3 text-xs text-white/50">
-        Then deliver to <span className="font-medium text-white/80">{load.lane.destination}, {load.lane.destState}</span> · {load.lane.miles} mi
+        {w.thenDeliver} <span className="font-medium text-white/80">{load.lane.destination}, {load.lane.destState}</span> · {load.lane.miles} mi
       </p>
       {!readOnly && <CardFooter load={load} rate={rate} onCall={onCall} />}
     </CardShell>
@@ -213,6 +217,8 @@ function TripSheet({ load, viewer }: { load: Load; viewer: "driver" | "carrier" 
 
 function DeliveryCard({ load, brokerName, upNext, viewer = "driver", driverName, onCall, onConfirm, onTripStep, onUpload, s }: DriverTripCardProps & { s: TripState }) {
   const readOnly = viewer === "carrier";
+  const w = useTripText(viewer);
+  const drive = driveWords(w, s);
   const rate = load.bookedRate ?? load.targetRate;
   const { arrived, handled: unloaded, doc: pod, docDone: podDone } = s;
   const lumper = load.documents.find((d) => d.type === "lumper_receipt");
@@ -225,41 +231,41 @@ function DeliveryCard({ load, brokerName, upNext, viewer = "driver", driverName,
     <CardShell>
       {from && to && (
         <MapHeader from={from} to={to} laneKey={`${origin}|${destination}`} progress={arrived ? 1 : s.legP} showTruck={arrived || s.located}>
-          <LiveDot /> {arrived ? "At the receiver" : "Heading to delivery"}
+          <LiveDot /> {arrived ? w.atReceiver : w.toDelivery}
         </MapHeader>
       )}
       <CardHeading
-        kicker="Delivery"
+        kicker={w.delivery}
         reference={load.referenceNumber}
         title={destination}
         sub={`${load.deliveryWindow}${brokerName ? ` · ${brokerName}` : ""}`}
-        aside={!arrived ? s.drive : undefined}
+        aside={!arrived ? drive : undefined}
       />
-      <CompletionBar value={s.done / s.total} caption={s.ready ? (readOnly ? "Ready to close out" : "All set, swipe to complete") : `${Math.floor(s.done)} of ${s.total} done`} />
+      <CompletionBar value={s.done / s.total} caption={s.ready ? (readOnly ? "Ready to close out" : w.readyComplete) : w.nDone(Math.floor(s.done), s.total)} />
       <TripSheet load={load} viewer={viewer} />
 
       <ol className="mt-5">
-        <Step state={arrived ? "done" : "current"} title="Drive to the receiver" detail={arrived ? "Checked in" : s.drive} />
-        <Step state={unloaded ? "done" : arrived ? "current" : "todo"} title="Get unloaded" detail={unloaded ? "Unloaded" : undefined}>
+        <Step state={arrived ? "done" : "current"} title={w.driveReceiver} detail={arrived ? w.checkedIn : drive} />
+        <Step state={unloaded ? "done" : arrived ? "current" : "todo"} title={w.getUnloaded} detail={unloaded ? w.unloaded : undefined}>
           {arrived && (
             <div className="flex flex-col items-start gap-2">
-              <DockTimer load={load} brokerName={brokerName} />
-              {!unloaded && !readOnly && <PillButton onClick={() => onTripStep(load.id, "unloaded")}>I&apos;m unloaded</PillButton>}
+              <DockTimer load={load} brokerName={brokerName} viewer={viewer} />
+              {!unloaded && !readOnly && <PillButton onClick={() => onTripStep(load.id, "unloaded")}>{w.imUnloaded}</PillButton>}
             </div>
           )}
         </Step>
-        <Step state={podDone ? "done" : arrived && unloaded ? "current" : "todo"} title="Upload the signed POD" last={!arrived}>
-          {arrived && <DocumentSlot doc={pod} label="Photo of POD" readOnly={readOnly} pagesKey={`${load.id}:pod`} onFile={(f) => onUpload(load.id, "pod", f)} />}
+        <Step state={podDone ? "done" : arrived && unloaded ? "current" : "todo"} title={w.uploadPod} last={!arrived}>
+          {arrived && <DocumentSlot doc={pod} label={w.photoOf("POD")} readOnly={readOnly} pagesKey={`${load.id}:pod`} onFile={(f) => onUpload(load.id, "pod", f)} />}
         </Step>
         {arrived && (
           <Step
             state={lumper?.status === "verified" ? "done" : "todo"}
-            title="Lumper receipt"
-            optional
-            detail={lumper ? undefined : "Only if a lumper was paid. Backroute files it for reimbursement."}
+            title={w.lumper}
+            optional={w.optional}
+            detail={lumper ? undefined : w.lumperNote}
             last
           >
-            {(!readOnly || lumper) && <DocumentSlot doc={lumper} label="Photo of receipt" readOnly={readOnly} onFile={(f) => onUpload(load.id, "lumper_receipt", f)} />}
+            {(!readOnly || lumper) && <DocumentSlot doc={lumper} label={w.photoReceipt} readOnly={readOnly} onFile={(f) => onUpload(load.id, "lumper_receipt", f)} />}
           </Step>
         )}
       </ol>
@@ -268,18 +274,18 @@ function DeliveryCard({ load, brokerName, upNext, viewer = "driver", driverName,
         {readOnly ? (
           <WaitingOn text={waitingOn(s, driverName)} />
         ) : !arrived ? (
-          <SwipeToConfirm label="Swipe when you arrive" onConfirm={() => onConfirm(load.id)} />
+          <SwipeToConfirm label={w.swipeArrive} onConfirm={() => onConfirm(load.id)} />
         ) : (
-          <SwipeToConfirm label="Swipe to complete delivery" disabledLabel={lockReason(s, "POD", false)} onConfirm={() => onConfirm(load.id)} chime="delivered" />
+          <SwipeToConfirm label={w.swipeComplete} disabledLabel={lockReason(s, "POD", false, w)} onConfirm={() => onConfirm(load.id)} chime="delivered" />
         )}
       </div>
       <p className="mt-3 flex items-center gap-1.5 text-xs text-white/50">
         {upNext === "chained" ? (
-          <>Next load already lined up <ArrowDown className="h-3.5 w-3.5" /></>
+          <>{w.nextLined} <ArrowDown className="h-3.5 w-3.5" /></>
         ) : upNext === "choose" ? (
-          <>Next-load options ready{readOnly ? "" : ", pick one below"} <ArrowDown className="h-3.5 w-3.5" /></>
+          <>{readOnly ? "Next-load options ready" : w.nextReady} <ArrowDown className="h-3.5 w-3.5" /></>
         ) : (
-          <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Lining up the next load</>
+          <><Loader2 className="h-3.5 w-3.5 animate-spin" /> {w.lining}</>
         )}
       </p>
       {!readOnly && <CardFooter load={load} rate={rate} onCall={onCall} />}
@@ -288,38 +294,39 @@ function DeliveryCard({ load, brokerName, upNext, viewer = "driver", driverName,
 }
 
 /** Why the final swipe is still locked, in the order the driver has to fix it. */
-export function lockReason(s: TripState, docName: "BOL" | "POD", preTrip: boolean): string | undefined {
-  if (!s.handled) return docName === "BOL" ? "Confirm you're loaded to continue" : "Confirm you're unloaded to continue";
-  if (!s.docDone) return s.doc ? `Checking the ${docName}…` : `Upload the ${docName} to continue`;
-  if (preTrip) return "Do your pre-trip inspection first";
+export function lockReason(s: TripState, docName: "BOL" | "POD", preTrip: boolean, w: TripText = TRIP_EN): string | undefined {
+  if (!s.handled) return docName === "BOL" ? w.lock.loaded : w.lock.unloaded;
+  if (!s.docDone) return s.doc ? w.lock.checking(docName) : w.lock.upload(docName);
+  if (preTrip) return w.lock.preTrip;
   return undefined;
 }
 
 /** The dock clock at the stop the truck is at: free time counting down, then detention counting up — and once the
  *  truck is loaded or unloaded, the claim the AI filed for it. */
-export function DockTimer({ load, brokerName, compact }: { load: Load; brokerName?: string; compact?: boolean }) {
+export function DockTimer({ load, brokerName, compact, viewer = "carrier" }: { load: Load; brokerName?: string; compact?: boolean; viewer?: "driver" | "carrier" }) {
   const now = useNow();
+  const w = useTripText(viewer);
   const clock = dockClock(load, now);
   if (!clock) return null;
   const claim = load.accessorials?.find((a) => a.type === "detention" && a.stop === clock.stop);
-  const broker = brokerName ?? "the broker";
+  const broker = brokerName ?? w.theBroker;
 
   let tone: "calm" | "warn" | "good";
   let text: string;
   if (claim) {
     tone = "good";
-    text = claim.status === "approved" ? `${broker} approved ${formatCurrency(claim.amount)} detention` : `Billed ${broker} ${formatCurrency(claim.amount)} detention`;
+    text = claim.status === "approved" ? w.dock.approved(broker, formatCurrency(claim.amount)) : w.dock.billed(broker, formatCurrency(claim.amount));
   } else if (!clock.running) {
     tone = "calm";
-    text = `${formatDockTime(clock.minutes)} at the dock, inside free time`;
+    text = w.dock.inside(formatDockTime(clock.minutes));
   } else if (clock.freeLeft > 0) {
     tone = "calm";
-    text = compact ? `At the dock ${formatDockTime(clock.minutes)} · ${formatDockTime(clock.freeLeft)} free left` : `At the dock ${formatDockTime(clock.minutes)} · ${formatDockTime(clock.freeLeft)} of free time left`;
+    text = compact ? w.dock.freeLeftShort(formatDockTime(clock.minutes), formatDockTime(clock.freeLeft)) : w.dock.freeLeft(formatDockTime(clock.minutes), formatDockTime(clock.freeLeft));
   } else {
     tone = "warn";
     text = compact
-      ? `Detention ${formatCurrency(clock.owed)} · ${formatDockTime(clock.minutes)} at the dock`
-      : `Detention running: ${formatCurrency(clock.owed)} so far at ${formatCurrency(DETENTION_RATE_HR)}/hr. Backroute bills ${broker} when you're done.`;
+      ? w.dock.detShort(formatCurrency(clock.owed), formatDockTime(clock.minutes))
+      : w.dock.detLong(formatCurrency(clock.owed), formatCurrency(DETENTION_RATE_HR), broker);
   }
 
   return (
@@ -370,6 +377,7 @@ export function DriverTripCompleteCard({
   const factoringOn = useStore((st) => st.settings.enabledAddons.includes("factoring-ai"));
   const payment = paymentStatus(load, broker, factoringOn, Date.parse(load.updatedAt));
   const pay = usePayView();
+  const w = useTripText("driver");
 
   function chooseNext() {
     onContinue();
@@ -391,71 +399,71 @@ export function DriverTripCompleteCard({
             <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--dot-live)]">
               <Check className="h-2.5 w-2.5" strokeWidth={3} />
             </span>
-            Load complete
+            {w.done.title}
           </MapHeader>
         )}
         <div className="flex items-end justify-between gap-3">
           <div>
-            <p className="text-sm text-white/60">Delivered to {load.lane.destination}, {load.lane.destState}</p>
+            <p className="text-sm text-white/60">{w.done.deliveredTo(`${load.lane.destination}, ${load.lane.destState}`)}</p>
             <p className="mt-0.5 text-4xl font-semibold tabular tracking-tight">{formatCurrency(pay.sees ? load.netProfit ?? 0 : pay.yourPay(load))}</p>
           </div>
           <p className="pb-1 text-right text-xs text-white/50">
-            {pay.sees ? "Est. net" : "Your pay"}
+            {pay.sees ? w.done.estNet : w.done.yourPay}
             <br />
             {pay.sees ? `${formatCurrency(rate)} · ` : ""}
             {load.lane.miles} mi
           </p>
         </div>
         <p className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/60">
-          <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> POD checked</span>
+          <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> {w.done.podChecked}</span>
           <span className="flex items-center gap-1">
-            <Check className="h-3.5 w-3.5" /> Invoice packet sent to {payment.method === "factoring" ? "factoring" : brokerName ?? "the broker"}
+            <Check className="h-3.5 w-3.5" /> {w.done.packetTo(payment.method === "factoring" ? w.done.factoring : brokerName ?? w.theBroker)}
           </span>
-          <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Your pay goes on this week&apos;s settlement</span>
-          {detention > 0 && <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> {formatCurrency(detention)} detention billed</span>}
+          <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> {w.done.settlement}</span>
+          {detention > 0 && <span className="flex items-center gap-1"><Check className="h-3.5 w-3.5" /> {w.done.detentionBilled(formatCurrency(detention))}</span>}
         </p>
 
         <div className={cn("mt-4 flex items-center justify-between gap-3 rounded-2xl px-4 py-3", postTripDone ? "bg-white/5" : "bg-white/10")}>
           <div className="flex items-center gap-2.5">
             <ClipboardCheck className={cn("h-4 w-4", postTripDone ? "text-[var(--accent-live)]" : "text-[var(--accent-warn)]")} />
             <div>
-              <p className="text-sm font-medium">Post-trip inspection</p>
-              <p className="text-xs text-white/55">{postTripDone ? "Logged for today" : "Required at the end of your driving day"}</p>
+              <p className="text-sm font-medium">{w.done.postTrip}</p>
+              <p className="text-xs text-white/55">{postTripDone ? w.done.postLogged : w.done.postRequired}</p>
             </div>
           </div>
-          {postTripDone ? <Check className="h-4 w-4 text-[var(--accent-live)]" /> : <InspectionLink kind="post_trip">Start</InspectionLink>}
+          {postTripDone ? <Check className="h-4 w-4 text-[var(--accent-live)]" /> : <InspectionLink kind="post_trip">{w.start}</InspectionLink>}
         </div>
 
         <div className="mt-3 rounded-2xl bg-white/5 p-4">
           {nextLoad ? (
             <>
               <p className="text-xs font-medium uppercase tracking-wider text-white/50">
-                {nextIsBooking ? "Up next · locking the rate" : "Up next · Pickup"}
+                {nextIsBooking ? w.done.upNextLocking : w.done.upNextPickup}
               </p>
               <p className="mt-0.5 text-xl font-semibold">{nextLoad.lane.origin}, {nextLoad.lane.originState}</p>
               <p className="mt-1 flex items-center gap-1.5 text-xs text-white/70">
-                <Clock className="h-3.5 w-3.5" /> {nextLoad.pickupWindow} · to {nextLoad.lane.destination}, {nextLoad.lane.destState}
+                <Clock className="h-3.5 w-3.5" /> {nextLoad.pickupWindow} · {w.done.to(`${nextLoad.lane.destination}, ${nextLoad.lane.destState}`)}
               </p>
               <button onClick={onContinue} className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-white py-4 text-base font-semibold text-ink-950">
-                Start next load <ArrowRight className="h-4 w-4" />
+                {w.done.startNext} <ArrowRight className="h-4 w-4" />
               </button>
             </>
           ) : (
             <>
               {offersCount > 0 ? (
                 <>
-                  <p className="text-sm text-white/80">Backroute found the top {offersCount} loads for your next trip.</p>
+                  <p className="text-sm text-white/80">{w.done.foundTop(offersCount)}</p>
                   <button onClick={chooseNext} className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-white py-4 text-base font-semibold text-ink-950">
-                    Choose your next load <ArrowDown className="h-4 w-4" />
+                    {w.done.chooseNext} <ArrowDown className="h-4 w-4" />
                   </button>
                 </>
               ) : (
                 <>
                   <p className="flex items-center gap-2 text-sm text-white/80">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Finding your next load
+                    <Loader2 className="h-4 w-4 animate-spin" /> {w.done.finding}
                   </p>
                   <button onClick={onContinue} className="mt-3 w-full rounded-full border border-white/25 py-3 text-sm font-semibold text-white">
-                    Done
+                    {w.done.ok}
                   </button>
                 </>
               )}
@@ -478,14 +486,15 @@ export function LiveDot() {
   return <span className="h-2 w-2 rounded-full bg-white" />;
 }
 
-export function AutoPickRow({ on, onChange, className }: { on: boolean; onChange: (on: boolean) => void; className?: string }) {
+export function AutoPickRow({ on, onChange, className, viewer = "driver" }: { on: boolean; onChange: (on: boolean) => void; className?: string; viewer?: "driver" | "carrier" }) {
+  const w = useTripText(viewer);
   return (
     <div className={cn("flex items-center justify-between gap-3", className)}>
       <div>
-        <p className="text-sm font-medium">Auto-pick the next load</p>
-        <p className="text-xs text-white/55">{on ? "Books the best fit for you." : "Off: you pick from the top 3."}</p>
+        <p className="text-sm font-medium">{w.autoPick}</p>
+        <p className="text-xs text-white/55">{on ? w.autoOn : w.autoOff}</p>
       </div>
-      <Switch checked={on} onChange={onChange} label="Auto-pick the next load" dark />
+      <Switch checked={on} onChange={onChange} label={w.autoPick} dark />
     </div>
   );
 }
@@ -579,7 +588,8 @@ function Step({
   state: "done" | "current" | "todo";
   title: string;
   detail?: React.ReactNode;
-  optional?: boolean;
+  /** The word for "optional", in the viewer's language. */
+  optional?: string;
   last?: boolean;
   children?: React.ReactNode;
 }) {
@@ -600,7 +610,7 @@ function Step({
       <div className="min-w-0 flex-1">
         <p className={cn("text-sm font-medium", state === "todo" && "text-white/60")}>
           {title}
-          {optional && <span className="ml-1.5 text-xs font-normal text-white/60">Optional</span>}
+          {optional && <span className="ml-1.5 text-xs font-normal text-white/60">{optional}</span>}
           <span className="sr-only">{state === "done" ? ", done" : state === "current" ? ", in progress" : ", not started"}</span>
         </p>
         {detail && <div className="mt-0.5 text-xs text-white/70">{detail}</div>}
@@ -622,12 +632,13 @@ export function PillButton({ onClick, children }: { onClick: () => void; childre
 const PAGES = new Map<string, File[]>();
 
 /** Upload slot for a stop document: take a photo (or pick a file), see the AI read it, retake if needed. */
-const PHOTO_PROBLEM = { dark: "Too dark to read. Turn on a light or move to one, then retake.", bright: "Too much glare to read. Tilt it away from the light and retake.", blurry: "Too blurry to read. Hold still, tap to focus, and retake." };
+type PhotoProblem = "dark" | "bright" | "blurry";
 
 export function DocumentSlot({ doc, label, readOnly, onFile, pagesKey }: { doc?: LoadDocument; label: string; readOnly?: boolean; onFile: (file: UploadedFile) => void; pagesKey?: string }) {
   const input = useRef<HTMLInputElement>(null);
   // A photo that looks unreadable waits here: retake it, or send it anyway.
-  const [doubt, setDoubt] = useState<{ file: File; why: keyof typeof PHOTO_PROBLEM } | null>(null);
+  const w = useTripText(readOnly ? "carrier" : "driver");
+  const [doubt, setDoubt] = useState<{ file: File; why: PhotoProblem } | null>(null);
   // The next photo starts the document over (first photo, Retake) or goes on as its next page (Add a page).
   const adding = useRef(false);
   const [, bump] = useState(0);
@@ -640,6 +651,8 @@ export function DocumentSlot({ doc, label, readOnly, onFile, pagesKey }: { doc?:
     else input.current?.click();
   };
 
+  // "Photo of BOL" → "BOL": the document's own name, for the file and the page count.
+  const docTitle = label.replace(/^Photo of |^Foto del |^Photo du |^Фото | ਦੀ ਫ਼ੋਟੋ$| की फ़ोटो$/g, "");
   const send = (file: File, preview?: File) => onFile({ name: file.name, previewUrl: (preview ?? file).type.startsWith("image/") ? URL.createObjectURL(preview ?? file) : undefined, file });
 
   /** A cropped page in: the document is this page alone, or every page so far as one PDF. */
@@ -650,7 +663,7 @@ export function DocumentSlot({ doc, label, readOnly, onFile, pagesKey }: { doc?:
     if (pagesKey) PAGES.set(pagesKey, pages);
     bump((n) => n + 1);
     if (pages.length === 1) return send(page);
-    send(await pagesToPdf(pages, `${label.replace(/^Photo of /, "")}-${pages.length}-pages`), pages[0]);
+    send(await pagesToPdf(pages, `${docTitle}-${pages.length}-pages`), pages[0]);
   }
 
   async function handle(e: React.ChangeEvent<HTMLInputElement>) {
@@ -685,10 +698,10 @@ export function DocumentSlot({ doc, label, readOnly, onFile, pagesKey }: { doc?:
     return (
       <div className="flex flex-col gap-2 rounded-2xl bg-white/10 p-3" role="alert">
         {picker}
-        <p className="text-xs leading-snug text-white/85">{PHOTO_PROBLEM[doubt.why]}</p>
+        <p className="text-xs leading-snug text-white/85">{w.photo[doubt.why]}</p>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => pick(adding.current)} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-semibold text-ink-950">
-            <Camera className="h-3.5 w-3.5" /> Retake
+            <Camera className="h-3.5 w-3.5" /> {w.photo.retake}
           </button>
           <button
             type="button"
@@ -699,14 +712,14 @@ export function DocumentSlot({ doc, label, readOnly, onFile, pagesKey }: { doc?:
             }}
             className="min-h-11 rounded-full border border-white/25 px-4 py-2 text-xs font-medium text-white/80"
           >
-            Send it anyway
+            {w.photo.sendAnyway}
           </button>
         </div>
       </div>
     );
 
   if (!doc) {
-    if (readOnly) return <p className="text-xs text-white/50">Waiting on the driver</p>;
+    if (readOnly) return <p className="text-xs text-white/50">{w.photo.waitingDriver}</p>;
     return (
       <div className="flex flex-col items-start gap-1.5">
         {picker}
@@ -717,7 +730,7 @@ export function DocumentSlot({ doc, label, readOnly, onFile, pagesKey }: { doc?:
         >
           <Camera className="h-4 w-4" /> {label}
         </button>
-        <p className="text-xs text-white/60">Lay it flat in good light, all four corners in the picture. More than one page? Add the rest after the first.</p>
+        <p className="text-xs text-white/60">{w.photo.layFlat}</p>
       </div>
     );
   }
@@ -734,27 +747,27 @@ export function DocumentSlot({ doc, label, readOnly, onFile, pagesKey }: { doc?:
       )}
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-medium">
-          {pageCount > 1 ? `${label.replace(/^Photo of /, "")} · ${pageCount} pages` : doc.name}
+          {pageCount > 1 ? w.photo.pages(docTitle, pageCount) : doc.name}
         </p>
         {doc.status === "pending" ? (
           <p className="mt-0.5 flex items-center gap-1 text-xs text-white/60">
-            <Loader2 className="h-3 w-3 animate-spin" /> Reading it…
+            <Loader2 className="h-3 w-3 animate-spin" /> {w.photo.reading}
           </p>
         ) : doc.status === "failed" ? (
-          <p className="mt-0.5 text-xs leading-snug text-[var(--accent-warn)]">{doc.aiNote ?? "Didn't upload."} Tap Retake.</p>
+          <p className="mt-0.5 text-xs leading-snug text-[var(--accent-warn)]">{w.photo.failed(doc.aiNote)}</p>
         ) : (
-          <p className={`mt-0.5 text-xs leading-snug ${doc.flagged ? "text-[var(--accent-warn)]" : "text-white/55"}`}>Checked: {doc.aiNote ?? "looks good"}</p>
+          <p className={`mt-0.5 text-xs leading-snug ${doc.flagged ? "text-[var(--accent-warn)]" : "text-white/55"}`}>{w.photo.checked(doc.aiNote)}</p>
         )}
       </div>
       {!readOnly && (
         <div className="flex shrink-0 flex-col items-end">
           {pagesKey && pageCount > 0 && doc.status !== "failed" && (
             <button type="button" onClick={() => pick(true)} className="min-h-9 px-2 text-xs font-semibold text-white underline-offset-2 hover:underline">
-              + Add a page
+              {w.photo.addPage}
             </button>
           )}
           <button type="button" onClick={() => pick(false)} className="min-h-9 px-2 text-xs font-semibold text-white/70 underline-offset-2 hover:underline">
-            Retake
+            {w.photo.retake}
           </button>
         </div>
       )}
@@ -763,6 +776,7 @@ export function DocumentSlot({ doc, label, readOnly, onFile, pagesKey }: { doc?:
 }
 
 function SealInput({ value, onSave }: { value?: string; onSave: (v: string) => void }) {
+  const w = useTripText("driver");
   const [draft, setDraft] = useState(value ?? "");
   const dirty = draft.trim() !== (value ?? "");
   return (
@@ -776,14 +790,14 @@ function SealInput({ value, onSave }: { value?: string; onSave: (v: string) => v
       <input
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        placeholder="e.g. 4471023"
+        placeholder={w.sealPlaceholder}
         inputMode="numeric"
-        aria-label="Seal number"
+        aria-label={w.seal}
         className="min-w-0 flex-1 rounded-full border border-white/20 bg-transparent px-4 py-2 text-sm text-white outline-none placeholder:text-white/35 focus:border-white/50"
       />
       {dirty && (
         <button type="submit" className="shrink-0 rounded-full bg-white px-4 py-2 text-xs font-semibold text-ink-950">
-          Save
+          {w.save}
         </button>
       )}
     </form>
@@ -792,6 +806,7 @@ function SealInput({ value, onSave }: { value?: string; onSave: (v: string) => v
 
 function CardFooter({ load, rate, onCall }: { load: Load; rate: number; onCall: () => void }) {
   const pay = usePayView();
+  const w = useTripText("driver");
   return (
     <div className="mt-5 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
       <Link href={`/driver/loads/${load.id}`} className="group min-w-0">
@@ -799,17 +814,17 @@ function CardFooter({ load, rate, onCall }: { load: Load; rate: number; onCall: 
           {formatCurrency(pay.sees ? rate : pay.yourPay(load))} <ChevronRight className="h-3.5 w-3.5 text-white/40 transition-transform group-hover:translate-x-0.5" />
         </p>
         <p className="truncate text-xs text-white/50">
-          {pay.sees ? `Est. net ${formatCurrency(load.netProfit ?? 0)}` : "Your pay"} · {load.lane.miles} mi · Load page
+          {pay.sees ? w.footer.estNet(formatCurrency(load.netProfit ?? 0)) : w.footer.yourPay} · {load.lane.miles} mi · {w.footer.loadPage}
         </p>
       </Link>
       <div className="flex shrink-0 items-center gap-2">
-        <button onClick={onCall} aria-label="Call dispatch" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/15">
+        <button onClick={onCall} aria-label={w.footer.call} className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/15">
           <Phone className="h-4 w-4" />
         </button>
-        <Link href="/driver/messages" aria-label="Message dispatch" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/15">
+        <Link href="/driver/messages" aria-label={w.footer.message} className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/15">
           <MessageCircle className="h-4 w-4" />
         </Link>
-        <Link href="/driver/incident" aria-label="Report an issue or emergency" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-[var(--accent-danger)] hover:bg-white/15">
+        <Link href="/driver/incident" aria-label={w.footer.report} className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-[var(--accent-danger)] hover:bg-white/15">
           <LifeBuoy className="h-4 w-4" />
         </Link>
       </div>

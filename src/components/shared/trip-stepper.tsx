@@ -27,7 +27,7 @@ function stepStatus(stage: LoadStage): { completed: number; active: number } {
 
 /** Named-milestone tracker (Dispatched -> At pickup -> In transit -> At delivery -> Delivered) for the detail page,
  *  where a driver checking "more info" wants to see exactly which checkpoints are done, not just an overall percentage. */
-export function TripStepper({ stage, invert }: { stage: LoadStage; invert?: boolean }) {
+export function TripStepper({ stage, invert, labels }: { stage: LoadStage; invert?: boolean; labels?: readonly string[] }) {
   const { completed, active } = stepStatus(stage);
   const filledClass = invert ? "bg-white" : "bg-ink-950";
   const unfilledClass = invert ? "bg-white/15" : "bg-ink-100";
@@ -72,7 +72,7 @@ export function TripStepper({ stage, invert }: { stage: LoadStage; invert?: bool
                 done || isActive ? (invert ? "text-white" : "text-ink-950") : invert ? "text-white/40" : "text-ink-400",
               )}
             >
-              {step.label}
+              {labels?.[i] ?? step.label}
             </span>
           </div>
         );

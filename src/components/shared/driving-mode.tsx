@@ -12,6 +12,7 @@ import type { DriveCommand, UiText } from "@/lib/lang/ui";
 import type { Lang, Load } from "@/lib/types";
 import { Lane } from "@/components/ui/lane";
 import { minutesIn } from "@/lib/spoken";
+import { driveWords, nextWords, TRIP } from "@/lib/lang/trip-ui";
 
 /** Commands in the driver's language, checked in this order so "unloaded" wins over "loaded". English also keeps
  *  its looser patterns ("I'm loaded up", "at the dock"). */
@@ -107,10 +108,10 @@ export function DrivingMode({
       onCall();
       return;
     } else {
-      // The step names come from the trip screens, which are English in the demo; other languages get the place.
+      // The next step in the language being spoken, then where and how far.
       words = (u, l) => {
-        const stop = s.card === "pickup" ? u.pickup : s.card === "delivery" ? u.delivery : u.nextLoad;
-        return l === "en" ? `Next: ${s.next.title}. ${s.card === "booking" ? "" : `${place}, ${s.drive}.`}` : `${stop}: ${place}${s.card === "booking" ? "" : `, ${s.drive}`}.`;
+        const w = TRIP[l];
+        return `${w.compact.next}: ${nextWords(w, s)}. ${s.card === "booking" ? "" : `${place}, ${driveWords(w, s)}.`}`.trim();
       };
     }
     respondWith(words);

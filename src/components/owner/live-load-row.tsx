@@ -16,6 +16,8 @@ export function LiveLoadRow({ load, who, needsPreTrip, onOpen }: { load: Load; w
   const s = tripState(load, now, needsPreTrip);
   const place = s.card === "booking" ? `${load.lane.origin} → ${load.lane.destination}` : s.card === "pickup" ? `${load.lane.origin}, ${load.lane.originState}` : `${load.lane.destination}, ${load.lane.destState}`;
   const late = load.late && load.late.stop === (s.card === "delivery" ? "delivery" : "pickup") ? load.late : null;
+  // A truck with no recent GPS isn't "on time": it's unknown, and gets its own grey mark.
+  const blind = s.card !== "booking" && !s.arrived && !s.located;
   const status = late
     ? `Late · ETA ${late.eta}`
     : s.card === "booking"
@@ -23,11 +25,12 @@ export function LiveLoadRow({ load, who, needsPreTrip, onOpen }: { load: Load; w
       : s.arrived
         ? s.card === "pickup" ? "At the shipper" : "At the receiver"
         : `${s.card === "pickup" ? "To pickup" : "To delivery"}${s.drive ? ` · ${s.drive}` : ""}`;
-  const progress = s.card === "booking" ? s.done : s.done / s.total;
+  // The bar is the trip: a load still being booked hasn't started it, so its bar is empty (not the booking's 90%).
+  const progress = s.card === "booking" ? 0 : s.done / s.total;
   return (
     <button type="button" onClick={onOpen} className="group flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-ink-50" aria-label={`${who}: ${place}, ${status}`}>
       <span className="flex h-4 w-3.5 shrink-0 items-center justify-center">
-        <StatusMark kind={late ? "needs_you" : s.arrived ? "waiting" : "moving"} />
+        <StatusMark kind={late ? "needs_you" : s.card === "booking" || s.arrived ? "waiting" : blind ? "off" : "moving"} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline justify-between gap-2">

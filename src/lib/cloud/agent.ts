@@ -30,9 +30,9 @@ export async function askToBook(loadId: string, also: string[] = []): Promise<st
   const plan = also.length ? { with: also } : {};
   let r = await call("/api/agent/book", { loadId, ...plan });
   if (!r.ok && r.error === "need_price") {
-    const typed = window.prompt("The broker didn't post a rate, and no lowest rate per mile is set. What should Backroute ask, all in ($)?");
-    const ask = Number((typed ?? "").replace(/[$,\s]/g, ""));
-    if (!(ask > 0)) return null;
+    const { askAmount } = await import("@/components/ui/ask-host");
+    const ask = await askAmount("What should Backroute ask?", "The broker didn't post a rate, and no lowest rate per mile is set. Type the all-in price to ask for.", "2,400");
+    if (!ask || !(ask > 0)) return null;
     r = await call("/api/agent/book", { loadId, ask, ...plan });
   }
   return r.ok ? null : (REASON[r.error] ?? "Couldn't do that. Check your connection and try again.");

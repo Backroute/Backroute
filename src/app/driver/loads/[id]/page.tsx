@@ -14,8 +14,7 @@ import { CounterOfferButton } from "@/components/shared/counter-offer-button";
 import { useLoad, useCarrierTrucks, usePrimaryDriver } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { STAGE_CONFIRM } from "@/lib/stage-confirm";
-import { LOAD_STATUS_HEADLINE, aiDispatcherNote, isTransitStage } from "@/lib/load-status";
-import { LOAD_STAGE_LABEL } from "@/lib/types";
+import { isTransitStage } from "@/lib/load-status";
 import type { Expense } from "@/lib/types";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { ViewTransition } from "react";
@@ -26,22 +25,12 @@ import { ReceiptCapture, type ReadReceipt } from "@/components/driver/receipt-ca
 import { usePayView } from "@/lib/pay-view";
 import { LoadSheet } from "@/components/shared/load-sheet";
 import { useDriverUi } from "@/lib/lang/use-driver-ui";
+import { stageNote, usePagesText } from "@/lib/lang/pages-ui";
+import { useTripText } from "@/lib/lang/trip-ui";
 
-const EXPENSE_CATEGORIES: { key: Expense["category"]; label: string }[] = [
-  { key: "lumper", label: "Lumper fee" },
-  { key: "detention", label: "Detention" },
-  { key: "parking", label: "Parking" },
-  { key: "scale", label: "Scale ticket" },
-  { key: "other", label: "Other" },
-];
+const EXPENSE_CATEGORIES: Expense["category"][] = ["lumper", "detention", "parking", "scale", "other"];
 
 const EXPENSE_STATUS_TONE = { pending: "warning", approved: "success", denied: "danger" } as const;
-
-/** Which document a stage is still waiting on — matched against STAGE_CONFIRM so this page's
- *  pending rows always agree with what the confirm button above them is about to do. */
-function pendingDocLabel(type: "bol" | "pod"): string {
-  return type === "bol" ? "Bill of Lading (BOL)" : "Proof of Delivery (POD)";
-}
 
 function SectionCard({ title, icon: Icon, children }: { title: string; icon: typeof MapPin; children: React.ReactNode }) {
   return (
@@ -82,13 +71,18 @@ export default function DriverLoadDetailPage() {
   const [receipt, setReceipt] = useState<ReadReceipt | null>(null);
   const pay = usePayView();
   const { t } = useDriverUi();
+  const p = usePagesText();
+  const w = useTripText("driver");
+  // Which document a stage is still waiting on — matched against STAGE_CONFIRM so this page's pending rows always
+  // agree with what the confirm button above them is about to do.
+  const pendingDocLabel = (type: "bol" | "pod") => (type === "bol" ? p.detail.pendingBol : p.detail.pendingPod);
 
   if (!load) {
     return (
       <div className="px-5 py-16 text-center">
-        <p className="text-sm text-ink-500">This load isn&apos;t in the current simulation window.</p>
+        <p className="text-sm text-ink-500">{p.detail.notFound}</p>
         <Link href="/driver" className="mt-3 inline-block text-sm font-medium text-ink-950 underline">
-          Back to Home
+          {p.detail.backHome}
         </Link>
       </div>
     );
@@ -118,7 +112,7 @@ export default function DriverLoadDetailPage() {
         <Link href="/driver" transitionTypes={BACK} aria-label="Back to home" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-ink-700 hover:bg-ink-50">
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <h1 className="text-sm font-semibold text-ink-950">Load detail</h1>
+        <h1 className="text-sm font-semibold text-ink-950">{p.detail.title}</h1>
       </div>
 
       <ViewTransition name={`load-${load.id}`} share="morph" default="none">
@@ -129,11 +123,11 @@ export default function DriverLoadDetailPage() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--dot-live)] opacity-75" />
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--dot-live)]" />
             </span>
-            {aiDispatcherNote(load.stage)}
+            {stageNote(p, load.stage)}
           </div>
           <LoadScoreBadge score={load.score} size="sm" invert />
         </div>
-        <p className="mt-3 text-lg font-semibold">{LOAD_STATUS_HEADLINE[load.stage] ?? LOAD_STAGE_LABEL[load.stage]}</p>
+        <p className="mt-3 text-lg font-semibold">{p.headline[load.stage] ?? p.stage[load.stage]}</p>
         <p className="mt-0.5 text-sm text-white/70">
           <Lane from={`${load.lane.origin}, ${load.lane.originState}`} to={`${load.lane.destination}, ${load.lane.destState}`} />
         </p>
@@ -144,7 +138,7 @@ export default function DriverLoadDetailPage() {
 
         <div className="mt-5">
           {isTransitStage(load.stage) ? (
-            <TripStepper stage={load.stage} invert />
+            <TripStepper stage={load.stage} invert labels={p.steps} />
           ) : (
             <Progress value={load.progressPct} barClassName="!bg-white" className="!bg-white/15" />
           )}
@@ -157,15 +151,15 @@ export default function DriverLoadDetailPage() {
             )}
             {step && (
               <Link href="/driver" className="flex items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-semibold text-ink-950">
-                Continue on your trip card
+                {p.detail.continueCard}
               </Link>
             )}
             <div className="grid grid-cols-2 gap-2">
               <Link href="/driver/messages" className="flex items-center justify-center gap-2 rounded-full border border-white/25 py-3 text-sm font-medium text-white">
-                <MessageCircle className="h-4 w-4" /> Message dispatch
+                <MessageCircle className="h-4 w-4" /> {p.detail.message}
               </Link>
               <Link href="/driver/incident" className="flex items-center justify-center gap-2 rounded-full border border-white/25 py-3 text-sm font-medium text-white">
-                <LifeBuoy className="h-4 w-4" /> Report issue
+                <LifeBuoy className="h-4 w-4" /> {p.detail.report}
               </Link>
             </div>
           </div>
@@ -173,7 +167,7 @@ export default function DriverLoadDetailPage() {
       </div>
       </ViewTransition>
 
-      <SectionCard title="Trip details" icon={MapPin}>
+      <SectionCard title={p.detail.trip} icon={MapPin}>
         {load.stops && load.stops.length > 0 ? (
           <StopsTimeline load={load} onCompleteStop={isCurrent ? (stopId) => completeLoadStop(load.id, stopId) : undefined} />
         ) : (
@@ -184,7 +178,7 @@ export default function DriverLoadDetailPage() {
               </span>
               <div className="pb-3">
                 <p className="text-sm font-medium text-ink-950">{load.lane.origin}, {load.lane.originState}</p>
-                <p className="text-xs text-ink-500">Pickup · {load.pickupWindow}</p>
+                <p className="text-xs text-ink-500">{p.detail.pickup} · {load.pickupWindow}</p>
               </div>
             </div>
             <div className="ml-3.5 -my-1 h-3 w-px bg-ink-200" />
@@ -194,7 +188,7 @@ export default function DriverLoadDetailPage() {
               </span>
               <div>
                 <p className="text-sm font-medium text-ink-950">{load.lane.destination}, {load.lane.destState}</p>
-                <p className="text-xs text-ink-500">Delivery · {load.deliveryWindow}</p>
+                <p className="text-xs text-ink-500">{p.detail.delivery} · {load.deliveryWindow}</p>
               </div>
             </div>
           </div>
@@ -203,34 +197,34 @@ export default function DriverLoadDetailPage() {
 
       <LoadSheet load={load} labels={t} />
 
-      <SectionCard title={pay.sees ? "Rate & earnings" : "Your pay"} icon={DollarSign}>
+      <SectionCard title={pay.sees ? p.detail.money : p.detail.yourPay} icon={DollarSign}>
         <div className="flex flex-col gap-2.5">
           {pay.sees ? (
             <>
-              <Row label="Total offer" value={formatCurrency(load.bookedRate ?? load.targetRate)} strong />
-              <Row label={load.bookedRate ? "Net profit" : "Est. net profit"} value={formatCurrency(load.netProfit ?? 0)} />
-              <Row label="Per mile" value={load.rpm ? `$${load.rpm.toFixed(2)}` : "—"} />
+              <Row label={p.detail.pays} value={formatCurrency(load.bookedRate ?? load.targetRate)} strong />
+              <Row label={load.bookedRate ? p.detail.net : p.detail.estNet} value={formatCurrency(load.netProfit ?? 0)} />
+              <Row label={p.detail.perMile} value={load.rpm ? `$${load.rpm.toFixed(2)}` : "—"} />
             </>
           ) : (
-            <Row label="Your pay for this load" value={formatCurrency(pay.yourPay(load))} strong />
+            <Row label={p.detail.payForLoad} value={formatCurrency(pay.yourPay(load))} strong />
           )}
         </div>
       </SectionCard>
 
-      <SectionCard title="Expenses" icon={Receipt}>
+      <SectionCard title={p.detail.expenses} icon={Receipt}>
         <div className="flex flex-col gap-2">
           {loadExpenses.length === 0 && !showExpenseForm && (
-            <p className="py-2 text-sm text-ink-400">No expenses submitted for this load.</p>
+            <p className="py-2 text-sm text-ink-400">{p.detail.noExpenses}</p>
           )}
           {loadExpenses.map((e) => (
             <div key={e.id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3.5 py-3">
               <div>
-                <p className="text-xs font-medium text-ink-900">{EXPENSE_CATEGORIES.find((c) => c.key === e.category)?.label}</p>
+                <p className="text-xs font-medium text-ink-900">{p.detail.cats[e.category]}</p>
                 {e.note && <p className="text-xs text-ink-400">{e.note}</p>}
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold tabular text-ink-950">{formatCurrency(e.amount)}</span>
-                <Badge tone={EXPENSE_STATUS_TONE[e.status]}>{e.status}</Badge>
+                <Badge tone={EXPENSE_STATUS_TONE[e.status]}>{p.detail.expStatus[e.status]}</Badge>
               </div>
             </div>
           ))}
@@ -248,13 +242,13 @@ export default function DriverLoadDetailPage() {
               <div className="flex flex-wrap gap-1.5">
                 {EXPENSE_CATEGORIES.map((c) => (
                   <button
-                    key={c.key}
-                    onClick={() => setExpenseCategory(c.key)}
+                    key={c}
+                    onClick={() => setExpenseCategory(c)}
                     className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                      expenseCategory === c.key ? "bg-ink-950 text-white" : "bg-white text-ink-600 border border-line"
+                      expenseCategory === c ? "bg-ink-950 text-white" : "bg-white text-ink-600 border border-line"
                     }`}
                   >
-                    {c.label}
+                    {p.detail.cats[c]}
                   </button>
                 ))}
               </div>
@@ -272,26 +266,26 @@ export default function DriverLoadDetailPage() {
               <input
                 value={expenseNote}
                 onChange={(e) => setExpenseNote(e.target.value)}
-                placeholder="Note (optional)"
+                placeholder={p.detail.notePlaceholder}
                 className="rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-ink-400"
               />
               <div className="flex items-center gap-2">
-                <Button size="sm" disabled={!expenseAmount.trim()} onClick={handleSubmitExpense}>Submit for reimbursement</Button>
-                <Button size="sm" variant="ghost" onClick={() => setShowExpenseForm(false)}>Cancel</Button>
+                <Button size="sm" disabled={!expenseAmount.trim()} onClick={handleSubmitExpense}>{p.detail.submitExpense}</Button>
+                <Button size="sm" variant="ghost" onClick={() => setShowExpenseForm(false)}>{p.detail.cancel}</Button>
               </div>
             </div>
           ) : (
             <Button size="sm" variant="outline" className="mt-1 self-start" onClick={() => setShowExpenseForm(true)}>
-              Submit an expense
+              {p.detail.addExpense}
             </Button>
           )}
         </div>
       </SectionCard>
 
-      <SectionCard title="Documents" icon={FileText}>
+      <SectionCard title={p.detail.docs} icon={FileText}>
         <div id="documents" className="flex flex-col gap-2">
           {load.documents.length === 0 && !pendingType && (
-            <p className="py-4 text-center text-sm text-ink-400">No documents yet for this load.</p>
+            <p className="py-4 text-center text-sm text-ink-400">{p.detail.noDocs}</p>
           )}
           {load.documents.map((doc) => (
             <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3.5 py-3">
@@ -301,21 +295,21 @@ export default function DriverLoadDetailPage() {
                 </span>
                 <div>
                   <p className="text-xs font-medium text-ink-900">{doc.name}</p>
-                  <p className="text-xs text-ink-400">{doc.uploadedBy === "driver" ? "Uploaded by you · " : ""}{formatDateTime(doc.generatedAt)}</p>
-                  {doc.aiNote && <p className="mt-0.5 text-xs text-ink-500">Checked: {doc.aiNote}</p>}
+                  <p className="text-xs text-ink-400">{doc.uploadedBy === "driver" ? p.detail.byYou : ""}{formatDateTime(doc.generatedAt)}</p>
+                  {doc.aiNote && <p className="mt-0.5 text-xs text-ink-500">{p.detail.checked(doc.aiNote)}</p>}
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <Badge tone={doc.status === "verified" ? "success" : "warning"}>
                   {doc.status === "verified" ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                  {doc.status}
+                  {p.detail.docStatus[doc.status]}
                 </Badge>
                 {(doc.type === "bol" || doc.type === "pod") && (
                   <button
                     onClick={() => recaptureDocument(load.id, doc.type as "bol" | "pod")}
                     className="flex shrink-0 items-center gap-1 text-xs font-medium text-ink-950 hover:underline"
                   >
-                    <Camera className="h-3 w-3" /> Retake
+                    <Camera className="h-3 w-3" /> {p.detail.retake}
                   </button>
                 )}
               </div>
@@ -326,7 +320,7 @@ export default function DriverLoadDetailPage() {
             <div className="theme-ink rounded-2xl bg-ink-900 p-3 text-white">
               <p className="mb-2 text-xs font-medium text-white/80">{pendingDocLabel(pendingType)}</p>
               <DocumentSlot
-                label={`Photo of ${pendingType === "bol" ? "BOL" : "POD"}`}
+                label={w.photoOf(pendingType === "bol" ? "BOL" : "POD")}
                 pagesKey={`${load.id}:${pendingType}`}
                 onFile={(f) => uploadLoadDocument(load.id, pendingType, f)}
               />
@@ -341,7 +335,7 @@ export default function DriverLoadDetailPage() {
                 <div>
                   <p className="text-xs font-medium text-ink-700">{pendingDocLabel(pendingType)}</p>
                   <p className="text-xs text-ink-400">
-                    Captured once this load reaches that stage.
+                    {p.detail.later}
                   </p>
                 </div>
               </div>

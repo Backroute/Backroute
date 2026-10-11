@@ -2,75 +2,51 @@
 
 import Link from "next/link";
 import { LoadStagePill } from "@/components/shared/load-stage";
-import { LoadOfferCard } from "@/components/shared/load-offer-card";
-import { OfferRail } from "@/components/shared/offer-rail";
-import { offerOptions } from "@/lib/plans";
-import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads, useBrokerMap } from "@/lib/selectors";
+import { ChevronRight } from "lucide-react";
+import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { LargeTitle } from "@/components/ui/large-title";
 import { ViewTransition } from "react";
 import { FORWARD } from "@/lib/nav-direction";
 import { Lane } from "@/components/ui/lane";
-import { crewOf } from "@/lib/hos-plan";
 import { usePayView } from "@/lib/pay-view";
+import { usePagesText } from "@/lib/lang/pages-ui";
 
 export default function DriverLoadsPage() {
   const driver = usePrimaryDriver();
   const trucks = useCarrierTrucks();
   const loads = useCarrierLoads();
   const pay = usePayView();
-  const brokers = useBrokerMap();
-  const selectLoadOffer = useStore((s) => s.actions.selectLoadOffer);
-  const requestOfferDetail = useStore((s) => s.actions.requestOfferDetail);
-  const resolveOfferDetail = useStore((s) => s.actions.resolveOfferDetail);
+  const p = usePagesText();
 
   const truck = trucks.find((t) => t.id === driver.truckId);
   // In a real account the office books loads with brokers; a company driver's app shows what's booked, not offers.
   const picksLoads = useStore((s) => s.session.mode !== "driver");
-  const pendingOffers = loads.filter((l) => l.truckId === truck?.id && l.stage === "offered" && picksLoads)
-    .sort((a, b) => Number(!!b.recommended) - Number(!!a.recommended) || b.score - a.score);
+  // The choice itself lives on Home, where the trip is; here it's one line pointing there.
+  const offerCount = loads.filter((l) => l.truckId === truck?.id && l.stage === "offered" && !!l.offerGroupId && picksLoads).length;
   const myLoads = [...loads.filter((l) => l.truckId === truck?.id && l.stage !== "offered")].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
   );
 
   return (
     <div className="flex flex-col gap-5 px-5">
-      {pendingOffers.length > 0 && (
-        <div>
-          <OfferRail
-            bleed
-            header={
-              <>
-                <h2 className="text-[17px] font-semibold tracking-tight text-ink-950">Choose your next load</h2>
-                <p className="text-xs text-ink-500">Best fit first. Swipe for the others.</p>
-              </>
-            }
-          >
-            {offerOptions(pendingOffers).map(([offer, ...rest]) => (
-              <LoadOfferCard
-                key={offer.id}
-                load={offer}
-                legs={[offer, ...rest]}
-                broker={brokers.get(offer.brokerId)}
-                brokers={brokers}
-                crew={crewOf(truck, driver)}
-                viewer="driver"
-                onSelect={() => offer.offerGroupId && selectLoadOffer(offer.offerGroupId, offer.id, "driver")}
-                onAsk={(text) => requestOfferDetail(offer.id, text)}
-                onAskResolve={(draft) => resolveOfferDetail(offer.id, draft)}
-              />
-            ))}
-          </OfferRail>
-        </div>
-      )}
-
       <div>
-        <LargeTitle className="font-display text-2xl text-ink-950">Your loads</LargeTitle>
+        <LargeTitle className="font-display text-2xl text-ink-950">{p.loads.title}</LargeTitle>
+
+        {offerCount > 0 && (
+          <Link href="/driver#next-load" className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-ink-950 px-4 py-3 text-white">
+            <span>
+              <span className="block text-sm font-semibold">{p.loads.choose(offerCount)}</span>
+              <span className="block text-xs text-white/60">{p.loads.chooseNote}</span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0" />
+          </Link>
+        )}
 
         {myLoads.length === 0 ? (
           <p className="py-10 text-center text-sm text-ink-400">
-            {pendingOffers.length > 0 ? "Pick a load above to get started." : "No loads assigned yet."}
+            {offerCount > 0 ? p.loads.pickFirst : p.loads.none}
           </p>
         ) : (
           <div className="mt-4 flex flex-col gap-3">
@@ -84,7 +60,7 @@ export default function DriverLoadsPage() {
                     </p>
                     <p className="mt-0.5 text-xs text-ink-400">{load.referenceNumber} · {formatDate(load.updatedAt)}</p>
                   </div>
-                  <LoadStagePill stage={load.stage} />
+                  <LoadStagePill stage={load.stage} label={p.stage[load.stage]} />
                 </div>
                 <div className="mt-3 flex items-center justify-between text-xs text-ink-500">
                   <span>{load.lane.miles} mi</span>
@@ -95,15 +71,15 @@ export default function DriverLoadsPage() {
                   <div className="flex items-center gap-4">
                     {pay.sees ? (
                       <>
-                        <span className="text-ink-500">Total offer <span className="font-semibold tabular text-ink-950">{formatCurrency(load.bookedRate ?? load.targetRate)}</span></span>
-                        <span className="text-ink-500">Est. net <span className="font-semibold tabular text-ink-950">{formatCurrency(load.netProfit ?? 0)}</span></span>
+                        <span className="text-ink-500">{p.loads.pays} <span className="font-semibold tabular text-ink-950">{formatCurrency(load.bookedRate ?? load.targetRate)}</span></span>
+                        <span className="text-ink-500">{p.loads.yourPay} <span className="font-semibold tabular text-ink-950">{formatCurrency(load.netProfit ?? 0)}</span></span>
                       </>
                     ) : (
-                      <span className="text-ink-500">Your pay <span className="font-semibold tabular text-ink-950">{formatCurrency(pay.yourPay(load))}</span></span>
+                      <span className="text-ink-500">{p.loads.yourPay} <span className="font-semibold tabular text-ink-950">{formatCurrency(pay.yourPay(load))}</span></span>
                     )}
                   </div>
                   {load.documents.length > 0 && (
-                    <span className="text-ink-400">{load.documents.length} doc{load.documents.length === 1 ? "" : "s"}</span>
+                    <span className="text-ink-400">{p.loads.docs(load.documents.length)}</span>
                   )}
                 </div>
               </Link>

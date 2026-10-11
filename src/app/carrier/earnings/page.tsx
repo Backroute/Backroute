@@ -7,6 +7,8 @@ import { useCarrierLoads, useCarrierTrucks, useBrokerMap, useDriverMap } from "@
 import { weekEarnings } from "@/lib/earnings";
 import { formatCurrency } from "@/lib/utils";
 import { StatusMark } from "@/components/ui/mark";
+import { MoneySource, type SourceRow } from "@/components/owner/money-source";
+import type { Load } from "@/lib/types";
 
 export default function EarningsPage() {
   const loads = useCarrierLoads();
@@ -17,16 +19,6 @@ export default function EarningsPage() {
   const perTruck = trucks
     .map((t) => ({ truck: t, driver: driverMap.get(t.driverId ?? ""), w: weekEarnings(loads.filter((l) => l.truckId === t.id)) }))
     .sort((a, b) => b.w.net - a.w.net);
-
-  const delivered = loads.filter((l) => l.stage === "delivered");
-  const netProfitTotal = loads.reduce((s, l) => s + (l.netProfit ?? 0), 0);
-  const avgRpm = (() => {
-    const withRpm = loads.filter((l) => l.rpm);
-    return withRpm.length ? withRpm.reduce((s, l) => s + (l.rpm ?? 0), 0) / withRpm.length : 0;
-  })();
-  const deadheadMiles = loads.reduce((s, l) => s + l.deadheadMiles, 0);
-  const totalMiles = loads.reduce((s, l) => s + l.lane.miles, 0) + deadheadMiles;
-  const emptyRate = totalMiles ? (deadheadMiles / totalMiles) * 100 : 0;
 
 
   const priced = loads.filter((l) => l.netProfit !== null);
@@ -87,6 +79,24 @@ export default function EarningsPage() {
       ? "You're consistently beating market rate. Worth testing a higher rate floor."
       : "You're tracking close to market rate. Hold your current floor for now.";
 
+  // Each number opens the loads behind it.
+  const rowOf = (l: Load, value: string, sub?: string): SourceRow => ({
+    id: l.id,
+    label: `${l.lane.origin} → ${l.lane.destination}`,
+    sub: sub ?? `${l.referenceNumber} · ${brokers.get(l.brokerId)?.company ?? "Broker"}`,
+    value,
+    href: `/carrier/loads/${l.id}`,
+  });
+  const netRows = week.loads.map((l) => rowOf(l, formatCurrency(l.netProfit ?? 0), `${l.referenceNumber} · ${formatCurrency(l.bookedRate ?? 0)} in`));
+  const rpmRows = week.loads.map((l) => rowOf(l, `${l.lane.miles + l.deadheadMiles} mi`, `${formatCurrency(l.bookedRate ?? 0)} · ${l.lane.miles} loaded + ${l.deadheadMiles} empty`));
+  const emptyRows = week.loads.filter((l) => l.deadheadMiles > 0).map((l) => rowOf(l, `${l.deadheadMiles} mi`, `${l.referenceNumber} · empty to pickup`));
+  const postedRows = week.loads
+    .filter((l) => (l.bookedRate ?? 0) > l.listedRate)
+    .map((l) => rowOf(l, `+${formatCurrency((l.bookedRate ?? 0) - l.listedRate)}`, `Posted ${formatCurrency(l.listedRate)} · booked ${formatCurrency(l.bookedRate ?? 0)}`));
+  const detentionRows = week.loads.flatMap((l) =>
+    (l.accessorials ?? []).map((a, i) => ({ ...rowOf(l, formatCurrency(a.amount), `${a.type === "detention" ? "Detention" : a.type} · ${a.status}`), id: `${l.id}-${i}` })),
+  );
+
   return (
     <div>
       <PageHeader title="Earnings" />
@@ -94,7 +104,14 @@ export default function EarningsPage() {
       <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
         {/* Bento: the week's number is the big tile, everything that explains it sits around it in smaller ones. */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <section className="theme-ink col-span-2 flex flex-col justify-between rounded-3xl bg-ink-950 p-5 text-white sm:p-6 lg:row-span-2" aria-labelledby="week-title">
+          <MoneySource
+            title="This week's net profit"
+            how="Each load this week (Monday to Sunday, by the day it delivers or picks up): what it paid, less fuel, tolls, empty miles and fees."
+            rows={netRows}
+            total={formatCurrency(week.net)}
+            className="col-span-2 lg:row-span-2"
+          >
+          <section className="theme-ink flex h-full flex-col justify-between rounded-3xl bg-ink-950 p-5 text-white sm:p-6" aria-labelledby="week-title">
             <div>
               <p id="week-title" className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-white/50">
                 <Sparkles className="h-3.5 w-3.5" /> This week
@@ -109,11 +126,21 @@ export default function EarningsPage() {
                 <TrendingUp className="h-4 w-4" /> Backroute earned you {formatCurrency(week.overMarket)} more than market
               </p>
             )}
+            <p className="mt-4 text-xs text-white/45">Tap for the loads behind it</p>
           </section>
-          <BentoTile label="Revenue / mile, all miles" value={`$${week.rpmAll.toFixed(2)}`} />
-          <BentoTile label="Empty miles" value={`${week.emptyPct.toFixed(0)}%`} tone={week.emptyPct > 20 ? "danger" : undefined} />
-          <BentoTile label="Above posted rates" value={`+${formatCurrency(week.overPosted)}`} tone={week.overPosted > 0 ? "live" : undefined} />
-          <BentoTile label="Detention billed for you" value={week.extras ? `+${formatCurrency(week.extras)}` : "$0"} />
+          </MoneySource>
+          <MoneySource title="Revenue per mile" how={`Revenue ${formatCurrency(week.gross)} ÷ every mile driven (${week.loadedMiles + week.emptyMiles} loaded and empty).`} rows={rpmRows} total={`$${week.rpmAll.toFixed(2)}/mi`}>
+            <BentoTile label="Revenue / mile, all miles" value={`$${week.rpmAll.toFixed(2)}`} />
+          </MoneySource>
+          <MoneySource title="Empty miles" how={`${week.emptyMiles} empty miles out of ${week.loadedMiles + week.emptyMiles} driven this week.`} rows={emptyRows} total={`${week.emptyPct.toFixed(0)}%`}>
+            <BentoTile label="Empty miles" value={`${week.emptyPct.toFixed(0)}%`} tone={week.emptyPct > 20 ? "danger" : undefined} />
+          </MoneySource>
+          <MoneySource title="Above posted rates" how="What each load booked for over what the broker first posted." rows={postedRows} total={`+${formatCurrency(week.overPosted)}`}>
+            <BentoTile label="Above posted rates" value={`+${formatCurrency(week.overPosted)}`} tone={week.overPosted > 0 ? "live" : undefined} />
+          </MoneySource>
+          <MoneySource title="Detention and extras" how="Detention, layover and other extras billed to brokers on this week's loads." rows={detentionRows} total={formatCurrency(week.extras)}>
+            <BentoTile label="Detention billed for you" value={week.extras ? `+${formatCurrency(week.extras)}` : "$0"} />
+          </MoneySource>
 
           <section aria-labelledby="trucks-title" className="col-span-2 rounded-3xl border border-line bg-white p-5 lg:row-span-2">
             <h3 id="trucks-title" className="t-section text-ink-950">
@@ -157,10 +184,6 @@ export default function EarningsPage() {
             <p className="mt-2 text-sm font-medium text-ink-950">{priced.length ? rateFloorNote : "Not enough delivered loads yet to say."}</p>
           </section>
 
-          <BentoTile label="Net profit, this cycle" value={formatCurrency(netProfitTotal)} />
-          <BentoTile label="Avg rate / mile" value={`$${avgRpm.toFixed(2)}`} />
-          <BentoTile label="Loads delivered" value={String(delivered.length)} />
-          <BentoTile label="Empty-mile rate" value={`${emptyRate.toFixed(1)}%`} sub="Of all miles driven" />
         </div>
 
         <MoneyCharts loads={loads} trucks={trucks} drivers={driverMap} />
@@ -172,7 +195,7 @@ export default function EarningsPage() {
 // Numbers stay in ink, like the rest of the page; `tone` only adds a small mark next to the label.
 function BentoTile({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "live" | "danger" }) {
   return (
-    <section className="flex min-h-[7.5rem] flex-col justify-between rounded-3xl border border-line bg-white p-4">
+    <section className="flex h-full min-h-[7.5rem] flex-col justify-between rounded-3xl border border-line bg-white p-4">
       <p className="t-label flex items-center gap-1.5 text-ink-500">
         {tone && <StatusMark kind={tone === "live" ? "done" : "needs_you"} />}
         {label}

@@ -14,7 +14,7 @@ export const loadsActions = (set: SetState, get: GetState): Pick<Actions, "selec
     // A real account: the AI emails the broker to book it (lib/cloud/agent), and the load changes when that's done.
     if (get().session.mode !== "demo") {
       // Loaded when needed: it reaches back into the store through the sync.
-      void import("../../cloud/agent").then((m) => m.askToBook(loadId, also)).then((problem) => problem && window.alert(problem));
+      void import("../../cloud/agent").then((m) => m.askToBook(loadId, also)).then(async (problem) => problem && (await import("@/components/ui/ask-host")).tell("Couldn't ask the broker", problem));
       return;
     }
     set((state) => {

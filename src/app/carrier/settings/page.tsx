@@ -39,8 +39,7 @@ import { SecurityCard } from "@/components/cloud/security-card";
 import { AuditLogCard } from "@/components/cloud/audit-log-card";
 import { HistoryCard } from "@/components/cloud/history-card";
 import { BasicsCard } from "@/components/cloud/basics-card";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
-import type { Aggressiveness } from "@/lib/store";
+import { formatCurrency, formatDate } from "@/lib/utils";
 
 const TABS = [
   { key: "basics", label: "Basics" },
@@ -61,12 +60,6 @@ const INVOICES = [
 const INITIAL_TEAM = [
   { id: "tm-1", name: "Alicia Moreno", email: "alicia@titanfreight.com", role: "Owner" },
   { id: "tm-2", name: "Chris Palmer", email: "chris@titanfreight.com", role: "Ops Manager" },
-];
-
-const AGGRESSIVENESS_OPTIONS: { key: Aggressiveness; label: string; desc: string }[] = [
-  { key: "conservative", label: "Conservative", desc: "Holds close to listed rate, escalates often." },
-  { key: "balanced", label: "Balanced", desc: "Negotiates firmly, escalates only on edge cases." },
-  { key: "aggressive", label: "Aggressive", desc: "Pushes hardest for net profit, walks away fast." },
 ];
 
 export default function SettingsPage() {
@@ -106,10 +99,7 @@ function Settings() {
           : "general";
   const setTab = (next: TabKey) => setPicked({ asked, tab: next });
   const tabs = TABS.filter((t) => signedIn || t.key !== "basics").map((t) => (t.key === "general" && !signedIn ? { ...t, label: "General" } : t));
-  const [card, setCard] = useState({ brand: "Visa", last4: "4242", expiry: "08/29" });
-  const [editingCard, setEditingCard] = useState(false);
-  const [cardNumberInput, setCardNumberInput] = useState("");
-  const [cardExpiryInput, setCardExpiryInput] = useState("");
+  const card = { brand: "Visa", last4: "4242", expiry: "08/29" };
 
   function handleInvite() {
     const email = inviteEmail.trim();
@@ -190,33 +180,6 @@ function Settings() {
               <div id="set-language" className="scroll-mt-24"><OwnerLanguageCard /></div>
               <div id="set-appearance" className="scroll-mt-24"><AppearanceCard /></div>
 
-              {/* The demo's simulated negotiation style; in a real account the owner's lowest rate per mile sets the price. */}
-              {!signedIn && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Negotiation aggressiveness</CardTitle>
-                  <CardDescription>How hard Backroute pushes before it accepts, holds, or escalates.</CardDescription>
-                </CardHeader>
-                <CardContent className="!pt-3">
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {AGGRESSIVENESS_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.key}
-                        onClick={() => updateSettings({ aggressiveness: opt.key })}
-                        className={cn(
-                          "rounded-2xl border p-4 text-left transition-colors",
-                          settings.aggressiveness === opt.key ? "border-ink-950 bg-ink-950 text-white" : "border-line hover:border-ink-300",
-                        )}
-                      >
-                        <p className="text-sm font-semibold">{opt.label}</p>
-                        <p className={cn("mt-1 text-xs", settings.aggressiveness === opt.key ? "text-white/60" : "text-ink-500")}>{opt.desc}</p>
-                      </button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-              )}
-
               <div className="grid gap-6 lg:grid-cols-2">
                 <Card id="set-autopilot" className="scroll-mt-24">
                   <CardHeader>
@@ -227,9 +190,10 @@ function Settings() {
                     {!signedIn && (
                       <>
                     <ToggleRow label="Avoid low-reliability brokers" desc="Never source or negotiate with 'watch' tier brokers" checked={settings.avoidWatchBrokers} onChange={(v) => updateSettings({ avoidWatchBrokers: v })} />
-                    <ToggleRow label="Voice agent" desc="Allow Backroute to call brokers directly" checked={settings.voiceEnabled} onChange={(v) => updateSettings({ voiceEnabled: v })} />
-                    <ToggleRow label="SMS agent" desc="Allow rate checks and counters over SMS" checked={settings.smsEnabled} onChange={(v) => updateSettings({ smsEnabled: v })} />
-                    <ToggleRow label="Email agent" desc="Allow inbox monitoring and negotiation by email" checked={settings.emailEnabled} onChange={(v) => updateSettings({ emailEnabled: v })} />
+                    <p className="pt-1 text-xs font-medium text-ink-800">How Backroute reaches brokers</p>
+                    <ToggleRow label="Calls" desc="Calls brokers about loads, rates and detention" checked={settings.voiceEnabled} onChange={(v) => updateSettings({ voiceEnabled: v })} />
+                    <ToggleRow label="Texts" desc="Texts brokers for rate checks and counters" checked={settings.smsEnabled} onChange={(v) => updateSettings({ smsEnabled: v })} />
+                    <ToggleRow label="Email" desc="Reads and answers broker email" checked={settings.emailEnabled} onChange={(v) => updateSettings({ emailEnabled: v })} />
                       </>
                     )}
                   </CardContent>
@@ -409,49 +373,12 @@ function Settings() {
                           <p className="text-xs text-ink-500">Expires {card.expiry} &middot; Next charge Oct 1</p>
                         </div>
                       </div>
-                      {!editingCard && (
-                        <Button variant="outline" size="sm" onClick={() => setEditingCard(true)}>Update payment method</Button>
-                      )}
+                      <Badge tone="neutral">Sample</Badge>
                     </div>
-                    {editingCard && (
-                      <div className="mt-4 flex flex-col gap-2.5 border-t border-line pt-4">
-                        <div className="flex flex-wrap gap-2.5">
-                          <label className="flex flex-1 flex-col gap-1 text-xs text-ink-500">
-                            Card number
-                            <input
-                              value={cardNumberInput}
-                              onChange={(e) => setCardNumberInput(e.target.value.replace(/\D/g, "").slice(0, 16))}
-                              placeholder="4242 4242 4242 4242"
-                              className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm text-ink-900 outline-none focus:border-ink-400"
-                            />
-                          </label>
-                          <label className="flex w-28 flex-col gap-1 text-xs text-ink-500">
-                            Expiry
-                            <input
-                              value={cardExpiryInput}
-                              onChange={(e) => setCardExpiryInput(e.target.value)}
-                              placeholder="MM/YY"
-                              className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm text-ink-900 outline-none focus:border-ink-400"
-                            />
-                          </label>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            disabled={cardNumberInput.length < 4 || !cardExpiryInput.trim()}
-                            onClick={() => {
-                              setCard({ brand: "Visa", last4: cardNumberInput.slice(-4), expiry: cardExpiryInput.trim() });
-                              setEditingCard(false);
-                              setCardNumberInput("");
-                              setCardExpiryInput("");
-                            }}
-                          >
-                            Save card
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setEditingCard(false)}>Cancel</Button>
-                        </div>
-                      </div>
-                    )}
+                    {/* The practice account never asks for a card: a real account updates it on the payment company's own secure page. */}
+                    <p className="mt-3 text-xs text-ink-500">
+                      A sample card. In your own account, you change it on the secure payment page from Billing; Backroute never asks you to type a card number here.
+                    </p>
                   </div>
 
                   <div>

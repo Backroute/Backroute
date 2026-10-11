@@ -88,6 +88,7 @@ export async function openFile(id: string) {
     else window.location.href = url;
   } catch {
     tab?.close();
-    alert("Couldn't open that file.");
+    const { tell } = await import("@/components/ui/ask-host");
+    void tell("Couldn't open that file", "Check your connection and try again. If it keeps happening, the file may have been removed.");
   }
 }

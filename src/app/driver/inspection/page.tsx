@@ -13,6 +13,7 @@ import { LargeTitle } from "@/components/ui/large-title";
 import { DVIR_CHECKLIST } from "@/lib/dvir";
 import { autoCrop } from "@/lib/doc-scan";
 import { uploadFile } from "@/lib/cloud/files";
+import { usePagesText } from "@/lib/lang/pages-ui";
 
 const CHECKLIST = DVIR_CHECKLIST;
 
@@ -39,6 +40,9 @@ function DvirInspection() {
   // Each defect's own words and photo, so the shop and the owner see exactly what's wrong.
   const [details, setDetails] = useState<Record<string, { note: string; preview?: string; fileId?: string; uploading?: boolean }>>({});
   const real = useStore((s) => s.session.mode !== "demo");
+  const p = usePagesText();
+  // The checklist's labels stay English in the record (the shop and the owner read them); the driver sees theirs.
+  const shown = (label: string) => p.insp.items[CHECKLIST.indexOf(label)] ?? label;
 
   async function photo(label: string, file: File) {
     const page = (await autoCrop(file)).file;
@@ -72,12 +76,8 @@ function DvirInspection() {
         <div className={cn("flex h-14 w-14 items-center justify-center rounded-full text-white", submitted === "pass" ? "bg-ink-950" : "bg-[var(--dot-warn)]")}>
           {submitted === "pass" ? <CheckCircle2 className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
         </div>
-        <p className="font-display text-xl text-ink-950">{submitted === "pass" ? "Inspection logged, no defects" : "Defect flagged"}</p>
-        <p className="text-sm text-ink-500">
-          {submitted === "pass"
-            ? "You're clear to roll."
-            : "Sent to your carrier for review. A human will follow up before this truck goes back out."}
-        </p>
+        <p className="font-display text-xl text-ink-950">{submitted === "pass" ? p.insp.passTitle : p.insp.defectTitle}</p>
+        <p className="text-sm text-ink-500">{submitted === "pass" ? p.insp.clear : p.insp.review}</p>
       </div>
     );
   }
@@ -85,12 +85,12 @@ function DvirInspection() {
   return (
     <div className="flex flex-col gap-5 px-5">
       <button onClick={() => router.back()} className="flex items-center gap-1.5 text-xs font-medium text-ink-500">
-        <ArrowLeft className="h-3.5 w-3.5" /> Back
+        <ArrowLeft className="h-3.5 w-3.5" /> {p.insp.back}
       </button>
 
       <div>
-        <LargeTitle className="font-display text-2xl text-ink-950">Vehicle inspection</LargeTitle>
-        <p className="mt-1 text-sm text-ink-500">{truck ? `${truck.unitNumber} · ${truck.equipmentType}` : "No truck assigned"}</p>
+        <LargeTitle className="font-display text-2xl text-ink-950">{p.insp.title}</LargeTitle>
+        <p className="mt-1 text-sm text-ink-500">{truck ? `${truck.unitNumber} · ${truck.equipmentType}` : p.insp.noTruck}</p>
       </div>
 
       <div className="flex rounded-full bg-ink-100 p-1">
@@ -103,7 +103,7 @@ function DvirInspection() {
               kind === k ? "bg-ink-950 text-white" : "text-ink-500",
             )}
           >
-            {k === "pre_trip" ? "Pre-trip" : "Post-trip"}
+            {k === "pre_trip" ? p.insp.pre : p.insp.post}
           </button>
         ))}
       </div>
@@ -112,16 +112,16 @@ function DvirInspection() {
         {CHECKLIST.map((label) => (
           <div key={label} className={cn("rounded-2xl border border-line", items[label] === "defect" && "bg-danger-soft")}>
             <button type="button" onClick={() => toggle(label)} aria-pressed={items[label] === "defect"} className="flex w-full items-center justify-between p-3.5 text-left">
-              <span className="text-sm font-medium text-ink-900">{label}</span>
-              <Badge tone={items[label] === "defect" ? "danger" : "success"}>{items[label] === "defect" ? "Defect" : "OK"}</Badge>
+              <span className="text-sm font-medium text-ink-900">{shown(label)}</span>
+              <Badge tone={items[label] === "defect" ? "danger" : "success"}>{items[label] === "defect" ? p.insp.defect : p.insp.ok}</Badge>
             </button>
             {items[label] === "defect" && (
               <div className="flex items-center gap-2 px-3.5 pb-3.5">
                 <input
                   value={details[label]?.note ?? ""}
                   onChange={(e) => setDetails((d) => ({ ...d, [label]: { ...d[label], note: e.target.value } }))}
-                  placeholder="What's wrong?"
-                  aria-label={`What's wrong with the ${label.toLowerCase()}`}
+                  placeholder={p.insp.whatsWrong}
+                  aria-label={`${p.insp.whatsWrong} ${shown(label)}`}
                   className="min-w-0 flex-1 rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-ink-400"
                 />
                 <label className="flex h-10 shrink-0 cursor-pointer items-center gap-1.5 overflow-hidden rounded-xl border border-line bg-white px-3 text-xs font-semibold text-ink-900">
@@ -130,13 +130,13 @@ function DvirInspection() {
                   ) : (
                     <Camera className="h-4 w-4" />
                   )}
-                  {details[label]?.uploading ? "Saving…" : details[label]?.preview ? "Retake" : "Photo"}
+                  {details[label]?.uploading ? p.insp.saving : details[label]?.preview ? p.insp.retake : p.insp.photo}
                   <input
                     type="file"
                     accept="image/*"
                     capture="environment"
                     className="sr-only"
-                    aria-label={`Photo of the ${label.toLowerCase()} problem`}
+                    aria-label={`${p.insp.photo}: ${shown(label)}`}
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       e.target.value = "";
@@ -153,28 +153,28 @@ function DvirInspection() {
       <textarea
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
-        placeholder="Anything else (optional)"
+        placeholder={p.insp.notes}
         rows={3}
         className="rounded-2xl border border-line bg-ink-50/60 p-3.5 text-sm outline-none focus:border-ink-400"
       />
 
       <Button size="lg" disabled={!truck} onClick={handleSubmit}>
-        Submit {kind === "pre_trip" ? "pre-trip" : "post-trip"} inspection
+        {p.insp.submit(kind)}
       </Button>
 
       {inspections.length > 0 && (
         <div className="flex flex-col gap-2 pb-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">Recent inspections</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">{p.insp.recent}</p>
           {inspections.slice(0, 5).map((d) => (
             <div key={d.id} className="flex items-center justify-between gap-2 rounded-xl border border-line px-3.5 py-2.5">
               <div className="flex items-center gap-2">
                 <ClipboardCheck className="h-3.5 w-3.5 text-ink-400" />
                 <div>
-                  <p className="text-xs font-medium text-ink-900">{d.kind === "pre_trip" ? "Pre-trip" : "Post-trip"}</p>
+                  <p className="text-xs font-medium text-ink-900">{d.kind === "pre_trip" ? p.insp.pre : p.insp.post}</p>
                   <p className="text-xs text-ink-400">{formatDate(d.createdAt)}</p>
                 </div>
               </div>
-              <Badge tone={d.overallStatus === "pass" ? "success" : "danger"}>{d.overallStatus === "pass" ? "Pass" : "Defect"}</Badge>
+              <Badge tone={d.overallStatus === "pass" ? "success" : "danger"}>{d.overallStatus === "pass" ? p.insp.pass : p.insp.defect}</Badge>
             </div>
           ))}
         </div>

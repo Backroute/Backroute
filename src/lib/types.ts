@@ -320,6 +320,10 @@ export interface Truck {
   odometerAt?: string;
   /** Engine fault codes the ELD reported (Samsara, Motive), newest first; cleared ones drop off. */
   faults?: TruckFault[];
+  /** Real accounts with an ELD: miles run in each state, by quarter ("2026-Q4" → { TX: 1820 }), for IFTA. */
+  stateMiles?: Record<string, Record<string, number>>;
+  /** The last ELD reading the state miles were counted from. */
+  iftaTrack?: { odometer?: number; lat: number; lon: number; state?: string; at: string };
   /** Plates and registration (IRP cab card): the date it runs out. */
   registrationExpires?: string;
   /** What truck GPS apps route around: low bridges, weight limits, hazmat tunnels. */

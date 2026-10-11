@@ -114,4 +114,6 @@ export interface AgentSettings {
   paused?: boolean;
   /** When they paused, to show how long it's been. */
   pausedAt?: string;
+  /** The quarter's IFTA diesel rates by state, from the rate matrix file the owner uploaded (never made up). */
+  iftaRates?: { quarter: string; rates: Record<string, number>; importedAt: string; fileName: string };
 }

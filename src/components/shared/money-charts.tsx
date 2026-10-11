@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNow } from "@/lib/hooks";
-import { isEarningLoad } from "@/lib/earnings";
+import { isEarningLoad, moneyDay, mondayOf } from "@/lib/earnings";
 import { useToken } from "@/lib/theme";
 import type { Driver, Load, Truck } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
@@ -12,16 +12,8 @@ import { formatCurrency } from "@/lib/utils";
 const WEEKS = 8;
 const WEEK = 7 * 86400_000;
 
-/** Monday 00:00 local of the week `t` falls in. */
-function mondayOf(t: number): number {
-  const d = new Date(t);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  return d.getTime();
-}
-
-/** When a load's money counts: the day it delivered, else the day it picks up, else when it came in. */
-const dayOf = (l: Load) => Date.parse(l.tripChecklist?.unloadedAt ?? l.deliveryAt ?? l.pickupAt ?? l.createdAt);
+/** When a load's money counts: the same day the week's tiles use. */
+const dayOf = moneyDay;
 const inOf = (l: Load) => l.invoice?.amount ?? l.bookedRate ?? 0;
 const keptOf = (l: Load) => l.netProfit ?? inOf(l) - (l.fuelCost ?? 0) - (l.tollCost ?? 0) - (l.deadheadCost ?? 0) - (l.commission ?? 0);
 
@@ -104,6 +96,9 @@ export function MoneyCharts({ loads, trucks, drivers }: { loads: Load[]; trucks:
 
   if (now === null) return null;
   const any = weeks.some((w) => w.in > 0);
+  // Week-by-week lines only mean something with a few weeks behind them; until then they'd be flat lines with one spike.
+  const weeksWithMoney = weeks.filter((w) => w.in > 0).length;
+  const trends = weeksWithMoney >= 3;
   const tooltip = {
     contentStyle: { borderRadius: 12, border: `1px solid ${c.line}`, fontSize: 12, background: c.surface, color: c.ink },
     cursor: { fill: c.soft, opacity: 0.4 },
@@ -135,8 +130,9 @@ export function MoneyCharts({ loads, trucks, drivers }: { loads: Load[]; trucks:
                         return `Week of ${label}${row ? ` · ${formatCurrency(row.in)} in` : ""}`;
                       }}
                     />
-                    <Bar dataKey="kept" stackId="m" fill={c.live} radius={[0, 0, 4, 4]} />
-                    <Bar dataKey="spent" stackId="m" fill={c.soft} radius={[6, 6, 0, 0]} />
+                    {/* No grow-in animation: it started late enough that the chart first looked empty. */}
+                    <Bar dataKey="kept" stackId="m" fill={c.live} radius={[0, 0, 4, 4]} isAnimationActive={false} />
+                    <Bar dataKey="spent" stackId="m" fill={c.soft} radius={[6, 6, 0, 0]} isAnimationActive={false} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -156,7 +152,12 @@ export function MoneyCharts({ loads, trucks, drivers }: { loads: Load[]; trucks:
         </CardContent>
       </Card>
 
-      {any && (
+      {any && !trends && (
+        <p className="rounded-2xl border border-dashed border-line px-4 py-3 text-sm text-ink-500">
+          Trends per truck and per lane show once there are 3 weeks of loads ({weeksWithMoney} so far).
+        </p>
+      )}
+      {trends && (
         <div className="grid gap-6 lg:grid-cols-2">
           <TrendList title="Kept per truck" description="Each truck's last 8 weeks. A flat or falling line is the one to look at." items={perTruck} colors={c} />
           <TrendList title="Kept per lane" description="Your five best-paying lanes, week by week." items={perLane} colors={c} />
@@ -206,7 +207,7 @@ function TrendList({
                 </div>
                 <div className="w-20 shrink-0 text-right">
                   <p className="text-sm font-semibold tabular text-ink-950">{formatCurrency(it.total)}</p>
-                  <p className={`text-xs tabular ${down ? "text-[var(--accent-danger)]" : "text-ink-500"}`}>{down ? "down this week" : "8 weeks"}</p>
+                  <p className={`text-xs tabular ${down ? "text-[var(--accent-danger)]" : "text-ink-500"}`}>{down ? "down this week" : "last 8 weeks"}</p>
                 </div>
               </li>
             );

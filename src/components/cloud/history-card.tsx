@@ -5,6 +5,7 @@ import { Mail, Undo2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { authHeader } from "@/lib/ai/client";
+import { askConfirm } from "@/components/ui/ask-host";
 
 interface Result {
   batch?: string;
@@ -253,7 +254,13 @@ function RecentImports({ refresh }: { refresh: number }) {
   }, [tick, refresh]);
 
   async function undo(b: Batch) {
-    if (!window.confirm(`Take out the ${b.loads} load${b.loads === 1 ? "" : "s"} from this import? Brokers it added that nothing else uses go too.`)) return;
+    const sure = await askConfirm(
+      `Take out ${b.loads} load${b.loads === 1 ? "" : "s"}?`,
+      "Everything this import added goes, including brokers that nothing else uses.",
+      `Take out ${b.loads} load${b.loads === 1 ? "" : "s"}`,
+      true,
+    );
+    if (!sure) return;
     setBusy(b.id);
     setNote(null);
     const res = await fetch(`/api/import/batches?batch=${encodeURIComponent(b.id)}`, { method: "DELETE", headers: await authHeader() }).catch(() => null);

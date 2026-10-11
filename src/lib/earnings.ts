@@ -33,9 +33,31 @@ export function isEarningLoad(load: Load): boolean {
   return EARNING_STAGES.has(load.stage) && load.bookedRate !== null;
 }
 
-/** The week's money for a set of loads (one truck's, or the whole fleet's). */
-export function weekEarnings(allLoads: Load[]): WeekEarnings {
-  const loads = allLoads.filter(isEarningLoad);
+/**
+ * The day a load's money counts, the same everywhere (the week tiles, the charts, the driver's pay): the day it
+ * delivered once it has, else the day it picks up, else the day it came in.
+ */
+export function moneyDay(l: Load): number {
+  const done = l.stage === "delivered" ? (l.tripChecklist?.unloadedAt ?? l.deliveryAt ?? l.updatedAt) : null;
+  return Date.parse(done ?? l.pickupAt ?? l.createdAt);
+}
+
+/** Monday 00:00, local time, of the week `t` falls in. */
+export function mondayOf(t: number): number {
+  const d = new Date(t);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.getTime();
+}
+
+/** This week's money (Monday to Sunday) for a set of loads: one truck's, or the whole fleet's. */
+export function weekEarnings(allLoads: Load[], now: number = Date.now()): WeekEarnings {
+  const start = mondayOf(now);
+  const loads = allLoads.filter((l) => {
+    if (!isEarningLoad(l)) return false;
+    const t = moneyDay(l);
+    return Number.isFinite(t) && t >= start && t < start + 7 * 86400_000;
+  });
   const gross = loads.reduce((s, l) => s + (l.bookedRate ?? 0), 0);
   const extras = loads.reduce((s, l) => s + (l.accessorials ?? []).reduce((a, x) => a + x.amount, 0), 0);
   const net = loads.reduce((s, l) => s + (l.netProfit ?? 0), 0);
@@ -56,7 +78,7 @@ export function weekEarnings(allLoads: Load[]): WeekEarnings {
 
   const byDay = DAY_LABELS.map((day) => ({ day, gross: 0, net: 0 }));
   for (const l of loads) {
-    const idx = (new Date(l.createdAt).getDay() + 6) % 7;
+    const idx = (new Date(moneyDay(l)).getDay() + 6) % 7;
     byDay[idx].gross += l.bookedRate ?? 0;
     byDay[idx].net += l.netProfit ?? 0;
   }

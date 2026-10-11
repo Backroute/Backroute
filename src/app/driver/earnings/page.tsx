@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { ArrowUpRight, Clock, Gauge, Sparkles, Timer, TrendingUp } from "lucide-react";
 import { usePrimaryDriver, useCarrierTrucks, useCarrierLoads } from "@/lib/selectors";
-import { computeDriverPay, payLabel } from "@/lib/settlements";
+import { computeDriverPay } from "@/lib/settlements";
+import { payWords, usePagesText } from "@/lib/lang/pages-ui";
+import { usePayView } from "@/lib/pay-view";
 import { weekEarnings } from "@/lib/earnings";
 import { useStore } from "@/lib/store";
 import { OwnerMoney } from "@/components/shared/owner-operator";
@@ -18,6 +20,8 @@ export default function DriverEarningsPage() {
   const loads = useCarrierLoads();
   const truck = trucks.find((t) => t.id === driver.truckId);
   const solo = useStore((s) => s.settings.ownerOperator);
+  const p = usePagesText();
+  const view = usePayView();
   const team = !!truck?.secondDriverId;
   const week = weekEarnings(loads.filter((l) => l.truckId === truck?.id));
   // An owner-operator keeps the truck's profit on each load; a company driver gets their pay.
@@ -32,8 +36,8 @@ export default function DriverEarningsPage() {
   return (
     <div className="flex flex-col gap-5 px-5">
       <div>
-        <LargeTitle className="font-display text-2xl text-ink-950">Earnings</LargeTitle>
-        <p className="mt-1 text-sm text-ink-500">This week, from every load Backroute booked for you.</p>
+        <LargeTitle className="font-display text-2xl text-ink-950">{p.earn.title}</LargeTitle>
+        <p className="mt-1 text-sm text-ink-500">{p.earn.sub}</p>
       </div>
 
       {/* An owner-operator sees the truck's profit and their invoices; a company driver sees their pay. */}
@@ -41,19 +45,19 @@ export default function DriverEarningsPage() {
         <OwnerMoney truck={truck} />
       ) : (
         <section className="theme-ink rounded-3xl bg-ink-950 p-5 text-white">
-          <p className="text-xs font-semibold uppercase tracking-wider text-white/50">Your pay this week</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-white/50">{p.earn.payWeek}</p>
           <p className="mt-1 text-4xl font-semibold tabular tracking-tight">{formatCurrency(pay)}</p>
           <p className="mt-1 text-xs text-white/55">
-            {payLabel(driver)}
-            {team ? " · split with your team partner" : ""}
+            {payWords(p, driver)}
+            {team ? p.earn.teamSplit : ""}
           </p>
           {week.overMarket > 0 && (
             <p className="mt-3 flex items-center gap-1.5 rounded-2xl bg-white/10 px-3 py-2 text-xs font-medium text-white/85">
-              <TrendingUp className="h-3.5 w-3.5 shrink-0" /> Backroute booked your loads {formatCurrency(week.overMarket)} above market rate
+              <TrendingUp className="h-3.5 w-3.5 shrink-0" /> {p.earn.overMarket(formatCurrency(week.overMarket))}
             </p>
           )}
 
-          <div className="mt-5 flex h-28 gap-2" role="img" aria-label="Pay by day this week">
+          <div className="mt-5 flex h-28 gap-2" role="img" aria-label={p.earn.byDay}>
             {payByDay.map((d, i) => (
               <div key={d.day} className="flex flex-1 flex-col items-center gap-1.5">
                 <div className="flex w-full flex-1 items-end">
@@ -63,7 +67,7 @@ export default function DriverEarningsPage() {
                     title={formatCurrency(d.pay)}
                   />
                 </div>
-                <span className={cn("text-xs", i === today ? "font-semibold text-white" : "text-white/70")}>{d.day}</span>
+                <span className={cn("text-xs", i === today ? "font-semibold text-white" : "text-white/70")}>{p.earn.days[i]}</span>
               </div>
             ))}
           </div>
@@ -71,31 +75,31 @@ export default function DriverEarningsPage() {
       )}
 
       <div className="grid grid-cols-3 gap-3">
-        <Stat label="Loads" value={week.loads.length} />
-        <Stat label="Miles" value={formatNumber(week.loadedMiles + week.emptyMiles)} />
-        <Stat label="Per mile, all miles" value={`$${week.rpmAll.toFixed(2)}`} />
+        <Stat label={p.earn.loads} value={week.loads.length} />
+        <Stat label={p.earn.miles} value={formatNumber(week.loadedMiles + week.emptyMiles)} />
+        <Stat label={p.earn.perMile} value={`$${week.rpmAll.toFixed(2)}`} />
       </div>
 
       <section className="rounded-3xl border border-line p-5">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold text-ink-950">
-          <Sparkles className="h-4 w-4" /> Where Backroute made you money
+          <Sparkles className="h-4 w-4" /> {p.earn.madeYou}
         </h2>
         <ul className="mt-3 flex flex-col divide-y divide-line">
-          <Row icon={TrendingUp} label="Negotiated above posted rates" value={`+${formatCurrency(week.overPosted)}`} />
-          <Row icon={Timer} label="Detention billed for you" value={week.extras ? `+${formatCurrency(week.extras)}` : "None this week"} />
+          <Row icon={TrendingUp} label={p.earn.abovePosted} value={`+${formatCurrency(week.overPosted)}`} />
+          <Row icon={Timer} label={p.earn.detention} value={week.extras ? `+${formatCurrency(week.extras)}` : p.earn.noneWeek} />
           <Row
             icon={Gauge}
-            label="Empty miles"
+            label={p.earn.empty}
             value={`${week.emptyPct.toFixed(0)}%`}
-            sub="Your next load is booked near where you deliver."
+            sub={p.earn.emptyNote}
           />
         </ul>
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-ink-950">Loads this week</h2>
+        <h2 className="mb-2 text-sm font-semibold text-ink-950">{p.earn.loadsWeek}</h2>
         {sorted.length === 0 ? (
-          <p className="rounded-2xl border border-line px-4 py-6 text-center text-sm text-ink-500">No booked loads yet this week. Backroute is on it.</p>
+          <p className="rounded-2xl border border-line px-4 py-6 text-center text-sm text-ink-500">{p.earn.noLoads}</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {sorted.map((l) => (
@@ -106,8 +110,10 @@ export default function DriverEarningsPage() {
                       <Lane from={l.lane.origin} to={l.lane.destination} />
                     </p>
                     <p className="text-xs text-ink-500">
-                      {formatDate(l.createdAt)} · {l.lane.miles} mi · {formatCurrency(l.bookedRate ?? 0)} load
-                      {l.stage !== "delivered" ? " · in progress" : ""}
+                      {formatDate(l.createdAt)} · {l.lane.miles} mi
+                      {/* The load's rate only for whoever sees the money (the owner-operator); a company driver sees their pay. */}
+                      {view.sees ? ` · ${formatCurrency(l.bookedRate ?? 0)}` : ""}
+                      {l.stage !== "delivered" ? p.earn.inProgress : ""}
                     </p>
                   </div>
                   <span className="flex shrink-0 items-center gap-1 text-sm font-semibold tabular text-ink-950">

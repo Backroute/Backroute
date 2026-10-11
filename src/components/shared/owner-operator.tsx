@@ -104,13 +104,17 @@ export function BusinessCard() {
   const { t, solo } = useDriverUi();
   const settings = useStore((s) => s.settings);
   const updateSettings = useStore((s) => s.actions.updateSettings);
+  // Only the person who owns the account can say they own the truck: a company driver signed in to their own app
+  // never sees the switch (turning it on would hand them the whole business).
+  const companyDriver = useStore((s) => s.session.mode === "driver");
+  if (companyDriver && !solo) return null;
   return (
     <section id="business" className="rounded-2xl border border-line p-4">
       <div className="flex items-center justify-between gap-3">
         <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-400">
           <Briefcase className="h-3.5 w-3.5" /> {t.yourBusiness}
         </p>
-        <Switch checked={solo} onChange={(on) => updateSettings({ ownerOperator: on })} label={t.ownTruck} />
+        {!companyDriver && <Switch checked={solo} onChange={(on) => updateSettings({ ownerOperator: on })} label={t.ownTruck} />}
       </div>
       <p className="mt-1 text-sm font-medium text-ink-950">{t.ownTruck}</p>
       <p className="mt-0.5 text-xs text-ink-500">{t.ownTruckNote}</p>

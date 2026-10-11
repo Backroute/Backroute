@@ -19,6 +19,7 @@ import { useNeedsYou } from "@/components/shared/needs-you";
 import { useAppBadge } from "@/lib/app-badge";
 import { CommandPalette, type CommandGroup } from "@/components/shared/command-palette";
 import { NotificationToastHost } from "@/components/shared/notification-toast";
+import { AskHost } from "@/components/ui/ask-host";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
@@ -226,6 +227,7 @@ function CarrierShell({ children }: { children: React.ReactNode }) {
       <SampleTracker />
       <SectionTabs />
       {children}
+      <AskHost />
       <NotificationToastHost events={alerts.filter(isUrgent)} hrefFor={(e) => (e.loadId ? `/carrier/loads/${e.loadId}` : undefined)} />
     </PortalShell>
   );

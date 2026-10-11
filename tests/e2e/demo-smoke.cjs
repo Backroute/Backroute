@@ -35,7 +35,8 @@ const ARGS = [`--proxy-server=${process.env.HTTPS_PROXY}`, "--proxy-bypass-list=
   check("the demo AI answers the driver's message", (await p.locator("body").innerText()).split("Where is my next load?").length > 1);
   // Plans: the AI offers several loads as one choice (back to back, or partials on one trailer), and booking one books
   // the whole plan, so the row of choices for that truck goes away.
-  await p.goto(BASE + "/driver/loads", { waitUntil: "domcontentloaded" });
+  // The choice lives on Home; the Loads tab only points there.
+  await p.goto(BASE + "/driver", { waitUntil: "domcontentloaded" });
   await p.getByText("Choose your next load").waitFor({ timeout: 90000 }).catch(() => {});
   const rail = await p.locator("body").innerText();
   check("the AI offers multi-load plans among the choices", /\d loads back to back|\d loads, one trailer/.test(rail), rail.slice(0, 200));

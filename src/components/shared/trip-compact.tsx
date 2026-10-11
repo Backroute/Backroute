@@ -31,6 +31,7 @@ import { Lane } from "@/components/ui/lane";
 import { StatusMark } from "@/components/ui/mark";
 import { QuickPreTrip } from "@/components/driver/quick-pretrip";
 import { usePayView } from "@/lib/pay-view";
+import { driveWords, nextWords, useTripText } from "@/lib/lang/trip-ui";
 
 /** The small, always-current trip card — Uber's collapsed sheet: where, when, how far along, and the one next
  *  step (with its button when it's the driver's to take). Tap it for everything else. */
@@ -42,8 +43,10 @@ export function TripCompactCard({
 }: DriverTripCardProps & { onOpen: () => void; showMap?: boolean; truckLabel?: string }) {
   const { load, needsPreTrip, viewer = "driver", driverName, onConfirm, onTripStep, onUpload } = props;
   const pay = usePayView(viewer);
+  const w = useTripText(viewer);
   const now = useNow();
   const s = tripState(load, now, needsPreTrip);
+  const drive = driveWords(w, s);
   const driver = viewer === "driver";
   const origin = `${load.lane.origin}, ${load.lane.originState}`;
   const destination = `${load.lane.destination}, ${load.lane.destState}`;
@@ -56,11 +59,10 @@ export function TripCompactCard({
     const today = new Date().toDateString();
     return st.loads.filter((l) => l.truckId === load.truckId && l.stage === "delivered" && l.lane.moveKind && new Date(l.updatedAt).toDateString() === today).length;
   });
-  const phase = s.card === "booking" ? "Booking" : s.card === "pickup" ? "Pickup" : "Delivery";
-  const kicker = load.lane.moveKind ? `Move ${movesToday + 1} today · ${MOVE_LABEL[load.lane.moveKind]}` : phase;
+  const phase = s.card === "booking" ? w.booking : s.card === "pickup" ? w.pickup : w.delivery;
+  const kicker = load.lane.moveKind ? w.compact.move(movesToday + 1, MOVE_LABEL[load.lane.moveKind]) : phase;
   const place = s.card === "booking" ? <Lane from={load.lane.origin} to={load.lane.destination} /> : s.card === "pickup" ? origin : destination;
-  const status =
-    s.card === "booking" ? "Booking" : s.arrived ? (s.card === "pickup" ? "At the shipper" : "At the receiver") : s.card === "pickup" ? "Heading to pickup" : "Heading to delivery";
+  const status = s.card === "booking" ? w.booking : s.arrived ? (s.card === "pickup" ? w.atShipper : w.atReceiver) : s.card === "pickup" ? w.toPickup : w.toDelivery;
   const mapFrom: LatLng | undefined = s.card === "pickup" ? pickupLegStart(load, props.truckCity, props.truckState) : originPt;
   const mapTo: LatLng | undefined = s.card === "pickup" ? originPt : destPt;
   const progress = s.card === "booking" ? 0 : s.arrived ? 1 : s.legP;
@@ -71,7 +73,7 @@ export function TripCompactCard({
   return (
     <CardShell className="p-0">
       {showMap && mapFrom && mapTo && (
-        <button type="button" onClick={onOpen} aria-label="Open trip details" className="relative isolate block h-28 w-full overflow-hidden text-left">
+        <button type="button" onClick={onOpen} aria-label={w.compact.openDetails} className="relative isolate block h-28 w-full overflow-hidden text-left">
           <TripMap from={mapFrom} to={mapTo} laneKey={s.card === "pickup" ? undefined : `${origin}|${destination}`} progress={progress} showTruck={s.card !== "booking" && s.located} compact />
           <span className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-10 bg-gradient-to-t from-ink-950 to-transparent" />
           <span className="absolute left-3 top-3 z-10 flex items-center gap-2 rounded-full bg-ink-950/85 px-3 py-1.5 text-xs font-semibold backdrop-blur-sm">
@@ -86,7 +88,7 @@ export function TripCompactCard({
             <p className="text-xs font-semibold uppercase tracking-wider text-white/50">
               {kicker}{load.lane.moveKind ? ` · ${phase}` : ` · ${load.referenceNumber}`}
             </p>
-            <p className="shrink-0 text-sm font-semibold tabular">{s.card === "booking" ? formatCurrency(pay.sees ? load.bookedRate ?? load.targetRate : pay.yourPay(load)) : s.drive}</p>
+            <p className="shrink-0 text-sm font-semibold tabular">{s.card === "booking" ? formatCurrency(pay.sees ? load.bookedRate ?? load.targetRate : pay.yourPay(load)) : drive}</p>
           </div>
           <p className="mt-0.5 truncate text-xl font-semibold tracking-tight">{place}</p>
           {truckLabel && <p className="mt-0.5 truncate text-xs text-white/55">{truckLabel}{!showMap ? ` · ${status}` : ""}</p>}
@@ -96,17 +98,17 @@ export function TripCompactCard({
 
         <div className="mt-3 flex items-center justify-between gap-3">
           <p className="min-w-0 text-sm leading-snug">
-            <span className="text-white/50">Next </span>
-            <span className="font-medium">{driver ? s.next.title : waitingOn(s, driverName)}</span>
+            <span className="text-white/50">{w.compact.next} </span>
+            <span className="font-medium">{driver ? nextWords(w, s) : waitingOn(s, driverName)}</span>
             {s.next.owner === "ai" && <Loader2 className="ml-1.5 inline h-3.5 w-3.5 animate-spin text-white/50" />}
           </p>
           {action === "loaded" || action === "unloaded" ? (
-            <PillButton onClick={() => onTripStep(load.id, action)}>{action === "loaded" ? "I'm loaded" : "I'm unloaded"}</PillButton>
+            <PillButton onClick={() => onTripStep(load.id, action)}>{action === "loaded" ? w.imLoaded : w.imUnloaded}</PillButton>
           ) : action === "upload_bol" || action === "upload_pod" ? (
-            <DocumentSlot label={`Photo of ${docName}`} pagesKey={`${load.id}:${action === "upload_bol" ? "bol" : "pod"}`} onFile={(f) => onUpload(load.id, action === "upload_bol" ? "bol" : "pod", f)} />
+            <DocumentSlot label={w.photoOf(docName)} pagesKey={`${load.id}:${action === "upload_bol" ? "bol" : "pod"}`} onFile={(f) => onUpload(load.id, action === "upload_bol" ? "bol" : "pod", f)} />
           ) : action === "pretrip" ? (
             <div className="flex flex-wrap items-center gap-2">
-              <InspectionLink kind="pre_trip">Start</InspectionLink>
+              <InspectionLink kind="pre_trip">{w.start}</InspectionLink>
               <QuickPreTrip />
             </div>
           ) : null}
@@ -114,13 +116,13 @@ export function TripCompactCard({
 
         {s.arrived && (
           <div className="mt-2.5">
-            <DockTimer load={load} brokerName={props.brokerName} compact />
+            <DockTimer load={load} brokerName={props.brokerName} compact viewer={viewer} />
           </div>
         )}
 
         {load.liveCall && (
           <div className="mt-3">
-            <BrokerCallRow load={load} brokerName={props.brokerName ?? "the broker"} contactName={contact} onCall={() => {}} compact />
+            <BrokerCallRow load={load} brokerName={props.brokerName ?? w.theBroker} contactName={contact} onCall={() => {}} compact />
           </div>
         )}
 
@@ -128,9 +130,9 @@ export function TripCompactCard({
           <div className="mt-3">
             <SwipeToConfirm
               label={
-                action === "arrive" ? "Swipe when you arrive" : action === "start" ? "Swipe to start the trip" : "Swipe to complete delivery"
+                action === "arrive" ? w.swipeArrive : action === "start" ? w.swipeStart : w.swipeComplete
               }
-              disabledLabel={action === "arrive" ? undefined : lockReason(s, docName, s.card === "pickup" && needsPreTrip)}
+              disabledLabel={action === "arrive" ? undefined : lockReason(s, docName, s.card === "pickup" && needsPreTrip, w)}
               onConfirm={() => onConfirm(load.id)}
               chime={action === "complete" ? "delivered" : undefined}
             />
@@ -138,7 +140,7 @@ export function TripCompactCard({
         )}
 
         <button type="button" onClick={onOpen} className="mt-3 flex w-full items-center justify-center gap-1 rounded-full py-1.5 text-xs font-medium text-white/60 hover:text-white">
-          <ChevronUp className="h-3.5 w-3.5" /> Full details
+          <ChevronUp className="h-3.5 w-3.5" /> {w.compact.fullDetails}
         </button>
       </div>
     </CardShell>
@@ -152,6 +154,7 @@ export function TripCompactCard({
  */
 export function TripHeroMap(props: DriverTripCardProps) {
   const { load, needsPreTrip } = props;
+  const w = useTripText(props.viewer ?? "driver");
   const now = useNow();
   const s = tripState(load, now, needsPreTrip);
   const origin = `${load.lane.origin}, ${load.lane.originState}`;
@@ -160,8 +163,7 @@ export function TripHeroMap(props: DriverTripCardProps) {
   const destPt = cityCoords(load.lane.destination, load.lane.destState);
   const from: LatLng | undefined = s.card === "pickup" ? pickupLegStart(load, props.truckCity, props.truckState) : originPt;
   const to: LatLng | undefined = s.card === "pickup" ? originPt : destPt;
-  const status =
-    s.card === "booking" ? "Booking" : s.arrived ? (s.card === "pickup" ? "At the shipper" : "At the receiver") : s.card === "pickup" ? "Heading to pickup" : "Heading to delivery";
+  const status = s.card === "booking" ? w.booking : s.arrived ? (s.card === "pickup" ? w.atShipper : w.atReceiver) : s.card === "pickup" ? w.toPickup : w.toDelivery;
   if (!from || !to) return null;
   return (
     <div className="theme-ink relative isolate h-[44vh] min-h-64 w-full overflow-hidden bg-ink-950 text-white" aria-label={`${status}. ${s.card === "pickup" ? origin : destination}`} role="img">
@@ -171,7 +173,7 @@ export function TripHeroMap(props: DriverTripCardProps) {
         <span className="flex items-center gap-2 rounded-full bg-ink-950/80 px-3 py-1.5 text-xs font-semibold backdrop-blur-md">
           {s.card === "booking" ? <Loader2 className="h-3.5 w-3.5 animate-spin text-white/70" /> : <LiveDot />} {status}
         </span>
-        {s.card !== "booking" && <span className="rounded-full bg-ink-950/80 px-3 py-1.5 text-xs font-semibold tabular backdrop-blur-md">{s.drive}</span>}
+        {s.card !== "booking" && <span className="rounded-full bg-ink-950/80 px-3 py-1.5 text-xs font-semibold tabular backdrop-blur-md">{driveWords(w, s)}</span>}
       </div>
     </div>
   );
@@ -198,6 +200,7 @@ export function TripDetails({
   const events = useStore((s) => s.activity).filter((e) => e.loadId === load.id);
   const rate = load.bookedRate ?? load.targetRate;
   const pay = usePayView(props.viewer ?? "driver");
+  const w = useTripText(props.viewer ?? "driver");
   const activity = [...events, ...(events.length < 3 ? loadHistory(load, brokerName ?? "the broker", pay.sees ? rate : null) : [])]
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
     .slice(0, 10);
@@ -206,13 +209,13 @@ export function TripDetails({
     <>
       <DriverTripCard {...props} />
 
-      <Section title="Next load">
-        <AutoPickRow on={autoPick} onChange={onAutoPick} />
+      <Section title={w.details.nextLoad}>
+        <AutoPickRow on={autoPick} onChange={onAutoPick} viewer={props.viewer ?? "driver"} />
       </Section>
 
-      <Section title="What Backroute is doing" icon={<Sparkles className="h-3.5 w-3.5" />}>
+      <Section title={w.details.doing} icon={<Sparkles className="h-3.5 w-3.5" />}>
         {activity.length === 0 ? (
-          <p className="text-sm text-white/50">Nothing logged yet.</p>
+          <p className="text-sm text-white/50">{w.details.nothing}</p>
         ) : (
           <ol className="flex flex-col gap-3">
             {activity.map((e) => (
@@ -229,32 +232,32 @@ export function TripDetails({
         )}
       </Section>
 
-      <FuelPlanSection load={load} />
+      <FuelPlanSection load={load} viewer={props.viewer ?? "driver"} />
 
-      <Section title="Load">
+      <Section title={w.details.load}>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-          <Fact label="Broker" value={brokerName ?? "—"} />
-          <Fact label="Reference" value={load.referenceNumber} />
+          <Fact label={w.details.broker} value={brokerName ?? "—"} />
+          <Fact label={w.details.reference} value={load.referenceNumber} />
           {pay.sees ? (
             <>
-              <Fact label="Total rate" value={formatCurrency(rate)} />
-              <Fact label="Est. net" value={formatCurrency(load.netProfit ?? 0)} />
+              <Fact label={w.details.totalRate} value={formatCurrency(rate)} />
+              <Fact label={w.details.estNet} value={formatCurrency(load.netProfit ?? 0)} />
             </>
           ) : (
-            <Fact label="Your pay" value={formatCurrency(pay.yourPay(load))} />
+            <Fact label={w.details.yourPay} value={formatCurrency(pay.yourPay(load))} />
           )}
-          <Fact label="Loaded miles" value={`${load.lane.miles} mi`} />
-          <Fact label="Empty miles" value={`${load.deadheadMiles} mi`} />
-          <Fact label="Equipment" value={load.equipmentType} />
-          <Fact label="Weight" value={`${load.weight.toLocaleString()} lbs`} />
-          <Fact label="Pickup" value={load.pickupWindow} />
-          <Fact label="Delivery" value={load.deliveryWindow} />
+          <Fact label={w.details.loadedMiles} value={`${load.lane.miles} mi`} />
+          <Fact label={w.details.emptyMiles} value={`${load.deadheadMiles} mi`} />
+          <Fact label={w.details.equipment} value={load.equipmentType} />
+          <Fact label={w.details.weight} value={`${load.weight.toLocaleString()} lbs`} />
+          <Fact label={w.details.pickup} value={load.pickupWindow} />
+          <Fact label={w.details.delivery} value={load.deliveryWindow} />
         </dl>
       </Section>
 
-      <Section title="Documents">
+      <Section title={w.details.documents}>
         {load.documents.length === 0 ? (
-          <p className="text-sm text-white/50">No documents yet.</p>
+          <p className="text-sm text-white/50">{w.details.noDocs}</p>
         ) : (
           <ul className="flex flex-col gap-2.5">
             {load.documents.map((d) => (
@@ -265,7 +268,7 @@ export function TripDetails({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">{d.name}</p>
                   <p className="text-xs text-white/50">
-                    {d.status === "pending" ? "Reading it…" : d.aiNote ? `Checked: ${d.aiNote}` : d.uploadedBy === "driver" ? "Uploaded by driver" : "Made by Backroute"}
+                    {d.status === "pending" ? w.photo.reading : d.aiNote ? w.photo.checked(d.aiNote) : d.uploadedBy === "driver" ? w.details.byDriver : w.details.byBackroute}
                   </p>
                 </div>
               </li>
@@ -275,15 +278,16 @@ export function TripDetails({
       </Section>
 
       <Link href={loadHref} className="flex items-center justify-center gap-1 rounded-full bg-white/10 py-3 text-sm font-medium text-white hover:bg-white/15">
-        Open the full load page <ChevronRight className="h-4 w-4" />
+        {w.details.openFull} <ChevronRight className="h-4 w-4" />
       </Link>
     </>
   );
 }
 
 /** Where to buy fuel on the loaded run — the driver still decides; the AI just says where it's cheapest. */
-function FuelPlanSection({ load }: { load: DriverTripCardProps["load"] }) {
+function FuelPlanSection({ load, viewer }: { load: DriverTripCardProps["load"]; viewer: "driver" | "carrier" }) {
   const now = useNow();
+  const w = useTripText(viewer);
   const mpg = useStore((st) => st.trucks.find((t) => t.id === load.truckId)?.mpg ?? 6.5);
   // The prices behind it are sample numbers, so a real account doesn't get told where to fuel from them.
   const sample = useStore((st) => st.session.mode === "demo");
@@ -294,33 +298,28 @@ function FuelPlanSection({ load }: { load: DriverTripCardProps["load"] }) {
   if (!plan) return null;
 
   return (
-    <Section title="Fuel plan" icon={<Fuel className="h-3.5 w-3.5" />}>
-      <p className="text-sm">
-        Tank about {plan.startPct}% · {plan.milesLeft} loaded mi left · ~{plan.gallonsNeeded} gal at {mpg.toFixed(1)} mpg
-      </p>
+    <Section title={w.fuel.title} icon={<Fuel className="h-3.5 w-3.5" />}>
+      <p className="text-sm">{w.fuel.tank(plan.startPct, plan.milesLeft, plan.gallonsNeeded, mpg.toFixed(1))}</p>
       {plan.stops.length === 0 ? (
-        <p className="mt-2 text-sm text-white/60">No fuel stop needed. You&apos;ll finish this run with more than a quarter tank.</p>
+        <p className="mt-2 text-sm text-white/60">{w.fuel.noStop}</p>
       ) : (
         <ol className="mt-3 flex flex-col gap-2.5">
           {plan.stops.map((stop) => (
             <li key={`${stop.state}-${stop.milesAhead}`} className="flex items-start justify-between gap-3 rounded-2xl bg-white/5 px-3.5 py-2.5">
               <div className="min-w-0">
                 <p className="text-sm font-medium">{stop.chain}, {stop.stateName}</p>
-                <p className="text-xs text-white/55">About {stop.milesAhead} mi ahead · buy {stop.gallons} gal, not a full tank</p>
+                <p className="text-xs text-white/55">{w.fuel.ahead(stop.milesAhead, stop.gallons)}</p>
               </div>
               <p className="shrink-0 text-right text-sm font-semibold tabular">
                 ${stop.pricePerGal.toFixed(2)}
-                <span className="block text-xs font-normal text-white/50">with card</span>
+                <span className="block text-xs font-normal text-white/50">{w.fuel.withCard}</span>
               </p>
             </li>
           ))}
         </ol>
       )}
-      {plan.savings > 0 && <p className="mt-2 text-xs text-white/60">About {formatCurrency(plan.savings)} less than filling up wherever the tank hits a quarter.</p>}
-      <p className="mt-2 text-xs leading-relaxed text-white/45">
-        Prices are this week&apos;s state averages with the {Math.round(CARD_DISCOUNT * 100)}¢ fuel card discount, which varies by stop. Fuel tax evens out on
-        your IFTA return, so the savings are pump price and discount only, not tax.
-      </p>
+      {plan.savings > 0 && <p className="mt-2 text-xs text-white/60">{w.fuel.savings(formatCurrency(plan.savings))}</p>}
+      <p className="mt-2 text-xs leading-relaxed text-white/45">{w.fuel.note(Math.round(CARD_DISCOUNT * 100))}</p>
     </Section>
   );
 }

@@ -8,6 +8,7 @@ import { canCall, textTo } from "../channels/out";
 import { needAppointment } from "./appointments";
 import { pushToOffice } from "../push";
 import { addActivity, claimMark, logChannel, save, saveDriverMessage, type CarrierContext } from "./db";
+import { addReading } from "../ifta";
 import { event } from "./dispatcher";
 import { sendOrQueue } from "./outbox";
 import { routedEta } from "./routing";
@@ -245,6 +246,8 @@ export async function applyEld(ctx: CarrierContext, kind: EldKind, data: { vehic
             stoppedSince: stillSince(truck.position, v, truck.stoppedSince),
             ...(place ? { currentCity: place.city, currentState: place.state } : {}),
           }),
+      // Miles by state for IFTA, counted from one reading to the next (on personal conveyance too: IFTA counts every mile).
+      ...ifta(truck, v, place?.state),
       // The odometer only goes up: a reading lower than what's known (a swapped ECU) is left alone.
       ...(v.odometerMiles && v.odometerMiles >= (truck.odometer ?? 0) ? { odometer: v.odometerMiles, odometerAt: v.at } : {}),
       ...(data.faults ? { faults: await faultsFor(ctx, truck, kind, data.faults.filter((f) => sameUnit(truck.unitNumber, f.unit))) } : {}),
@@ -254,6 +257,12 @@ export async function applyEld(ctx: CarrierContext, kind: EldKind, data: { vehic
     trucks++;
   }
   return { trucks, drivers, unmatched };
+}
+
+/** The truck's IFTA state miles after this reading. */
+function ifta(truck: Truck, v: EldVehicle, state: string | undefined): Pick<Truck, "stateMiles" | "iftaTrack"> {
+  const r = addReading(truck.stateMiles, truck.iftaTrack, { lat: v.lat, lon: v.lon, at: v.at, ...(v.odometerMiles ? { odometer: v.odometerMiles } : {}), ...(state ? { state } : {}) });
+  return { stateMiles: r.quarters, iftaTrack: r.track };
 }
 
 /** The truck's open codes now: kept as first seen, new ones added; a new one that means stop reaches the owner at once. */

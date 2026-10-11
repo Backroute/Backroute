@@ -161,7 +161,12 @@ export default function CarrierOverviewPage() {
           <div className="mb-3 flex items-end justify-between gap-3">
             <div>
               <h2 id="live-loads-title" className="text-sm font-semibold text-ink-950">Live loads</h2>
-              <p className="mt-0.5 text-xs text-ink-500">Tap one for the trip, the log and the paperwork.</p>
+              <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink-500">
+                <span className="flex items-center gap-1"><StatusMark kind="moving" /> On the way</span>
+                <span className="flex items-center gap-1"><StatusMark kind="waiting" /> At a stop or booking</span>
+                <span className="flex items-center gap-1"><StatusMark kind="off" /> No GPS</span>
+                <span className="flex items-center gap-1"><StatusMark kind="needs_you" /> Late</span>
+              </p>
             </div>
             <Button href="/carrier/fleet" variant="ghost" size="sm">
               View fleet <ArrowUpRight className="h-3.5 w-3.5" />

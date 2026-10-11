@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { StatusMark } from "@/components/ui/mark";
 import { useNow } from "@/lib/hooks";
 import { stopDates } from "@/lib/load-dates";
@@ -29,7 +31,11 @@ function stateOf(load: Load, kind: "pickup" | "delivery"): Stop["state"] {
   if (done) return { mark: "done", word: kind === "pickup" ? "Picked up" : "Delivered" };
   if ((kind === "pickup" ? load.stage === "at_pickup" : load.stage === "at_delivery")) return { mark: "moving", word: "At the dock" };
   if (load.late?.stop === kind) return { mark: "needs_you", word: `Late, about ${load.late.eta}` };
-  return { mark: "moving", word: "On time" };
+  // Not dispatched yet: nobody is driving to it, so it can't be "on time".
+  if (load.stage === "rate_confirmed" || load.stage === "booked") return { mark: "waiting", word: load.stage === "booked" ? "Booked, not dispatched yet" : "Rate agreed, booking" };
+  // The delivery of a load that hasn't picked up yet is just on the calendar.
+  if (kind === "delivery" && !PICKED_UP.includes(load.stage)) return { mark: "off", word: "Scheduled" };
+  return { mark: "moving", word: kind === "pickup" ? "On the way" : "On the road" };
 }
 
 /**
@@ -41,6 +47,7 @@ export function TodayBoard() {
   const trucks = useTruckMap();
   const drivers = useDriverMap();
   const now = useNow();
+  const [showDone, setShowDone] = useState(false);
   if (now === null) return null;
 
   const stops: Stop[] = [];
@@ -67,6 +74,9 @@ export function TodayBoard() {
   const today = stops.filter((s) => s.relative === "Today");
   const shown = (today.length ? today : stops.filter((s) => s.relative === "Tomorrow")).sort((a, b) => a.at - b.at);
   const late = today.filter((s) => s.state.mark === "needs_you").length;
+  // Finished stops fold away under one line, so what's still ahead is what the owner sees.
+  const done = shown.filter((s) => s.state.mark === "done");
+  const ahead = shown.filter((s) => s.state.mark !== "done");
 
   return (
     <section aria-labelledby="today-title" className="rounded-3xl border border-line bg-white p-4 sm:p-5">
@@ -81,8 +91,20 @@ export function TodayBoard() {
       {shown.length === 0 ? (
         <p className="mt-2 text-sm text-ink-500">No pickups or deliveries today or tomorrow.</p>
       ) : (
-        <ol className="mt-3 flex flex-col">
-          {shown.map((s) => {
+        <>
+        {done.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowDone((v) => !v)}
+            aria-expanded={showDone}
+            className="mt-2 flex w-full items-center gap-1.5 rounded-xl px-1 py-1.5 text-xs font-medium text-ink-500 hover:text-ink-950"
+          >
+            <StatusMark kind="done" /> {done.length} done
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showDone ? "rotate-180" : ""}`} />
+          </button>
+        )}
+        <ol className="mt-1 flex flex-col">
+          {(showDone ? shown : ahead).map((s) => {
             const truck = s.load.truckId ? trucks.get(s.load.truckId) : undefined;
             const driver = truck?.driverId ? drivers.get(truck.driverId) : undefined;
             return (
@@ -109,6 +131,8 @@ export function TodayBoard() {
             );
           })}
         </ol>
+        {ahead.length === 0 && !showDone && <p className="mt-1 text-sm text-ink-500">Every stop is done.</p>}
+        </>
       )}
     </section>
   );
