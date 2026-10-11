@@ -1,5 +1,5 @@
 import type { Broker, Driver, Load, Truck, TruckGear } from "../types";
-import { isoToStopLocal } from "../stop-time";
+import { hourAtStop, isoToStopLocal } from "../stop-time";
 
 /**
  * The calls a seasoned dispatcher makes in a glance, written down: what makes a load worth more than the lane's usual
@@ -167,4 +167,72 @@ export function betterTwin(a: Load, b: Load, brokers: Pick<Broker, "id" | "avgDa
   if (rate(a) !== rate(b)) return rate(a) > rate(b) ? a : b;
   const days = (l: Load) => brokers.find((x) => x.id === l.brokerId)?.avgDaysToPay ?? 99;
   return days(a) <= days(b) ? a : b;
+}
+
+/**
+ * What the carrier's own history and the load's situation add on top (lib/agent/booking puts them with the rest):
+ * a lane paying more lately, a weekday that pays more on it, a broker who rarely pays detention, a dock known to keep
+ * trucks long, and a long empty run to the pickup (asked as dollars, the way dispatchers ask for deadhead).
+ */
+export function situationPremiums(o: {
+  trend?: { pct: number } | null;
+  weekday?: { pct: number; day: string } | null;
+  detentionPaidPct?: number | null;
+  slowDockHours?: number | null;
+  deadheadMiles?: number;
+  loadedMiles?: number;
+}): Premium & { deadheadDollars: number } {
+  const reasons: string[] = [];
+  let pct = 0;
+  if (o.trend && o.trend.pct >= 5) {
+    pct += 3;
+    reasons.push(`lane paying ${o.trend.pct}% more lately`);
+  }
+  if (o.weekday && o.weekday.pct >= 8) {
+    pct += 4;
+    reasons.push(`${o.weekday.day} pickups pay more on this lane`);
+  }
+  if (o.detentionPaidPct != null && o.detentionPaidPct < 50) {
+    pct += 3;
+    reasons.push("broker rarely pays detention");
+  }
+  if (o.slowDockHours && o.slowDockHours >= 3) {
+    pct += 4;
+    reasons.push(`a dock that keeps trucks about ${o.slowDockHours} hours`);
+  }
+  // Empty miles worth paying for: a long run to the pickup, compared to the load itself.
+  const dh = o.deadheadMiles ?? 0;
+  const deadheadDollars = dh >= 150 && o.loadedMiles && dh > o.loadedMiles * 0.4 ? round25(dh * 0.75) : 0;
+  if (deadheadDollars) reasons.push(`${Math.round(dh)} empty miles to the pickup`);
+  return { factor: 1 + pct / 100, reasons, deadheadDollars };
+}
+
+/**
+ * A lane the owner won't run, from Settings: "TX>CA" (that lane), ">CA" (into California from anywhere) or "NY>" (out
+ * of New York). The entry it matched, or null.
+ */
+export function laneAvoided(avoid: string[] | undefined, o: { originState: string; destinationState: string }): string | null {
+  for (const raw of avoid ?? []) {
+    const [from, to] = raw.toUpperCase().replace(/\s/g, "").split(">");
+    if ((!from || from === o.originState.toUpperCase()) && (!to || to === o.destinationState.toUpperCase()) && (from || to)) return raw;
+  }
+  return null;
+}
+
+/** A load that would run on a day the owner blocked for this truck (YYYY-MM-DD, the truck home or in the shop). */
+export function dayBlocked(blocked: string[] | undefined, pickupAt: number | null, miles: number): string | null {
+  if (!blocked?.length || !pickupAt) return null;
+  // Pickup day through the day it should deliver, at about 500 miles a day.
+  const days = Math.floor(miles / 500);
+  for (let i = 0; i <= days; i++) {
+    const d = new Date(pickupAt + i * 86400_000).toISOString().slice(0, 10);
+    if (blocked.includes(d)) return d;
+  }
+  return null;
+}
+
+/** A pickup earlier in the day than the driver said they start (their local hour at the dock). */
+export function beforeStart(startAfter: number | undefined, pickupAt: number | null, originState: string): boolean {
+  if (startAfter == null || !pickupAt) return false;
+  return hourAtStop(originState, pickupAt) < startAfter;
 }

@@ -82,3 +82,33 @@ export function memoryNote(loads: Load[], brokers: Broker[], load: Load): string
   if (load.market) out.push(`${load.market.source} has this lane at about $${load.market.rpm.toFixed(2)} a mile right now${load.market.high ? ` (up to $${load.market.high.toFixed(2)})` : ""}.`);
   return out.join(" ");
 }
+
+/**
+ * Whether a lane has been paying more or less lately: the carrier's last three weeks on it against the four months
+ * before, with at least two loads in each. Null when there isn't enough to say.
+ */
+export function laneTrend(loads: Load[], lane: { originState: string; destState: string }, now = Date.now()): { pct: number; recent: number; before: number } | null {
+  const same = loads.filter((l) => worked(l) && l.lane.originState === lane.originState && l.lane.destState === lane.destState);
+  const at = (l: Load) => Date.parse(l.pickupAt ?? l.updatedAt);
+  const recent = same.filter((l) => at(l) > now - 21 * DAY && at(l) <= now);
+  const before = same.filter((l) => at(l) <= now - 21 * DAY && at(l) > now - 120 * DAY);
+  if (recent.length < 2 || before.length < 2) return null;
+  const avg = (xs: Load[]) => xs.reduce((s, l) => s + l.bookedRate! / l.lane.miles, 0) / xs.length;
+  const r = avg(recent), b = avg(before);
+  return { pct: Math.round(((r - b) / b) * 100), recent: Math.round(r * 100) / 100, before: Math.round(b * 100) / 100 };
+}
+
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/**
+ * A day of the week that pays more on a lane, from the carrier's own loads: three or more picking up that day, against
+ * at least six on the lane in all. The percent over the lane's average, and the day's name.
+ */
+export function weekdayEdge(loads: Load[], lane: { originState: string; destState: string }, weekday: number, now = Date.now()): { pct: number; day: string } | null {
+  const same = loads.filter((l) => worked(l) && l.lane.originState === lane.originState && l.lane.destState === lane.destState && l.pickupAt && Date.parse(l.pickupAt) > now - 180 * DAY);
+  if (same.length < 6) return null;
+  const that = same.filter((l) => new Date(l.pickupAt!).getUTCDay() === weekday);
+  if (that.length < 3) return null;
+  const avg = (xs: Load[]) => xs.reduce((s, l) => s + l.bookedRate! / l.lane.miles, 0) / xs.length;
+  return { pct: Math.round(((avg(that) - avg(same)) / avg(same)) * 100), day: DAYS[weekday] };
+}

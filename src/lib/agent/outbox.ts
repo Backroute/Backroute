@@ -109,6 +109,8 @@ const LABEL: Record<DraftPurpose, string> = {
   capacity: "Tell them the truck is free",
   pass: "Pass on it politely",
   ack: "Send this note",
+  extra_pay: "Send the extra pay claim",
+  notice: "Send the notice",
 };
 
 const WHAT: Record<DraftPurpose, string> = {
@@ -129,6 +131,8 @@ const WHAT: Record<DraftPurpose, string> = {
   capacity: "Told a broker about a free truck:",
   pass: "Passed on a load from",
   ack: "Replied to",
+  extra_pay: "Claimed extra pay from",
+  notice: "Told the broker:",
 };
 
 /**
@@ -138,7 +142,7 @@ const WHAT: Record<DraftPurpose, string> = {
  */
 export function replyTo(ctx: Pick<CarrierContext, "carrier" | "settings">, purpose: DraftPurpose | undefined): string | undefined {
   const ours = ctx.carrier.inbound_key ? inboundAddress(ctx.carrier.inbound_key) : null;
-  const bill = purpose === "invoice" || purpose === "detention" || purpose === "layover" || purpose === "payment_reminder" || purpose === "tonu";
+  const bill = purpose === "invoice" || purpose === "detention" || purpose === "layover" || purpose === "extra_pay" || purpose === "payment_reminder" || purpose === "tonu";
   const list = [bill ? ctx.settings.remitEmail : null, ours].filter((a): a is string => !!a);
   return list.length ? [...new Set(list)].join(", ") : undefined;
 }
@@ -201,6 +205,7 @@ async function afterSent(ctx: CarrierContext, loadId: string, draft: DraftMessag
   else if (p === "tonu") next = { ...load, tonuClaimedAt: at };
   else if (p === "detention") next = { ...load, detentionClaims: (load.detentionClaims ?? []).map((c) => (c.sentAt ? c : { ...c, sentAt: at })) };
   else if (p === "layover") next = { ...load, layoverClaims: (load.layoverClaims ?? []).map((c) => (c.sentAt ? c : { ...c, sentAt: at })) };
+  else if (p === "extra_pay") next = { ...load, extraClaims: (load.extraClaims ?? []).map((c) => (c.sentAt || !c.draftedAt ? c : { ...c, sentAt: at })) };
   else if (p === "factoring" && load.invoice) next = { ...load, factoredAt: at, invoice: { ...load.invoice, sentAt: at, sentTo: draft.to } };
   else if (p === "claim" && load.claim) next = { ...load, claim: { ...load.claim, insurerSentAt: at } };
   else if (p === "payment_reminder" && load.invoice) next = { ...load, invoice: { ...load.invoice, remindedAt: [...(load.invoice.remindedAt ?? []), at] } };

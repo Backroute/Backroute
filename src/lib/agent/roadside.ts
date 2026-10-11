@@ -10,9 +10,12 @@ import { forCarrier } from "./scope";
 import { toE164 } from "../cloud/phone";
 import type { Item } from "../cloud/rows";
 import { placeCoords, roadMiles } from "../trip-geo";
+import { translateForDriver } from "../ai/translate";
+import { etaHours, longBreakdown, recoveryTruck } from "../road-exceptions";
+import { hourAtStop } from "../stop-time";
 import type { Driver, Load, MessageChannel, Roadside, RoadsideShop, Truck } from "../types";
 import { addActivity, claimMark, logChannel, save, saveDriverMessage, threadWith, type CarrierContext } from "./db";
-import { event, passToOwner as raise, uid } from "./dispatcher";
+import { event, passToOwner as raise, tellOwner, uid } from "./dispatcher";
 import { sendOrQueue } from "./outbox";
 import * as mail from "./templates";
 
@@ -20,7 +23,10 @@ import * as mail from "./templates";
  * A breakdown, handled the way a good dispatcher does it in the first ten minutes: find repair help near where the
  * truck actually is (the ELD position, or what the driver said), text the driver the nearest open shops, phone the
  * first one to see if they can come, tell the broker the load is delayed, and put the repair bill in front of the
- * owner. What the AI doesn't do: agree to a price for the repair, or tell the driver whether it's safe to drive.
+ * owner. When the carrier has a roadside plan or warranty line, the driver gets that number first. What the AI doesn't
+ * do: agree to a repair price over the owner's limit, or tell the driver whether it's safe to drive. When the repair
+ * won't be done today, breakdownFollowUps offers the owner a repower with another of their trucks, tells the broker,
+ * and sends the driver hotels nearby for the night.
  *
  * Shops come from Google Places (GOOGLE_PLACES_API_KEY, Places API (New) Text Search).
  */
@@ -163,6 +169,13 @@ export async function handleBreakdown(ctx: CarrierContext, driver: Driver, detai
   const lang = driver.prefs?.language ?? "en";
   const done: string[] = [];
 
+  // The carrier's own roadside plan or warranty line comes first: it's what they pay for.
+  const plan = ctx.settings.roadsidePlan;
+  if (plan?.phone) {
+    await textDriver(ctx, driver, await translateForDriver(`Your truck has roadside help with ${plan.name}: call ${plan.phone}${plan.account ? ` (account ${plan.account})` : ""} first. I'm looking up shops near you too.`, lang), "roadside_plan");
+    done.push(`gave ${driver.name.split(" ")[0]} the ${plan.name} number`);
+  }
+
   let shops: RoadsideShop[] = [];
   let towTried = false;
   if (placesConfigured()) {
@@ -223,9 +236,81 @@ export async function handleBreakdown(ctx: CarrierContext, driver: Driver, detai
     critical: noHelp,
   });
   await addActivity(ctx.carrier.id, event({ type: "incident", loadId: load?.id, message: `Truck ${truck.unitNumber} broke down`, detail: `${where.text} · ${details}`, severity: "danger" }));
+  if (noHelp && plan?.phone) return `Texted the driver ${plan.name}'s number (${plan.phone}) to call first; the office is finding a shop too. Tell them to stay safe: flashers on, triangles out.`;
   return noHelp
     ? "Couldn't look up repair shops; the office is finding one and will call the driver. Tell them to stay safe: flashers on, triangles out."
     : `Texted the driver ${shops.length} repair shop${shops.length === 1 ? "" : "s"} near them${calling ? ` and calling ${calling} now` : ""}. The owner and the broker know. Tell them to stay safe: flashers on, triangles out.`;
+}
+
+// ─── When the repair won't be done today ─────────────────────────────────────
+
+/**
+ * A breakdown that's turning into a long one (nobody can come, the shop said tomorrow, or three hours with no shop):
+ * the owner is offered a repower with their closest free truck, the broker hears what's happening with the load, and
+ * the driver gets hotels nearby when it's evening or the repair runs overnight. Each once per breakdown.
+ */
+export async function breakdownFollowUps(ctx: CarrierContext, now: number): Promise<string[]> {
+  const done: string[] = [];
+  for (const truck of ctx.trucks) {
+    const r = truck.roadside;
+    if (!r || now - Date.parse(r.at) > 36 * 3600_000) continue;
+    const why = longBreakdown(r, now);
+    if (!why) continue;
+    const load = r.loadId ? ctx.loads.find((l) => l.id === r.loadId && ROLLING.has(l.stage)) : undefined;
+    const driver = ctx.drivers.find((d) => d.id === r.driverId);
+    let followUp = { ...r.followUp };
+
+    if (load && !followUp.recoveryAt && (await claimMark(ctx.carrier.id, `truck:${truck.id}`, `recovery:${r.at}`))) {
+      const other = recoveryTruck(truck, ctx.trucks, ctx.loads, now);
+      const otherDriver = other ? ctx.drivers.find((d) => d.id === other.truck.driverId) : undefined;
+      await raise(ctx, {
+        reason: `${load.referenceNumber} is stuck with truck ${truck.unitNumber} near ${r.where}: ${why}. ${
+          other
+            ? `Truck ${other.truck.unitNumber}${otherDriver ? ` (${otherDriver.name})` : ""} is free ${other.miles} miles away in ${other.truck.currentCity}, ${other.truck.currentState}: send it to take the trailer and finish the load?`
+            : "None of your trucks is free within 300 miles: if the freight can't wait, the broker may send another carrier to recover it."
+        }`,
+        loadId: load.id,
+        label: "Decided",
+        source: "sms",
+        to: "owner",
+      });
+      const to = load.brokerContactEmail ?? ctx.brokers.find((b) => b.id === load.brokerId)?.email;
+      if (to && canEmail(ctx.carrier))
+        await sendOrQueue(ctx, {
+          purpose: "notice",
+          to,
+          subject: mail.subjectFor(load, "Breakdown update"),
+          body: `Hi,\n\nAn update on ${load.referenceNumber}: our truck is still down near ${r.where} and the repair won't be done soon (${why}). ${
+            other
+              ? `We can send another of our trucks, about ${other.miles} miles away, to take the trailer and finish the load; we'll confirm the new ETA shortly.`
+              : "If the freight can't wait, tell us and we'll have the trailer ready for another truck to recover it."
+          }\n\nThanks,\n${ctx.carrier.name}`,
+          loadId: load.id,
+          withinRules: true,
+          why: `Tell the broker ${load.referenceNumber} won't be moving soon?`,
+        });
+      followUp = { ...followUp, recoveryAt: new Date(now).toISOString(), ...(other ? { recoveryTruckId: other.truck.id } : {}) };
+      done.push(`${load.referenceNumber}: long breakdown, ${other ? `repower with ${other.truck.unitNumber} offered` : "no truck free to repower"}`);
+    }
+
+    const overnight = (etaHours(r.found?.eta) ?? 0) >= 12 || r.exhausted || hourAtStop(truck.currentState || "TX", now) >= 17;
+    if (driver && overnight && !followUp.hotelAt && placesConfigured() && (await claimMark(ctx.carrier.id, `truck:${truck.id}`, `hotel:${r.at}`))) {
+      const where = whereIs(truck, r.where, now);
+      const hotels = (await searchPlaces("hotel with truck parking", where.near, where.text).catch(() => [] as Place[])).filter((p) => p.phone).slice(0, 2);
+      if (hotels.length) {
+        const list = hotels.map((h) => `${h.name}${h.miles !== undefined ? `, ${h.miles} mi` : ""}: ${h.phone}`).join("; ");
+        await textDriver(ctx, driver, await translateForDriver(`The truck won't be fixed tonight. Hotels near you with room for a truck: ${list}. Call ahead, and send me the receipt.`, driver.prefs?.language ?? "en"), "roadside_hotel");
+        await tellOwner(ctx, { reason: `${driver.name} may need a hotel tonight near ${r.where} while truck ${truck.unitNumber} is down. Backroute sent them ${hotels.length === 1 ? "one" : "two"} nearby.`, loadId: r.loadId, label: "Got it", source: "sms" });
+        followUp = { ...followUp, hotelAt: new Date(now).toISOString() };
+        done.push(`sent ${driver.name.split(" ")[0]} hotels near ${r.where}`);
+      }
+    }
+    if (followUp.recoveryAt !== r.followUp?.recoveryAt || followUp.hotelAt !== r.followUp?.hotelAt) {
+      const fresh = ctx.trucks.find((t) => t.id === truck.id) ?? truck;
+      await saveRoadside(ctx, fresh, { ...fresh.roadside!, followUp });
+    }
+  }
+  return done;
 }
 
 // ─── The call to the shop ────────────────────────────────────────────────────

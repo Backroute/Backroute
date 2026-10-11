@@ -88,6 +88,8 @@ const BATCH_PURPOSES: Partial<Record<DraftPurpose, [string, string]>> = {
   ack: ["short reply", "short replies"],
   detention: ["detention claim", "detention claims"],
   layover: ["layover claim", "layover claims"],
+  extra_pay: ["extra pay claim", "extra pay claims"],
+  notice: ["notice to a broker", "notices to brokers"],
   tonu: ["TONU claim", "TONU claims"],
   payment_reminder: ["payment reminder", "payment reminders"],
   eta_update: ["ETA update", "ETA updates"],

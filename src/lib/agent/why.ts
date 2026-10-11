@@ -6,6 +6,7 @@ import { floorFor, learnedFor } from "./pricing";
 import { brokerMemory } from "./memory";
 import { learnedAsk } from "./ask-learning";
 import { reloadOutlook } from "./chain";
+import { dockHoursFor } from "./facilities";
 
 /**
  * Why the AI went for a load, in the owner's words: what it pays against their lowest and the market, the empty miles
@@ -28,7 +29,13 @@ export function whyBook(ctx: Pick<CarrierContext, "trucks" | "drivers" | "broker
     lines.push(`${parts.join("; ")}.`);
   }
   if (load.surchargePct) lines.push(`Asked ${load.surchargePct}% more because this broker is slow to pay.`);
-  if (load.premium?.pct) lines.push(`Asked ${load.premium.pct}% more: ${load.premium.reasons.join(", ")}.`);
+  if (load.premium?.pct || load.premium?.deadhead) lines.push(`Asked ${[load.premium.pct ? `${load.premium.pct}% more` : null, load.premium.deadhead ? `$${load.premium.deadhead} for the empty miles` : null].filter(Boolean).join(" and ")}: ${load.premium.reasons.join(", ")}.`);
+  // Pay for the truck's time, not just its miles: driving at about 50 mph, plus the docks (their usual times when known).
+  if (miles && load.netProfit != null) {
+    const docks = dockHoursFor(ctx.loads, load);
+    const hours = (load.deadheadMiles + miles) / 50 + (docks.pickup ?? 2) + (docks.delivery ?? 2);
+    lines.push(`Nets about ${money(load.netProfit / hours)} an hour of the truck's time (${Math.round(hours)} hours with the docks).`);
+  }
   // Empty miles to get there.
   const truck = ctx.trucks.find((t) => t.id === load.truckId);
   if (truck) lines.push(`${Math.round(load.deadheadMiles)} empty miles to the pickup for truck ${truck.unitNumber}${truck.currentCity ? ` from ${truck.currentCity}, ${truck.currentState}` : ""}.`);
@@ -65,7 +72,7 @@ export function whyBook(ctx: Pick<CarrierContext, "trucks" | "drivers" | "broker
     lines.push(`Best of ${others.length + 1} offers for this truck${best?.netProfit != null && load.netProfit != null ? `; the next best nets ${money(best.netProfit)} against ${money(load.netProfit)}` : ""}.`);
   }
   for (const w of load.scheduleWarnings ?? []) lines.push(w.text);
-  return lines.slice(0, 9);
+  return lines.slice(0, 10);
 }
 
 /** The why, stamped on the load. */

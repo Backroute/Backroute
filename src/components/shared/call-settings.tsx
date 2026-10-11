@@ -152,6 +152,21 @@ export function CallSettingsCard({ driver }: { driver: Driver }) {
         </select>
       </label>
 
+      <label className="mt-3 flex items-center justify-between gap-3 text-xs font-medium text-ink-800">
+        {t.earliestPickup}
+        <select
+          value={prefs.startAfter ?? ""}
+          onChange={(e) => setDriverPrefs(driver.id, { startAfter: e.target.value === "" ? undefined : Number(e.target.value) })}
+          className="rounded-full border border-line bg-white px-2.5 py-1 text-xs outline-none focus:border-ink-400"
+        >
+          {EARLIEST.map((h) => (
+            <option key={h ?? "any"} value={h ?? ""}>
+              {h === undefined ? t.anyTimeOnDuty : L.hour(h)}
+            </option>
+          ))}
+        </select>
+      </label>
+
       <p className="mt-4 text-xs font-medium text-ink-800">{t.dontSend}</p>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {([

@@ -172,6 +172,9 @@ export interface Driver {
   /** Driver Settlement AI: how pay is computed. Local drivers are usually paid by the hour. */
   payType: "percentage" | "per_mile" | "hourly" | "per_move";
   payRate: number;
+  /** The driver's share of extra pay collected for work they did (tarping, driver assist, a redelivery, miles out of
+   *  route), 0-1. Unset: a percentage driver gets their percentage; others get none unless the owner sets it. */
+  extraShare?: number;
   /** Last time someone at the carrier actually talked with this driver, as logged on the Fleet page. */
   lastCheckInAt?: string;
   /** Carrier told the AI to put getting this driver home ahead of the best-paying load. */
@@ -237,6 +240,8 @@ export interface DriverPrefs {
   avoidCities?: string[];
   /** The driver won't load or unload freight by hand (driver assist, touch freight). */
   noTouchFreight?: boolean;
+  /** The earliest hour (0–23, at the dock) the driver wants a pickup. */
+  startAfter?: number;
   /** New-load options by phone call, or just a text. */
   newLoads?: "call" | "text";
   /** Where calls and texts go: the app, or a regular phone call and SMS for drivers who won't use an app. */
@@ -310,6 +315,8 @@ export interface Truck {
   currentCity: string;
   currentState: string;
   homeBase: string;
+  /** Days the owner kept this truck off the board (YYYY-MM-DD): home time, the shop. No load is booked across them. */
+  blockedDays?: string[];
   /** The gear the owner says this truck carries. Unset: not listed, so loads aren't checked against it. */
   gear?: TruckGear[];
   /** Real accounts with an ELD connected: where the truck actually is, and when that was read. */
@@ -415,6 +422,8 @@ export interface Roadside {
   exhausted?: boolean;
   /** The AI moved on to heavy-duty towing after the repair shops. */
   towTried?: boolean;
+  /** A repair that won't be done today: when the owner was offered a repower (and with which truck), and hotels sent. */
+  followUp?: { recoveryAt?: string; recoveryTruckId?: string; hotelAt?: string };
 }
 
 /** One checklist item in a DVIR (Driver Vehicle Inspection Report). */
@@ -731,7 +740,11 @@ export interface Load {
   /** Times the broker posted this same load again after we first saw it (they're short of trucks). */
   repostCount?: number;
   /** Asked this much more for the load, and why (weekend pickup, hazmat, posted again; lib/agent/judgment). */
-  premium?: { pct: number; reasons: string[] };
+  premium?: { pct: number; reasons: string[]; /** Dollars added for a long empty run to the pickup. */ deadhead?: number };
+  /** The broker asked to be called back: when. The AI calls again then, once. */
+  callBackAt?: string;
+  /** The driver's hours from the ELD when the load was booked on them, and the driving it needs: kept for an audit. */
+  hoursCheck?: { at: string; driverId: string; drive: number; shift: number; cycle: number; read: string; source: string; needsDriving: number };
   /** The same freight offered by another broker: that load's id. The AI asks for the better paying one. */
   twinId?: string;
   /** Appointment times (or first come, first served), as the broker said them on the phone. */
@@ -764,6 +777,13 @@ export interface Load {
   appointments?: Partial<Record<"pickup" | "delivery", FacilityAppointment>>;
   /** Layover claims: the truck held overnight at a stop (lib/agent/layover). */
   layoverClaims?: LayoverClaim[];
+  /** Extra pay for work beyond the haul the driver reported (tarping, driver assist, a scale, a redelivery, miles
+   *  out of route, reefer fuel), claimed from the broker and billed on the invoice (lib/agent/extras). */
+  extraClaims?: ExtraClaim[];
+  /** Something went wrong with the freight itself: refused at delivery, not what the paperwork says, stolen (lib/agent/extras). */
+  exception?: { kind: LoadExceptionKind; at: string; details: string; brokerToldAt?: string };
+  /** Real accounts: the last distance from the truck to the stop it's heading for, from the ELD, to catch a wrong turn. */
+  heading?: { stop: "pickup" | "delivery"; miles: number; at: string };
   /** A change the broker asked for after booking (an added stop, a new delivery), priced by the AI (lib/agent/changes). */
   change?: LoadChange;
   /** A cargo claim (damage, shortage) and the file the AI keeps for it (lib/agent/claims). */
@@ -939,7 +959,7 @@ export interface DraftMessage {
  */
 export type OwnerRule = "tonu_default" | "detention_default" | "invoice_noted_pod" | "replies" | "portal_setup" | "reposition";
 
-export type DraftPurpose = "reply" | "book_request" | "counter" | "accept" | "setup_packet" | "invoice" | "detention" | "layover" | "change" | "claim" | "factoring" | "payment_reminder" | "tonu" | "eta_update" | "capacity" | "pass" | "ack";
+export type DraftPurpose = "reply" | "book_request" | "counter" | "accept" | "setup_packet" | "invoice" | "detention" | "layover" | "change" | "claim" | "factoring" | "payment_reminder" | "tonu" | "eta_update" | "capacity" | "pass" | "ack" | "extra_pay" | "notice";
 
 export interface DriverMessage {
   id: string;
@@ -1210,7 +1230,7 @@ export interface LoadChange {
 export interface CargoClaim {
   openedAt: string;
   /** Who raised it: the broker or shipper in writing, or the AI from a POD with exceptions. */
-  source: "broker" | "pod";
+  source: "broker" | "pod" | "driver";
   kind: "damage" | "shortage" | "loss" | "other";
   amount?: number;
   details: string;
@@ -1222,6 +1242,24 @@ export interface CargoClaim {
   packetFileId?: string;
   packetAt?: string;
   insurerSentAt?: string;
+}
+
+export type ExtraKind = "driver_assist" | "tarp" | "scale" | "redelivery" | "out_of_route" | "reefer_fuel";
+export type LoadExceptionKind = "refused" | "wrong_freight" | "theft";
+
+export interface ExtraClaim {
+  id: string;
+  kind: ExtraKind;
+  /** What the driver said happened, in a sentence. */
+  detail: string;
+  /** A receipt's total (a scale ticket, reefer fuel) or what was worked out (miles × rate); unset until known. */
+  amount?: number;
+  /** Where the amount came from: the rate con, the owner's price list, a receipt, the load's own per-mile rate. */
+  basis?: "rate_con" | "owner" | "receipt" | "per_mile";
+  miles?: number;
+  at: string;
+  draftedAt?: string;
+  sentAt?: string;
 }
 
 export interface DetentionClaim {

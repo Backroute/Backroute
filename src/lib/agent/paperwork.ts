@@ -7,6 +7,7 @@ import { claimMark, latestFiles, releaseMark, save, storeFile, type CarrierConte
 import { passToOwner } from "./dispatcher";
 import { sendOrQueue } from "./outbox";
 import * as mail from "./templates";
+import { EXTRA_LABEL } from "../road-exceptions";
 import { carrierRecord, recordLine } from "./record";
 import { portalOn, queuePortalTask } from "../portal/tasks";
 
@@ -113,6 +114,7 @@ function invoiceLines(load: Load): { label: string; amount: number }[] {
   const lines = [{ label: "Line haul, all in", amount: load.bookedRate ?? 0 }];
   for (const c of load.detentionClaims ?? []) if (c.sentAt && c.amount > 0) lines.push({ label: `Detention at ${c.stop} (${Math.round(c.minutes / 6) / 10} hours, claimed ${c.sentAt.slice(0, 10)})`, amount: c.amount });
   for (const c of load.layoverClaims ?? []) if (c.sentAt && c.amount > 0) lines.push({ label: `Layover at ${c.stop} (${c.days} day${c.days === 1 ? "" : "s"}, claimed ${c.sentAt.slice(0, 10)})`, amount: c.amount });
+  for (const c of load.extraClaims ?? []) if (c.sentAt && c.amount) lines.push({ label: `${EXTRA_LABEL[c.kind]}${c.miles ? ` (${c.miles} miles)` : ""}, claimed ${c.sentAt.slice(0, 10)}`, amount: c.amount });
   if (load.change?.status === "agreed" && load.change.extra > 0) lines.push({ label: load.change.kind === "reroute" ? `Reroute (${load.change.extraMiles} extra miles)` : `Extra stop${load.change.places.length === 1 ? "" : "s"} (${load.change.places.map((p) => `${p.city}, ${p.state}`).join("; ")})`, amount: load.change.extra });
   for (const d of load.documents) if (d.type === "lumper_receipt" && d.amount && d.fileId) lines.push({ label: "Lumper (receipt attached)", amount: d.amount });
   return lines;
@@ -309,6 +311,68 @@ export async function sendDetentionClaims(ctx: CarrierContext, now: number): Pro
       } catch (error) {
         console.error("[paperwork] detention failed", load.id, error);
         await releaseMark(ctx.carrier.id, load.id, `detention_${d.stop}`);
+      }
+    }
+  }
+  return done;
+}
+
+/**
+ * Free time ran out with the truck still at the dock: the broker hears it then, in writing, while they can still push
+ * the shipper or receiver (and so the detention claim later isn't a surprise). Once per stop; not for a truck that got
+ * there late, which isn't owed detention.
+ */
+export async function freeTimeNotices(ctx: CarrierContext, now: number): Promise<string[]> {
+  const done: string[] = [];
+  for (const load of ctx.loads) {
+    if (!["dispatched", "at_pickup", "in_transit", "at_delivery"].includes(load.stage) || load.imported) continue;
+    const c = load.tripChecklist;
+    for (const stop of ["pickup", "delivery"] as const) {
+      const arrived = stop === "pickup" ? c?.arrivedPickupAt : c?.arrivedDeliveryAt;
+      const left = stop === "pickup" ? (c?.leftPickupAt ?? c?.loadedAt) : (c?.leftDeliveryAt ?? c?.unloadedAt);
+      if (!arrived || left || c?.detentionNoticeSent?.includes(stop)) continue;
+      const due = stop === "pickup" ? load.pickupAt : load.deliveryAt;
+      const a = Date.parse(arrived);
+      if (due && a > Date.parse(due) + 30 * 60_000) continue;
+      const start = Math.max(a, due ? Date.parse(due) : a);
+      const terms = detentionTerms(load.rateConReading?.detention);
+      const freeHours = terms.freeHours ?? FREE_HOURS;
+      const over = now - start - freeHours * HOUR;
+      // Only while it's news: a stop that ran out of free time half a day ago is the detention claim's job.
+      if (over < 0 || over > 6 * HOUR) continue;
+      const to = billTo(ctx, load);
+      if (!to || !(await claimMark(ctx.carrier.id, load.id, `free_time_${stop}`))) continue;
+      try {
+        const state = stop === "pickup" ? load.lane.originState : load.lane.destState;
+        const place = stop === "pickup" ? `${load.lane.origin}, ${load.lane.originState}` : `${load.lane.destination}, ${load.lane.destState}`;
+        const perHour = terms.perHour ?? ctx.settings.detentionPerHour ?? DEFAULT_DETENTION_PER_HOUR;
+        const broker = brokerOf(ctx, load);
+        const body = `Hi${broker?.contact ? ` ${broker.contact}` : ""},
+
+Our truck on ${load.referenceNumber} got to ${stop} in ${place} at ${formatAtStop(arrived, state)}${due ? `, on time for the ${formatAtStop(due, state)} appointment` : ""}, and is still waiting to be ${stop === "pickup" ? "loaded" : "unloaded"}.
+
+Free time (${freeHours} hours) ran out at ${formatAtStop(new Date(start + freeHours * HOUR).toISOString(), state)}. Detention starts now at $${perHour}/hour${terms.perHour ? ", per the rate confirmation" : ""}. Please let the ${stop === "pickup" ? "shipper" : "receiver"} know, and confirm the detention.
+
+Thanks,
+${ctx.carrier.name}`;
+        const result = await sendOrQueue(ctx, {
+          purpose: "notice",
+          to,
+          toName: broker?.contact || undefined,
+          subject: mail.subjectFor(load, "Detention starting"),
+          body,
+          loadId: load.id,
+          withinRules: true,
+          why: `${load.referenceNumber} is past free time at ${stop}. Tell the broker detention has started?`,
+        });
+        const current = ctx.loads.find((l) => l.id === load.id) ?? load;
+        const next: Load = { ...current, tripChecklist: { ...current.tripChecklist, detentionNoticeSent: [...(current.tripChecklist?.detentionNoticeSent ?? []), stop] }, updatedAt: new Date(now).toISOString() };
+        await save("loads", ctx.carrier.id, next as unknown as Item);
+        ctx.loads = ctx.loads.map((l) => (l.id === load.id ? next : l));
+        done.push(`${load.referenceNumber}: free time over at ${stop}, broker notice ${result}`);
+      } catch (error) {
+        console.error("[paperwork] free-time notice failed", load.id, error);
+        await releaseMark(ctx.carrier.id, load.id, `free_time_${stop}`);
       }
     }
   }

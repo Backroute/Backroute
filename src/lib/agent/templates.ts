@@ -33,6 +33,8 @@ function askReason(load: Load): string {
     r.includes("hazmat") ? "hazmat" : null,
     r.includes("high-value freight") ? "high-value freight" : null,
     r.includes("driver handles the freight") ? "driver assist" : null,
+    r.some((x) => x.startsWith("a dock that keeps trucks")) ? "a slow dock" : null,
+    load.premium?.deadhead ? `the ${Math.round(load.deadheadMiles)} empty miles to get there` : null,
   ].filter(Boolean) as string[];
   if (!said.length) return "";
   const list = said.length === 1 ? said[0] : `${said.slice(0, -1).join(", ")} and ${said.at(-1)}`;

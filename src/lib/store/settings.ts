@@ -34,8 +34,14 @@ export interface AgentSettings {
   fuelPrices?: FuelPrices;
   /** Who the carrier factors with ("RTS Financial"), shown in Settings → Integrations. */
   factoringCompany?: string;
+  /** Lanes the owner won't run: "TX>CA", ">CA" (into a state from anywhere) or "NY>" (out of a state). */
+  avoidLanes?: string[];
   /** Repairs on the road the AI may okay with the shop without asking, in dollars. Unset or 0: the owner approves every one. */
   repairLimit?: number;
+  /** A roadside assistance plan or warranty line the driver calls first on a breakdown. */
+  roadsidePlan?: { name: string; phone: string; account?: string };
+  /** What the owner charges brokers for work beyond the haul when the rate con doesn't say: a flat amount each. */
+  extraPay?: Partial<Record<"driver_assist" | "tarp" | "redelivery", number>>;
   /** Ask more for a weekend pickup, short notice, hazmat, high-value or touch freight, and a load posted again. On unless turned off. */
   askPremiums?: boolean;
   /** What the owner wants each truck to gross in a week: the report card measures against it. */

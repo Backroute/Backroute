@@ -1,9 +1,11 @@
 import { computeDriverPay } from "./settlements";
+import { extraPayLines } from "./road-exceptions";
 import type { Advance, Driver, Expense, Load, PayRun, Truck } from "./types";
 
 /**
  * Driver pay, week by week, the way a bookkeeper runs it: the loads each driver delivered that week at their pay
- * rate, plus what the carrier owes them back (approved lumpers, scales, parking), minus their deductions (insurance,
+ * rate, their share of extra pay the broker was billed for their work (tarping, driver assist, a redelivery, miles out
+ * of route), plus what the carrier owes them back (approved lumpers, scales, parking), minus their deductions (insurance,
  * ELD, a truck lease), any advance they took, and escrow held back up to its cap. Paid runs are what the 1099 adds up
  * at year end.
  */
@@ -48,18 +50,21 @@ export function buildPayRun(input: {
   const end = weekEnd(period);
   const others = input.runs.filter((r) => !(r.driverId === driver.id && r.period === period));
   const paidLoads = new Set(others.flatMap((r) => r.lines.map((x) => x.loadId)));
-  const lines = loadsFor(driver, input.loads, input.trucks, period)
-    .filter(({ l }) => !paidLoads.has(l.id))
+  const theirs = loadsFor(driver, input.loads, input.trucks, period).filter(({ l }) => !paidLoads.has(l.id));
+  const lines = theirs
     .map(({ l, truck }) => ({
       loadId: l.id,
       ref: l.referenceNumber,
       lane: `${l.lane.origin}, ${l.lane.originState} → ${l.lane.destination}, ${l.lane.destState}`,
       pay: computeDriverPay(l, driver, !!truck?.secondDriverId),
     }));
-  const extras = input.expenses
+  const extras = [
+    ...theirs.flatMap(({ l, truck }) => extraPayLines(l, driver, !!truck?.secondDriverId)),
+    ...input.expenses
     // Paid by the company up front (a lumper code, a reserved parking spot): nothing came out of the driver's pocket.
     .filter((e) => e.driverId === driver.id && e.status === "approved" && !e.upfront && (e.respondedAt ?? e.createdAt).slice(0, 10) <= end && (e.respondedAt ?? e.createdAt).slice(0, 10) >= period)
-    .map((e) => ({ label: `${e.category[0].toUpperCase()}${e.category.slice(1)} reimbursed${e.note ? `: ${e.note}` : ""}`, amount: e.amount }));
+    .map((e) => ({ label: `${e.category[0].toUpperCase()}${e.category.slice(1)} reimbursed${e.note ? `: ${e.note}` : ""}`, amount: e.amount })),
+  ];
   const gross = round(lines.reduce((s, x) => s + x.pay, 0) + extras.reduce((s, x) => s + x.amount, 0));
 
   // Deductions that repeat come out of every run with pay in it; one-time ones out of the first.

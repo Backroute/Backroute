@@ -70,7 +70,9 @@ export async function callBroker(ctx: CarrierContext, load: Load, url: string | 
  * whether it's still available. The price comes after, once the broker names theirs or asks for ours.
  */
 export function brokerCallOpening(ctx: CarrierContext, load: Load): string {
-  return `Hi, this is the AI dispatcher for ${ctx.carrier.name}${ctx.carrier.mc ? `, MC ${ctx.carrier.mc.replace(/\D/g, "").split("").join(" ")}` : ""}. This call is transcribed. I'm calling on your ${load.lane.origin} to ${load.lane.destination} load, ${load.referenceNumber}, picking up ${when(load.pickupWindow)}. Is it still available?`;
+  // The rep who posted it or wrote to us, asked for by name, the way a dispatcher does.
+  const rep = ctx.brokers.find((b) => b.id === load.brokerId)?.contact?.trim().split(/\s+/)[0];
+  return `Hi${rep && /^[A-Z][a-z]+$/.test(rep) ? `, is ${rep} there? This` : ", this"} is the AI dispatcher for ${ctx.carrier.name}${ctx.carrier.mc ? `, MC ${ctx.carrier.mc.replace(/\D/g, "").split("").join(" ")}` : ""}. This call is transcribed. I'm calling on your ${load.lane.origin} to ${load.lane.destination} load, ${load.referenceNumber}, picking up ${when(load.pickupWindow)}. Is it still available?`;
 }
 
 /** A broker calling back the number the AI called them from: pick up where that call left off. */
@@ -407,6 +409,15 @@ export async function brokerCallTurn(ctx: CarrierContext, load: Load, said: stri
 export async function followUpByPhone(ctx: CarrierContext, now: number, urlFor: (loadId: string) => string | null): Promise<string[]> {
   const done: string[] = [];
   for (const load of ctx.loads) {
+    // A broker who asked to be called back: at the time they said, once, while we're still waiting on them.
+    if (load.callBackAt && load.stage === "negotiating") {
+      if (Date.parse(load.callBackAt) > now) continue;
+      const next: Load = { ...load, callBackAt: undefined, updatedAt: new Date(now).toISOString() };
+      await save("loads", ctx.carrier.id, next as unknown as Item);
+      ctx.loads = ctx.loads.map((l) => (l.id === next.id ? next : l));
+      if (await callBroker(ctx, next, urlFor(load.id))) done.push(`${load.referenceNumber}: called the broker back as they asked`);
+      continue;
+    }
     const req = load.bookRequest;
     const soon = !!load.pickupAt && Date.parse(load.pickupAt) - now < 24 * 3600_000;
     const wait = (soon ? 10 : 30) * 60_000;
@@ -418,6 +429,22 @@ export async function followUpByPhone(ctx: CarrierContext, now: number, urlFor: 
 }
 
 const SORRY = "Sorry, I'll have someone from the office follow up by email. Thanks.";
+
+const WORD_MINUTES: Record<string, number> = { a: 5, couple: 5, few: 10, five: 5, ten: 10, fifteen: 15, twenty: 20, thirty: 30, "half an": 30, an: 60 };
+
+/**
+ * "Call me back in ten", "give me fifteen minutes", "try me in half an hour", "call back later": the minutes to wait
+ * (later or "in a bit" is 15), or null when they didn't ask for a call back.
+ */
+export function callBackIn(said: string): number | null {
+  const m = said.match(/\b(?:call|ring|try)(?: me| us)? back (?:in )?(?:about |like )?(\d{1,3}|a few|a couple|five|ten|fifteen|twenty|thirty|half an|an) ?(minutes?|mins?|hours?)?\b|\bgive me (\d{1,3}|five|ten|fifteen|twenty|thirty) ?(minutes?|mins?)\b|\btry me (?:again )?in (\d{1,3}|five|ten|fifteen|twenty|thirty|half an|an) ?(minutes?|mins?|hours?)\b/i);
+  if (!m) return /\b(call|ring|try)(?: me| us)? back (later|in a bit|in a little)\b/i.test(said) ? 15 : null;
+  const n = (m[1] ?? m[3] ?? m[5])!.toLowerCase();
+  const unit = (m[2] ?? m[4] ?? m[6] ?? "minutes").toLowerCase();
+  const v = /^\d+$/.test(n) ? Number(n) : (WORD_MINUTES[n.replace(/^a /, "")] ?? 15);
+  const minutes = unit.startsWith("hour") ? (/^\d+$/.test(n) ? v * 60 : n === "half an" ? 30 : 60) : v;
+  return Math.max(5, Math.min(minutes, 240));
+}
 
 /** One turn of a call with a broker, by either kind of call: logged, answered inside the rules. */
 export function brokerCallReply(ctx: CarrierContext, load: Load, callSid: string, said: string, data: Record<string, unknown> = {}): Promise<CallReply> {
@@ -434,6 +461,18 @@ async function brokerCallAnswer(ctx: CarrierContext, load: Load, callSid: string
     return tree;
   }
   await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "in", counterparty: key, body: said, data: { kind: "broker_call", loadId: load.id, ...data } });
+  // "Call me back in ten": the AI says it will, hangs up, and calls again then (once).
+  const later = callBackIn(said);
+  if (later !== null && (await claimMark(ctx.carrier.id, load.id, `call_back:${new Date().toISOString().slice(0, 13)}`))) {
+    const at = new Date(Date.now() + later * 60_000).toISOString();
+    const next: Load = { ...load, callBackAt: at, updatedAt: new Date().toISOString() };
+    await save("loads", ctx.carrier.id, next as unknown as Item);
+    ctx.loads = ctx.loads.map((l) => (l.id === next.id ? next : l));
+    await releaseMark(ctx.carrier.id, load.id, "broker_call");
+    const bye = `Sure thing, I'll call you back in about ${later} minutes. Thanks.`;
+    await logChannel({ carrierId: ctx.carrier.id, channel: "voice", direction: "out", counterparty: key, body: bye, data: { kind: "broker_call", loadId: load.id } });
+    return { reply: bye, hangUp: true };
+  }
   // "I don't talk to robots": fine. The AI says it'll email, does, and never calls them again.
   if (NO_AI.test(said)) {
     const broker = ctx.brokers.find((b) => b.id === load.brokerId);

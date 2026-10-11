@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { useMounted } from "@/lib/hooks";
 import { markSample } from "@/components/cloud/sample-fleet";
 import { formatAtStop } from "@/lib/stop-time";
+import { EXTRA_LABEL } from "@/lib/road-exceptions";
 import type { Load } from "@/lib/types";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -40,6 +41,9 @@ function stepsOf(load: Load, names: { broker?: string; driver?: string }): { ste
   const delivered = load.stage === "delivered";
   const pickedUp = !!load.tripChecklist?.loadedAt || ["in_transit", "at_delivery", "delivered"].includes(load.stage);
 
+  const extras = (load.extraClaims ?? [])
+    .map((c) => `${EXTRA_LABEL[c.kind].split(" (")[0]}${c.amount ? ` ${formatCurrency(c.amount)}` : ""}${c.sentAt ? " claimed" : " to claim"}`)
+    .join(", ");
   const steps: Step[] = [
     {
       key: "offer",
@@ -65,7 +69,9 @@ function stepsOf(load: Load, names: { broker?: string; driver?: string }): { ste
       at: booked ? (rateCon?.generatedAt ?? load.updatedAt) : undefined,
       who: booked ? "broker" : undefined,
       whoLabel: booked ? `${broker} confirmed` : undefined,
-      detail: booked && load.bookedRate ? `${formatCurrency(load.bookedRate)} all in` : undefined,
+      detail: booked && load.bookedRate
+        ? `${formatCurrency(load.bookedRate)} all in${load.hoursCheck ? ` · ${driver} had ${load.hoursCheck.drive} h to drive, ${load.hoursCheck.cycle} h left on the week (${load.hoursCheck.source}); the load needs about ${load.hoursCheck.needsDriving} h` : ""}`
+        : undefined,
     },
     {
       key: "ratecon",
@@ -91,7 +97,7 @@ function stepsOf(load: Load, names: { broker?: string; driver?: string }): { ste
       at: delivered ? (load.tripChecklist?.unloadedAt ?? load.deliveryAt ?? load.updatedAt) : undefined,
       who: delivered ? "driver" : undefined,
       whoLabel: delivered ? driver : undefined,
-      detail: delivered ? (pod ? "Proof of delivery in" : "Waiting on the proof of delivery") : undefined,
+      detail: delivered ? `${pod ? "Proof of delivery in" : "Waiting on the proof of delivery"}${extras ? ` · ${extras}` : ""}` : extras || undefined,
     },
     {
       key: "invoiced",
@@ -114,6 +120,12 @@ function stepsOf(load: Load, names: { broker?: string; driver?: string }): { ste
         : undefined,
     },
   ];
+  if (load.exception) {
+    const x = load.exception;
+    const title = x.kind === "refused" ? "Refused at delivery" : x.kind === "wrong_freight" ? "Freight didn't match" : "Reported stolen";
+    const after = x.kind === "wrong_freight" ? "ratecon" : "pickup";
+    steps.splice(steps.findIndex((s) => s.key === after) + 1, 0, { key: "exception", title, at: x.at, who: "driver", whoLabel: driver, detail: `${x.details}${x.brokerToldAt ? ` · ${broker} told in writing` : ""}` });
+  }
   const ended = load.stage === "declined" ? (req?.passedAt ? "Let go: the broker wouldn't come up to your lowest." : "Let go: it didn't work out with the broker.") : undefined;
   return { steps, ended };
 }

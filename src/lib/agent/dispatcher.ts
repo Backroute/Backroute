@@ -16,6 +16,7 @@ import { decideItem } from "./decide";
 import { dollarAmounts } from "./pricing";
 import { NEARBY, findNearby, handleBreakdown } from "./roadside";
 import { recordFeedback } from "./care";
+import { claimExtra, loadException } from "./extras";
 import { LOAD_STAGE_LABEL, LOAD_STAGE_ORDER, type ActivityEvent, type Driver, type Escalation, type Load, type LoadStage, type MessageChannel } from "../types";
 import type { Item } from "../cloud/rows";
 import { addActivity, save, type CarrierContext } from "./db";
@@ -151,9 +152,9 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: Talk, effects
     betaZodTool({
       name: "report_problem",
       description:
-        "Tell the owner about a problem on the road: breakdown, accident, running late, weather, a problem at the dock, a safety concern. For a crash, injury or danger, set urgent and tell the driver to call 911 first.",
+        "Tell the owner about a problem on the road: breakdown, accident, running late, weather, a problem at the dock, a safety concern; the receiver refusing the load (refused), freight at pickup that isn't what the paperwork says (wrong_freight), or the load or trailer stolen (theft). For a crash, injury, theft or danger, set urgent and tell the driver to call 911 first.",
       inputSchema: z.object({
-        kind: z.enum(["breakdown", "accident", "late", "weather", "dock", "safety", "other"]),
+        kind: z.enum(["breakdown", "accident", "late", "weather", "dock", "safety", "refused", "wrong_freight", "theft", "other"]),
         details: z.string().describe("What happened, where, and what the driver needs, in a sentence or two."),
         where: z.string().optional().describe("Where the truck is, if the driver said: highway and mile marker, exit, or town."),
         urgent: z.boolean(),
@@ -166,6 +167,12 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: Talk, effects
           return said;
         }
         const load = current();
+        // The freight itself gone wrong: the broker hears in writing at once, the driver gets the steps (lib/agent/extras).
+        if ((kind === "refused" || kind === "wrong_freight" || kind === "theft") && load) {
+          const said = await loadException(ctx, driver, load, kind, details, sourceOf(channel));
+          effects.done.push(`Load exception: ${kind.replace("_", " ")}`);
+          return said;
+        }
         // A crash, an injury or danger is an emergency: the support team's phones ring, and the owner sees it. Anything
         // else (running late, weather, a dock problem) is the owner's to know about; the AI keeps the broker posted.
         const emergency = urgent || kind === "accident";
@@ -180,6 +187,25 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: Talk, effects
         await addActivity(ctx.carrier.id, event({ type: "incident", loadId: load?.id, message: `${first} reported a problem: ${kind}`, detail: details, severity: urgent ? "danger" : "warning" }));
         effects.done.push(`Told the owner: ${kind}`);
         return "The owner has been told and it's on their Needs you list.";
+      },
+    }),
+    betaZodTool({
+      name: "claim_extra",
+      description:
+        "The driver did work beyond the haul on their current load, or paid for something the broker owes: tarped the load, loaded or unloaded by hand (driver assist), went back for a redelivery, ran miles out of route (a detour the broker or receiver caused), paid for a scale ticket, or bought reefer fuel. Backroute claims it from the broker and puts it on the invoice.",
+      inputSchema: z.object({
+        kind: z.enum(["driver_assist", "tarp", "scale", "redelivery", "out_of_route", "reefer_fuel"]),
+        detail: z.string().max(300).describe("What happened, in a sentence, in English, e.g. 'Receiver made driver unload 22 pallets by hand' or 'Tarped 4 coils at the shipper'."),
+        amount: z.number().positive().optional().describe("For a scale ticket or reefer fuel: the receipt's total in dollars."),
+        miles: z.number().positive().optional().describe("For out of route: the extra miles."),
+      }),
+      run: async (o) => {
+        // Often said right after delivery: the load they just finished counts, for three days.
+        const load = current() ?? theirLoads().filter((l) => l.stage === "delivered" && Date.parse(l.updatedAt) > Date.now() - 3 * 86400_000).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+        if (!load) return "No load on file for this driver right now. Ask which load it was for.";
+        const said = await claimExtra(ctx, driver, load, o);
+        effects.done.push(`Extra pay: ${o.kind.replace("_", " ")} on ${load.referenceNumber}`);
+        return said;
       },
     }),
     betaZodTool({
@@ -218,14 +244,15 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: Talk, effects
     betaZodTool({
       name: "set_driver_preference",
       description:
-        "A standing rule the driver gives about which loads they'll run, said in passing or asked: a state or city they won't go to, or that they won't load or unload freight by hand (touch freight, driver assist). Backroute stops booking such loads for them. Use remove to take one back ('I'll do Chicago again').",
+        "A standing rule the driver gives about which loads they'll run, said in passing or asked: a state or city they won't go to, that they won't load or unload freight by hand (touch freight, driver assist), or the earliest they want a pickup. Backroute stops booking such loads for them. Use remove to take one back ('I'll do Chicago again').",
       inputSchema: z.object({
         avoidState: z.string().length(2).optional().describe("Two-letter state they won't go to, e.g. NJ."),
         avoidCity: z.string().max(60).optional().describe("A city they won't pick up or deliver in, e.g. Chicago."),
         noTouchFreight: z.boolean().optional().describe("True: no touch freight. False: they'll do it again."),
+        startAfter: z.number().int().min(0).max(23).nullable().optional().describe("The earliest hour (0-23) they want a pickup, e.g. 6 for 'nothing before 6 am'. null to clear."),
         remove: z.boolean().optional().describe("True to take the state or city back off their list."),
       }),
-      run: async ({ avoidState, avoidCity, noTouchFreight, remove }) => {
+      run: async ({ avoidState, avoidCity, noTouchFreight, startAfter, remove }) => {
         const fresh = ctx.drivers.find((d) => d.id === driver.id) ?? driver;
         const p = fresh.prefs ?? {};
         const st = avoidState?.toUpperCase();
@@ -234,12 +261,12 @@ function driverTools(ctx: CarrierContext, driver: Driver, channel: Talk, effects
           const rest = (list ?? []).filter((x) => x.toLowerCase() !== v.toLowerCase());
           return remove ? rest : [...rest, v].slice(-12);
         };
-        const prefs = { ...p, avoidStates: toggle(p.avoidStates, st), avoidCities: toggle(p.avoidCities, avoidCity?.trim()), ...(noTouchFreight !== undefined ? { noTouchFreight } : {}) };
+        const prefs = { ...p, avoidStates: toggle(p.avoidStates, st), avoidCities: toggle(p.avoidCities, avoidCity?.trim()), ...(noTouchFreight !== undefined ? { noTouchFreight } : {}), ...(startAfter !== undefined ? { startAfter: startAfter ?? undefined } : {}) };
         const next: Driver = { ...fresh, prefs };
         await save("drivers", ctx.carrier.id, next as unknown as Item);
         ctx.drivers = ctx.drivers.map((d) => (d.id === next.id ? next : d));
         effects.done.push("Updated which loads the driver runs");
-        const what = [st && `${remove ? "back on" : "no more"} ${st}`, avoidCity && `${remove ? "back on" : "no more"} ${avoidCity}`, noTouchFreight !== undefined && (noTouchFreight ? "no touch freight" : "touch freight is fine")].filter(Boolean).join(", ");
+        const what = [st && `${remove ? "back on" : "no more"} ${st}`, avoidCity && `${remove ? "back on" : "no more"} ${avoidCity}`, noTouchFreight !== undefined && (noTouchFreight ? "no touch freight" : "touch freight is fine"), startAfter !== undefined && (startAfter === null ? "any pickup time" : `no pickups before ${startAfter}:00`)].filter(Boolean).join(", ");
         return `Saved: ${what}. Backroute won't book against it.`;
       },
     }),

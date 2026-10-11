@@ -20,7 +20,7 @@ import { callBroker, truckAt } from "./broker-call";
 import { canMakePickup } from "./eld";
 import { askFor, floorFor } from "./pricing";
 import { ourNumbers, respond, withTheirOffer } from "./negotiation";
-import { brokerMemory, laneMemory } from "./memory";
+import { brokerMemory, laneMemory, laneTrend, weekdayEdge } from "./memory";
 import { route } from "./routing";
 import { slowDocks } from "./facilities";
 import { slowDocksAnywhere } from "./network";
@@ -32,7 +32,8 @@ import * as mail from "./templates";
 import { tipsForLoad } from "./facility-notes";
 import { addWhy, whyBook, withWhy } from "./why";
 import { hardProblem, scheduleWarnings } from "./schedule";
-import { askPremiums, betterTwin, driverWontRun, gearMissing, hazmatText, MAX_PREMIUM, redFlags, repostOf, repostPremium, twinOf, withPremium } from "./judgment";
+import { gradeNote } from "../grades";
+import { askPremiums, beforeStart, betterTwin, dayBlocked, laneAvoided, pickupWeekday, situationPremiums, driverWontRun, gearMissing, hazmatText, MAX_PREMIUM, redFlags, repostOf, repostPremium, twinOf, withPremium } from "./judgment";
 import { reeferLine } from "./reefer";
 import { translateForDriver } from "../ai/translate";
 import { cantRun } from "../expiry";
@@ -134,6 +135,10 @@ function fitDetail(ctx: CarrierContext, truck: Truck, o: LoadAsk, opts: { planne
   // Cities they avoid, touch freight they said no to (lib/agent/judgment), and gear the truck doesn't carry.
   if (driverWontRun(ctx.drivers.find((d) => d.id === truck.driverId), { originCity: o.originCity, destinationCity: o.destinationCity ?? "", notes: o.notes })) return null;
   if (gearMissing(truck, o.notes).length) return null;
+  // Lanes the owner won't run, days they blocked for this truck, and a pickup before the driver starts their day.
+  if (laneAvoided(ctx.settings.avoidLanes, o)) return null;
+  if (dayBlocked(truck.blockedDays, o.pickupAt, o.miles)) return null;
+  if (beforeStart(ctx.drivers.find((d) => d.id === truck.driverId)?.prefs?.startAfter, o.pickupAt, o.originState)) return null;
   // A partial on the way: it joins the truck's trip when there's room and time for it (lib/agent/trips), along with
   // any other partial the AI is asking for on this truck. Not with a full load being asked for.
   if (o.trip && !ctx.loads.some((l) => l.truckId === truck.id && l.stage === "negotiating" && !isPartial(l))) {
@@ -409,10 +414,22 @@ export async function requestBooking(ctx: CarrierContext, load: Load, ask: numbe
   if (!how.byOwner && !load.premium && ctx.settings.askPremiums !== false) {
     const p = askPremiums({ pickupAt: load.pickupAt, originState: load.lane.originState, hazmat: load.hazmat, notes: load.offerNotes, commodity: load.commodity }, Date.now());
     const r = repostPremium(load.repostCount ?? 0);
-    const factor = Math.min(MAX_PREMIUM, p.factor * r.factor);
-    if (factor > 1) {
-      ask = withPremium(ask, { factor, reasons: [] });
-      load = { ...load, premium: { pct: Math.round((factor - 1) * 100), reasons: [...p.reasons, ...r.reasons] } };
+    // What the carrier's own history says about this lane, this broker and these docks.
+    const weekday = pickupWeekday(load.pickupAt, load.lane.originState);
+    const slow = slowDocks(ctx.loads, load)[0];
+    const sit = situationPremiums({
+      trend: laneTrend(ctx.loads, load.lane),
+      weekday: weekday === null ? null : weekdayEdge(ctx.loads, load.lane, weekday),
+      detentionPaidPct: broker && broker.loadsBooked >= 3 ? broker.detentionPaidPct : null,
+      slowDockHours: slow ? Math.round(slow.avgMinutes / 30) / 2 : null,
+      deadheadMiles: load.deadheadMiles,
+      loadedMiles: load.lane.miles,
+    });
+    const factor = Math.min(MAX_PREMIUM, p.factor * r.factor * sit.factor);
+    const reasons = [...p.reasons, ...r.reasons, ...sit.reasons];
+    if (factor > 1 || sit.deadheadDollars) {
+      ask = withPremium(ask, { factor, reasons: [] }) + sit.deadheadDollars;
+      load = { ...load, premium: { pct: Math.round((factor - 1) * 100), reasons, ...(sit.deadheadDollars ? { deadhead: sit.deadheadDollars } : {}) } };
     }
   }
   // Why this load, at this price, for this truck: kept on the load, and shown with anything waiting for the owner.
@@ -572,6 +589,12 @@ export async function bookIt(ctx: CarrierContext, load: Load, rate?: number): Pr
     updatedAt: at,
     bookRequest: load.bookRequest ? { ...load.bookRequest, status: "accepted" } : undefined,
   };
+  // The hours on record when it went on the driver: what the ELD said and what the load needs, kept for an audit.
+  const hosDriver = ctx.drivers.find((d) => d.id === truck?.driverId);
+  if (hosDriver?.hos) {
+    const needs = Math.round(((load.deadheadMiles + load.lane.miles) / 50) * 10) / 10;
+    booked.hoursCheck = { at, driverId: hosDriver.id, drive: hosDriver.hos.drive, shift: hosDriver.hos.shift, cycle: hosDriver.hos.cycle, read: hosDriver.hos.at, source: hosDriver.hos.source, needsDriving: needs };
+  }
   const trip = truck && joins ? tripWith(ctx, truck, joins) : truck && free && isPartial(load) ? newTrip(load) : undefined;
   if (trip) booked.tripId = trip.id;
   // The trip's other loads are on it too (a partial the truck was on before the trip started).
@@ -644,7 +667,7 @@ export async function textNewLoad(ctx: CarrierContext, load: Load, tripNote?: st
   // The shared record from every carrier on Backroute fills in docks this carrier hasn't been to.
   const slow = (await slowDocksAnywhere(ctx, load).catch(() => slowDocks(ctx.loads, load))).map((f) => SLOW_DOCK[lang]({ name: f.name, hours: (Math.round(f.avgMinutes / 30) / 2).toString() }));
   // What the driver should know before they go: the reefer setting, and what other drivers said about the docks.
-  const extra = [tripNote, sheetLine(load), reeferLine(load), ...(await tipsForLoad(load).catch(() => [])), ...(load.scheduleWarnings ?? []).filter((w) => !w.hard).map((w) => w.text)].filter(Boolean).join(" ");
+  const extra = [tripNote, sheetLine(load), reeferLine(load), gradeNote(load.lane), ...(await tipsForLoad(load).catch(() => [])), ...(load.scheduleWarnings ?? []).filter((w) => !w.hard).map((w) => w.text)].filter(Boolean).join(" ");
   const text = [NEW_LOAD[lang]({
     ref: load.referenceNumber,
     from: `${load.lane.origin}, ${load.lane.originState}`,

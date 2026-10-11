@@ -145,7 +145,7 @@ if (env.QBO_ENV === "sandbox") warn("QBO_ENV=sandbox: QuickBooks connects to Int
 
 // Settings that only make sense while testing.
 if (env.QUIET_HOURS === "0-0") warn("QUIET_HOURS=0-0: texts that can wait go out at night too");
-for (const k of ["BRIEF_HOURS", "CARE_HOURS", "REVIEW_HOURS"]) if (env[k] === "0-24") warn(`${k}=0-24: these texts can go out at any hour`);
+for (const k of ["BRIEF_HOURS", "EVENING_HOURS", "CARE_HOURS", "REVIEW_HOURS"]) if (env[k] === "0-24") warn(`${k}=0-24: these texts can go out at any hour`);
 if (env.UNDO_SECONDS === "0") warn("UNDO_SECONDS=0: owners get no chance to undo an email the AI sends");
 if (has("EVAL_SECRET")) warn("EVAL_SECRET is set: the measuring endpoints are on. Leave it unset in production unless you're measuring");
 if (env.AI_IN_DEMO === "on") warn("AI_IN_DEMO=on: demo visitors use the real AI (and your API spend)");

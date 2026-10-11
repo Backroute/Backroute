@@ -90,7 +90,12 @@ export async function runBoards(ctx: CarrierContext, rows: IntegrationRow[], now
         const slot = urgent ? `u${Math.floor(now / SEARCH_URGENT)}` : `${Math.floor(now / SEARCH_EVERY)}`;
         if (!(await claimMark(ctx.carrier.id, `truck:${truck.id}`, `board_search:${row.kind}:${slot}`))) continue;
         // A post with no phone or email has no one to book it with.
-        const loads = (await board.search(q)).filter((l) => l.brokerEmail || l.brokerPhone);
+        let loads = (await board.search(q)).filter((l) => l.brokerEmail || l.brokerPhone);
+        // Nothing near: look further out, step by step, never past the most empty miles the owner allows.
+        for (const radius of [250, 350]) {
+          if (loads.length || radius > (ctx.settings.maxDeadhead ?? 300)) break;
+          loads = (await board.search({ ...q, radius })).filter((l) => l.brokerEmail || l.brokerPhone);
+        }
         found += loads.length;
         // Loads heading toward the driver's home first, then by pay.
         loads.sort((a, b) => Number(b.destinationState === q.towardState) - Number(a.destinationState === q.towardState) || (b.rate ?? 0) / (b.miles || 1) - (a.rate ?? 0) / (a.miles || 1));

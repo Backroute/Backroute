@@ -2,6 +2,7 @@
 
 import { FirstRunEmpty } from "@/components/shared/empty-next-step";
 import { TruckPapers } from "@/components/cloud/truck-papers";
+import { BlockedDays } from "@/components/owner/blocked-days";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, Home, Link2, MapPin, Phone, Sparkles, Users } from "lucide-react";
 import { safetySummary } from "@/lib/safety";
@@ -166,6 +167,7 @@ export default function FleetPage() {
                 )}
 
                 {signedIn && <TruckPapers truckId={truck.id} unit={truck.unitNumber} />}
+                {signedIn && now !== null && <BlockedDays truck={truck} today={new Date(now).toISOString().slice(0, 10)} />}
 
                 {secondDriver && (
                   <div className="flex items-center gap-3">

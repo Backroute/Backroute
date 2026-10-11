@@ -112,6 +112,21 @@ export function BusinessCard() {
           </div>
           <Switch checked={settings.askPremiums !== false} onChange={(v) => updateSettings({ askPremiums: v })} label="Ask more when a load is harder" />
         </div>
+        <label className="flex flex-col gap-1 border-t border-line pt-4 text-sm font-medium text-ink-900">
+          Lanes Backroute won&apos;t run
+          <input
+            aria-label="Lanes Backroute won't run"
+            key={(settings.avoidLanes ?? []).join(",")}
+            defaultValue={(settings.avoidLanes ?? []).join(", ")}
+            placeholder="TX>CA, >NY"
+            onBlur={(e) => {
+              const lanes = [...new Set(e.target.value.toUpperCase().split(/[,;\s]+/).map((x) => x.trim()).filter((x) => /^[A-Z]{0,2}>[A-Z]{0,2}$/.test(x) && x !== ">"))].slice(0, 30);
+              updateSettings({ avoidLanes: lanes.length ? lanes : undefined });
+            }}
+            className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-normal outline-none focus:border-ink-500"
+          />
+          <span className="text-xs font-normal text-ink-500">Two-letter states: TX&gt;CA is that lane, &gt;CA anything into California, NY&gt; anything out of New York. For every truck; a driver&apos;s own no-go states are on their profile.</span>
+        </label>
         <div className="flex items-center justify-between gap-4 border-t border-line pt-4">
           <div>
             <p className="text-sm font-medium text-ink-900">Repairs Backroute can okay</p>
@@ -133,8 +148,83 @@ export function BusinessCard() {
             />
           </label>
         </div>
+        <RoadsidePlan />
+        <ExtraPay />
       </CardContent>
     </Card>
+  );
+}
+
+const FIELD = "rounded-xl border border-line bg-white px-3 py-2 text-sm font-normal outline-none focus:border-ink-500";
+
+/** The roadside assistance or warranty line the driver calls first on a breakdown. */
+function RoadsidePlan() {
+  const plan = useStore((s) => s.settings.roadsidePlan);
+  const updateSettings = useStore((s) => s.actions.updateSettings);
+  const form = useRef<HTMLDivElement>(null);
+  const save = () => {
+    const get = (n: string) => (form.current?.querySelector<HTMLInputElement>(`[name="${n}"]`)?.value ?? "").trim();
+    const name = get("plan-name").slice(0, 60);
+    const phone = get("plan-phone").slice(0, 30);
+    const account = get("plan-account").slice(0, 40);
+    updateSettings({ roadsidePlan: name && phone.replace(/\D/g, "").length >= 10 ? { name, phone, ...(account ? { account } : {}) } : undefined });
+  };
+  return (
+    <div ref={form} className="flex flex-col gap-2 border-t border-line pt-4">
+      <div>
+        <p className="text-sm font-medium text-ink-900">Roadside plan or warranty</p>
+        <p className="text-xs text-ink-500">On a breakdown, the driver gets this number to call first, before the shops Backroute finds.</p>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-3">
+        <input name="plan-name" aria-label="Roadside plan name" key={`n${plan?.name ?? ""}`} defaultValue={plan?.name ?? ""} placeholder="Plan name" onBlur={save} className={FIELD} />
+        <input name="plan-phone" aria-label="Roadside plan phone" inputMode="tel" key={`p${plan?.phone ?? ""}`} defaultValue={plan?.phone ?? ""} placeholder="Phone" onBlur={save} className={FIELD} />
+        <input name="plan-account" aria-label="Roadside plan account number" key={`a${plan?.account ?? ""}`} defaultValue={plan?.account ?? ""} placeholder="Account # (optional)" onBlur={save} className={FIELD} />
+      </div>
+    </div>
+  );
+}
+
+const EXTRAS: { kind: "tarp" | "driver_assist" | "redelivery"; label: string }[] = [
+  { kind: "tarp", label: "Tarping" },
+  { kind: "driver_assist", label: "Driver assist" },
+  { kind: "redelivery", label: "Redelivery" },
+];
+
+/** What the owner charges for work beyond the haul when the rate con doesn't say. */
+function ExtraPay() {
+  const prices = useStore((s) => s.settings.extraPay);
+  const updateSettings = useStore((s) => s.actions.updateSettings);
+  return (
+    <div className="flex flex-col gap-2 border-t border-line pt-4">
+      <div>
+        <p className="text-sm font-medium text-ink-900">Extra pay</p>
+        <p className="text-xs text-ink-500">When a driver tarps, unloads by hand or goes back for a redelivery, Backroute claims it from the broker at the rate con&apos;s price. When the rate con doesn&apos;t say, it uses these. Empty: you&apos;re asked each time.</p>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {EXTRAS.map((x) => (
+          <label key={x.kind} className="flex items-center justify-between gap-2 text-sm text-ink-800">
+            {x.label}
+            <span className="flex items-center gap-1">
+              $
+              <input
+                aria-label={`${x.label} price, in dollars`}
+                inputMode="numeric"
+                key={prices?.[x.kind] ?? "none"}
+                defaultValue={prices?.[x.kind] ?? ""}
+                placeholder="—"
+                onBlur={(e) => {
+                  const n = Math.round(Number(e.target.value.replace(/[^\d.]/g, "")));
+                  const next = { ...prices, [x.kind]: Number.isFinite(n) && n > 0 ? Math.min(n, 5000) : undefined };
+                  for (const k of Object.keys(next) as (keyof typeof next)[]) if (next[k] === undefined) delete next[k];
+                  updateSettings({ extraPay: Object.keys(next).length ? next : undefined });
+                }}
+                className="w-20 rounded-xl border border-line bg-white px-3 py-2 text-sm tabular outline-none focus:border-ink-500"
+              />
+            </span>
+          </label>
+        ))}
+      </div>
+    </div>
   );
 }
 

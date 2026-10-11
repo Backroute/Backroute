@@ -10,7 +10,8 @@ import { needAppointment } from "./appointments";
 import { pushToOffice } from "../push";
 import { addActivity, claimMark, logChannel, save, saveDriverMessage, type CarrierContext } from "./db";
 import { addReading } from "../ifta";
-import { event } from "./dispatcher";
+import { event, uid } from "./dispatcher";
+import { wrongWay } from "../road-exceptions";
 import { sendOrQueue } from "./outbox";
 import { routedEta } from "./routing";
 import { etaWithReasons, stillSince, stoppedOddly } from "./late-risk";
@@ -464,6 +465,51 @@ export async function checkCalls(ctx: CarrierContext, now: number): Promise<stri
       why: `Send ${load.referenceNumber}'s check call (truck at ${where})?`,
     });
     done.push(`${load.referenceNumber}: check call`);
+  }
+  return done;
+}
+
+/**
+ * A truck getting farther from the stop it's heading to, ELD reading over reading (lib/road-exceptions wrongWay): the
+ * driver gets a text to check the route before the miles add up. Once per stop per load; a fuel stop or detour that
+ * comes back toward the stop doesn't count.
+ */
+export async function wrongWayChecks(ctx: CarrierContext, now: number): Promise<string[]> {
+  const done: string[] = [];
+  for (const load of ctx.loads) {
+    if (load.stage !== "dispatched" && load.stage !== "in_transit") continue;
+    const truck = ctx.trucks.find((t) => t.id === load.truckId && t.currentLoadId === load.id);
+    const pos = truck?.position;
+    if (!truck || !pos || now - Date.parse(pos.at) > 30 * 60_000) continue;
+    const stop = load.stage === "dispatched" ? "pickup" : "delivery";
+    const [city, state] = stop === "pickup" ? [load.lane.origin, load.lane.originState] : [load.lane.destination, load.lane.destState];
+    const target = roughCoords(city, state);
+    if (!target?.exact) continue;
+    const miles = Math.round(roadMiles([pos.lat, pos.lon], target.at));
+    const before = load.heading?.stop === stop ? load.heading : undefined;
+    const farther = wrongWay(before, miles, now);
+    // Keep a reading 15-90 minutes old to compare against: replaced when it's stale, or after a warning.
+    const keep = before && !farther && now - Date.parse(before.at) < 30 * 60_000;
+    if (!keep) {
+      const next: Load = { ...load, heading: { stop, miles, at: new Date(now).toISOString() } };
+      await save("loads", ctx.carrier.id, next as unknown as Item);
+      ctx.loads = ctx.loads.map((l) => (l.id === load.id ? next : l));
+    }
+    if (!farther || !(await claimMark(ctx.carrier.id, load.id, `wrong_way_${stop}`))) continue;
+    const driver = ctx.drivers.find((d) => d.id === truck.driverId);
+    const phone = driver ? toE164(driver.phone) : null;
+    if (driver && phone && !driver.prefs?.smsOptOut) {
+      const mins = Math.round((now - Date.parse(before!.at)) / 60_000);
+      const text = await translateForDriver(
+        `Heads up: you're getting farther from your ${stop} in ${city}, ${state}: ${miles} miles now, ${farther} more than ${mins} minutes ago. If that's not a fuel stop or a detour, check the route${(stop === "pickup" ? load.pickupAddress : load.deliveryAddress) ? ` to ${stop === "pickup" ? load.pickupAddress : load.deliveryAddress}` : ""}.`,
+        driver.prefs?.language ?? "en",
+      );
+      const sid = await textTo(ctx.carrier, phone, text);
+      await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: new Date(now).toISOString(), channel: "sms", ai: true });
+      await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: phone, body: text, data: { kind: "wrong_way", loadId: load.id } });
+    }
+    await addActivity(ctx.carrier.id, event({ type: "check_call", loadId: load.id, message: `${truck.unitNumber} heading away from ${stop}`, detail: `${miles} mi from ${city}, ${state} · ${farther} mi farther than the last reading`, severity: "warning" }));
+    done.push(`${load.referenceNumber}: wrong way to ${stop}`);
   }
   return done;
 }

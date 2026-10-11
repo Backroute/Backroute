@@ -113,6 +113,7 @@ export interface UiText {
   avoidCities: string;
   avoidCitiesHint: string;
   noTouch: string;
+  earliestPickup: string;
   newLoads: string;
   callMe: string;
   textMe: string;
@@ -265,6 +266,7 @@ const en: UiText = {
   avoidCities: "Cities you won't go to",
   avoidCitiesHint: "Like Chicago, Atlanta",
   noTouch: "No touch freight (I don't load or unload)",
+  earliestPickup: "Earliest pickup",
   newLoads: "New load options",
   callMe: "Call me",
   textMe: "Just text me",
@@ -417,6 +419,7 @@ const es: UiText = {
   avoidCities: "Ciudades a las que no vas",
   avoidCitiesHint: "Por ejemplo: Chicago, Atlanta",
   noTouch: "Sin carga a mano (no cargo ni descargo)",
+  earliestPickup: "Carga más temprana",
   newLoads: "Opciones de cargas nuevas",
   callMe: "Llámame",
   textMe: "Solo mensaje",
@@ -569,6 +572,7 @@ const pa: UiText = {
   avoidCities: "ਸ਼ਹਿਰ ਜਿੱਥੇ ਤੁਸੀਂ ਨਹੀਂ ਜਾਂਦੇ",
   avoidCitiesHint: "ਜਿਵੇਂ Chicago, Atlanta",
   noTouch: "ਹੱਥ ਨਾਲ ਮਾਲ ਨਹੀਂ (ਮੈਂ ਲੋਡ ਜਾਂ ਅਨਲੋਡ ਨਹੀਂ ਕਰਦਾ)",
+  earliestPickup: "ਸਭ ਤੋਂ ਪਹਿਲਾਂ ਪਿਕਅੱਪ",
   newLoads: "ਨਵੇਂ ਲੋਡ",
   callMe: "ਫ਼ੋਨ ਕਰੋ",
   textMe: "ਸਿਰਫ਼ ਮੈਸੇਜ",
@@ -721,6 +725,7 @@ const hi: UiText = {
   avoidCities: "शहर जहाँ आप नहीं जाते",
   avoidCitiesHint: "जैसे Chicago, Atlanta",
   noTouch: "हाथ से माल नहीं (मैं लोड या अनलोड नहीं करता)",
+  earliestPickup: "सबसे पहला पिकअप",
   newLoads: "नए लोड",
   callMe: "फ़ोन करें",
   textMe: "सिर्फ़ मैसेज",
@@ -873,6 +878,7 @@ const ru: UiText = {
   avoidCities: "Города, куда вы не ездите",
   avoidCitiesHint: "Например: Chicago, Atlanta",
   noTouch: "Без ручной погрузки (сам не гружу и не выгружаю)",
+  earliestPickup: "Самая ранняя загрузка",
   newLoads: "Новые грузы",
   callMe: "Звони",
   textMe: "Просто пиши",
@@ -1025,6 +1031,7 @@ const uk: UiText = {
   avoidCities: "Міста, куди ви не їздите",
   avoidCitiesHint: "Наприклад: Chicago, Atlanta",
   noTouch: "Без ручного вантаження (сам не вантажу й не розвантажую)",
+  earliestPickup: "Найраніше завантаження",
   newLoads: "Нові вантажі",
   callMe: "Дзвони",
   textMe: "Просто пиши",
@@ -1177,6 +1184,7 @@ const fr: UiText = {
   avoidCities: "Villes où vous n'allez pas",
   avoidCitiesHint: "Par exemple : Chicago, Atlanta",
   noTouch: "Pas de manutention (je ne charge ni ne décharge)",
+  earliestPickup: "Chargement au plus tôt",
   newLoads: "Nouveaux voyages",
   callMe: "Appelle-moi",
   textMe: "Juste un texto",

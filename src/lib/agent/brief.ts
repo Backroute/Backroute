@@ -6,7 +6,7 @@ import { canText, textTo } from "../channels/out";
 import { toE164 } from "../cloud/phone";
 import { LANG_INFO } from "../lang/pack";
 import { formatAtStop, hourAtStop, zoneFor } from "../stop-time";
-import { placeCoords } from "../trip-geo";
+import { placeCoords, roadMiles } from "../trip-geo";
 import type { Driver, Lang, Load, Truck } from "../types";
 import { alertsAlong, alertsAt } from "../weather";
 import { truckPath } from "./routing";
@@ -162,6 +162,65 @@ export async function morningBriefs(ctx: CarrierContext, now: number): Promise<s
       await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: phone, body: text, data: { kind: "morning_brief" } });
       done.push(`Morning text to ${facts.driver}`);
     }
+  }
+  return done;
+}
+
+// ─── The evening before ──────────────────────────────────────────────────────
+
+function eveningHours(): [number, number] {
+  const [a, b] = (process.env.EVENING_HOURS ?? "18-21").split("-").map(Number);
+  return [Number.isFinite(a) ? a : 18, Number.isFinite(b) ? b : 21];
+}
+
+const MPH = 50;
+
+/**
+ * Tomorrow's first pickup, the way a dispatcher says it the night before: where and when, how far the truck is from
+ * it now, when to leave (driving at 50 mph with an hour to spare), and the 10-hour break if the clock says they need
+ * it. Null when the driver has no pickup tomorrow. No I/O.
+ */
+export function eveningFacts(loads: Load[], truck: Truck, driver: Pick<Driver, "name" | "hoursRemaining">, now: number): { text: string; loadId: string } | null {
+  const next = loads
+    .filter((l) => l.truckId === truck.id && ["booked", "rate_confirmed", "dispatched"].includes(l.stage) && l.pickupAt)
+    .sort((a, b) => a.pickupAt!.localeCompare(b.pickupAt!))[0];
+  if (!next) return null;
+  const state = next.lane.originState;
+  const tomorrow = dayAt(state, now + 24 * HOUR);
+  if (dayAt(state, Date.parse(next.pickupAt!)) !== tomorrow) return null;
+  const from: [number, number] | undefined = truck.position ? [truck.position.lat, truck.position.lon] : placeCoords(truck.currentCity, truck.currentState);
+  const to = placeCoords(next.lane.origin, state);
+  const away = from && to ? Math.round(roadMiles(from, to)) : null;
+  const leave = away !== null && away > 15 ? Date.parse(next.pickupAt!) - (away / MPH + 1) * HOUR : null;
+  const appt = next.appointments?.pickup?.confirmation;
+  const parts = [
+    `${driver.name.split(" ")[0]}, tomorrow: pickup ${next.referenceNumber} in ${next.lane.origin}, ${state} at ${formatAtStop(next.pickupAt!, state)}${appt ? ` (appt #${appt})` : ""}${next.pickupAddress ? `, ${next.pickupAddress}` : ""}.`,
+    away !== null && away > 15 ? `You're about ${away} miles away${leave && leave > now ? `: leave by ${formatAtStop(new Date(leave).toISOString(), truck.currentState || state)}` : ""}.` : "",
+    driver.hoursRemaining !== undefined && driver.hoursRemaining < 3 ? "Get your 10-hour break in tonight so the clock is full in the morning." : "",
+    "Reply if anything's changed.",
+  ];
+  return { text: parts.filter(Boolean).join(" "), loadId: next.id };
+}
+
+/** The evening text before a pickup day: once per driver per evening, in their language, in their evening hours. */
+export async function eveningNotes(ctx: CarrierContext, now: number): Promise<string[]> {
+  if (ctx.settings.morningBriefs === false || !canText(ctx.carrier)) return [];
+  const [from, to] = eveningHours();
+  const done: string[] = [];
+  for (const truck of ctx.trucks) {
+    const driver = ctx.drivers.find((d) => d.id === truck.driverId);
+    const phone = driver ? toE164(driver.phone) : null;
+    if (!driver || !phone || driver.prefs?.morningBrief === false || driver.prefs?.smsOptOut) continue;
+    const state = truck.currentState || driver.homeBase?.split(",")[1]?.trim() || "TX";
+    const hour = hourAtStop(state, now);
+    if (hour < from || hour >= to) continue;
+    const facts = eveningFacts(ctx.loads, truck, driver, now);
+    if (!facts || !(await claimMark(ctx.carrier.id, `evening:${driver.id}:${dayAt(state, now)}`, "evening_note"))) continue;
+    const text = await translateForDriver(facts.text, driver.prefs?.language ?? "en");
+    const sid = await textTo(ctx.carrier, phone, text);
+    await saveDriverMessage(ctx.carrier.id, { id: uid("dm"), driverId: driver.id, from: "ai", content: text, timestamp: new Date(now).toISOString(), channel: "sms", ai: true }, "/driver");
+    await logChannel({ carrierId: ctx.carrier.id, channel: "sms", direction: "out", providerId: sid ?? null, driverId: driver.id, counterparty: phone, body: text, data: { kind: "evening_note", loadId: facts.loadId } });
+    done.push(`Evening text to ${driver.name.split(" ")[0]}`);
   }
   return done;
 }

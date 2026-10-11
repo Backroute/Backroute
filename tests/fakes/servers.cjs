@@ -244,7 +244,7 @@ http.createServer(async (req, res) => {
   const results = blocks.filter((x) => x.type === "tool_result");
   if (results.length) {
     const prev = b.messages.at(-2).content.find((x) => x.type === "tool_use");
-    const done = { remember: "Noted. Good luck to her Saturday!", update_load_status: "Marked you loaded. Drive safe.", report_problem: "Sorry to hear that. The owner knows and will call you.", hang_up: "Bye, drive safe.", flag_for_owner: "Thanks, we'll confirm shortly. - Titan Freight", broker_offer: "BROKER-CALL:", booked: "BOOKED:", broker_mc: "MC-CHECK:", driver_feedback: "Thanks for telling me.", broker_email: "EMAIL:", not_available: "OK, thanks anyway.", load_details: "DETAILS:", find_nearby: "NEARBY:", our_price: "OUR-PRICE:", tell_support: "SUPPORT:", send_packet: "PACKET:", follow_up: "FOLLOW-UP:", carrier_is: "DESK:", take_load: "INTAKE:", leave_message: "MSG:", note_facility: "TIP:", reefer_reading: "REEFER:" };
+    const done = { remember: "Noted. Good luck to her Saturday!", update_load_status: "Marked you loaded. Drive safe.", report_problem: "Sorry to hear that. The owner knows and will call you.", hang_up: "Bye, drive safe.", flag_for_owner: "Thanks, we'll confirm shortly. - Titan Freight", broker_offer: "BROKER-CALL:", booked: "BOOKED:", broker_mc: "MC-CHECK:", driver_feedback: "Thanks for telling me.", broker_email: "EMAIL:", not_available: "OK, thanks anyway.", load_details: "DETAILS:", find_nearby: "NEARBY:", our_price: "OUR-PRICE:", tell_support: "SUPPORT:", send_packet: "PACKET:", follow_up: "FOLLOW-UP:", carrier_is: "DESK:", take_load: "INTAKE:", leave_message: "MSG:", note_facility: "TIP:", reefer_reading: "REEFER:", claim_extra: "EXTRA:" };
     return reply(res, msg(b.model, [{ type: "text", text: done[prev.name] + ` [tool said: ${results[0].content}]` }]));
   }
   const said = blocks.filter((x) => x.type === "text").map((x) => x.text).join("\n");
@@ -263,6 +263,13 @@ http.createServer(async (req, res) => {
     const reefer = words.match(/reefer (?:is |at |reads |says )*(-?\d+)/i);
     if (reefer && tools.includes("reefer_reading") && !/Recorded/.test(said)) return use("reefer_reading", { temp_f: Number(reefer[1]), pulp: /pulp/i.test(words) });
     if (/\bpark\b/i.test(said) && tools.includes("find_nearby")) return use("find_nearby", { kind: "parking" });
+    if (/\btarped\b/i.test(words) && tools.includes("claim_extra")) return use("claim_extra", { kind: "tarp", detail: "Tarped the load at the shipper" });
+    if (/unload(?:ed)? it (?:all )?(?:myself|by hand)/i.test(words) && tools.includes("claim_extra")) return use("claim_extra", { kind: "driver_assist", detail: "Receiver made the driver unload by hand" });
+    const scale = words.match(/scale ticket (?:was )?\$(\d+(?:\.\d+)?)/i);
+    if (scale && tools.includes("claim_extra")) return use("claim_extra", { kind: "scale", detail: "Scaled the load", amount: Number(scale[1]) });
+    if (/refused the load|won'?t take the load/i.test(words)) return use("report_problem", { kind: "refused", details: "Receiver refused it: product arrived damaged per receiver", urgent: false });
+    if (/doesn'?t match|wrong freight/i.test(words)) return use("report_problem", { kind: "wrong_freight", details: "Shipper is loading 30 pallets of cans, rate con says 18 pallets of paper", urgent: false });
+    if (/trailer (?:is |was )?stolen|got stolen/i.test(words)) return use("report_problem", { kind: "theft", details: "Trailer stolen from the truck stop lot overnight", urgent: true });
     if (/broke down/i.test(said)) return use("report_problem", { kind: "breakdown", details: /tire|flat/i.test(said) ? "Blew a steer tire" : "Truck broke down on I-35 near Waco", where: /waco/i.test(said) ? "I-35 near Waco, TX" : undefined, urgent: false });
     if (/bye/i.test(said) && tools.includes("hang_up")) return use("hang_up", {});
     return reply(res, msg(b.model, [{ type: "text", text: "DRIVER-REPLY: your pickup is in Dallas." }]));
@@ -655,6 +662,8 @@ http.createServer(async (req, res) => {
       if (/^Lone Star Foods/i.test(q.textQuery)) return reply(res, { places: [{ displayName: { text: "Starbucks" }, regularOpeningHours: { periods: wk(6, 9) } }] });
       return reply(res, {});
     }
+    if (q.textQuery?.startsWith("hotel with truck parking"))
+      return reply(res, { places: [place("Brazos Inn & Truck Lot", "(254) 555-0150", true, 31.56, -97.14, 4.0), place("Waco Budget Motel", "(254) 555-0151", true, 31.58, -97.12, 3.6)] });
     if (q.textQuery?.startsWith("truck parking"))
       return reply(res, { places: [place("Love's Travel Stop", "(254) 555-0190", true, 31.57, -97.15, 4.1), place("Rest Area I-35 MM 340", null, true, 31.7, -97.2, 3.9)] });
     return reply(res, { places: [

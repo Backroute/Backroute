@@ -2,6 +2,9 @@ import "server-only";
 import { claimMark, latestFiles, type CarrierContext } from "./db";
 import { dueWords, paperworkDue } from "../expiry";
 import { passToOwner } from "./dispatcher";
+import { milesUntilService, serviceEtaDays } from "../maintenance";
+import { chainEnd, doneAt } from "./chain";
+import type { Load, Truck } from "../types";
 
 /**
  * The deadlines a small carrier's dispatcher usually keeps for the owner: each truck's plates and annual DOT
@@ -53,5 +56,40 @@ export async function complianceReminders(ctx: CarrierContext, now: number): Pro
     });
     done.push(item.key);
   }
+  done.push(...(await serviceWindows(ctx, now)));
   return done;
 }
+
+/**
+ * Service due soon by miles (from the ELD's odometer): the owner is told when the truck is next free, so the shop
+ * visit lands on a slow day instead of costing a load. A day they kept the truck off the board comes first; else the
+ * day after its last booked load delivers. Once a week per truck.
+ */
+export async function serviceWindows(ctx: CarrierContext, now: number): Promise<string[]> {
+  const done: string[] = [];
+  for (const truck of ctx.trucks) {
+    if (!truck.odometerAt || truck.status === "maintenance") continue;
+    const days = serviceEtaDays(truck, ctx.loads, now);
+    const left = milesUntilService(truck);
+    if (days === null ? left > 1500 : days > 14) continue;
+    const window = freeDay(truck, ctx.loads, now);
+    if (!(await claimMark(ctx.carrier.id, `truck:${truck.id}`, `service_window:${Math.floor(now / (7 * 86400_000))}`))) continue;
+    const due = left <= 0 ? "is past due for service" : `is due for service in about ${days ?? "a few"} day${days === 1 ? "" : "s"} (${Math.round(left).toLocaleString("en-US")} miles)`;
+    await passToOwner(ctx, { reason: `Truck ${truck.unitNumber} ${due}. ${window.text} Book the shop then, so it doesn't cost a load.`, label: "Booked", source: "app", to: "owner" });
+    done.push(`service window for truck ${truck.unitNumber}`);
+  }
+  return done;
+}
+
+/** The next day a truck is free: a day the owner blocked, or the day after its last booked load delivers. */
+export function freeDay(truck: Truck, loads: Load[], now: number): { date: string | null; text: string } {
+  const fmt = (ms: number) => new Date(ms).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
+  const today = new Date(now).toISOString().slice(0, 10);
+  const blocked = (truck.blockedDays ?? []).filter((d) => d >= today).sort()[0];
+  if (blocked) return { date: blocked, text: `It's already off the board ${fmt(Date.parse(`${blocked}T12:00:00Z`))}.` };
+  const last = chainEnd(loads, truck);
+  const end = last ? doneAt(last) : null;
+  if (end && end > now) return { date: new Date(end + 86400_000).toISOString().slice(0, 10), text: `It's free after ${last!.referenceNumber} delivers in ${last!.lane.destination}, ${last!.lane.destState}, so ${fmt(end + 86400_000)} works.` };
+  return { date: today, text: "Nothing's booked on it yet, so the sooner the better." };
+}
+

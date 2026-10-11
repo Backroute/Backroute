@@ -55,13 +55,13 @@ async function saveClaim(ctx: CarrierContext, load: Load, claim: CargoClaim): Pr
  * A claim on a load: from the broker or shipper in writing (acknowledged, and told what to send), or from a POD with
  * damage or a shortage written on it (the file starts before anyone asks). Returns what happened.
  */
-export async function openClaim(ctx: CarrierContext, load: Load, o: { source: CargoClaim["source"]; details: string; amount?: number | null; claimant?: string; claimantName?: string; subject?: string; inReplyTo?: string }): Promise<string> {
+export async function openClaim(ctx: CarrierContext, load: Load, o: { source: CargoClaim["source"]; details: string; amount?: number | null; claimant?: string; claimantName?: string; subject?: string; inReplyTo?: string; kind?: CargoClaim["kind"] }): Promise<string> {
   const current = ctx.loads.find((l) => l.id === load.id) ?? load;
   const had = current.claim;
   const now = new Date().toISOString();
   let claim: CargoClaim = had
     ? { ...had, ...(o.amount ? { amount: o.amount } : {}), ...(o.claimant && !had.claimant ? { claimant: o.claimant } : {}), ...(o.source === "broker" ? { source: "broker" as const, details: o.details.slice(0, 500) } : {}) }
-    : { openedAt: now, source: o.source, kind: kindOf(o.details), details: o.details.slice(0, 500), ...(o.amount ? { amount: o.amount } : {}), ...(o.claimant ? { claimant: o.claimant } : {}) };
+    : { openedAt: now, source: o.source, kind: o.kind ?? kindOf(o.details), details: o.details.slice(0, 500), ...(o.amount ? { amount: o.amount } : {}), ...(o.claimant ? { claimant: o.claimant } : {}) };
   const done: string[] = [];
 
   // The driver's account, while they still remember the dock.
@@ -94,7 +94,7 @@ export async function openClaim(ctx: CarrierContext, load: Load, o: { source: Ca
   const saved = await saveClaim(ctx, current, claim);
 
   if (!had) {
-    await addActivity(ctx.carrier.id, event({ type: "incident", loadId: saved.id, message: `Cargo claim opened on ${saved.referenceNumber}`, detail: `${claim.kind}${claim.amount ? ` · $${claim.amount.toLocaleString("en-US")}` : ""} · ${claim.source === "broker" ? "filed by the broker" : "from the POD"}`, severity: "warning" }));
+    await addActivity(ctx.carrier.id, event({ type: "incident", loadId: saved.id, message: `Cargo claim opened on ${saved.referenceNumber}`, detail: `${claim.kind}${claim.amount ? ` · $${claim.amount.toLocaleString("en-US")}` : ""} · ${claim.source === "broker" ? "filed by the broker" : claim.source === "driver" ? "reported by the driver" : "from the POD"}`, severity: "warning" }));
     await passToOwner(ctx, {
       reason: `Cargo claim on ${saved.referenceNumber} (${claim.kind}${claim.amount ? `, $${claim.amount.toLocaleString("en-US")}` : ""}): ${claim.details.slice(0, 200)}. Backroute ${done.length ? done.join(" and ") : "opened a file"} and is putting the claim file together for your insurer. You decide whether to pay it yourself or file it with insurance.`,
       loadId: saved.id,

@@ -20,20 +20,22 @@ import { parkingReminders } from "./parking";
 import { makeContractLoads } from "./contracts";
 import { marksFor, type CarrierContext } from "./db";
 import { forCarrier } from "./scope";
-import { applyEld, checkCalls, lateNotices, readEld } from "./eld";
+import { applyEld, checkCalls, lateNotices, readEld, wrongWayChecks } from "./eld";
 import { applySafety, readSafety } from "./safety";
 import { readGeotab, type GeotabConfig } from "./geotab";
 import { xeroRound } from "./xero";
 import { pullFeed, readFeed } from "./feeds";
+import { breakdownFollowUps } from "./roadside";
 import { integrationsFor, saveIntegration, setStatus, type EldConfig, type FeedConfig } from "./integrations";
 import { chasePayments } from "./money";
-import { expireOffers, sendDetentionClaims, sendInvoices, warnCoiExpiring } from "./paperwork";
+import { expireOffers, freeTimeNotices, sendDetentionClaims, sendInvoices, warnCoiExpiring } from "./paperwork";
+import { sendExtraClaims } from "./extras";
 import { refreshPlans } from "./plan";
 import { actOnDecisions } from "./decisions";
 import { suggestRepositions } from "./reposition";
 import { trackingRounds } from "./tracking";
 import { portalReady, portalRounds } from "../portal/tasks";
-import { morningBriefs } from "./brief";
+import { eveningNotes, morningBriefs } from "./brief";
 import { reeferRounds } from "./reefer";
 import { weeklyReview } from "./review";
 
@@ -61,7 +63,10 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   if (canEmail(ctx.carrier)) {
     // Layover first: a stop held overnight is claimed as that, not as hours of detention, and it's on the invoice.
     done.push(...(await sendLayoverClaims(ctx, now)));
+    // Extra pay first too, so it's on the invoice that follows.
+    done.push(...(await sendExtraClaims(ctx, now)));
     done.push(...(await sendInvoices(ctx)));
+    done.push(...(await freeTimeNotices(ctx, now)));
     done.push(...(await sendDetentionClaims(ctx, now)));
     done.push(...(await chasePayments(ctx, now)));
     done.push(...(await claimRounds(ctx, now)));
@@ -95,7 +100,10 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
     }
   }
   // Pulling into and out of a dock's lot, from the ELD's GPS: the dock times for detention, and "arrived" for the driver.
-  if (links.some((l) => l.kind === "samsara" || l.kind === "motive" || l.kind === "geotab")) done.push(...(await eldDockTimes(ctx, now).catch((e) => (console.error("[rounds] ELD dock times failed", e), []))));
+  if (links.some((l) => l.kind === "samsara" || l.kind === "motive" || l.kind === "geotab")) {
+    done.push(...(await eldDockTimes(ctx, now).catch((e) => (console.error("[rounds] ELD dock times failed", e), []))));
+    if (canText(ctx.carrier)) done.push(...(await wrongWayChecks(ctx, now).catch((e) => (console.error("[rounds] wrong-way checks failed", e), []))));
+  }
   for (const link of links.filter((l) => l.kind === "load_feed")) {
     try {
       const cfg = link.config as FeedConfig;
@@ -111,6 +119,7 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   done.push(...(await actOnDecisions(ctx)));
   done.push(...(await suggestRepositions(ctx, now)));
   done.push(...(await complianceReminders(ctx, now)));
+  done.push(...(await breakdownFollowUps(ctx, now).catch((e) => (console.error("[rounds] breakdown follow-ups failed", e), []))));
   done.push(...(await pullStatements(ctx, links, now)));
   done.push(...(await parkingReminders(ctx, now).catch((e) => (console.error("[rounds] parking reminders failed", e), []))));
   done.push(...(await quickbooksRound(ctx, links, now).catch((e) => (console.error("[rounds] quickbooks failed", e), []))));
@@ -124,6 +133,7 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   done.push(...(await appLinkRounds(ctx, now, base).catch((e) => (console.error("[rounds] app links failed", e), []))));
   // The driver's morning text, reefer readings, and the owner's Monday review.
   done.push(...(await morningBriefs(ctx, now).catch((e) => (console.error("[rounds] morning texts failed", e), []))));
+  done.push(...(await eveningNotes(ctx, now).catch((e) => (console.error("[rounds] evening texts failed", e), []))));
   done.push(...(await reeferRounds(ctx, now).catch((e) => (console.error("[rounds] reefer checks failed", e), []))));
   done.push(...(await weeklyReview(ctx, now).catch((e) => (console.error("[rounds] weekly review failed", e), []))));
   await refreshPlans(ctx, now);

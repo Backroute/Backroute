@@ -10,10 +10,10 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 
 | Status | Items |
 |---|---|
-| Done | 290 |
-| Partly | 96 |
-| To build | 84 |
-| Needs real accounts | 19 |
+| Done | 326 |
+| Partly | 98 |
+| To build | 44 |
+| Needs real accounts | 21 |
 | Needs people | 11 |
 
 
@@ -24,7 +24,7 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 1 | Search every connected board for each truck at the same moment. | Partly | Boards searched each round per truck; real boards need agreements |
 | 2 | Start searching 36 hours before a truck delivers, not only when empty. | Done | Searches for trucks delivering within a day and a half |
 | 3 | Search from where the truck will be, not where it is. | Done | Searches from where the truck will be empty |
-| 4 | Widen the search radius step by step when nothing fits. | To build | Radius is fixed at 150 miles |
+| 4 | Widen the search radius step by step when nothing fits. | Done | A search that finds nothing widens to 250, then up to 350 miles (within the owner's deadhead) |
 | 5 | Search backhauls toward the driver's home first. | Done | Loads toward the driver's home come first |
 | 6 | Read every broker email blast and pull out each load. | Done | Broker emails read, each load pulled out |
 | 7 | Read load lists in attached spreadsheets and PDFs. | To build | Spreadsheet/PDF load lists attached to emails aren't read yet |
@@ -35,8 +35,8 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 12 | Ask favorite brokers directly for freight on a lane by email. | Done | Capacity emails to brokers who send freight from that state |
 | 13 | Call favorite brokers when a truck is about to be empty. | To build | Only emails; no call to favorite brokers yet |
 | 14 | Post empty trucks with the right date, place and equipment. | Done | Trucks posted once a day when the owner turns it on |
-| 15 | Repost trucks when the plan changes. | To build | Posts aren't refreshed when the plan changes |
-| 16 | Take posts down the moment a truck is booked. | To build | Posts aren't taken down when a truck is booked |
+| 15 | Repost trucks when the plan changes. | Needs real accounts | Post refresh needs each board's update endpoint, which isn't public; not guessed |
+| 16 | Take posts down the moment a truck is booked. | Needs real accounts | Post removal needs each board's delete endpoint, which isn't public; not guessed |
 | 17 | Answer broker calls about posted trucks on the first ring. | Done | Broker calls about posted trucks reach the AI |
 | 18 | Search for partial loads that fit leftover trailer space. | Done | Partials planned into trips |
 | 19 | Search for power-only loads when the trailer is free. | To build | Power-only loads not matched |
@@ -46,7 +46,7 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 
 | # | Item | Status | Note |
 |---|---|---|---|
-| 21 | Score each load by profit per hour, not just per mile. | To build | Scored per mile and net, not per hour |
+| 21 | Score each load by profit per hour, not just per mile. | Partly | Per-hour pay shown in the load's why (with dock hours); the choice still ranks by mile and net |
 | 22 | Count empty miles to pickup at the real cost per mile. | Done | Empty miles costed in net profit |
 | 23 | Count how hard it is to reload where the load delivers. | Done | Reload outlook where the load ends |
 | 24 | Count dock wait time from history at that shipper. | Partly | Slow docks told to the driver, not counted in the choice |
@@ -59,7 +59,7 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 31 | Skip loads that need gear the truck lacks (straps, tarps, load locks). | Done | Truck gear checked (judgment) |
 | 32 | Skip brokers the owner blocked. | Done | Blocked brokers aren't booked |
 | 33 | Prefer brokers who pay fast. | Partly | Slow payers priced up; fast payers not preferred in the choice |
-| 34 | Prefer shippers with short dock times. | To build | Short dock times not preferred in the choice |
+| 34 | Prefer shippers with short dock times. | Partly | A slow dock is priced into the ask (+4%); not yet a tie-breaker in the choice |
 | 35 | Compare two loads in a row against one long load. | Done | Plans compare back-to-back loads with long runs |
 | 36 | Compare a load today against a better one tomorrow. | To build | No today-vs-tomorrow comparison |
 | 37 | Explain in one line why it picked this load. | Done | Why-lines on every load |
@@ -72,11 +72,11 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | # | Item | Status | Note |
 |---|---|---|---|
 | 41 | Know the going rate for each lane today. | Needs real accounts | Built; needs a rate data account |
-| 42 | Know whether rates on a lane are rising or falling this week. | To build | No lane trend yet |
+| 42 | Know whether rates on a lane are rising or falling this week. | Done | Lane trend from the carrier's own loads: 5%+ rising lanes ask 3% more |
 | 43 | Know each broker's usual pay on each lane. | Done | Broker memory per lane |
 | 44 | Know the carrier's own past pay on each lane. | Done | Lane history pricing |
 | 45 | Know seasonal swings (produce, holidays, quarter end). | Needs real accounts | Needs a year of market data |
-| 46 | Know which days of the week pay more on a lane. | To build | No day-of-week pricing |
+| 46 | Know which days of the week pay more on a lane. | Done | Weekday edge from the carrier's own loads: a day paying 8%+ more asks 4% more |
 | 47 | Know reefer, flatbed and van gaps on the same lane. | Partly | Market by equipment when the rate service gives it |
 | 48 | Price extra stops correctly. | Done | Extra stops priced |
 | 49 | Price detention terms into the ask. | Partly | Detention terms asked for, not priced into the ask |
@@ -87,7 +87,7 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 54 | Price hazmat and high-value freight higher. | Done | Hazmat and high-value premium |
 | 55 | Price team loads for team speed. | Done | Team premium |
 | 56 | Price partial loads per foot of trailer. | Done | Partials priced by trailer share |
-| 57 | Price deadhead pay on long empty runs. | To build | No deadhead pay asked on long empty runs |
+| 57 | Price deadhead pay on long empty runs. | Done | Long empty runs (150+ mi, over 40% of loaded) asked for as dollars on top |
 | 58 | Track how often its first ask gets accepted. | Done | Ask learning tracks acceptance |
 | 59 | Raise the first ask when it is accepted too easily. | Done | Raises the ask when taken too easily |
 | 60 | Lower the first ask when it loses too many loads. | Done | Lowers it when it loses loads |
@@ -124,7 +124,7 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 81 | Call within a minute of a good posting. | Done | Calls right away on board loads for empty trucks |
 | 82 | Get through broker phone menus. | Done | Phone menus |
 | 83 | Wait on hold and keep the line open. | Done | Hold |
-| 84 | Ask for the right person by name. | To build | Doesn't ask for a rep by name |
+| 84 | Ask for the right person by name. | Done | Broker calls open by asking for the rep by name |
 | 85 | Say who it is calling for and that it's an AI. | Done | Says who it calls for and that it's an AI |
 | 86 | Ask "is it still available?" first. | Done | Asks if it's still available |
 | 87 | Ask what the broker is paying before naming a number. | Done | Asks what they pay first |
@@ -133,7 +133,7 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 90 | Handle being talked over without losing the thread. | Needs real accounts | Needs real calls |
 | 91 | Understand thick accents and bad cell signals. | Needs real accounts | Needs real calls |
 | 92 | Leave a short voicemail when nobody answers. | Done | Voicemail |
-| 93 | Call back when the broker said "call me in ten." | To build | "Call me in ten" not scheduled |
+| 93 | Call back when the broker said "call me in ten." | Done | "Call me back in ten" scheduled and called back |
 | 94 | Recap the agreement before hanging up. | Partly | Recaps on booking; not always |
 | 95 | Ask the broker to email the rate con right away. | Done | Asks for the rate con |
 | 96 | Hand the call to the owner on request. | Done | Owner can join |
@@ -184,11 +184,11 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 131 | Pay attention to the 70-hour clock across the week. | Done | 70-hour clock |
 | 132 | Plan the 34-hour restart at home or a good spot. | Partly | 34-hour restart planned, not where |
 | 133 | Plan fuel stops into the week's plan. | Done | Fuel stops planned |
-| 134 | Plan maintenance into slow days. | To build | Maintenance not planned into slow days |
+| 134 | Plan maintenance into slow days. | Done | Service due and the truck's next free day in the reminders |
 | 135 | Plan inspections before they expire. | Done | Inspection reminders |
 | 136 | Show the week's plan as one simple timeline per truck. | Partly | Plan lines and lineup; no timeline view |
 | 137 | Let the owner lock a load into the plan. | To build | Owner can't lock a load into the plan |
-| 138 | Let the owner block a day for a truck. | To build | Owner can't block a day for a truck |
+| 138 | Let the owner block a day for a truck. | Done | Owner blocks days per truck on the Fleet page; loads running into them are skipped |
 | 139 | Show expected weekly revenue per truck. | Partly | This week's money per truck, not expected |
 | 140 | Show expected weekly empty miles per truck. | Partly | Empty miles this week, not expected |
 
@@ -200,10 +200,10 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 142 | Know the 11-hour, 14-hour and 70-hour clocks. | Done | 11, 14 and 70 |
 | 143 | Know the 30-minute break rule. | Done | 30-minute break in trip timing |
 | 144 | Know split sleeper rules. | Done | Split sleeper |
-| 145 | Know short-haul exemptions. | To build | Short-haul exemption not known |
-| 146 | Know adverse driving conditions extensions. | To build | Adverse driving extension not known |
-| 147 | Know personal conveyance rules. | To build | Personal conveyance not known |
-| 148 | Know yard move rules. | To build | Yard moves not known |
+| 145 | Know short-haul exemptions. | Done | Short-haul exception in the AI's hours knowledge |
+| 146 | Know adverse driving conditions extensions. | Done | Adverse driving extension in the AI's hours knowledge |
+| 147 | Know personal conveyance rules. | Done | Personal conveyance in the AI's hours knowledge |
+| 148 | Know yard move rules. | Done | Yard moves in the AI's hours knowledge |
 | 149 | Plan the 10-hour break location in advance. | Partly | Parking near where hours run out |
 | 150 | Find truck parking near where hours run out. | Done | Parking found |
 | 151 | Book truck parking when the driver asks. | Done | Parking booked when asked |
@@ -213,9 +213,9 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 155 | Account for real dock time from history. | Done | Dock time from history |
 | 156 | Account for traffic in big cities. | Done | Traffic (HERE) |
 | 157 | Account for weather slowdowns. | Done | Weather |
-| 158 | Account for mountain grades. | To build | Mountain grades not counted |
+| 158 | Account for mountain grades. | Done | Mountain passes on the lane named in the driver's text, with chain laws Oct-Apr |
 | 159 | Account for team drivers' combined hours. | Done | Team hours |
-| 160 | Keep a log of every hours decision for audits. | To build | No hours-decision log |
+| 160 | Keep a log of every hours decision for audits. | Done | Driver's clocks at booking and what the load needs, on the load's timeline |
 
 ## 9. Home time and driver preferences (161–180)
 
@@ -229,7 +229,7 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 166 | Know drivers who won't do touch freight. | Done | No touch freight |
 | 167 | Know drivers who won't haul hazmat. | Done | Hazmat by endorsement |
 | 168 | Know preferred run lengths per driver. | Done | Run types |
-| 169 | Know preferred start times per driver. | To build | Preferred start times not kept |
+| 169 | Know preferred start times per driver. | Done | Driver's earliest pickup kept (said in a text or set on the profile) |
 | 170 | Know religious and family days off. | Partly | Time off and remembered notes |
 | 171 | Ask drivers new preferences in plain conversation. | Done | Asked and remembered in conversation |
 | 172 | Remember preferences said in passing. | Done | Said in passing (remember, preferences) |
@@ -265,7 +265,7 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 197 | Remind the driver of the reefer temperature. | Done | Reefer setting |
 | 198 | Send the next load before the current one delivers. | Done | Next load before delivery |
 | 199 | Send a morning brief with the day's stops. | Done | Morning brief |
-| 200 | Send an end-of-day note with tomorrow's plan. | To build | No evening note to drivers |
+| 200 | Send an end-of-day note with tomorrow's plan. | Done | Evening text before a pickup day: where, when, how far, when to leave, the break |
 
 ## 11. Appointments and docks (201–220)
 
@@ -289,7 +289,7 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 216 | Share dock tips with the next driver going there. | Done | Tips shared |
 | 217 | Track average wait time per dock. | Done | Wait per dock |
 | 218 | Warn the owner about slow docks before booking. | Partly | Driver told; owner not before booking |
-| 219 | Charge more for slow docks. | To build | Slow docks not priced |
+| 219 | Charge more for slow docks. | Done | Slow docks priced into the ask |
 | 220 | Keep a dock directory per carrier. | Partly | Facility memory; no directory page |
 
 ## 12. Tracking and check calls (221–240)
@@ -305,7 +305,7 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 227 | Send a tracking link brokers can open without signing in. | Done | Tracking link |
 | 228 | Text the driver only when the ELD can't answer. | Done | Texts only when needed |
 | 229 | Notice when a truck stops in the wrong place. | Done | Stopped in the wrong place |
-| 230 | Notice when a truck goes the wrong way. | To build | Wrong way not caught |
+| 230 | Notice when a truck goes the wrong way. | Done | With an ELD, a truck getting 10+ miles farther from its stop gets a text |
 | 231 | Notice when the ELD stops reporting. | Done | ELD quiet |
 | 232 | Ask the driver for a location when GPS is missing. | Done | Asks the driver |
 | 233 | Confirm pickup with the BOL photo. | Done | BOL photo |
@@ -328,9 +328,9 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 245 | Tell the driver the new plan. | Done | Driver told |
 | 246 | Tell the owner only when it costs money. | Partly | Owner told; not only when it costs money |
 | 247 | Handle shipper not ready. | Partly | Detention covers it; no shipper-not-ready path |
-| 248 | Handle receiver refusing the load. | To build | Receiver refusing not handled |
+| 248 | Handle receiver refusing the load. | Done | Receiver refusing: broker asked for instructions in writing, driver told to hold and note the BOL |
 | 249 | Handle short or damaged freight. | Done | Shortage and damage |
-| 250 | Handle wrong freight loaded. | To build | Wrong freight not handled |
+| 250 | Handle wrong freight loaded. | Done | Wrong freight at pickup: broker asked to confirm, driver told not to sign for it |
 | 251 | Handle overweight loads. | Partly | Scale checks; no overweight path |
 | 252 | Handle reefer temperature problems. | Done | Reefer readings |
 | 253 | Handle a cancelled load and claim TONU. | Done | Cancellations and TONU |
@@ -351,18 +351,18 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 263 | Find mobile repair for tires and small fixes. | Partly | Tire service searched; no mobile repair search |
 | 264 | Find towing for heavy trucks. | Done | Towing |
 | 265 | Call shops for price and time. | Done | Price asked |
-| 266 | Check the warranty or roadside plan first. | To build | Warranty or roadside plan not checked |
+| 266 | Check the warranty or roadside plan first. | Done | The carrier's roadside plan or warranty number goes to the driver first |
 | 267 | Tell the broker about the delay with a new time. | Done | Broker told |
-| 268 | Ask the broker about recovering the load if it's long. | To build | Load recovery not asked |
-| 269 | Find another truck to recover the load. | To build | No recovery truck |
-| 270 | Book a hotel for the driver if needed. | To build | No hotel |
+| 268 | Ask the broker about recovering the load if it's long. | Done | A long breakdown: the broker told the load won't move soon and offered a repower |
+| 269 | Find another truck to recover the load. | Done | Closest free truck of the same type (300 mi) offered to the owner as a repower |
+| 270 | Book a hotel for the driver if needed. | Done | Two hotels with truck room near the driver, in the evening or overnight |
 | 271 | Track repair cost against the owner's limit. | Done | Repair limit |
 | 272 | Ask the owner before big repairs. | Done | Owner asked over the limit |
 | 273 | Call 911 guidance for accidents. | Done | 911 first |
 | 274 | Alert the owner and support on accidents. | Done | Owner and support told |
 | 275 | Collect accident photos and a police report number. | Partly | Claims paperwork; no police report number |
 | 276 | Start the insurance claim. | Partly | Owner files with the insurer |
-| 277 | Handle cargo theft reports. | To build | Cargo theft not handled |
+| 277 | Handle cargo theft reports. | Done | Theft: emergency to support, broker told, claim file started, driver told 911 and police report |
 | 278 | Handle driver illness on the road. | Partly | Support; no illness path |
 | 279 | Handle a driver who stops answering. | Done | Calls and the owner |
 | 280 | Log every emergency step for the record. | Partly | Activity log |
@@ -372,24 +372,24 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | # | Item | Status | Note |
 |---|---|---|---|
 | 281 | Start the detention clock from the ELD arrival time. | Done | ELD arrival |
-| 282 | Tell the broker when free time runs out. | To build | Broker not told when free time runs out |
+| 282 | Tell the broker when free time runs out. | Done | Broker told when free time runs out with the truck still at the dock |
 | 283 | Ask for detention approval in writing. | Partly | Claims sent; no approval asked |
 | 284 | Bill detention with ELD times as proof. | Done | ELD times as proof |
 | 285 | Claim layover when the truck is held overnight. | Done | Layover |
 | 286 | Claim TONU on cancellations. | Done | TONU |
 | 287 | Claim lumper reimbursement with the receipt. | Done | Lumper |
 | 288 | Claim extra stop pay. | Done | Extra stop pay |
-| 289 | Claim driver assist pay. | To build | Driver assist pay not claimed |
-| 290 | Claim tarp pay. | To build | Tarp pay not claimed |
-| 291 | Claim reefer fuel where the contract allows. | To build | Reefer fuel not claimed |
-| 292 | Claim scale ticket fees. | To build | Scale fees not claimed |
+| 289 | Claim driver assist pay. | Done | Driver assist claimed at the rate con's or owner's price |
+| 290 | Claim tarp pay. | Done | Tarping claimed at the rate con's or owner's price |
+| 291 | Claim reefer fuel where the contract allows. | Done | Reefer fuel claimed from the receipt |
+| 292 | Claim scale ticket fees. | Done | Scale tickets claimed from the receipt |
 | 293 | Claim truck order not used fees. | Done | TONU |
-| 294 | Claim redelivery fees. | To build | Redelivery not claimed |
-| 295 | Claim out-of-route miles. | To build | Out-of-route miles not claimed |
+| 294 | Claim redelivery fees. | Done | Redelivery claimed at the rate con's or owner's price |
+| 295 | Claim out-of-route miles. | Done | Out-of-route miles claimed at the rate con's or the load's own rate a mile |
 | 296 | Follow up on unpaid extras. | Partly | Invoices followed up; extras not separately |
 | 297 | Track which brokers pay extras. | Partly | Detention paid % per broker |
 | 298 | Price slow payers of extras higher next time. | To build | Slow payers of extras not priced |
-| 299 | Share extras with drivers on their pay. | To build | Extras not shared on driver pay |
+| 299 | Share extras with drivers on their pay. | Done | Driver's share of extra pay for their work on the pay run |
 | 300 | Show the owner how much extra money it recovered. | Done | Report card extras |
 
 ## 16. Paperwork and billing handoff (301–320)
@@ -575,7 +575,7 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 442 | Let the owner set a lowest rate. | Done | Lowest rate |
 | 443 | Let the owner set the most empty miles. | Done | Empty miles |
 | 444 | Let the owner set brokers to avoid. | Done | Brokers to avoid |
-| 445 | Let the owner set lanes to avoid. | To build | No lanes to avoid |
+| 445 | Let the owner set lanes to avoid. | Done | Lanes the carrier won't run, in Settings |
 | 446 | Let the owner set a spending limit for repairs. | Done | Repair limit |
 | 447 | Let the owner set rules in plain words. | Partly | Teach on each load |
 | 448 | Never break a rule, even if a broker pushes. | Done | Rules hold |
@@ -613,8 +613,8 @@ Every item from the list of what it takes for the AI to do a human dispatcher's 
 | 475 | Answer faster on calls (under a second). | Needs real accounts | Needs real calls |
 | 476 | Handle background road noise. | Needs real accounts | Needs real calls |
 | 477 | Handle bad cell signals with patience. | Needs real accounts | Needs real calls |
-| 478 | Read back numbers to confirm them. | To build | Numbers not read back |
-| 479 | Spell names and numbers when asked. | To build | No spelling on request |
+| 478 | Read back numbers to confirm them. | Done | Numbers read back on calls |
+| 479 | Spell names and numbers when asked. | Done | Names and numbers spelled on request |
 | 480 | Have native speakers review every language. | Needs people | Needs native speakers |
 
 ## 25. Measuring the AI against a human dispatcher (481–500)

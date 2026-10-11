@@ -62,6 +62,8 @@ export ELEVENLABS_VOICE_ID=voice-1
 export ELEVENLABS_BASE=http://localhost:3009/elevenlabs
 export WEATHER_API_BASE=http://localhost:3009/weather
 export BRIEF_HOURS=0-24
+# The evening-before text never goes out in the suites (its facts are unit-tested): it would land in other suites' threads.
+export EVENING_HOURS=0-0
 export APP_LINK_HOURS=0-24
 export REVIEW_DAY=any
 export REVIEW_HOURS=0-24

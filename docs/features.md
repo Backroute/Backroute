@@ -121,7 +121,12 @@ What the real version does today, and what it doesn't do yet. How to switch each
   - texts the driver the nearest open ones.
   - phones them one by one until one says they can come, then texts the driver that shop's number and how soon.
   - emails the broker that the load is delayed.
-  - puts the repair bill in front of the owner. The AI never agrees to a repair price.
+  - gives the driver the carrier's own roadside plan or warranty number first, when one is set (Settings → Business).
+  - puts the repair bill in front of the owner. The AI okays a repair on the call only under the owner's repair limit
+    (Settings → Business); over it, or with no price given, the owner approves it.
+  - when the repair won't be done today (nobody can come, the shop says hours or tomorrow, or three hours with no shop):
+    offers the owner a repower with their closest free truck of the same type (within 300 miles), tells the broker the
+    load won't move soon, and texts the driver two hotels nearby with room for a truck in the evening or overnight.
 - **Your rules** (Settings → General): judgment calls the owner can hand to the AI:
   - TONU at the usual amount
   - detention at the usual rate
@@ -530,6 +535,41 @@ What the real version does today, and what it doesn't do yet. How to switch each
     on time, at or over the market), as advice, not a lock.
   - Fixed: texts from the late-truck, stopped-truck and parking checks went to the driver's number as typed
     ("(214) 555-0148"); every text now goes out in the +1 form.
+
+- **More of the dispatcher's judgment (batch A):**
+  - **The carrier's own history:** a lane paying 5% or more lately than in the months before (+3%), and a weekday that
+    pays 8% or more on a lane (+4%), from the carrier's delivered loads. A broker who pays detention less than half the
+    time (+3%) and a dock that keeps trucks three hours or more (+4%) are priced in, inside the same 18% cap. A long
+    empty run to the pickup (150 miles or more, and more than 40% of the loaded miles) is asked for as dollars on top,
+    at $0.75 a mile in steps of $25.
+  - **Lanes, days and start times the owner sets:** lanes the carrier won't run (Settings → Business: "TX>CA", ">CA",
+    "NY>"), days a truck is kept off (Fleet page), and a driver's earliest pickup ("nothing before 6 am").
+  - **Hours shown when booked:** the driver's clocks when the load was booked and what it needs, on the load's timeline.
+  - **Mountain grades and chain laws:** the driver's new-load text names the passes on the way, and from October to April
+    the chain-law rule.
+  - **Hours-of-service knowledge:** short-haul, adverse driving, personal conveyance, yard moves and split sleeper, so the
+    AI explains them right. Numbers read back on calls; names spelled on request.
+  - **"Call me back in ten":** the AI calls the broker back when they asked.
+  - **Wider searches:** a board search that finds nothing tries 250 miles, then up to 350 (within the owner's deadhead).
+  - **Shop days:** service due and a truck's next free day go in the reminders.
+
+- **After booking (batch B):**
+  - **Extra pay:** when a driver says they tarped, unloaded by hand (driver assist), went back for a redelivery, ran miles
+    out of route, paid for a scale ticket or bought reefer fuel, the AI claims it from the broker in writing the same
+    hour, at the rate con's price (or the posting's), the owner's price list (Settings → Business → Extra pay), the
+    receipt, or the miles at the load's own rate a mile (that one waits for the owner's OK). With nothing to price it
+    by, the owner is asked once. Claimed extras are on the invoice, and the driver's share of their work is on their
+    pay run (a percentage driver's percentage, unless the owner sets another share).
+  - **Freight gone wrong:** a receiver refusing the load, freight at pickup that doesn't match the paperwork, or a stolen
+    load. The broker is told in writing at once, the driver gets the exact steps (hold on site, write it on the BOL,
+    photos; for theft, 911 and the police report), and the owner sees it. A theft is an emergency for support and starts
+    the claim file for the insurer.
+  - **Free time running out:** with the truck still at the dock past free time, the broker is told detention has started,
+    once per stop. A truck that got there late isn't.
+  - **Wrong way:** with an ELD, a truck getting more than 10 miles farther from its stop between readings gets a text to
+    check the route, once per stop.
+  - **The evening before:** a text the evening before a pickup day with where and when, how far the truck is, when to
+    leave, and the 10-hour break if the clock is low (EVENING_HOURS, default 6-9 PM at the truck).
 
 ## What it doesn't do yet
 
