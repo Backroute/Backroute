@@ -610,6 +610,11 @@ function StatementForm({ kind, name, busy, onSubmit }: { kind: "fuel_feed" | "to
         <Link href="/carrier/costs" className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-sm font-medium text-ink-800">
           <Upload className="h-3.5 w-3.5" /> Upload a file instead
         </Link>
+        {kind === "fuel_feed" && (
+          <Link href="/carrier/costs#fuel-prices" className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-sm font-medium text-ink-800">
+            Station prices for fuel plans
+          </Link>
+        )}
       </div>
       <p className="text-xs text-ink-500">One {kind === "fuel_feed" ? "fuel card" : "toll"} report address at a time; files from other cards can always be uploaded on Costs.</p>
     </div>

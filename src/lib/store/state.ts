@@ -4,10 +4,10 @@ import { type OfferAskDraft } from "../engine";
 import { type BrokerPolicy } from "../broker-policy";
 import { type QuickPhrase } from "../lang";
 import { type FleetEntry, type NewLoad } from "../fleet";
-import type { Advance, FuelTx, PayRun, TollTx, RateConPdfReading, ActivityEvent, Broker, Carrier, CarrierMessage, DispatchCall, Driver, DriverMessage, DriverPrefs, HosStatus, DvirInspection, DvirItem, Escalation, Expense, TimeOffRequest, Incident, IncidentType, Load, RunType, MaintenanceAppointment, Truck, VoiceCall } from "../types";
+import type { TripChecklist, Advance, FuelTx, PayRun, TollTx, RateConPdfReading, ActivityEvent, Broker, Carrier, CarrierMessage, DispatchCall, Driver, DriverMessage, DriverPrefs, HosStatus, DvirInspection, DvirItem, Escalation, Expense, TimeOffRequest, Incident, IncidentType, Load, RunType, MaintenanceAppointment, Truck, VoiceCall } from "../types";
 import type { AgentSettings, Autonomy } from "./settings";
 
-export type DriverDocType = "bol" | "pod" | "lumper_receipt";
+export type DriverDocType = "bol" | "pod" | "lumper_receipt" | "pickup_photo" | "scale_ticket";
 
 export interface LiveMetrics {
   activeCalls: number;
@@ -78,6 +78,8 @@ export interface StoreState {
     /** Driver ticks off an on-site step at the stop they're at: loaded at pickup, unloaded at delivery. */
     confirmTripStep: (loadId: string, step: "loaded" | "unloaded") => void;
     setSealNumber: (loadId: string, sealNumber: string) => void;
+    /** Trailer numbers and scale weights from the driver at pickup. */
+    setTripInfo: (loadId: string, patch: Partial<TripChecklist>) => void;
     /** Driver photographs a document at the stop; a moment later the AI has read it and marks it verified
      *  (and for a lumper receipt, files the reimbursement itself). Re-uploading replaces the previous one. */
     uploadLoadDocument: (loadId: string, type: DriverDocType, file: { name: string; previewUrl?: string; file?: File }) => void;
@@ -145,6 +147,8 @@ export interface StoreState {
     setAiPaused: (loadId: string, paused: boolean) => void;
     /** The office sets a dock's street address (the driver's truck GPS goes there). Empty clears it. */
     setDockAddress: (loadId: string, stop: "pickup" | "delivery", address: string) => void;
+    /** Live load or drop and hook at the shipper: the driver's pickup steps follow it. */
+    setPickupType: (loadId: string, type: "live" | "drop_hook") => void;
     opsOverrideRate: (loadId: string, amount: number) => void;
     /** Ops manually re-tiers a broker — after investigating a complaint, a false-positive fraud flag,
      *  whatever the automated score missed. Same "internal action, visible to the carrier" transparency

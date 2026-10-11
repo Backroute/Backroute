@@ -120,6 +120,8 @@ export interface PagesText {
     payStatements: string;
     noDelivered: string;
     total(amount: string): string;
+    weekly: string;
+    weekOf(date: string): string;
     details: string;
     cdl: string;
     hired: string;
@@ -321,6 +323,8 @@ const en: PagesText = {
     payStatements: "Pay statements",
     noDelivered: "No delivered loads yet.",
     total: (x) => `${x} total`,
+    weekly: "Weekly statements",
+    weekOf: (d) => `Week of ${d}`,
     details: "Details",
     cdl: "CDL",
     hired: "Hired",
@@ -522,6 +526,8 @@ const es: PagesText = {
     payStatements: "Comprobantes de pago",
     noDelivered: "Todavía no hay cargas entregadas.",
     total: (x) => `${x} en total`,
+    weekly: "Recibos semanales",
+    weekOf: (d) => `Semana del ${d}`,
     details: "Datos",
     cdl: "CDL",
     hired: "Contratado",
@@ -723,6 +729,8 @@ const fr: PagesText = {
     payStatements: "Relevés de paie",
     noDelivered: "Pas encore de chargement livré.",
     total: (x) => `${x} au total`,
+    weekly: "Relevés de la semaine",
+    weekOf: (d) => `Semaine du ${d}`,
     details: "Infos",
     cdl: "Permis CDL",
     hired: "Embauché",
@@ -924,6 +932,8 @@ const pa: PagesText = {
     payStatements: "ਤਨਖ਼ਾਹ ਦੇ ਵੇਰਵੇ",
     noDelivered: "ਅਜੇ ਕੋਈ ਲੋਡ ਡਿਲੀਵਰ ਨਹੀਂ।",
     total: (x) => `ਕੁੱਲ ${x}`,
+    weekly: "ਹਫ਼ਤਾਵਾਰੀ ਸਟੇਟਮੈਂਟ",
+    weekOf: (d) => `${d} ਵਾਲਾ ਹਫ਼ਤਾ`,
     details: "ਜਾਣਕਾਰੀ",
     cdl: "CDL",
     hired: "ਨੌਕਰੀ ਸ਼ੁਰੂ",
@@ -1125,6 +1135,8 @@ const hi: PagesText = {
     payStatements: "पगार के विवरण",
     noDelivered: "अभी कोई लोड डिलीवर नहीं।",
     total: (x) => `कुल ${x}`,
+    weekly: "साप्ताहिक स्टेटमेंट",
+    weekOf: (d) => `${d} वाला हफ़्ता`,
     details: "जानकारी",
     cdl: "CDL",
     hired: "नौकरी शुरू",
@@ -1326,6 +1338,8 @@ const ru: PagesText = {
     payStatements: "Расчёты по оплате",
     noDelivered: "Доставленных грузов пока нет.",
     total: (x) => `Всего ${x}`,
+    weekly: "Недельные выписки",
+    weekOf: (d) => `Неделя с ${d}`,
     details: "Данные",
     cdl: "CDL",
     hired: "Принят",
@@ -1527,6 +1541,8 @@ const uk: PagesText = {
     payStatements: "Розрахунки з оплати",
     noDelivered: "Доставлених вантажів поки немає.",
     total: (x) => `Усього ${x}`,
+    weekly: "Тижневі виписки",
+    weekOf: (d) => `Тиждень з ${d}`,
     details: "Дані",
     cdl: "CDL",
     hired: "Прийнято",

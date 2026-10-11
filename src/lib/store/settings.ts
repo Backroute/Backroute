@@ -1,4 +1,5 @@
 /** What the owner sets for the AI: how much it books on its own, and the business details the real version uses. */
+import type { FuelPrices } from "../fuel-prices";
 import { type BrokerPolicy } from "../broker-policy";
 import type { Lang, OwnerRule } from "../types";
 
@@ -29,6 +30,8 @@ export interface AgentSettings {
   businessAddress?: string;
   /** Real accounts: invoices go to the factoring company instead of the broker when this is set. */
   factoringEmail?: string;
+  /** The fuel card's station prices, the cheapest few per state (lib/fuel-prices): the trip's fuel plan uses them. */
+  fuelPrices?: FuelPrices;
   /** Who the carrier factors with ("RTS Financial"), shown in Settings → Integrations. */
   factoringCompany?: string;
   /** Real accounts: the AI texts drivers before pickup and delivery, and follows up. On unless turned off. */

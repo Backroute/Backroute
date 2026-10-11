@@ -1,5 +1,6 @@
 "use client";
 
+import { ShareLinkButton } from "@/components/owner/share-link-button";
 import { useState } from "react";
 import Link from "next/link";
 import { Building2, CalendarPlus, Plus, Trash2 } from "lucide-react";
@@ -156,6 +157,7 @@ function ShipperCard({ shipper }: { shipper: Broker }) {
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 !pt-3">
+        <ShareLinkButton kind="shipper" id={shipper.id} label="Their page: loads, PODs and invoices" email={shipper.email || undefined} subject={`Your loads with us`} />
         <div>
           <p className="t-label text-ink-500">Contract lanes</p>
           <ul className="mt-2 flex flex-col gap-2">

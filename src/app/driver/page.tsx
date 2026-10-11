@@ -65,6 +65,7 @@ export default function DriverHomePage() {
   const acknowledgeDelivery = useStore((s) => s.actions.acknowledgeDelivery);
   const confirmTripStep = useStore((s) => s.actions.confirmTripStep);
   const setSealNumber = useStore((s) => s.actions.setSealNumber);
+  const setTripInfo = useStore((s) => s.actions.setTripInfo);
   const uploadLoadDocument = useStore((s) => s.actions.uploadLoadDocument);
   const setAutoChain = useStore((s) => s.actions.setAutoChain);
   const startInboundCall = useStore((s) => s.actions.startInboundCall);
@@ -126,6 +127,7 @@ export default function DriverHomePage() {
         onCounter: (amount) => requestBetterRate(currentLoad.id, "driver", amount),
         onTripStep: confirmTripStep,
         onSeal: setSealNumber,
+        onTripInfo: setTripInfo,
         onUpload: uploadLoadDocument,
       }
     : null;

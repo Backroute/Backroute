@@ -14,6 +14,7 @@ import { costsByLoad, gallonsByState } from "@/lib/fuel-import";
 import { iftaReturnDue } from "@/lib/expiry";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Lane } from "@/components/ui/lane";
+import { FuelPricesCard } from "@/components/owner/fuel-prices-card";
 
 /** The quarter a date is in, as yyyy-mm-dd bounds. */
 function quarterOf(now: number): { from: string; to: string; label: string } {
@@ -97,9 +98,11 @@ export default function CostsPage() {
               </p>
             )}
             {error && <p className="text-sm text-[var(--accent-danger)]">{error}</p>}
-            <p className="text-xs text-ink-500">With the card company&apos;s feed connected (Settings → Connections), they come in by themselves every night.</p>
+            <p className="text-xs text-ink-500">With the card&apos;s report address connected (Settings → Integrations), they come in by themselves every round.</p>
           </CardContent>
         </Card>
+
+        <FuelPricesCard />
 
         {unknownUnits.length > 0 && (
           <Card>

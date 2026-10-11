@@ -20,7 +20,8 @@ const esc = (s: string) =>
     .replace(/\(/g, "\\(")
     .replace(/\)/g, "\\)");
 
-export function textPdf(lines: PdfLine[]): Buffer {
+/** The PDF's bytes; works in the browser too (pay statements and trip reports are made on the phone). */
+export function pdfBytes(lines: PdfLine[]): Uint8Array {
   const width = 612;
   const height = 792; // US Letter
   let y = height - 64;
@@ -40,16 +41,21 @@ export function textPdf(lines: PdfLine[]): Buffer {
     `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>`,
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>",
-    `<< /Length ${Buffer.byteLength(stream, "latin1")} >>\nstream\n${stream}\nendstream`,
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
   ];
   let out = "%PDF-1.4\n";
   const offsets: number[] = [];
   objects.forEach((body, i) => {
-    offsets.push(Buffer.byteLength(out, "latin1"));
+    offsets.push(out.length);
     out += `${i + 1} 0 obj\n${body}\nendobj\n`;
   });
-  const xref = Buffer.byteLength(out, "latin1");
+  const xref = out.length;
   out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("")}`;
   out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
-  return Buffer.from(out, "latin1");
+  // Every character is Latin-1 (esc replaced the rest), so one character is one byte.
+  return Uint8Array.from(out, (c) => c.charCodeAt(0));
+}
+
+export function textPdf(lines: PdfLine[]): Buffer {
+  return Buffer.from(pdfBytes(lines));
 }

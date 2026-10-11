@@ -1,4 +1,5 @@
 import type { Load } from "./types";
+import { cheapestByState, routeStates, type FuelPrices } from "./fuel-prices";
 
 /** Average retail diesel by state this week, $/gal (demo data; live it comes from the fuel card's price feed). */
 const DIESEL_PRICE: Record<string, number> = {
@@ -55,6 +56,8 @@ const CHAINS = ["Pilot Flying J", "Love's"];
 
 interface FuelStop {
   state: string;
+  /** From the carrier's price file: the station's name and town. */
+  station?: string;
   stateName: string;
   chain: string;
   milesAhead: number;
@@ -70,6 +73,8 @@ interface FuelPlan {
   stops: FuelStop[];
   /** Against filling up at pump price wherever the tank hits a quarter. */
   savings: number;
+  /** Where the prices came from: the carrier's own fuel card price file, or this week's sample state averages. */
+  source: { kind: "file"; name: string; at: string } | { kind: "sample" };
 }
 
 function hash(s: string): number {
@@ -89,9 +94,19 @@ function startingTankPct(load: Load): number {
  * reconciled on the IFTA return by miles driven per state, so buying in a low-tax state doesn't cut tax; the
  * savings are pump price and card discount only.
  */
-export function planFuel(load: Load, mpg: number, milesDone: number): FuelPlan | null {
-  const states = ROUTE_STATES[`${load.lane.origin}|${load.lane.destination}`];
+export function planFuel(load: Load, mpg: number, milesDone: number, prices?: FuelPrices | null): FuelPlan | null {
+  // With the carrier's price file: the cheapest station the card covers in each state on the way, at the card's price.
+  const best = prices?.stations.length ? cheapestByState(prices.stations) : null;
+  const states = (best ? routeStates({ city: load.lane.origin, state: load.lane.originState }, { city: load.lane.destination, state: load.lane.destState }) : null) ?? ROUTE_STATES[`${load.lane.origin}|${load.lane.destination}`];
   if (!states) return null;
+  if (best && !states.some((st) => best[st])) return null;
+  const priceIn = (st: string) => (best ? (best[st]?.price ?? null) : (DIESEL_PRICE[st] ?? 3.9) - CARD_DISCOUNT);
+  // What filling up anywhere costs: the file's average for the state when there is one, else the sample average.
+  const pumpIn = (st: string) => {
+    if (!best || !prices) return DIESEL_PRICE[st] ?? 3.9;
+    const here = prices.stations.filter((x) => x.state === st);
+    return here.length ? here.reduce((t, x) => t + (x.retail ?? x.price), 0) / here.length : (best[st]?.price ?? 0);
+  };
   const total = load.lane.miles;
   const segment = total / states.length;
   const milesLeft = Math.max(0, Math.round(total - milesDone));
@@ -104,9 +119,9 @@ export function planFuel(load: Load, mpg: number, milesDone: number): FuelPlan |
     .map((st, i) => {
       const lineAt = i * segment + 15;
       const inThisState = milesDone >= lineAt && milesDone < (i + 1) * segment;
-      return { state: st, i, price: (DIESEL_PRICE[st] ?? 3.9) - CARD_DISCOUNT, pos: inThisState ? milesDone + 5 : lineAt };
+      return { state: st, i, price: priceIn(st), pos: inThisState ? milesDone + 5 : lineAt };
     })
-    .filter((s) => s.pos > milesDone && s.pos < total - 20);
+    .filter((s): s is { state: string; i: number; price: number; pos: number } => s.price !== null && s.pos > milesDone && s.pos < total - 20);
   const stops: FuelStop[] = [];
   const range = (TANK_GALLONS - RESERVE_GALLONS) * mpg;
   let pos = milesDone;
@@ -122,7 +137,9 @@ export function planFuel(load: Load, mpg: number, milesDone: number): FuelPlan |
     if (gallons >= 10) {
       fuel += gallons;
       stops.push({
-        state: st.state, stateName: STATE_NAME[st.state] ?? st.state, chain: CHAINS[(hash(load.id) + st.i) % CHAINS.length],
+        state: st.state, stateName: STATE_NAME[st.state] ?? st.state,
+        chain: best ? best[st.state].name : CHAINS[(hash(load.id) + st.i) % CHAINS.length],
+        ...(best && best[st.state].city ? { station: `${best[st.state].name}, ${best[st.state].city}` } : {}),
         milesAhead: Math.round(st.pos - milesDone), gallons, pricePerGal: st.price, cost: Math.round(gallons * st.price),
       });
     }
@@ -138,14 +155,14 @@ export function planFuel(load: Load, mpg: number, milesDone: number): FuelPlan |
       const st = states[Math.min(states.length - 1, Math.floor(m / segment))];
       const g = TANK_GALLONS - habitFuel;
       habitGallons += g;
-      habitCost += g * (DIESEL_PRICE[st] ?? 3.9);
+      habitCost += g * pumpIn(st);
       habitFuel = TANK_GALLONS;
     }
   }
   const planGallons = stops.reduce((s, x) => s + x.gallons, 0);
   const planAvg = planGallons ? stops.reduce((s, x) => s + x.cost, 0) / planGallons : 0;
-  const habitAvg = habitGallons ? habitCost / habitGallons : states.reduce((s, st) => s + (DIESEL_PRICE[st] ?? 3.9), 0) / states.length;
+  const habitAvg = habitGallons ? habitCost / habitGallons : states.reduce((s, st) => s + pumpIn(st), 0) / states.length;
   const savings = planGallons ? Math.max(0, Math.round(planGallons * (habitAvg - planAvg))) : 0;
 
-  return { startPct, milesLeft, gallonsNeeded, stops, savings };
+  return { startPct, milesLeft, gallonsNeeded, stops, savings, source: best && prices ? { kind: "file", name: prices.source, at: prices.at } : { kind: "sample" } };
 }

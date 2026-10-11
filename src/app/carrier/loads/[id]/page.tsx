@@ -46,16 +46,20 @@ import { Lane } from "@/components/ui/lane";
 import { hasSheet, LoadSheet } from "@/components/shared/load-sheet";
 import { DispatchChecklist } from "@/components/shared/dispatch-checklist";
 import { dispatchStops } from "@/lib/dispatch-checks";
+import { TripReportCard } from "@/components/owner/trip-report-card";
+import { ShareLinkButton } from "@/components/owner/share-link-button";
 
 /** Cancellable once rate is locked in; once in transit the freight is already moving, so that's a
  *  claim situation, not a cancellation. Dispatched/at_pickup carry a TONU fee since the truck already committed. */
 const CANCELLABLE_STAGES: LoadStage[] = ["rate_confirmed", "booked", "dispatched", "at_pickup"];
 const TONU_STAGES: LoadStage[] = ["dispatched", "at_pickup"];
+/** A tracking link is worth sending once the load is booked, and still opens after delivery. */
+const SHAREABLE: LoadStage[] = ["rate_confirmed", "booked", "dispatched", "at_pickup", "in_transit", "at_delivery", "delivered"];
 /** Swappable up through at_pickup — once freight is actually moving with a truck, that's a mid-route
  *  problem (see incident reporting), not a reassignment. */
 const REASSIGNABLE_STAGES: LoadStage[] = ["booked", "dispatched", "at_pickup"];
 
-type Section = "sheet" | "why" | "deal" | "rateCon" | "docs" | "timeline" | "pay" | "rateProfit" | "expenses" | "assignment" | "stops";
+type Section = "sheet" | "why" | "deal" | "rateCon" | "docs" | "timeline" | "pay" | "rateProfit" | "expenses" | "assignment" | "stops" | "report";
 
 /**
  * The page leads with what the load needs now. While it's being won, the broker talk and the money; once it's on a
@@ -63,7 +67,7 @@ type Section = "sheet" | "why" | "deal" | "rateCon" | "docs" | "timeline" | "pay
  */
 function sectionOrder(stage: LoadStage): { main: Section[]; side: Section[] } {
   if (stage === "delivered" || stage === "cancelled")
-    return { main: ["docs", "rateCon", "deal", "why"], side: ["pay", "rateProfit", "expenses", "timeline", "assignment", "stops"] };
+    return { main: ["report", "docs", "rateCon", "deal", "why"], side: ["pay", "rateProfit", "expenses", "timeline", "assignment", "stops"] };
   if (isTransitStage(stage) || stage === "booked" || stage === "rate_confirmed")
     return { main: ["docs", "sheet", "stops", "rateCon", "deal", "why"], side: ["assignment", "timeline", "pay", "rateProfit", "expenses"] };
   return { main: ["why", "deal", "rateCon", "docs"], side: ["rateProfit", "expenses", "timeline", "pay", "assignment", "stops"] };
@@ -395,7 +399,8 @@ export default function LoadDetailPage() {
     </>
   );
   const sheet = hasSheet(load) ? <LoadSheet load={load} className="bg-white" /> : null;
-  const sections = { sheet, why, deal, rateCon, docs, timeline, pay, rateProfit, expenses, assignment, stops };
+  const report = load.stage === "delivered" ? <TripReportCard load={load} truck={truck?.unitNumber} driver={driver?.name} broker={broker?.company} /> : null;
+  const sections = { sheet, why, deal, rateCon, docs, timeline, pay, rateProfit, expenses, assignment, stops, report };
   const layout = sectionOrder(load.stage);
 
   return (
@@ -428,6 +433,11 @@ export default function LoadDetailPage() {
         </div>
         <WhereNow load={load} truck={truck} driverName={driver?.name} />
         <ContactRow driver={driver} broker={broker} className="mt-3" />
+        {SHAREABLE.includes(load.stage) && (
+          <div className="mt-3">
+            <ShareLinkButton kind="track" id={load.id} label="Share tracking" email={load.brokerContactEmail ?? broker?.email} subject={`Tracking for ${load.referenceNumber}`} />
+          </div>
+        )}
         {load.stage !== "cancelled" && (
           <div className="mt-4">
             {isTransitStage(load.stage) ? <TripStepper stage={load.stage} /> : <Progress value={load.progressPct} />}
@@ -624,8 +634,42 @@ function DockAddresses({ load }: { load: Load }) {
     { stop: "pickup" as const, label: "Pickup dock", address: load.pickupAddress ?? load.rateConReading?.shipperAddress ?? null },
     { stop: "delivery" as const, label: "Delivery dock", address: load.deliveryAddress ?? load.rateConReading?.receiverAddress ?? null },
   ];
+  const setPickupType = useStore((s) => s.actions.setPickupType);
+  const dropHook = load.pickupType === "drop_hook";
+  const t = load.tripChecklist;
   return (
     <div className="mt-3.5 flex flex-col gap-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs text-ink-500">At the shipper</span>
+        <div role="group" aria-label="Pickup type" className="inline-flex rounded-full border border-line p-0.5 text-xs">
+          {(["live", "drop_hook"] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              aria-pressed={(k === "drop_hook") === dropHook}
+              onClick={() => setPickupType(load.id, k)}
+              className={"rounded-full px-2.5 py-1 font-medium " + ((k === "drop_hook") === dropHook ? "bg-ink-950 text-white" : "text-ink-600")}
+            >
+              {k === "live" ? "Live load" : "Drop and hook"}
+            </button>
+          ))}
+        </div>
+      </div>
+      {(t?.trailerNumber || t?.droppedTrailer) && (
+        <div className="flex items-start justify-between gap-3">
+          <span className="text-xs text-ink-500">Trailer</span>
+          <span className="text-right text-sm font-medium text-ink-950">
+            {t?.trailerNumber ?? "—"}
+            {t?.droppedTrailer ? <span className="block text-xs font-normal text-ink-500">Left {t.droppedTrailer} at the shipper</span> : null}
+          </span>
+        </div>
+      )}
+      {t?.scale && (
+        <div className="flex items-start justify-between gap-3">
+          <span className="text-xs text-ink-500">Scale</span>
+          <span className="text-right text-sm font-medium text-ink-950">{t.scale.gross.toLocaleString()} lbs gross</span>
+        </div>
+      )}
       {stops.map((x) =>
         editing === x.stop ? (
           <form

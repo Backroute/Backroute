@@ -544,7 +544,7 @@ export interface VoiceCall {
 
 export interface LoadDocument {
   id: string;
-  type: "rate_confirmation" | "bol" | "pod" | "invoice" | "lumper_receipt";
+  type: "rate_confirmation" | "bol" | "pod" | "invoice" | "lumper_receipt" | "pickup_photo" | "scale_ticket";
   name: string;
   generatedAt: string;
   /** "pending" while the AI is still reading a driver upload; "failed" when it didn't reach the server (retake it). */
@@ -570,6 +570,11 @@ export interface TripChecklist {
   loadedAt?: string;
   unloadedAt?: string;
   sealNumber?: string;
+  /** The trailer the load rides in; on a drop and hook, the empty one left at the shipper too. */
+  trailerNumber?: string;
+  droppedTrailer?: string;
+  /** What the truck weighed loaded, off the scale ticket (lib/scale). */
+  scale?: { steer?: number; drives?: number; trailer?: number; gross: number; at: string };
   /** When the truck drove out of the dock's lot, from the ELD: the "out" time for detention. */
   leftPickupAt?: string;
   leftDeliveryAt?: string;
@@ -698,6 +703,8 @@ export interface Load {
   tracking?: { app: string | null; link: string | null; askedAt: string; acceptedAt?: string };
   /** Real accounts: pickup and delivery appointment times, for check-ins and detention. */
   pickupAt?: string;
+  /** Live load (the driver waits while it's loaded) or drop and hook (leave an empty trailer, take a loaded one). */
+  pickupType?: "live" | "drop_hook";
   deliveryAt?: string;
   /** What's in the trailer, as the broker said it. */
   commodity?: string;

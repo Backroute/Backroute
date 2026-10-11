@@ -2,7 +2,8 @@
 
 import { PapersWallet } from "@/components/driver/papers-wallet";
 import { useEffect, useState } from "react";
-import { CalendarClock, DollarSign, Home, Phone, Star, Users } from "lucide-react";
+import { CalendarClock, DollarSign, FileDown, Home, Phone, Star, Users } from "lucide-react";
+import { downloadPdf, payStatementLines } from "@/lib/statements";
 import { CallSettingsCard, LanguageCard } from "@/components/shared/call-settings";
 import { BusinessCard } from "@/components/shared/owner-operator";
 import { AppearanceCard } from "@/components/shared/appearance-card";
@@ -58,7 +59,7 @@ function tabFor(search: string, hash: string): ProfileTab {
 }
 
 export default function DriverProfilePage() {
-  const { t } = useDriverUi();
+  const { t, lang } = useDriverUi();
   const p = usePagesText();
   // Four groups instead of one long page; a link can open one (?tab=truck).
   const [tab, setTab] = useState<ProfileTab>("me");
@@ -70,6 +71,7 @@ export default function DriverProfilePage() {
   const carrier = usePrimaryCarrier();
   const trucks = useCarrierTrucks();
   const drivers = useStore((s) => s.drivers);
+  const payRuns = useStore((s) => s.payRuns);
   const loads = useCarrierLoads();
   const truck = trucks.find((t) => t.id === driver.truckId);
   const updateHomeTimeTarget = useStore((s) => s.actions.updateHomeTimeTarget);
@@ -91,6 +93,7 @@ export default function DriverProfilePage() {
     .filter((l) => l.stage === "delivered" && l.truckId === truck?.id)
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   const totalPay = paidLoads.reduce((s, l) => s + computeDriverPay(l, driver, isTeam), 0);
+  const myRuns = payRuns.filter((r) => r.driverId === driver.id).sort((a, b) => b.period.localeCompare(a.period));
 
   return (
     <div className="flex flex-col gap-5 px-5">
@@ -304,6 +307,30 @@ export default function DriverProfilePage() {
           </>
         )}
       </div>
+
+      {myRuns.length > 0 && (
+        <div className="rounded-2xl border border-line p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">{p.profile.weekly}</p>
+          <div className="mt-2 flex flex-col divide-y divide-line">
+            {myRuns.slice(0, 8).map((r) => (
+              <div key={r.id} className="flex items-center justify-between gap-2 py-2.5 first:pt-0 last:pb-0">
+                <p className="text-sm text-ink-800">{p.profile.weekOf(new Date(`${r.period}T12:00:00`).toLocaleDateString(lang === "en" ? "en-US" : lang, { month: "short", day: "numeric" }))}</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold tabular text-ink-950">{formatCurrency(r.net)}</span>
+                  <button
+                    type="button"
+                    aria-label={`PDF ${r.period}`}
+                    onClick={() => void downloadPdf(`pay-${r.period}.pdf`, payStatementLines(r, driver.name, { name: carrier.name, mc: carrier.mc }))}
+                    className="inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-xs font-medium text-ink-700"
+                  >
+                    <FileDown className="h-3.5 w-3.5" /> PDF
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="rounded-2xl border border-line p-4">
         <p className="text-xs font-semibold uppercase tracking-wider text-ink-400">{p.profile.details}</p>

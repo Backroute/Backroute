@@ -9,8 +9,9 @@ const Kind = z.enum(["w9", "coi", "authority", "noa", "voided_check", "bol", "po
 const TRUCK_PAPERS = ["cab_card", "insurance_card", "ifta_license", "annual_inspection"];
 const OFFICE_PAPERS = ["w9", "coi", "authority", "noa", "voided_check", ...TRUCK_PAPERS];
 const STOP_DOCS = new Set(["bol", "pod", "lumper_receipt"]);
-/** What a driver photographs on the road that isn't tied to a stop: a receipt for an expense, an inspection defect. */
-const ROAD_PHOTOS = new Set(["receipt", "dvir_photo"]);
+/** What a driver photographs on the road that the AI doesn't read for signatures: a receipt for an expense, an
+ *  inspection defect, the load before the doors close, a scale ticket. */
+const ROAD_PHOTOS = new Set(["receipt", "dvir_photo", "pickup_photo", "scale_ticket"]);
 const MAX = 10 * 1024 * 1024;
 const TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp", "image/gif", "image/heic"]);
 

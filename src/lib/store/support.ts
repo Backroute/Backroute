@@ -270,7 +270,7 @@ export function takeOrWalk(state: StoreState, escalationId: string, take: boolea
   };
 }
 
-export const DRIVER_DOC_LABEL: Record<DriverDocType, string> = { bol: "BOL", pod: "POD", lumper_receipt: "lumper receipt" };
+export const DRIVER_DOC_LABEL: Record<DriverDocType, string> = { bol: "BOL", pod: "POD", lumper_receipt: "lumper receipt", pickup_photo: "photo of the load", scale_ticket: "scale ticket" };
 
 /** What the AI "reads" off a driver's document photo — the details a dispatcher would otherwise check by hand. */
 export function readDriverDocument(load: Load, type: DriverDocType): { note: string; lumperAmount?: number } {
@@ -279,6 +279,11 @@ export function readDriverDocument(load: Load, type: DriverDocType): { note: str
     return { note: `${randInt(18, 26)} pallets · ${load.weight.toLocaleString()} lbs${seal}. Shipper signed, matches the rate con.` };
   }
   if (type === "pod") return { note: "Signed by the receiver, no shortages or damage noted." };
+  if (type === "pickup_photo") return { note: "Saved with the load. It shows how it was loaded." };
+  if (type === "scale_ticket") {
+    const gross = load.tripChecklist?.scale?.gross;
+    return { note: gross ? `Scale ticket saved · ${gross.toLocaleString()} lbs gross.` : "Scale ticket saved." };
+  }
   const amount = randInt(85, 240);
   return { note: `$${amount} lumper fee. Sent for reimbursement.`, lumperAmount: amount };
 }

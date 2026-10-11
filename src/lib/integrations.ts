@@ -76,7 +76,7 @@ const statement = (kind: "fuel_feed" | "toll_feed", name: string, site: string):
   does: kind === "fuel_feed" ? `${name} purchases put on the load each truck was on.` : `${name} tolls put on the load each truck was on.`,
   gets:
     kind === "fuel_feed"
-      ? ["Each fill-up matched to the truck and the load by date and unit or card number", "Each load's real profit counts its fuel", "Gallons bought by state for the IFTA return"]
+      ? ["Each fill-up matched to the truck and the load by date and unit or card number", "Each load's real profit counts its fuel", "Gallons bought by state for the IFTA return", "With the card's station price list: each trip's fuel plan names the cheapest stop on the way"]
       : ["Each toll matched to the truck and the load", "Each load's real profit counts its tolls"],
   how: "A statement file (CSV), uploaded or read from a report address",
   steps: [

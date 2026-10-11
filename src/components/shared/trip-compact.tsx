@@ -289,12 +289,13 @@ function FuelPlanSection({ load, viewer }: { load: DriverTripCardProps["load"]; 
   const now = useNow();
   const w = useTripText(viewer);
   const mpg = useStore((st) => st.trucks.find((t) => t.id === load.truckId)?.mpg ?? 6.5);
-  // The prices behind it are sample numbers, so a real account doesn't get told where to fuel from them.
+  // A real account gets a plan only from its own fuel card's price file; the sample prices are for the demo.
   const sample = useStore((st) => st.session.mode === "demo");
+  const prices = useStore((st) => st.settings.fuelPrices);
   const s = tripState(load, now, false);
-  if (!sample || s.card === "booking" || load.stage === "at_delivery") return null;
+  if ((!sample && !prices) || s.card === "booking" || load.stage === "at_delivery") return null;
   const milesDone = s.card === "delivery" ? Math.round(load.lane.miles * s.legP) : 0;
-  const plan = planFuel(load, mpg, milesDone);
+  const plan = planFuel(load, mpg, milesDone, prices);
   if (!plan) return null;
 
   return (
@@ -307,7 +308,7 @@ function FuelPlanSection({ load, viewer }: { load: DriverTripCardProps["load"]; 
           {plan.stops.map((stop) => (
             <li key={`${stop.state}-${stop.milesAhead}`} className="flex items-start justify-between gap-3 rounded-2xl bg-white/5 px-3.5 py-2.5">
               <div className="min-w-0">
-                <p className="text-sm font-medium">{stop.chain}, {stop.stateName}</p>
+                <p className="text-sm font-medium">{stop.station ?? stop.chain}, {stop.stateName}</p>
                 <p className="text-xs text-white/55">{w.fuel.ahead(stop.milesAhead, stop.gallons)}</p>
               </div>
               <p className="shrink-0 text-right text-sm font-semibold tabular">
@@ -319,7 +320,9 @@ function FuelPlanSection({ load, viewer }: { load: DriverTripCardProps["load"]; 
         </ol>
       )}
       {plan.savings > 0 && <p className="mt-2 text-xs text-white/60">{w.fuel.savings(formatCurrency(plan.savings))}</p>}
-      <p className="mt-2 text-xs leading-relaxed text-white/45">{w.fuel.note(Math.round(CARD_DISCOUNT * 100))}</p>
+      <p className="mt-2 text-xs leading-relaxed text-white/45">
+        {plan.source.kind === "file" ? w.fuel.fromFile(plan.source.name, new Date(plan.source.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })) : w.fuel.note(Math.round(CARD_DISCOUNT * 100))}
+      </p>
     </Section>
   );
 }

@@ -140,6 +140,25 @@ export interface TripText {
     byBackroute: string;
     openFull: string;
   };
+  extra: {
+    trailer: string;
+    trailerPlaceholder: string;
+    dropHook: string;
+    dropped: string;
+    hooked: string;
+    loadPhoto: string;
+    loadPhotoNote: string;
+    scale: string;
+    scaleNote: string;
+    steer: string;
+    drives: string;
+    tandems: string;
+    gross: string;
+    legal: string;
+    over(what: string, lbs: string): string;
+    ticket: string;
+    weigh: string;
+  };
   fuel: {
     title: string;
     tank(pct: number, miles: number, gallons: number, mpg: string): string;
@@ -148,6 +167,7 @@ export interface TripText {
     withCard: string;
     savings(amount: string): string;
     note(cents: number): string;
+    fromFile(source: string, date: string): string;
   };
 }
 
@@ -310,6 +330,25 @@ const en: TripText = {
     byBackroute: "Made by Backroute",
     openFull: "Open the full load page",
   },
+  extra: {
+    trailer: "Trailer number",
+    trailerPlaceholder: "e.g. 53104",
+    dropHook: "Drop and hook",
+    dropped: "Trailer you dropped",
+    hooked: "Trailer you hooked",
+    loadPhoto: "Photo of the load",
+    loadPhotoNote: "Doors open, before the seal. It shows how it was loaded if anything's damaged later.",
+    scale: "Scale it",
+    scaleNote: "Weigh on a certified scale before the highway, then add the numbers and the ticket.",
+    steer: "Steer",
+    drives: "Drives",
+    tandems: "Trailer",
+    gross: "Gross",
+    legal: "Legal on every axle.",
+    over: (w, lbs) => `${w} ${lbs} lbs over. Slide the tandems or the fifth wheel, or call dispatch.`,
+    ticket: "Photo of the scale ticket",
+    weigh: "Save weights",
+  },
   fuel: {
     title: "Fuel plan",
     tank: (p, m, g, mpg) => `Tank about ${p}% · ${m} loaded mi left · ~${g} gal at ${mpg} mpg`,
@@ -319,6 +358,7 @@ const en: TripText = {
     savings: (a) => `About ${a} less than filling up wherever the tank hits a quarter.`,
     note: (c) =>
       `Prices are this week's state averages with the ${c}¢ fuel card discount, which varies by stop. Fuel tax evens out on your IFTA return, so the savings are pump price and discount only, not tax.`,
+    fromFile: (src, d) => `Prices are your card's, from ${src} (${d}). Fuel tax evens out on your IFTA return, so the savings are price only, not tax.`,
   },
 };
 
@@ -481,6 +521,25 @@ const es: TripText = {
     byBackroute: "Hecho por Backroute",
     openFull: "Abrir la página completa de la carga",
   },
+  extra: {
+    trailer: "Número de remolque",
+    trailerPlaceholder: "p. ej. 53104",
+    dropHook: "Dejar y enganchar",
+    dropped: "Remolque que dejaste",
+    hooked: "Remolque que enganchaste",
+    loadPhoto: "Foto de la carga",
+    loadPhotoNote: "Puertas abiertas, antes del sello. Muestra cómo se cargó si algo llega dañado.",
+    scale: "Pésalo",
+    scaleNote: "Pesa en una báscula certificada antes de la autopista y agrega los números y el ticket.",
+    steer: "Dirección",
+    drives: "Tracción",
+    tandems: "Remolque",
+    gross: "Total",
+    legal: "Legal en todos los ejes.",
+    over: (w, lbs) => `${w}: ${lbs} lbs de más. Mueve los tándems o la quinta rueda, o llama a despacho.`,
+    ticket: "Foto del ticket de báscula",
+    weigh: "Guardar pesos",
+  },
   fuel: {
     title: "Plan de combustible",
     tank: (p, m, g, mpg) => `Tanque cerca de ${p}% · ${m} mi cargado restantes · ~${g} gal a ${mpg} mpg`,
@@ -490,6 +549,7 @@ const es: TripText = {
     savings: (a) => `Unos ${a} menos que llenar donde el tanque llegue a un cuarto.`,
     note: (c) =>
       `Los precios son promedios estatales de esta semana con el descuento de ${c}¢ de la tarjeta de combustible, que cambia según la parada. El impuesto se compensa en tu declaración IFTA, así que el ahorro es solo precio y descuento, no impuesto.`,
+    fromFile: (src, d) => `Precios de tu tarjeta, de ${src} (${d}). El impuesto se compensa en tu declaración IFTA, así que el ahorro es solo precio, no impuesto.`,
   },
 };
 
@@ -652,6 +712,25 @@ const fr: TripText = {
     byBackroute: "Fait par Backroute",
     openFull: "Ouvrir la page complète du chargement",
   },
+  extra: {
+    trailer: "Numéro de remorque",
+    trailerPlaceholder: "ex. 53104",
+    dropHook: "Dépôt et attelage",
+    dropped: "Remorque laissée",
+    hooked: "Remorque attelée",
+    loadPhoto: "Photo du chargement",
+    loadPhotoNote: "Portes ouvertes, avant le scellé. Ça montre comment c'était chargé si quelque chose arrive abîmé.",
+    scale: "Pesez",
+    scaleNote: "Pesez sur une balance certifiée avant l'autoroute, puis ajoutez les chiffres et le ticket.",
+    steer: "Directeur",
+    drives: "Moteur",
+    tandems: "Remorque",
+    gross: "Total",
+    legal: "Légal sur tous les essieux.",
+    over: (w, lbs) => `${w} : ${lbs} lb de trop. Déplacez les tandems ou la sellette, ou appelez le répartiteur.`,
+    ticket: "Photo du ticket de pesée",
+    weigh: "Enregistrer les poids",
+  },
   fuel: {
     title: "Plan carburant",
     tank: (p, m, g, mpg) => `Réservoir vers ${p} % · ${m} mi chargés restants · ~${g} gal à ${mpg} mpg`,
@@ -661,6 +740,7 @@ const fr: TripText = {
     savings: (a) => `Environ ${a} de moins que faire le plein là où le réservoir tombe au quart.`,
     note: (c) =>
       `Les prix sont les moyennes de l'État cette semaine avec la remise carte carburant de ${c}¢, qui varie selon la station. La taxe s'équilibre sur ta déclaration IFTA, donc l'économie vient du prix à la pompe et de la remise, pas de la taxe.`,
+    fromFile: (src, d) => `Prix de ta carte, d'après ${src} (${d}). La taxe s'équilibre sur ta déclaration IFTA, donc l'économie vient du prix, pas de la taxe.`,
   },
 };
 
@@ -823,6 +903,25 @@ const pa: TripText = {
     byBackroute: "Backroute ਨੇ ਬਣਾਇਆ",
     openFull: "ਲੋਡ ਦਾ ਪੂਰਾ ਪੰਨਾ ਖੋਲ੍ਹੋ",
   },
+  extra: {
+    trailer: "ਟ੍ਰੇਲਰ ਨੰਬਰ",
+    trailerPlaceholder: "ਜਿਵੇਂ 53104",
+    dropHook: "ਡ੍ਰੌਪ ਐਂਡ ਹੁੱਕ",
+    dropped: "ਜੋ ਟ੍ਰੇਲਰ ਛੱਡਿਆ",
+    hooked: "ਜੋ ਟ੍ਰੇਲਰ ਜੋੜਿਆ",
+    loadPhoto: "ਲੋਡ ਦੀ ਫ਼ੋਟੋ",
+    loadPhotoNote: "ਦਰਵਾਜ਼ੇ ਖੁੱਲ੍ਹੇ, ਸੀਲ ਤੋਂ ਪਹਿਲਾਂ। ਜੇ ਬਾਅਦ ਵਿੱਚ ਕੁਝ ਖ਼ਰਾਬ ਹੋਵੇ ਤਾਂ ਦਿਖਾਉਂਦੀ ਹੈ ਕਿ ਕਿਵੇਂ ਲੋਡ ਹੋਇਆ ਸੀ।",
+    scale: "ਵਜ਼ਨ ਕਰੋ",
+    scaleNote: "ਹਾਈਵੇ ਤੋਂ ਪਹਿਲਾਂ ਸਰਟੀਫ਼ਾਈਡ ਸਕੇਲ ਤੇ ਤੋਲੋ, ਫਿਰ ਨੰਬਰ ਅਤੇ ਟਿਕਟ ਪਾਓ।",
+    steer: "ਸਟੀਅਰ",
+    drives: "ਡ੍ਰਾਈਵ",
+    tandems: "ਟ੍ਰੇਲਰ",
+    gross: "ਕੁੱਲ",
+    legal: "ਹਰ ਐਕਸਲ ਤੇ ਠੀਕ ਹੈ।",
+    over: (w, lbs) => `${w} ${lbs} lbs ਵੱਧ। ਟੈਂਡਮ ਜਾਂ ਫ਼ਿਫ਼ਥ ਵ੍ਹੀਲ ਸਰਕਾਓ, ਜਾਂ ਡਿਸਪੈਚ ਨੂੰ ਫ਼ੋਨ ਕਰੋ।`,
+    ticket: "ਸਕੇਲ ਟਿਕਟ ਦੀ ਫ਼ੋਟੋ",
+    weigh: "ਵਜ਼ਨ ਸੇਵ ਕਰੋ",
+  },
   fuel: {
     title: "ਤੇਲ ਦੀ ਯੋਜਨਾ",
     tank: (p, m, g, mpg) => `ਟੈਂਕ ਲਗਭਗ ${p}% · ${m} ਲੋਡ ਮੀਲ ਬਾਕੀ · ~${g} ਗੈਲਨ, ${mpg} mpg`,
@@ -831,6 +930,7 @@ const pa: TripText = {
     withCard: "ਕਾਰਡ ਨਾਲ",
     savings: (a) => `ਜਿੱਥੇ ਟੈਂਕ ਚੌਥਾਈ ਹੋਵੇ ਉੱਥੇ ਭਰਨ ਨਾਲੋਂ ਲਗਭਗ ${a} ਘੱਟ।`,
     note: (c) => `ਕੀਮਤਾਂ ਇਸ ਹਫ਼ਤੇ ਦੀ ਸਟੇਟ ਔਸਤ ਹਨ, ${c}¢ ਫ਼ਿਊਲ ਕਾਰਡ ਛੋਟ ਨਾਲ, ਜੋ ਹਰ ਥਾਂ ਵੱਖਰੀ ਹੁੰਦੀ ਹੈ। ਟੈਕਸ IFTA ਰਿਟਰਨ 'ਤੇ ਬਰਾਬਰ ਹੋ ਜਾਂਦਾ ਹੈ, ਇਸ ਲਈ ਬਚਤ ਸਿਰਫ਼ ਪੰਪ ਕੀਮਤ ਤੇ ਛੋਟ ਦੀ ਹੈ।`,
+    fromFile: (src, d) => `ਕੀਮਤਾਂ ਤੁਹਾਡੇ ਕਾਰਡ ਦੀਆਂ ਹਨ, ${src} ਤੋਂ (${d})। ਟੈਕਸ IFTA ਰਿਟਰਨ 'ਤੇ ਬਰਾਬਰ ਹੋ ਜਾਂਦਾ ਹੈ, ਇਸ ਲਈ ਬਚਤ ਸਿਰਫ਼ ਕੀਮਤ ਦੀ ਹੈ।`,
   },
 };
 
@@ -993,6 +1093,25 @@ const hi: TripText = {
     byBackroute: "Backroute ने बनाया",
     openFull: "लोड का पूरा पेज खोलें",
   },
+  extra: {
+    trailer: "ट्रेलर नंबर",
+    trailerPlaceholder: "जैसे 53104",
+    dropHook: "ड्रॉप एंड हुक",
+    dropped: "जो ट्रेलर छोड़ा",
+    hooked: "जो ट्रेलर जोड़ा",
+    loadPhoto: "लोड की फ़ोटो",
+    loadPhotoNote: "दरवाज़े खुले, सील से पहले। बाद में कुछ खराब हो तो दिखाती है कि कैसे लोड हुआ था।",
+    scale: "वज़न करें",
+    scaleNote: "हाईवे से पहले सर्टिफ़ाइड स्केल पर तौलें, फिर नंबर और टिकट डालें।",
+    steer: "स्टीयर",
+    drives: "ड्राइव",
+    tandems: "ट्रेलर",
+    gross: "कुल",
+    legal: "हर एक्सल पर सही है।",
+    over: (w, lbs) => `${w} ${lbs} lbs ज़्यादा। टैंडम या फ़िफ़्थ व्हील खिसकाएँ, या डिस्पैच को फ़ोन करें।`,
+    ticket: "स्केल टिकट की फ़ोटो",
+    weigh: "वज़न सेव करें",
+  },
   fuel: {
     title: "डीज़ल की योजना",
     tank: (p, m, g, mpg) => `टैंक लगभग ${p}% · ${m} लोड मील बाकी · ~${g} गैलन, ${mpg} mpg`,
@@ -1001,6 +1120,7 @@ const hi: TripText = {
     withCard: "कार्ड से",
     savings: (a) => `जहाँ टैंक चौथाई हो वहाँ भरवाने से लगभग ${a} कम।`,
     note: (c) => `कीमतें इस हफ़्ते का स्टेट औसत हैं, ${c}¢ फ़्यूल कार्ड छूट के साथ, जो हर जगह अलग होती है। टैक्स IFTA रिटर्न पर बराबर हो जाता है, इसलिए बचत सिर्फ़ पंप कीमत और छूट की है।`,
+    fromFile: (src, d) => `कीमतें आपके कार्ड की हैं, ${src} से (${d})। टैक्स IFTA रिटर्न पर बराबर हो जाता है, इसलिए बचत सिर्फ़ कीमत की है।`,
   },
 };
 
@@ -1163,6 +1283,25 @@ const ru: TripText = {
     byBackroute: "Сделано Backroute",
     openFull: "Открыть полную страницу груза",
   },
+  extra: {
+    trailer: "Номер прицепа",
+    trailerPlaceholder: "напр. 53104",
+    dropHook: "Оставить и забрать",
+    dropped: "Оставленный прицеп",
+    hooked: "Забранный прицеп",
+    loadPhoto: "Фото груза",
+    loadPhotoNote: "Двери открыты, до пломбы. Покажет, как был загружен груз, если что-то повредится.",
+    scale: "Взвесьте",
+    scaleNote: "Взвесьтесь на сертифицированных весах до трассы и добавьте цифры и талон.",
+    steer: "Рулевая",
+    drives: "Ведущие",
+    tandems: "Прицеп",
+    gross: "Общий",
+    legal: "Все оси в норме.",
+    over: (w, lbs) => `${w}: перегруз ${lbs} фунтов. Сдвиньте тандем или седло или позвоните диспетчеру.`,
+    ticket: "Фото весового талона",
+    weigh: "Сохранить вес",
+  },
   fuel: {
     title: "План заправок",
     tank: (p, m, g, mpg) => `Бак около ${p}% · осталось ${m} миль с грузом · ~${g} гал при ${mpg} mpg`,
@@ -1171,6 +1310,7 @@ const ru: TripText = {
     withCard: "по карте",
     savings: (a) => `Примерно на ${a} дешевле, чем заправляться, где бак дойдёт до четверти.`,
     note: (c) => `Цены — средние по штату за эту неделю со скидкой топливной карты ${c}¢, которая зависит от заправки. Налог выравнивается в отчёте IFTA, так что экономия — только цена и скидка, не налог.`,
+    fromFile: (src, d) => `Цены вашей карты, из ${src} (${d}). Налог выравнивается в отчёте IFTA, так что экономия — только цена, не налог.`,
   },
 };
 
@@ -1333,6 +1473,25 @@ const uk: TripText = {
     byBackroute: "Зроблено Backroute",
     openFull: "Відкрити повну сторінку вантажу",
   },
+  extra: {
+    trailer: "Номер причепа",
+    trailerPlaceholder: "напр. 53104",
+    dropHook: "Залишити й забрати",
+    dropped: "Залишений причіп",
+    hooked: "Забраний причіп",
+    loadPhoto: "Фото вантажу",
+    loadPhotoNote: "Двері відчинені, до пломби. Покаже, як був завантажений вантаж, якщо щось пошкодиться.",
+    scale: "Зважте",
+    scaleNote: "Зважтеся на сертифікованих вагах до траси й додайте цифри та талон.",
+    steer: "Кермова",
+    drives: "Ведучі",
+    tandems: "Причіп",
+    gross: "Загальна",
+    legal: "Усі осі в нормі.",
+    over: (w, lbs) => `${w}: перевантаження ${lbs} фунтів. Посуньте тандем або сідло чи зателефонуйте диспетчеру.`,
+    ticket: "Фото вагового талона",
+    weigh: "Зберегти вагу",
+  },
   fuel: {
     title: "План заправок",
     tank: (p, m, g, mpg) => `Бак близько ${p}% · лишилось ${m} миль із вантажем · ~${g} гал при ${mpg} mpg`,
@@ -1341,6 +1500,7 @@ const uk: TripText = {
     withCard: "за карткою",
     savings: (a) => `Приблизно на ${a} дешевше, ніж заправлятися там, де бак дійде до чверті.`,
     note: (c) => `Ціни — середні по штату за цей тиждень зі знижкою паливної картки ${c}¢, яка залежить від заправки. Податок вирівнюється у звіті IFTA, тож економія — лише ціна й знижка, не податок.`,
+    fromFile: (src, d) => `Ціни вашої картки, з ${src} (${d}). Податок вирівнюється у звіті IFTA, тож економія — лише ціна, не податок.`,
   },
 };
 

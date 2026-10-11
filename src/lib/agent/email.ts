@@ -13,7 +13,7 @@ import { answerRateReply, bookIt, offersFromEmail, requestBooking, type Sender }
 import { sendOrQueue } from "./outbox";
 import * as mail from "./templates";
 import { sendSetupPacket } from "./paperwork";
-import { doubleBrokered, lookalikeOf, paymentScam } from "./fraud";
+import { contactMoved, doubleBrokered, lookalikeOf, paymentScam } from "./fraud";
 import { checkBroker } from "./brokers";
 import { cancelLoad } from "./cancel";
 import { recordPayments } from "./money";
@@ -112,14 +112,37 @@ async function handle(carrierId: string, email: InboundEmail) {
         // The rate con names the broker's MC: check it against FMCSA (and it's how a new broker gets verified). A
         // different MC than the broker we booked with is how double brokering shows up: nothing moves until it's checked.
         const onLoad = ctx.brokers.find((b) => b.id === load!.brokerId);
-        const double = doubleBrokered(reading.brokerMc, onLoad);
+        const doubled = doubleBrokered(reading.brokerMc, onLoad);
+        // The broker we know, but from another company's address: held the same way until they confirm from their own.
+        const moved = doubled ? null : contactMoved(from, onLoad, reading.brokerEmail);
+        const double = doubled ?? moved;
         // Nothing is booked on it. The broker we dealt with is asked, at the address we already had, to send their own
         // rate con; the owner is told. A real mix-up gets fixed by their answer; a double broker gets nothing.
         if (double) {
-          await passToOwner(ctx, { reason: `Possible double brokering on ${load.referenceNumber}. ${double} Backroute didn't book it and asked ${onLoad!.company} at the address you already had to send a rate con from their own company.`, loadId: load.id, label: "Got it", source: "email", to: "owner", brokerId: onLoad!.id });
           const known = onLoad!.email && onLoad!.email.toLowerCase() !== from ? onLoad!.email : load.brokerContactEmail;
+          await passToOwner(ctx, {
+            reason: doubled
+              ? `Possible double brokering on ${load.referenceNumber}. ${doubled} Backroute didn't book it and asked ${onLoad!.company} at the address you already had to send a rate con from their own company.`
+              : `Held ${load.referenceNumber}: ${moved} Backroute didn't book it or change anything, and asked ${onLoad!.company}${known ? ` at ${known}` : ""} to confirm it's from them.`,
+            loadId: load.id,
+            label: "Got it",
+            source: "email",
+            to: "owner",
+            brokerId: onLoad!.id,
+          });
           if (known && (await claimMark(carrierId, load.id, "double_ask")))
-            await sendOrQueue(ctx, { purpose: "ack", to: known, toName: onLoad!.contact || undefined, subject: mail.subjectFor(load, "Rate con"), body: `Hi${onLoad!.contact ? ` ${onLoad!.contact}` : ""},\n\nWe got a rate con for ${load.referenceNumber} from ${from} that shows a different broker (${reading.brokerMc ?? "another MC"}), not ${onLoad!.company}. We won't run it as is. If the load is yours, please send the rate con from ${onLoad!.company}.\n\nThanks,\n${ctx.carrier.name}`, loadId: load.id, withinRules: true, why: `Ask ${onLoad!.company} to confirm ${load.referenceNumber}?` });
+            await sendOrQueue(ctx, {
+              purpose: "ack",
+              to: known,
+              toName: onLoad!.contact || undefined,
+              subject: mail.subjectFor(load, "Rate con"),
+              body: doubled
+                ? `Hi${onLoad!.contact ? ` ${onLoad!.contact}` : ""},\n\nWe got a rate con for ${load.referenceNumber} from ${from} that shows a different broker (${reading.brokerMc ?? "another MC"}), not ${onLoad!.company}. We won't run it as is. If the load is yours, please send the rate con from ${onLoad!.company}.\n\nThanks,\n${ctx.carrier.name}`
+                : `Hi${onLoad!.contact ? ` ${onLoad!.contact}` : ""},\n\nWe got a rate con for ${load.referenceNumber} from ${from}, which isn't the address we have for ${onLoad!.company}. Before we run it, could you send it from your usual address, or confirm the new one here?\n\nThanks,\n${ctx.carrier.name}`,
+              loadId: load.id,
+              withinRules: true,
+              why: `Ask ${onLoad!.company} to confirm ${load.referenceNumber}?`,
+            });
         }
         else if (onLoad && reading.brokerMc) await checkBroker(ctx, onLoad, reading.brokerMc);
         const serious = reading.mismatches.filter((m) => m.serious).length + (double ? 1 : 0);

@@ -8,7 +8,7 @@ import type { ActivityEvent, DvirInspection, Escalation, Expense, TimeOffRequest
 import { DRIVER_DOC_LABEL, EXPENSE_CATEGORY_LABEL, aiMilestoneEvent, autoPickOffer, openIncident, promoteChainedLoad, readDriverDocument, uid } from "../support";
 import type { Actions, GetState, SetState } from "../state";
 
-export const tripActions = (set: SetState, get: GetState): Pick<Actions, "driverConfirmStage" | "acknowledgeDelivery" | "setAutoChain" | "confirmTripStep" | "setSealNumber" | "uploadLoadDocument" | "recaptureDocument" | "completeLoadStop" | "reportIncident" | "startClaim" | "scheduleMaintenance" | "completeMaintenance" | "submitDvir" | "requestTimeOff" | "respondTimeOff" | "submitExpense" | "respondExpense"> => ({
+export const tripActions = (set: SetState, get: GetState): Pick<Actions, "driverConfirmStage" | "acknowledgeDelivery" | "setAutoChain" | "confirmTripStep" | "setSealNumber" | "setTripInfo" | "uploadLoadDocument" | "recaptureDocument" | "completeLoadStop" | "reportIncident" | "startClaim" | "scheduleMaintenance" | "completeMaintenance" | "submitDvir" | "requestTimeOff" | "respondTimeOff" | "submitExpense" | "respondExpense"> => ({
   driverConfirmStage: (loadId) =>
     set((state) => {
       const load = state.loads.find((l) => l.id === loadId);
@@ -136,6 +136,11 @@ export const tripActions = (set: SetState, get: GetState): Pick<Actions, "driver
   setSealNumber: (loadId, sealNumber) =>
     set((state) => ({
       loads: state.loads.map((l) => (l.id === loadId ? { ...l, tripChecklist: { ...l.tripChecklist, sealNumber: sealNumber.trim() || undefined } } : l)),
+    })),
+
+  setTripInfo: (loadId, patch) =>
+    set((state) => ({
+      loads: state.loads.map((l) => (l.id === loadId ? { ...l, tripChecklist: { ...l.tripChecklist, ...patch } } : l)),
     })),
 
   uploadLoadDocument: (loadId, type, file) => {

@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Download, HandCoins, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, FileDown, HandCoins, Plus, Trash2 } from "lucide-react";
+import { downloadPdf, payStatementLines } from "@/lib/statements";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
-import { useCarrierLoads } from "@/lib/selectors";
+import { useCarrierLoads, usePrimaryCarrier } from "@/lib/selectors";
 import { ExpensesList } from "@/components/owner/expenses-list";
 import { PRIMARY_CARRIER_ID } from "@/lib/mock-data";
 import { addAdvance, draftPayRuns, markPayRunPaid, updateDriver } from "@/lib/back-office";
@@ -28,6 +29,7 @@ function download(name: string, text: string) {
 }
 
 export default function PayPage() {
+  const carrier = usePrimaryCarrier();
   const demo = useStore((s) => s.session.mode === "demo");
   const drivers = useStore((s) => s.drivers).filter((d) => !demo || d.carrierId === PRIMARY_CARRIER_ID);
   const runs = useStore((s) => s.payRuns);
@@ -91,7 +93,7 @@ export default function PayPage() {
               </p>
             )}
             {week.map((r) => (
-              <RunRow key={r.id} run={r} name={name(r.driverId)} open={open === r.id} onToggle={() => setOpen(open === r.id ? null : r.id)} />
+              <RunRow key={r.id} run={r} name={name(r.driverId)} company={{ name: carrier.name, mc: carrier.mc }} open={open === r.id} onToggle={() => setOpen(open === r.id ? null : r.id)} />
             ))}
           </CardContent>
         </Card>
@@ -220,7 +222,7 @@ export default function PayPage() {
   );
 }
 
-function RunRow({ run, name, open, onToggle }: { run: PayRun; name: string; open: boolean; onToggle: () => void }) {
+function RunRow({ run, name, company, open, onToggle }: { run: PayRun; name: string; company: { name: string; mc?: string }; open: boolean; onToggle: () => void }) {
   const paid = run.status === "paid";
   return (
     <div className="rounded-2xl border border-line">
@@ -236,6 +238,14 @@ function RunRow({ run, name, open, onToggle }: { run: PayRun; name: string; open
         </button>
         <div className="flex items-center gap-3">
           <span className="text-lg font-semibold tabular text-ink-950">{formatCurrency(run.net)}</span>
+          <button
+            type="button"
+            aria-label={`Pay statement PDF for ${name}`}
+            onClick={() => void downloadPdf(`pay-${name.replace(/\s+/g, "-").toLowerCase()}-${run.period}.pdf`, payStatementLines(run, name, company))}
+            className="inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-xs font-medium text-ink-700 hover:bg-ink-50"
+          >
+            <FileDown className="h-3.5 w-3.5" /> PDF
+          </button>
           {paid ? (
             <Badge tone="success">Paid {run.paidAt ? formatDate(run.paidAt) : ""}</Badge>
           ) : (

@@ -17,7 +17,8 @@ import { SwipeToConfirm } from "./swipe-to-confirm";
 import { TripMap } from "./trip-map";
 import { BrokerCallRow } from "./broker-call";
 import type { DriverDocType } from "@/lib/store";
-import type { Load, LoadDocument } from "@/lib/types";
+import type { Load, LoadDocument, TripChecklist } from "@/lib/types";
+import { SCALE_LIMITS, scaleOver, type ScaleWeights } from "@/lib/scale";
 import { autoCrop, pagesToPdf } from "@/lib/doc-scan";
 import { QuickPreTrip } from "@/components/driver/quick-pretrip";
 import { LiveScanner } from "@/components/driver/live-scanner";
@@ -47,6 +48,8 @@ export interface DriverTripCardProps {
   onCounter: (amount: number) => void;
   onTripStep: (loadId: string, step: "loaded" | "unloaded") => void;
   onSeal: (loadId: string, sealNumber: string) => void;
+  /** Trailer numbers and scale weights the driver types at pickup. */
+  onTripInfo?: (loadId: string, patch: Partial<TripChecklist>) => void;
   onUpload: (loadId: string, type: DriverDocType, file: UploadedFile) => void;
 }
 
@@ -129,7 +132,7 @@ function BookingCard({ load, brokerName, viewer = "driver", onCall, onCounter }:
 
 // ---------- Pickup ----------
 
-function PickupCard({ load, brokerName, truckCity, truckState, needsPreTrip, viewer = "driver", driverName, onCall, onConfirm, onTripStep, onSeal, onUpload, s }: DriverTripCardProps & { s: TripState }) {
+function PickupCard({ load, brokerName, truckCity, truckState, needsPreTrip, viewer = "driver", driverName, onCall, onConfirm, onTripStep, onSeal, onTripInfo, onUpload, s }: DriverTripCardProps & { s: TripState }) {
   const readOnly = viewer === "carrier";
   const w = useTripText(viewer);
   const drive = driveWords(w, s);
@@ -178,6 +181,19 @@ function PickupCard({ load, brokerName, truckCity, truckState, needsPreTrip, vie
         <Step state={bolDone ? "done" : arrived && loaded ? "current" : "todo"} title={w.uploadBol} last={!arrived}>
           {arrived && <DocumentSlot doc={bol} label={w.photoOf("BOL")} readOnly={readOnly} pagesKey={`${load.id}:bol`} onFile={(f) => onUpload(load.id, "bol", f)} />}
         </Step>
+        {arrived && (
+          <TrailerStep load={load} readOnly={readOnly} onSave={(patch) => onTripInfo?.(load.id, patch)} />
+        )}
+        {arrived && (
+          <Step state={load.documents.some((d) => d.type === "pickup_photo") ? "done" : "todo"} title={w.extra.loadPhoto} optional={w.optional} detail={readOnly ? undefined : w.extra.loadPhotoNote}>
+            <DocumentSlot doc={load.documents.find((d) => d.type === "pickup_photo")} label={w.extra.loadPhoto} readOnly={readOnly} onFile={(f) => onUpload(load.id, "pickup_photo", f)} />
+          </Step>
+        )}
+        {arrived && loaded && (
+          <Step state={load.tripChecklist?.scale ? "done" : "todo"} title={w.extra.scale} optional={w.optional} detail={readOnly ? undefined : w.extra.scaleNote}>
+            <ScaleStep load={load} readOnly={readOnly} onSave={(scale) => onTripInfo?.(load.id, { scale })} onTicket={(f) => onUpload(load.id, "scale_ticket", f)} />
+          </Step>
+        )}
         {arrived && (
           <Step state={load.tripChecklist?.sealNumber ? "done" : "todo"} title={w.seal} optional={w.optional} last>
             {readOnly ? (
@@ -801,6 +817,90 @@ function SealInput({ value, onSave }: { value?: string; onSave: (v: string) => v
         </button>
       )}
     </form>
+  );
+}
+
+/** The trailer the load rides in; on a drop and hook, the empty one left behind too, so a trailer is never lost track of. */
+function TrailerStep({ load, readOnly, onSave }: { load: Load; readOnly: boolean; onSave: (patch: Partial<TripChecklist>) => void }) {
+  const w = useTripText(readOnly ? "carrier" : "driver");
+  const dropHook = load.pickupType === "drop_hook";
+  const t = load.tripChecklist;
+  const [hooked, setHooked] = useState(t?.trailerNumber ?? "");
+  const [dropped, setDropped] = useState(t?.droppedTrailer ?? "");
+  const done = !!t?.trailerNumber && (!dropHook || !!t?.droppedTrailer);
+  const dirty = hooked.trim() !== (t?.trailerNumber ?? "") || (dropHook && dropped.trim() !== (t?.droppedTrailer ?? ""));
+  const field = "min-w-0 flex-1 rounded-full border border-white/20 bg-transparent px-4 py-2 text-sm text-white outline-none placeholder:text-white/35 focus:border-white/50";
+  return (
+    <Step state={done ? "done" : "todo"} title={dropHook ? w.extra.dropHook : w.extra.trailer} optional={dropHook ? undefined : w.optional}>
+      {readOnly ? (
+        <p className="text-xs text-white/60">
+          {dropHook ? `${w.extra.dropped}: ${t?.droppedTrailer ?? "—"} · ${w.extra.hooked}: ${t?.trailerNumber ?? "—"}` : (t?.trailerNumber ?? "Not recorded yet")}
+        </p>
+      ) : (
+        <form
+          className="flex flex-col gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSave({ trailerNumber: hooked.trim() || undefined, ...(dropHook ? { droppedTrailer: dropped.trim() || undefined } : {}) });
+          }}
+        >
+          {dropHook && <input value={dropped} onChange={(e) => setDropped(e.target.value)} placeholder={w.extra.trailerPlaceholder} aria-label={w.extra.dropped} className={field} />}
+          <div className="flex items-center gap-2">
+            <input value={hooked} onChange={(e) => setHooked(e.target.value)} placeholder={w.extra.trailerPlaceholder} aria-label={dropHook ? w.extra.hooked : w.extra.trailer} className={field} />
+            {dirty && (
+              <button type="submit" className="shrink-0 rounded-full bg-white px-4 py-2 text-xs font-semibold text-ink-950">
+                {w.save}
+              </button>
+            )}
+          </div>
+        </form>
+      )}
+    </Step>
+  );
+}
+
+/** Weights off the scale ticket, checked against the usual limits (lib/scale), and the ticket's photo. */
+function ScaleStep({ load, readOnly, onSave, onTicket }: { load: Load; readOnly: boolean; onSave: (scale: NonNullable<TripChecklist["scale"]>) => void; onTicket: (f: UploadedFile) => void }) {
+  const w = useTripText(readOnly ? "carrier" : "driver");
+  const saved = load.tripChecklist?.scale;
+  const [f, setF] = useState({ steer: saved?.steer?.toString() ?? "", drives: saved?.drives?.toString() ?? "", trailer: saved?.trailer?.toString() ?? "", gross: saved?.gross?.toString() ?? "" });
+  const num = (v: string) => (v.trim() ? Math.round(Number(v.replace(/[^\d.]/g, ""))) : undefined);
+  const weights: ScaleWeights = { steer: num(f.steer), drives: num(f.drives), trailer: num(f.trailer), gross: num(f.gross) ?? 0 };
+  const shown = saved ?? null;
+  const over = shown ? scaleOver(shown) : [];
+  const name = { steer: w.extra.steer, drives: w.extra.drives, trailer: w.extra.tandems, gross: w.extra.gross };
+  const field = "w-full min-w-0 rounded-full border border-white/20 bg-transparent px-3 py-2 text-sm text-white outline-none placeholder:text-white/35 focus:border-white/50";
+  const ticket = load.documents.find((d) => d.type === "scale_ticket");
+  return (
+    <div className="flex flex-col gap-2">
+      {!readOnly && (
+        <form
+          className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const gross = weights.gross || (weights.steer ?? 0) + (weights.drives ?? 0) + (weights.trailer ?? 0);
+            if (gross > 0) onSave({ ...weights, gross, at: new Date().toISOString() });
+          }}
+        >
+          {(["steer", "drives", "trailer", "gross"] as const).map((k) => (
+            <label key={k} className="flex flex-col gap-1 text-[11px] text-white/60">
+              {name[k]}
+              <input inputMode="numeric" value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} placeholder={SCALE_LIMITS[k].toLocaleString()} aria-label={name[k]} className={field} />
+            </label>
+          ))}
+          <button type="submit" className="col-span-2 w-fit rounded-full bg-white px-4 py-2 text-xs font-semibold text-ink-950 sm:col-span-4">
+            {w.extra.weigh}
+          </button>
+        </form>
+      )}
+      {shown && (
+        <p className={cn("text-xs", over.length ? "font-medium text-[var(--accent-warn)]" : "text-white/70")}>
+          {over.length ? over.map((o) => w.extra.over(name[o.part], o.over.toLocaleString())).join(" ") : `${w.extra.legal} ${shown.gross.toLocaleString()} lbs`}
+        </p>
+      )}
+      {readOnly && !shown && <p className="text-xs text-white/60">Not recorded yet</p>}
+      <DocumentSlot doc={ticket} label={w.extra.ticket} readOnly={readOnly} onFile={onTicket} />
+    </div>
   );
 }
 
