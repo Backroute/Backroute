@@ -4,7 +4,7 @@ import { checkStopDocument } from "@/lib/ai/doc-check";
 import { admin, dbConfigured } from "@/lib/agent/db";
 import { caller } from "@/lib/agent/user";
 
-const Kind = z.enum(["w9", "coi", "authority", "noa", "voided_check", "bol", "pod", "lumper_receipt", "receipt", "dvir_photo", "cab_card", "insurance_card", "ifta_license", "annual_inspection", "other"]);
+const Kind = z.enum(["w9", "coi", "authority", "noa", "voided_check", "bol", "pod", "lumper_receipt", "receipt", "dvir_photo", "cab_card", "insurance_card", "ifta_license", "annual_inspection", "pickup_photo", "scale_ticket", "other"]);
 /** The papers a driver shows at a roadside inspection, for one truck or the whole fleet (lib/cloud/files TRUCK_PAPERS). */
 const TRUCK_PAPERS = ["cab_card", "insurance_card", "ifta_license", "annual_inspection"];
 const OFFICE_PAPERS = ["w9", "coi", "authority", "noa", "voided_check", ...TRUCK_PAPERS];

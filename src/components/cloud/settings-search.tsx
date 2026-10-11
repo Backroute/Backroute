@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Search } from "lucide-react";
+import { HUB } from "@/lib/integrations";
 
 /** One place in Settings: its tab, its card's anchor, and the words an owner would type looking for it. */
 export interface SettingSpot {
@@ -11,6 +12,8 @@ export interface SettingSpot {
   words: string;
   /** Only in a signed-in account, or only in the demo. */
   only?: "real" | "demo";
+  /** An integration's panel in Settings → Integrations (lib/integrations HUB id). */
+  open?: string;
 }
 
 export const SETTING_SPOTS: SettingSpot[] = [
@@ -21,15 +24,13 @@ export const SETTING_SPOTS: SettingSpot[] = [
   { tab: "general", id: "set-rules", title: "Your rules", words: "rules without asking automatic approve learned", only: "real" },
   { tab: "general", id: "set-portals", title: "Broker websites", words: "portal website login password broker site", only: "real" },
   { tab: "general", id: "set-papers", title: "Your papers", words: "w-9 w9 coi insurance certificate authority mc letter voided check noa documents papers", only: "real" },
-  { tab: "general", id: "set-connections", title: "ELD, load boards and feeds", words: "eld samsara motive dat truckstop load board feed connect keys", only: "real" },
   { tab: "general", id: "set-history", title: "Bring your history", words: "import past loads history csv rate cons spreadsheet", only: "real" },
-  { tab: "general", id: "set-quickbooks", title: "QuickBooks Online", words: "quickbooks qbo accounting books bookkeeping", only: "real" },
-  { tab: "general", id: "set-exports", title: "Downloads", words: "export download csv payroll bookkeeper invoices iif", only: "real" },
   { tab: "general", id: "set-language", title: "Language", words: "language spanish español english" },
   { tab: "general", id: "set-appearance", title: "Appearance", words: "dark mode light theme colors appearance" },
   { tab: "general", id: "set-autopilot", title: "Autopilot", words: "autopilot ask me first full hands off approve booking" },
   { tab: "general", id: "set-notifications", title: "Notifications", words: "notifications alerts push phone text me email daily text weekly review morning brief drivers" },
-  { tab: "integrations", id: "set-integrations", title: "Integrations", words: "integrations tms eld load boards connect" },
+  { tab: "integrations", id: "set-integrations", title: "Integrations", words: "integrations connect apps eld load boards fuel card tolls factoring accounting" },
+  ...HUB.filter((e) => e.flow.type !== "request").map((e) => ({ tab: "integrations", id: "set-integrations", title: e.name, words: `${e.category} ${e.does} ${e.keywords ?? ""}`.toLowerCase(), open: e.id })),
   { tab: "addons", id: "set-addons", title: "Add-ons", words: "add-ons addons factoring insurance ifta fuel card" },
   { tab: "billing", id: "set-billing", title: "Billing", words: "billing subscription plan card payment invoice charge price" },
   { tab: "billing", id: "set-team", title: "Who can sign in", words: "team invite dispatcher bookkeeper driver app access sign in members consent" },
@@ -70,7 +71,7 @@ export function SettingsSearch({ signedIn, onPick }: { signedIn: boolean; onPick
             <li className="px-4 py-3 text-sm text-ink-500">Nothing by that name. Try another word.</li>
           ) : (
             matches.map((s) => (
-              <li key={s.id}>
+              <li key={`${s.id}-${s.title}`}>
                 <button
                   type="button"
                   role="option"

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { dbConfigured, loadContext } from "@/lib/agent/db";
 import { applyEld, EldError, readEld } from "@/lib/agent/eld";
 import { FeedError, readFeed } from "@/lib/agent/feeds";
-import { integrationsFor, removeIntegration, saveIntegration, type CustomBoardConfig, type FeedConfig, type IntegrationKind, type StatementConfig, type TruckstopConfig } from "@/lib/agent/integrations";
+import { integrationsFor, removeIntegration, saveIntegration, setStatus, type CustomBoardConfig, type EldConfig, type FeedConfig, type IntegrationKind, type StatementConfig, type TruckstopConfig } from "@/lib/agent/integrations";
 import { boardFor } from "@/lib/agent/boards";
 import { importStatementText, readStatement, StatementError } from "@/lib/agent/costs";
 import { datConfigured } from "@/lib/agent/boards/dat";
@@ -11,6 +11,11 @@ import { truckstopConfigured } from "@/lib/agent/boards/truckstop";
 import { BoardError } from "@/lib/agent/boards/types";
 import { caller } from "@/lib/agent/user";
 import { quickbooksConfigured, type QuickbooksConfig } from "@/lib/agent/quickbooks";
+import { readGeotab, sealGeotab, type GeotabConfig } from "@/lib/agent/geotab";
+import { xeroConfigured, type XeroConfig } from "@/lib/agent/xero";
+import type { PayoutsConfig } from "@/lib/agent/payouts";
+import { vaultConfigured } from "@/lib/portal/vault";
+import { overLimit, tooMany } from "@/lib/rate-limit";
 
 const Custom = z.object({
   name: z.string().trim().min(2).max(40),
@@ -27,6 +32,7 @@ const Body = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("dat"), userEmail: z.string().trim().email().max(200), postTrucks: z.boolean().optional() }),
   z.object({ kind: z.literal("board"), config: Custom }),
   z.object({ kind: z.enum(["samsara", "motive"]), apiKey: z.string().trim().min(8).max(500) }),
+  z.object({ kind: z.literal("geotab"), database: z.string().trim().min(2).max(100), userName: z.string().trim().min(2).max(200), password: z.string().min(4).max(200) }),
   z.object({
     kind: z.enum(["fuel_feed", "toll_feed"]),
     url: z.string().url().max(2000).refine((u) => u.startsWith("https://") || process.env.NODE_ENV !== "production", "https only"),
@@ -52,7 +58,7 @@ export async function GET(request: Request) {
   const rows = await integrationsFor(who.me.carrierId);
   return Response.json({
     // Whether Backroute's own side of each board is in place (its partner agreement and login).
-    available: { truckstop: truckstopConfigured(), dat: datConfigured(), quickbooks: quickbooksConfigured() },
+    available: { truckstop: truckstopConfigured(), dat: datConfigured(), quickbooks: quickbooksConfigured(), xero: xeroConfigured(), vault: vaultConfigured() },
     connections: rows.map((r) => ({
       kind: r.kind,
       status: r.status,
@@ -62,6 +68,9 @@ export async function GET(request: Request) {
       ...(r.kind === "truckstop" || r.kind === "dat" ? { postTrucks: !!(r.config as TruckstopConfig).postTrucks } : {}),
       ...(r.kind === "gmail" || r.kind === "outlook" ? { name: (r.config as MailboxConfig).email, lastSync: (r.config as MailboxConfig).lastChecked ?? null } : {}),
       ...(r.kind === "quickbooks" ? { name: (r.config as QuickbooksConfig).companyName ?? null, lastSync: (r.config as QuickbooksConfig).lastSync ?? null } : {}),
+      ...(r.kind === "xero" ? { name: (r.config as unknown as XeroConfig).tenantName ?? null, lastSync: (r.config as unknown as XeroConfig).lastSync ?? null } : {}),
+      ...(r.kind === "geotab" ? { name: (r.config as unknown as GeotabConfig).database } : {}),
+      ...(r.kind === "payouts" ? { name: (r.config as unknown as PayoutsConfig).company?.bankName ?? null } : {}),
     })),
   });
 }
@@ -111,6 +120,16 @@ export async function POST(request: Request) {
       await saveIntegration(who.me.carrierId, "load_feed", cfg, status);
       return Response.json({ ok: true, status });
     }
+    if (b.kind === "geotab") {
+      // Signed in and read once now, so a wrong database or password shows here; the password is kept sealed.
+      const cfg = sealGeotab(who.me.carrierId, b);
+      const { vehicles, server } = await readGeotab(who.me.carrierId, cfg);
+      const ctx = await loadContext(who.me.carrierId);
+      const applied = ctx ? await applyEld(ctx, "geotab", { vehicles, clocks: [] }) : { trucks: 0, drivers: 0, unmatched: [] };
+      const status = `Connected · ${applied.trucks} truck${applied.trucks === 1 ? "" : "s"} matched${applied.unmatched.length ? `; not matched: ${applied.unmatched.slice(0, 5).join(", ")}` : ""} · hours come from Geotab's HOS app`;
+      await saveIntegration(who.me.carrierId, "geotab", { ...cfg, ...(server ? { server } : {}) } as never, status);
+      return Response.json({ ok: true, status });
+    }
     if (b.kind !== "samsara" && b.kind !== "motive") return Response.json({ error: "bad_request" }, { status: 400 });
     const data = await readEld(b.kind, b.apiKey);
     const ctx = await loadContext(who.me.carrierId);
@@ -124,10 +143,57 @@ export async function POST(request: Request) {
   }
 }
 
+/**
+ * "Check now": runs a saved connection once with what's on file (the ELD read, a board's test search, the feed or
+ * statement read) and saves what happened, so the owner can see it works without typing the key again.
+ */
+export async function PATCH(request: Request) {
+  if (!dbConfigured()) return Response.json({ error: "not_set_up" }, { status: 503 });
+  const who = await caller(request);
+  if (!who || who.me.role === "driver" || who.me.role === "bookkeeper") return Response.json({ error: "sign_in" }, { status: 401 });
+  if (await overLimit(`int-check:${who.me.carrierId}`, 3600, 30)) return tooMany();
+  const kind = new URL(request.url).searchParams.get("kind") ?? "";
+  const row = (await integrationsFor(who.me.carrierId)).find((r) => r.kind === kind);
+  if (!row) return Response.json({ error: "not_connected" }, { status: 404 });
+  const ctx = await loadContext(who.me.carrierId);
+  if (!ctx) return Response.json({ error: "not_set_up" }, { status: 503 });
+  try {
+    let status: string;
+    if (row.kind === "samsara" || row.kind === "motive") {
+      const applied = await applyEld(ctx, row.kind, await readEld(row.kind, (row.config as EldConfig).apiKey));
+      status = `Connected · ${applied.trucks} truck${applied.trucks === 1 ? "" : "s"} and ${applied.drivers} driver${applied.drivers === 1 ? "" : "s"} matched${applied.unmatched.length ? `; not matched: ${applied.unmatched.slice(0, 5).join(", ")}` : ""}`;
+    } else if (row.kind === "geotab") {
+      const { vehicles } = await readGeotab(who.me.carrierId, row.config as unknown as GeotabConfig);
+      const applied = await applyEld(ctx, "geotab", { vehicles, clocks: [] });
+      status = `Connected · ${applied.trucks} truck${applied.trucks === 1 ? "" : "s"} matched${applied.unmatched.length ? `; not matched: ${applied.unmatched.slice(0, 5).join(", ")}` : ""}`;
+    } else if (row.kind === "load_feed") {
+      const rows = await readFeed(row.config as FeedConfig);
+      status = `Connected · ${rows.length} usable load${rows.length === 1 ? "" : "s"} in it now`;
+    } else if (row.kind === "fuel_feed" || row.kind === "toll_feed") {
+      const r = await importStatementText(ctx, row.kind === "fuel_feed" ? "fuel" : "toll", await readStatement(row.config as StatementConfig));
+      status = `Connected · ${r.read} new line${r.read === 1 ? "" : "s"}, ${r.matched} on a load`;
+    } else if (row.kind === "truckstop" || row.kind === "dat" || row.kind.startsWith("board:")) {
+      const board = boardFor(row);
+      if (!board) return Response.json({ ok: true, status: row.status ?? "Saved · waiting on Backroute's agreement with this board" });
+      const truck = ctx.trucks.find((t) => t.currentCity && t.currentState);
+      const found = truck ? await board.search({ originCity: truck.currentCity, originState: truck.currentState, radius: 150, availableFrom: new Date().toISOString(), equipment: truck.equipmentType }) : [];
+      status = `Connected · test search found ${found.length} load${found.length === 1 ? "" : "s"} near ${truck?.currentCity ?? "your trucks"}`;
+    } else {
+      return Response.json({ error: "bad_request" }, { status: 400 });
+    }
+    await setStatus(who.me.carrierId, row.kind, status);
+    return Response.json({ ok: true, status });
+  } catch (e) {
+    const reason = e instanceof EldError || e instanceof FeedError || e instanceof BoardError || e instanceof StatementError ? e.message : "Couldn't reach it.";
+    await setStatus(who.me.carrierId, row.kind, `Not working: ${reason}`);
+    return Response.json({ ok: false, reason }, { status: 422 });
+  }
+}
+
 export async function DELETE(request: Request) {
   const who = await caller(request);
   if (!who || who.me.role === "driver" || who.me.role === "bookkeeper") return Response.json({ error: "sign_in" }, { status: 401 });
-  const kind = z.union([z.enum(["samsara", "motive", "load_feed", "fuel_feed", "toll_feed", "truckstop", "dat"]), z.string().regex(/^board:[a-z0-9_-]{1,40}$/)]).safeParse(new URL(request.url).searchParams.get("kind"));
+  const kind = z.union([z.enum(["samsara", "motive", "geotab", "load_feed", "fuel_feed", "toll_feed", "truckstop", "dat", "payouts"]), z.string().regex(/^board:[a-z0-9_-]{1,40}$/)]).safeParse(new URL(request.url).searchParams.get("kind"));
   if (!kind.success) return Response.json({ error: "bad_request" }, { status: 400 });
   await removeIntegration(who.me.carrierId, kind.data as IntegrationKind);
   return Response.json({ ok: true });

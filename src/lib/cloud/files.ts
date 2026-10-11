@@ -1,7 +1,7 @@
 import { authHeader } from "../ai/client";
 import { enqueue, startQueue, whenSent, type Queued } from "./upload-queue";
 
-export type FileKind = "w9" | "coi" | "authority" | "noa" | "voided_check" | "bol" | "pod" | "lumper_receipt" | "receipt" | "dvir_photo" | TruckPaper | "other";
+export type FileKind = "w9" | "coi" | "authority" | "noa" | "voided_check" | "bol" | "pod" | "lumper_receipt" | "receipt" | "dvir_photo" | "pickup_photo" | "scale_ticket" | TruckPaper | "other";
 
 /** What a driver shows at a roadside inspection: the truck's registration (cab card), insurance card, IFTA license and annual inspection. */
 export const TRUCK_PAPERS = ["cab_card", "insurance_card", "ifta_license", "annual_inspection"] as const;

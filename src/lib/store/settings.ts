@@ -29,6 +29,8 @@ export interface AgentSettings {
   businessAddress?: string;
   /** Real accounts: invoices go to the factoring company instead of the broker when this is set. */
   factoringEmail?: string;
+  /** Who the carrier factors with ("RTS Financial"), shown in Settings → Integrations. */
+  factoringCompany?: string;
   /** Real accounts: the AI texts drivers before pickup and delivery, and follows up. On unless turned off. */
   checkIns?: boolean;
   autonomy: Autonomy;

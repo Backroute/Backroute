@@ -41,8 +41,10 @@ async function upload(kind, as, loadId) {
   // A driver with a truck on a load that delivers today, running late.
   put("drivers", "ez-d1", { id: "ez-d1", name: "Ezra Lane", phone: "+12145550131", email: "", truckId: "ez-t1", carrierId: "carrier-titan", hosStatus: "on_duty", hoursRemaining: 9, cdl: "", rating: 5, hireDate: iso(-24 * 400), homeBase: "Dallas, TX", runType: "regional", homeTimeTarget: "Flexible", payType: "percentage", payRate: 0.28, prefs: { language: "en" } }, { name: "Ezra Lane", phone: "+12145550131" });
   put("trucks", "ez-t1", { id: "ez-t1", unitNumber: "EZ-1", driverId: "ez-d1", carrierId: "carrier-titan", equipmentType: "Dry Van", status: "on_load", currentCity: "Waco", currentState: "TX", homeBase: "Dallas, TX", currentLoadId: "ez-L1", nextLoadId: null, mpg: 6.5, odometer: 100000, lastServiceMiles: 90000, serviceIntervalMiles: 25000, nextInspectionDue: iso(24 * 300) }, { unit_number: "EZ-1", driver_id: "ez-d1" });
-  const today = new Date();
-  const at = (h) => { const d = new Date(today); d.setHours(h, 0, 0, 0); return d.toISOString(); };
+  // Both stops today where the docks are (Texas): the delivery between now and Central-time midnight, whatever the hour.
+  const ct = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Chicago" }));
+  const toMidnight = 24 * 60 - (ct.getHours() * 60 + ct.getMinutes());
+  const at = (h) => new Date(Date.now() + (h === 6 ? -Math.min(180, ct.getHours() * 60 + ct.getMinutes() - 1) : Math.max(5, Math.min(240, toMidnight - 10))) * 60000).toISOString();
   put("loads", "ez-L1", { id: "ez-L1", referenceNumber: "EZ-100", stage: "in_transit", carrierId: "carrier-titan", truckId: "ez-t1", brokerId: "u5-b1", source: "test", lane: { origin: "Dallas", originState: "TX", destination: "Houston", destState: "TX", miles: 240 }, equipmentType: "Dry Van", weight: 30000, pickupWindow: "today", deliveryWindow: "today", pickupAt: at(6), deliveryAt: at(20), listedRate: 900, targetRate: 900, bookedRate: 900, deadheadMiles: 0, fuelCost: 100, tollCost: 0, deadheadCost: 0, commission: 0, netProfit: 700, rpm: 3.75, score: 80, messages: [], calls: [], documents: [], createdAt: iso(-30), updatedAt: iso(0), late: { stop: "delivery", eta: "9:10 pm", at: iso(0) } }, { truck_id: "ez-t1", stage: "in_transit" });
   db(`insert into auth.users values ('${DRV_SUB}', '${DRV_PHONE}') on conflict do nothing`);
   db(`delete from members where user_id = '${DRV_SUB}'`);
@@ -97,7 +99,8 @@ async function upload(kind, as, loadId) {
   await op.getByLabel("Search settings").fill("quickbooks");
   await op.getByRole("option", { name: "QuickBooks Online" }).click();
   await op.waitForTimeout(1500);
-  check("Settings search opens the right tab on the right card", (await op.getByRole("button", { name: "Company", pressed: true }).count()) === 1 && (await op.locator("#set-quickbooks").isVisible()));
+  await op.getByRole("dialog").waitFor({ timeout: 30000 }).catch(() => {});
+  check("Settings search opens Integrations on QuickBooks' own panel", (await op.getByRole("button", { name: "Integrations", pressed: true }).count()) === 1 && /What Backroute does with it/i.test(await op.getByRole("dialog").innerText().catch(() => "")));
 
   // The driver.
   const dctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });

@@ -565,6 +565,57 @@ http.createServer(async (req, res) => {
       return reply(res, { [T]: row });
     }
   }
+  // Xero: sign-in with single-use refresh tokens, one organisation, and invoices and payments kept as sent.
+  if (u.pathname.startsWith("/xero/")) {
+    const xr = (globalThis.__xero ??= { n: 100, refresh: "xero-refresh-1", invoices: [], payments: [] });
+    if (u.pathname === "/xero/token") {
+      if (req.headers.authorization !== "Basic " + Buffer.from("xero-id:xero-secret").toString("base64")) return deny();
+      const f = new URLSearchParams(await body(req));
+      log("xero", { kind: "token", grant: f.get("grant_type"), code: f.get("code"), redirect: f.get("redirect_uri") });
+      if (f.get("grant_type") === "authorization_code" && f.get("code") === "good-code") return reply(res, { access_token: "xero-access-" + xr.n++, refresh_token: xr.refresh, expires_in: 1800 });
+      if (f.get("grant_type") === "refresh_token" && f.get("refresh_token") === xr.refresh) {
+        xr.refresh = "xero-refresh-" + xr.n++;
+        return reply(res, { access_token: "xero-access-" + xr.n++, refresh_token: xr.refresh, expires_in: 1800 });
+      }
+      res.writeHead(400, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ error: "invalid_grant" }));
+    }
+    if (u.pathname === "/xero/revoke") {
+      log("xero", { kind: "revoke", body: await body(req) });
+      return reply(res, {});
+    }
+    if (!/^Bearer xero-access-/.test(req.headers.authorization ?? "")) return deny();
+    if (u.pathname === "/xero/connections") return reply(res, [{ tenantId: "tenant-1", tenantName: "Lone Star Freight", tenantType: "ORGANISATION" }]);
+    if (req.headers["xero-tenant-id"] !== "tenant-1") return deny();
+    if (req.method === "POST" && u.pathname === "/xero/api/Invoices") {
+      const b = JSON.parse((await body(req)) || "{}");
+      const inv = { ...b.Invoices[0], InvoiceID: "xi-" + xr.n++ };
+      xr.invoices.push(inv);
+      log("xero", { kind: "invoice", inv });
+      return reply(res, { Invoices: [inv] });
+    }
+    if (req.method === "PUT" && u.pathname === "/xero/api/Payments") {
+      const b = JSON.parse((await body(req)) || "{}");
+      xr.payments.push(b.Payments[0]);
+      log("xero", { kind: "payment", payment: b.Payments[0] });
+      return reply(res, { Payments: b.Payments });
+    }
+    return deny();
+  }
+  // Geotab: JSON-RPC sign-in, then the devices and where each one last was.
+  if (u.pathname === "/geotab/apiv1") {
+    const b = JSON.parse((await body(req)) || "{}");
+    log("geotab", { method: b.method, typeName: b.params?.typeName, database: b.params?.database ?? b.params?.credentials?.database });
+    if (b.method === "Authenticate") {
+      if (b.params?.database !== "lonestar" || b.params?.password !== "geotab-good-pass") return reply(res, { error: { message: "Incorrect login credentials", errors: [{ name: "InvalidUserException" }] } });
+      return reply(res, { result: { credentials: { database: "lonestar", userName: b.params.userName, sessionId: "geo-session" }, path: "ThisServer" } });
+    }
+    if (b.params?.credentials?.sessionId !== "geo-session") return reply(res, { error: { message: "Authentication failed", errors: [{ name: "InvalidUserException" }] } });
+    if (b.method === "Get" && b.params.typeName === "Device") return reply(res, { result: [{ id: "b1", name: "HB1" }, { id: "b2", name: "GEO-9" }] });
+    if (b.method === "Get" && b.params.typeName === "DeviceStatusInfo")
+      return reply(res, { result: [{ device: { id: "b1" }, latitude: 32.78, longitude: -96.8, dateTime: new Date().toISOString() }, { device: { id: "b2" }, latitude: 35.15, longitude: -90.05, dateTime: new Date().toISOString() }, { device: { id: "b3" }, latitude: 0, longitude: 0 }] });
+    return reply(res, { error: { message: "Unknown method" } });
+  }
   // Truck parking reservations: two lots near wherever it's asked; bookings logged, cancels too.
   if (u.pathname.startsWith("/parking/v1/")) {
     if (req.headers.authorization !== "Bearer parking-key") return deny();

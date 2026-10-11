@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const o = await owner(request);
   if ("error" in o) return o.error;
-  if (await overLimit(`qbo-sync:${o.who.me.carrierId}`, 6, 3600)) return tooMany();
+  if (await overLimit(`qbo-sync:${o.who.me.carrierId}`, 3600, 12)) return tooMany();
   const row = (await integrationsFor(o.who.me.carrierId)).find((r) => r.kind === "quickbooks");
   const ctx = await loadContext(o.who.me.carrierId);
   if (!row || !ctx) return Response.json({ error: "not_connected" }, { status: 404 });

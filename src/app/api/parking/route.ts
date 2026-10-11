@@ -26,7 +26,7 @@ export async function GET(request: Request) {
   if (!parkingConfigured()) return Response.json({ error: "parking_off" }, { status: 503 });
   const w = await who(request, new URL(request.url).searchParams.get("truck"));
   if ("error" in w) return w.error;
-  if (await overLimit(`parking:${w.c.me.userId}`, 30, 60)) return tooMany();
+  if (await overLimit(`parking:${w.c.me.userId}`, 60, 30)) return tooMany();
   const driver = w.ctx.drivers.find((d) => d.id === w.truck.driverId);
   const where = whereToPark(w.truck, driver, w.ctx.loads);
   if (!where) return Response.json({ spots: [], where: null, booked: w.truck.parking ?? null });
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return Response.json({ error: "bad_request" }, { status: 400 });
   const w = await who(request, parsed.data.truck ?? null);
   if ("error" in w) return w.error;
-  if (await overLimit(`parking-book:${w.c.me.userId}`, 5, 3600)) return tooMany();
+  if (await overLimit(`parking-book:${w.c.me.userId}`, 3600, 5)) return tooMany();
   if (w.truck.parking?.status === "booked" && Date.parse(w.truck.parking.arriveAt) > Date.now() - 12 * 3600_000) return Response.json({ error: "already_booked", booked: w.truck.parking }, { status: 409 });
   const driver = w.ctx.drivers.find((d) => d.id === w.truck.driverId);
   const where = whereToPark(w.truck, driver, w.ctx.loads);

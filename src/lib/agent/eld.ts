@@ -31,9 +31,9 @@ import { tripEtas } from "./trips";
  * when the account allows it and skipped quietly when it doesn't.
  */
 
-type EldKind = "samsara" | "motive";
+export type EldKind = "samsara" | "motive" | "geotab";
 
-interface EldVehicle {
+export interface EldVehicle {
   unit: string;
   lat: number;
   lon: number;

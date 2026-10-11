@@ -98,15 +98,16 @@ What the real version does today, and what it doesn't do yet. How to switch each
   - Before booking it asks what the freight is, the weight and the appointments. Freight over what the truck can legally carry isn't booked, and hazmat waits for the owner unless they've said they haul it.
   - It leaves a short voicemail if nobody answers, and a phone-only broker gets one more call.
   - The booking is still confirmed by the broker's rate con.
-- **Load boards** (Settings → General → ELD, load boards and feeds), once Backroute has the board's agreement:
+- **Load boards** (Settings → Integrations), once Backroute has the board's agreement:
   - **Truckstop** (the carrier's Integration ID) and **DAT** (the carrier's DAT login email). Any other board with an API (123Loadboard, Direct Freight, a broker's portal) is described in JSON by Backroute support, with no new code.
   - Every 30 minutes, for each truck that's empty or delivers within a day and a half, the AI searches within 150 miles of where it will be empty, from when it will be. That lines up the reload before delivery.
   - Loads heading toward the driver's home come first. They go through the same broker check, pricing and booking as email.
   - If the owner turns it on, each truck is also posted as available once a day.
   - Before the agreement is in place, the carrier can still save their side; it shows "waiting on Backroute's agreement".
-- **Load feeds:** any list of loads a broker, shipper or load board publishes as JSON or CSV at a web address (Settings → General → ELD, load boards and feeds). It's read every round, and the loads go through the same matching and booking as email. Format below.
-- **ELD (Samsara or Motive):**
-  - Truck locations and drivers' hours are read every round.
+- **Load feeds:** any list of loads a broker, shipper or load board publishes as JSON or CSV at a web address (Settings → Integrations). It's read every round, and the loads go through the same matching and booking as email. Format below.
+- **ELD (Samsara, Motive or Geotab):**
+  - Truck locations and drivers' hours are read every round (Geotab: locations; its hours stay in Geotab's HOS app).
+  - Miles by state for IFTA are counted from one reading to the next, and Samsara and Motive safety events (speeding, harsh braking, following too close…) go in each driver's file with a coaching point.
   - The AI offers a truck only loads its driver has the hours to reach in time.
   - It emails the broker as soon as a truck can't make an appointment, instead of 30 minutes after.
 - **Pricing and planning like a dispatcher who's been there a while:**
@@ -316,7 +317,7 @@ What the real version does today, and what it doesn't do yet. How to switch each
 - **Truck parking, only when asked.** The driver taps **Reserve a spot** (spots near where their hours run out, with prices), or asks the AI by text, call or chat. The owner can ask in the app's chat, or book from the app. The AI never books a spot on its own; the tool refuses unless the person's own words asking for it are in their message. The driver gets the address, confirmation and gate code.
 - **Late trucks seen sooner.** ETAs use live traffic (HERE), weather warnings on the road ahead, and the driver's hours. Within 30 minutes either side of the appointment, the owner hears it's tight, with why. Past that, the broker is told, as before. A truck stopped 90 minutes or more away from its stops, with the driver on duty, gets an "everything OK?" text.
 - **Offline, finished.** The trip's map area is kept on the phone when the trip map opens (the road ahead, whole-trip to town level), so the map still draws with no signal. A Yes/No tapped on a notification with no signal is kept and sent once the phone is back online, with a note saying so.
-- **QuickBooks Online, kept in step.** The owner connects their company once (Settings → General). Every hour the AI puts in:
+- **QuickBooks Online, kept in step.** The owner connects their company once (Settings → Integrations → QuickBooks Online). Every hour the AI puts in:
   - each invoice sent to a broker, with the broker as the customer and one line per charge
   - the payment when the broker pays
   - fuel, tolls, and the lumpers and scales drivers paid that the owner approved
@@ -436,6 +437,26 @@ What the real version does today, and what it doesn't do yet. How to switch each
   empty trucks follow with Choose and Auto-pick. **Messages** keeps a slim header on a phone. **Today's stops** show
   the date, wrap instead of cutting off, and put stops with no set time after the timed ones.
 
+- **Integrations, in one place (Settings → Integrations).** Every service a carrier, dispatcher or driver uses, by
+  kind: email, ELD & GPS, load boards, fuel cards, tolls, accounting, factoring, driver pay, broker tracking, carrier
+  setup networks, phone, navigation and compliance. A line under the title says how many are connected and names any
+  that stopped working. Each one opens a panel with the whole flow:
+  - what it does, what Backroute does with it, how it connects, and the steps in order
+  - the form for that service (an API key, a sign-in with Google, Microsoft, Intuit or Xero, an address and header,
+    a factoring email and the Notice of Assignment, bank details)
+  - a test right away: nothing is saved that doesn't work, and the result says what it found ("2 trucks matched")
+  - its status and when it last ran, **Check now** (runs it again with what's on file) and **Disconnect** (asks first)
+  - services Backroute can't sign into itself (123Loadboard, another ELD, instant pay, your own number) have **Ask us
+    to connect it**, which goes to Backroute's support team with the owner's note, so nothing is promised that isn't
+    being done.
+  - New: **Geotab** (a MyGeotab database and a read-only user; the password is kept encrypted), **Xero** (invoices and
+    broker payments every hour, on the account codes the owner picks; each once), **direct deposit** (the sending
+    bank, each driver's account kept encrypted and shown as the last four, and each week's pay runs as a NACHA bank
+    file to upload to the bank; drivers without an account are listed, so nobody's missed), and **factoring** per
+    company (RTS, OTR, Triumph, Apex, TBS, Riviera, eCapital or another).
+  - A link opens one panel (`/carrier/settings?tab=integrations&open=xero`), and Settings search finds each by name.
+  - The sample account goes through the same panels, marked Sample; nothing leaves it.
+
 ## What it doesn't do yet
 
 The AI now does the day-to-day work of a dispatcher by email, text and phone. What's still out of its reach, or needs something from outside:
@@ -467,6 +488,11 @@ The AI now does the day-to-day work of a dispatcher by email, text and phone. Wh
 - **Weather covers the US and Canada only.** Mexico isn't covered.
 - **Holidays are the US ones.** A dock's hours come from what drivers told the AI, else its posted hours on Google Places (a heads-up only). A dock with neither is assumed open.
 - **Parking needs a reservation partner** (step 23). The API Backroute expects is small and written down. Each network (Truck Parking Club, TA, Pilot) has its own partner terms. Without one, the AI finds lots nearby and the driver books in their truck stop app.
+- **Some integrations are one at a time or by request.** One fuel card and one toll report address at a time (other
+  cards' files are uploaded on Costs). Instant pay to a debit card, another ELD, 123Loadboard and using your own
+  business number are set up by Backroute's support team. Backroute never moves driver pay itself: the owner uploads
+  the bank file, and should check its layout with their bank before the first one. Xero's and Geotab's request formats
+  follow their public documents and are tested against stand-ins; try each with a real account before a pilot.
 - **Reading Gmail needs Google's verification** (step 25): `gmail.readonly` is a restricted scope, so until the app passes Google's review and yearly security assessment, only test users can connect. Outlook needs no review, but some company accounts need their admin's consent. Forwarding works for everyone meanwhile.
 - **Hiding the rate from drivers is what the screens show,** not a lock: the load's numbers still reach the phone with the load (they're needed for the driver's pay). Keeping them off the phone entirely would mean a separate driver view of each load on the server.
 - **Dock times from the ELD need a routing account** (step 12) to find the dock's exact spot from its street address, and an ELD connected (step 8). Without either, the driver taps.

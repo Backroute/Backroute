@@ -5,7 +5,9 @@ import type { MailboxConfig } from "./mailbox";
 
 /** A carrier's connections to outside services, kept server-side (see migration 20260927000000_support.sql). */
 
-export type IntegrationKind = "samsara" | "motive" | "load_feed" | "fuel_feed" | "toll_feed" | "truckstop" | "dat" | "quickbooks" | "gmail" | "outlook" | `board:${string}`;
+export type IntegrationKind =
+  | "samsara" | "motive" | "geotab" | "load_feed" | "fuel_feed" | "toll_feed" | "truckstop" | "dat" | "quickbooks" | "xero" | "gmail" | "outlook" | "payouts"
+  | `board:${string}`;
 
 export interface EldConfig {
   apiKey: string;

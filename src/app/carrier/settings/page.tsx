@@ -1,9 +1,8 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { CheckCircle2, CreditCard, Download, FileText, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
-import { INTEGRATION_CATEGORIES } from "@/lib/integrations";
+import { useRouter, useSearchParams } from "next/navigation";
+import { CheckCircle2, CreditCard, Download, FileText, Plus, Sparkles, Trash2 } from "lucide-react";
 import { ADDONS } from "@/lib/addons";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -30,11 +29,9 @@ import { OwnerRulesCard } from "@/components/cloud/owner-rules";
 import { PortalCard } from "@/components/cloud/portal-card";
 import { BillingCard } from "@/components/cloud/billing-card";
 import { PhoneAlerts } from "@/components/cloud/phone-alerts";
-import { ExportsCard } from "@/components/cloud/exports-card";
 import { SettingsSearch } from "@/components/cloud/settings-search";
 import { LeaveCard } from "@/components/cloud/leave-card";
-import { QuickbooksCard } from "@/components/cloud/quickbooks-card";
-import { ConnectionsCard } from "@/components/cloud/connections-card";
+import { IntegrationsHub } from "@/components/cloud/integrations-hub";
 import { SecurityCard } from "@/components/cloud/security-card";
 import { AuditLogCard } from "@/components/cloud/audit-log-card";
 import { HistoryCard } from "@/components/cloud/history-card";
@@ -82,11 +79,9 @@ function Settings() {
   // A real account manages who can sign in; the demo keeps its sample team.
   const signedIn = useStore((s) => s.session.mode !== "demo");
   const [inviteEmail, setInviteEmail] = useState("");
-  const [connections, setConnections] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(INTEGRATION_CATEGORIES.flatMap((c) => c.items).map((i) => [i.id, i.connected])),
-  );
   // A real account opens on the five questions that matter; the demo, on everything.
   // A link can open a tab (?tab=general). The owner's own pick holds until a link asks for another one.
+  const router = useRouter();
   const asked = useSearchParams().get("tab");
   const [picked, setPicked] = useState<{ asked: string | null; tab: TabKey } | null>(null);
   const tab: TabKey =
@@ -118,6 +113,8 @@ function Settings() {
           <SettingsSearch
             signedIn={signedIn}
             onPick={(spot) => {
+              // An integration opens its own panel in the hub.
+              if (spot.open) return router.replace(`/carrier/settings?tab=integrations&open=${spot.open}`, { scroll: false });
               setTab(spot.tab as TabKey);
               // The tab renders first; then the card is brought into view and marked for a moment.
               setTimeout(() => {
@@ -170,10 +167,7 @@ function Settings() {
                   <div id="set-rules" className="scroll-mt-24"><OwnerRulesCard /></div>
                   <div id="set-portals" className="scroll-mt-24"><PortalCard /></div>
                   <div id="set-papers" className="scroll-mt-24"><DocumentsCard /></div>
-                  <div id="set-connections" className="scroll-mt-24"><ConnectionsCard /></div>
                   <div id="set-history" className="scroll-mt-24"><HistoryCard /></div>
-                  <div id="set-quickbooks" className="scroll-mt-24"><QuickbooksCard /></div>
-                  <div id="set-exports" className="scroll-mt-24"><ExportsCard /></div>
                 </>
               )}
 
@@ -224,81 +218,7 @@ function Settings() {
             </>
           )}
 
-          {tab === "integrations" && (
-            <Card id="set-integrations" className="scroll-mt-24">
-              <CardHeader>
-                <CardTitle>Integrations</CardTitle>
-                <CardDescription>The load boards, TMS, ELD, and back-office tools Backroute reads and writes to.</CardDescription>
-              </CardHeader>
-              <CardContent className="!pt-3 flex flex-col gap-5">
-                <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">TMS</p>
-                  <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
-                    <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-950 text-xs font-bold text-white">
-                          {initials(settings.tmsProvider)}
-                        </span>
-                        <div>
-                          <p className="text-sm font-medium text-ink-900">{settings.tmsProvider}</p>
-                          <p className="text-xs text-ink-500">Booked loads sync automatically after rate confirmation.</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {settings.tmsConnected ? (
-                          <Badge tone="success"><CheckCircle2 className="h-3 w-3" /> Connected</Badge>
-                        ) : (
-                          <Badge tone="warning">Disconnected</Badge>
-                        )}
-                        <Button variant="outline" size="sm" onClick={() => updateSettings({ tmsConnected: true })}>
-                          <RefreshCw className="h-3.5 w-3.5" /> Sync now
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {INTEGRATION_CATEGORIES.map((cat) => (
-                  <div key={cat.name}>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-400">{cat.name}</p>
-                    <div className="flex flex-col divide-y divide-line rounded-2xl border border-line">
-                      {cat.items.map((item) => {
-                        const connected = connections[item.id];
-                        return (
-                          <div key={item.id} className="flex flex-wrap items-center justify-between gap-4 px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-xs font-bold text-ink-700">
-                                {initials(item.name)}
-                              </span>
-                              <div>
-                                <p className="text-sm font-medium text-ink-900">{item.name}</p>
-                                <p className="text-xs text-ink-500">{item.detail}</p>
-                              </div>
-                            </div>
-                            {connected ? (
-                              <div className="flex items-center gap-2">
-                                <Badge tone="success"><CheckCircle2 className="h-3 w-3" /> Connected</Badge>
-                                <button
-                                  onClick={() => setConnections((c) => ({ ...c, [item.id]: false }))}
-                                  className="text-xs font-medium text-ink-400 hover:text-[var(--accent-danger)]"
-                                >
-                                  Disconnect
-                                </button>
-                              </div>
-                            ) : (
-                              <Button variant="outline" size="sm" onClick={() => setConnections((c) => ({ ...c, [item.id]: true }))}>
-                                Connect
-                              </Button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
+          {tab === "integrations" && <IntegrationsHub />}
 
           {tab === "addons" && (
             <Card id="set-addons" className="scroll-mt-24">
@@ -473,11 +393,6 @@ function Settings() {
       </div>
     </div>
   );
-}
-
-function initials(name: string): string {
-  const words = name.replace(/\.(com|ai)$/i, "").split(/[\s.]+/).filter(Boolean);
-  return words.slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 }
 
 function Field({ label, value }: { label: string; value: string }) {

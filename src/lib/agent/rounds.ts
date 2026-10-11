@@ -22,8 +22,10 @@ import { marksFor, type CarrierContext } from "./db";
 import { forCarrier } from "./scope";
 import { applyEld, checkCalls, lateNotices, readEld } from "./eld";
 import { applySafety, readSafety } from "./safety";
+import { readGeotab, type GeotabConfig } from "./geotab";
+import { xeroRound } from "./xero";
 import { pullFeed, readFeed } from "./feeds";
-import { integrationsFor, setStatus, type EldConfig, type FeedConfig } from "./integrations";
+import { integrationsFor, saveIntegration, setStatus, type EldConfig, type FeedConfig } from "./integrations";
 import { chasePayments } from "./money";
 import { expireOffers, sendDetentionClaims, sendInvoices, warnCoiExpiring } from "./paperwork";
 import { refreshPlans } from "./plan";
@@ -81,8 +83,19 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
       await setStatus(id, kind, `Not working: ${e instanceof Error ? e.message : "error"}`);
     }
   }
+  for (const link of links.filter((l) => l.kind === "geotab")) {
+    try {
+      const cfg = link.config as unknown as GeotabConfig;
+      const { vehicles, server } = await readGeotab(id, cfg);
+      const applied = await applyEld(ctx, "geotab", { vehicles, clocks: [] });
+      if (server && server !== cfg.server) await saveIntegration(id, "geotab", { ...cfg, server } as never, `Connected · ${applied.trucks} trucks updated`);
+      else await setStatus(id, "geotab", `Connected · ${applied.trucks} trucks updated`);
+    } catch (e) {
+      await setStatus(id, "geotab", `Not working: ${e instanceof Error ? e.message : "error"}`);
+    }
+  }
   // Pulling into and out of a dock's lot, from the ELD's GPS: the dock times for detention, and "arrived" for the driver.
-  if (links.some((l) => l.kind === "samsara" || l.kind === "motive")) done.push(...(await eldDockTimes(ctx, now).catch((e) => (console.error("[rounds] ELD dock times failed", e), []))));
+  if (links.some((l) => l.kind === "samsara" || l.kind === "motive" || l.kind === "geotab")) done.push(...(await eldDockTimes(ctx, now).catch((e) => (console.error("[rounds] ELD dock times failed", e), []))));
   for (const link of links.filter((l) => l.kind === "load_feed")) {
     try {
       const cfg = link.config as FeedConfig;
@@ -101,6 +114,7 @@ async function rounds(ctx: CarrierContext, now: number, base: string | null): Pr
   done.push(...(await pullStatements(ctx, links, now)));
   done.push(...(await parkingReminders(ctx, now).catch((e) => (console.error("[rounds] parking reminders failed", e), []))));
   done.push(...(await quickbooksRound(ctx, links, now).catch((e) => (console.error("[rounds] quickbooks failed", e), []))));
+  done.push(...(await xeroRound(ctx, links, now).catch((e) => (console.error("[rounds] xero failed", e), []))));
   done.push(...(await makeContractLoads(ctx, now)));
   done.push(...(await trackHomeTime(ctx, now)));
   if (canText(ctx.carrier)) done.push(...(await trackingRounds(ctx, now)));

@@ -7,7 +7,7 @@ import { finishConnect, quickbooksConfigured, readState } from "@/lib/agent/quic
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const back = (result: string) => Response.redirect(new URL(`/carrier/settings?tab=general&quickbooks=${result}`, process.env.PUBLIC_BASE_URL ?? url.origin), 303);
+  const back = (result: string) => Response.redirect(new URL(`/carrier/settings?tab=integrations&open=quickbooks&quickbooks=${result}`, process.env.PUBLIC_BASE_URL ?? url.origin), 303);
   if (!dbConfigured() || !quickbooksConfigured()) return back("off");
   const who = readState(url.searchParams.get("state") ?? "");
   const code = url.searchParams.get("code");

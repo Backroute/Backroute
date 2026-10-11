@@ -156,7 +156,7 @@ export interface Driver {
   /** Hours left on the 70-hour, 8-day clock (the "recap"), when known. The ELD's `hos.cycle` wins when connected. */
   cycleHoursLeft?: number;
   /** Real accounts with an ELD connected: the driver's hours clocks, and when they were read. */
-  hos?: { drive: number; shift: number; cycle: number; at: string; source: "samsara" | "motive" };
+  hos?: { drive: number; shift: number; cycle: number; at: string; source: "samsara" | "motive" | "geotab" };
   cdl: string;
   rating: number;
   hireDate: string;
@@ -298,7 +298,7 @@ export interface Truck {
   currentState: string;
   homeBase: string;
   /** Real accounts with an ELD connected: where the truck actually is, and when that was read. */
-  position?: { lat: number; lon: number; at: string; description?: string; source: "samsara" | "motive" };
+  position?: { lat: number; lon: number; at: string; description?: string; source: "samsara" | "motive" | "geotab" };
   /** Real accounts: the AI's plan for this truck (now, next, home time), refreshed every dispatch round. */
   plan?: { lines: string[]; at: string };
   /** Real accounts: the AI sent the truck empty toward busier freight; board searches start from there. */
@@ -373,7 +373,7 @@ export interface TruckFault {
   /** critical: stop and get it looked at (engine derate, oil pressure, coolant); warn: book it in soon. */
   severity: "info" | "warn" | "critical";
   at: string;
-  source: "samsara" | "motive" | "manual";
+  source: "samsara" | "motive" | "geotab" | "manual";
 }
 
 export interface RoadsideShop {
