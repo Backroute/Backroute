@@ -1,5 +1,6 @@
 "use client";
 
+import { FirstRunEmpty } from "@/components/shared/empty-next-step";
 import { TruckPapers } from "@/components/cloud/truck-papers";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, Home, Link2, MapPin, Phone, Sparkles, Users } from "lucide-react";
@@ -88,6 +89,16 @@ export default function FleetPage() {
         )}
       </section>
 
+      {trucks.length === 0 && (
+        <div className="px-4 pt-6 sm:px-8">
+          <FirstRunEmpty
+            title="No trucks yet"
+            body="Add each truck with its unit number and driver. Backroute finds loads for the trucks here, texts their drivers, and follows them on the map once the ELD is connected."
+          >
+            <AddTruckButton />
+          </FirstRunEmpty>
+        </div>
+      )}
       <div className="grid gap-5 px-4 py-6 sm:px-8 sm:grid-cols-2 xl:grid-cols-3">
         {trucks.map((truck) => {
           const driver = drivers.get(truck.driverId ?? "");

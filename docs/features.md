@@ -457,6 +457,30 @@ What the real version does today, and what it doesn't do yet. How to switch each
   - A link opens one panel (`/carrier/settings?tab=integrations&open=xero`), and Settings search finds each by name.
   - The sample account goes through the same panels, marked Sample; nothing leaves it.
 
+- **The 50-item round, features and polish:**
+  - **Fuel by real price:** the owner uploads the fuel card's station price list on Costs; each trip's fuel plan names
+    the cheapest stop the card covers in each state on the way, at the card's price, and says which file and date. A
+    real account with no price file gets no fuel plan (the sample prices are for the demo only).
+  - **Pay statement PDF** for each pay run, from the owner's Pay page and the driver's Profile (weekly statements).
+  - **Trip report** on every delivered load: times at each dock and how long it sat, trailer and seal, papers, scale
+    weight, detention, and what the load made after real fuel and tolls (estimates are marked), with a PDF.
+  - **Share tracking:** a link per load for the broker or shipper, no sign-in, good for 21 days. It shows the town the
+    truck is near (never the spot), an arrival time only from a position under two hours old, and the POD once
+    delivered; nothing about money or the driver. Signed on the server, so it can't be changed to show another load.
+  - **Shipper page:** a direct customer's link to their loads (moving now and the last 60 days), PODs and invoices.
+  - **Pickup steps:** trailer number (on a drop and hook, the trailer left and the one taken), a photo of the load
+    with the doors open, and the scale: steer, drives, trailer and gross checked against 12,000 / 34,000 / 34,000 /
+    80,000 lbs, with the ticket's photo. The office sets live load or drop and hook on the load page.
+  - **A broker's address changing:** a rate con that names (or comes from) another company's email than the broker
+    on file is held like a possible double broker: nothing booked, the broker asked at the known address, the owner
+    told. Rate cons sent through DocuSign or a TMS are judged by the email printed on them.
+  - **Money taps wait with Undo:** "Take it", "Walk away" and one-tap approvals (a detention invoice) count after a few
+    seconds, like a swipe.
+  - **A driver's first screen asks their language**, in every language at once; it sets both the app and how dispatch
+    talks to them.
+  - **New accounts see what each page is for:** Fleet, Earnings and Brokers say what will be there and the one step
+    that fills them.
+
 ## What it doesn't do yet
 
 The AI now does the day-to-day work of a dispatcher by email, text and phone. What's still out of its reach, or needs something from outside:

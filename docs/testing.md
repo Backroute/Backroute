@@ -316,6 +316,16 @@ The code was run against local stand-ins that behave like the real services:
     with a non-English file name and its date.
   - A driver's first day, walked through on a phone (sign in from the link, agree, pre-trip, pickup, BOL, delivery,
     POD): every step works and every screen is free of serious accessibility problems.
+  - Integrations and the 50-item features (30 checks in `hub-unit`, 30 in `features-unit`, and `hub-e2e`): Geotab
+    signed into with a sealed password (a wrong one said plainly, nothing saved), Check now, Xero connected through its
+    sign-in stand-in with a forged return refused, invoices and payments on the owner's account codes once each,
+    revoked on disconnect; direct deposit (a bad routing number turned away, accounts sealed and shown as the last
+    four, a NACHA file of 94-character records in whole blocks); "ask us to connect it" reaching support; the hub in
+    the browser (search, a panel's steps and form, a link opening one panel, Disconnect asking first). The unit checks:
+    routing check digits and the NACHA layout, safety event kinds, Xero invoices, the yearly driver-file reminders,
+    the price file and fuel plan, scale limits, the tracking view (town only, no stale ETA, nothing about money), signed
+    share links (expired or changed ones refused), a broker's address changing (DocuSign judged by the printed email),
+    pay statements, trip reports, and a well-formed PDF.
 - **Ready for real traffic:**
   - Crash reporting (11 checks in `errors-e2e`, 7 unit checks): an error in a browser or on the server is counted by
     kind (the same error on two loads is one kind), never with the page's query; a crashed page reports what it

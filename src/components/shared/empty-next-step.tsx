@@ -28,3 +28,24 @@ export function EmptyNextStep({ what, fallback }: { what: string; fallback: stri
     </div>
   );
 }
+
+/**
+ * A page with nothing on it yet, for a new account: what will be here, and the one step that fills it. The sample
+ * account always has data, so it never shows there.
+ */
+export function FirstRunEmpty({ title, body, action, href, children }: { title: string; body: string; action?: string; href?: string; children?: React.ReactNode }) {
+  const real = useStore((s) => s.session.mode !== "demo");
+  if (!real) return null;
+  return (
+    <div className="flex flex-col items-start gap-3 rounded-3xl border border-dashed border-line bg-white px-5 py-6">
+      <p className="text-base font-semibold text-ink-950">{title}</p>
+      <p className="max-w-xl text-sm text-ink-600">{body}</p>
+      {children ??
+        (href && (
+          <Button href={href} size="sm" variant="primary">
+            {action}
+          </Button>
+        ))}
+    </div>
+  );
+}

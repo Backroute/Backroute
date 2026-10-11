@@ -1,5 +1,6 @@
 "use client";
 
+import { FirstRunEmpty } from "@/components/shared/empty-next-step";
 import { Info } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,14 @@ export default function BrokersPage() {
     <div>
       <PageHeader title="Brokers" description="How each broker pays and treats carriers, and how Backroute deals with them." />
       <div className="flex flex-col gap-5 px-4 py-6 sm:px-8">
+        {rows.length === 0 && (
+          <FirstRunEmpty
+            title="No brokers yet"
+            body="Every broker who sends you a load lands here, checked with FMCSA first: authority, how long they've been around, and later how fast they pay you."
+            action="Connect email or a load board"
+            href="/carrier/settings?tab=integrations&open=forwarding"
+          />
+        )}
         <div className="grid grid-cols-3 gap-3">
           <Summary label="Book normally" value={counts.normal} tone="text-ink-950" />
           <Summary label="Ask more to cover slow pay" value={counts.surcharge} tone="text-[var(--accent-warn)]" />

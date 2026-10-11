@@ -338,7 +338,17 @@ export function NeedsYouList() {
             <SourceTag source={e.source} />
             <p className="text-sm leading-relaxed text-ink-800">{e.reason}</p>
             {e.answers && e.status === "open" ? (
-              <TakeOrWalk escalation={e} load={load} onAnswer={(yes) => (yes && celebrate("approve"), resolveEscalation(e.id, yes))} />
+              <TakeOrWalk
+                escalation={e}
+                load={load}
+                onAnswer={(yes) =>
+                  // Money moves on this: it waits a few seconds with Undo before it counts.
+                  queueWithUndo(e.id, yes ? e.answers!.yes : e.answers!.no, () => {
+                    if (yes) celebrate("approve");
+                    resolveEscalation(e.id, yes);
+                  })
+                }
+              />
             ) : e.suggestRule && signedIn ? (
               <RuleSuggestion escalation={e} />
             ) : e.portalTaskId && signedIn && e.status === "open" ? (
@@ -386,9 +396,12 @@ export function NeedsYouList() {
                   size="sm"
                   variant="primary"
                   onClick={() => {
-                    if (e.recommendedAction === "approve") celebrate("approve");
-                    else haptic("tap");
-                    resolveEscalation(e.id, e.recommendedAction === "approve");
+                    haptic("tap");
+                    // A tap that sends an invoice or a claim waits a few seconds with Undo, like a swipe.
+                    queueWithUndo(e.id, e.recommendedLabel ?? "Done", () => {
+                      if (e.recommendedAction === "approve") celebrate("approve");
+                      resolveEscalation(e.id, e.recommendedAction === "approve");
+                    });
                   }}
                 >
                   <Check className="h-3.5 w-3.5" /> {e.recommendedLabel}
@@ -476,9 +489,14 @@ export function NeedsYouList() {
                   <UserRound className="h-4 w-4 text-ink-400" /> Check in with {driver.name}
                 </p>
                 <p className="mt-0.5 text-xs text-ink-600">{view.signals.slice(0, 2).map((s) => s.text).join(" · ")}</p>
-                <div className="mt-3">
-                  <Button size="sm" variant="primary" href="/carrier/fleet#retention">
-                    See what to do
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {driver.phone && (
+                    <Button size="sm" variant="primary" href={`tel:${driver.phone.replace(/[^\d+]/g, "")}`}>
+                      <Phone className="h-3.5 w-3.5" /> Call {driver.name.split(" ")[0]}
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" href={`/carrier/fleet/driver/${driver.id}`}>
+                    {driver.name.split(" ")[0]}&apos;s page
                   </Button>
                 </div>
               </AttentionCard>

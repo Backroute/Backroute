@@ -90,8 +90,8 @@ export function LanguageCard({ driver }: { driver: Driver }) {
       <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-400">
         <Languages className="h-3.5 w-3.5" /> {t.language}
       </p>
-      {picker(t.talkLang, driver.prefs?.language ?? "en", (l) => setDriverPrefs(driver.id, { language: l }))}
-      {picker(t.appLang, appLangOf(driver), (l) => setDriverPrefs(driver.id, { appLanguage: l }))}
+      {picker(t.talkLang, driver.prefs?.language ?? "en", (l) => setDriverPrefs(driver.id, { language: l, langPicked: true }))}
+      {picker(t.appLang, appLangOf(driver), (l) => setDriverPrefs(driver.id, { appLanguage: l, langPicked: true }))}
       <p className="mt-2 text-xs text-ink-500">{t.languageNote}</p>
     </section>
   );

@@ -223,6 +223,8 @@ export interface DriverPrefs {
   language?: Lang;
   /** The language the app's screens are in. English unless the driver picks another. */
   appLanguage?: Lang;
+  /** The driver picked their language on first opening the app (or later in Profile), so it isn't asked again. */
+  langPicked?: boolean;
   /** Hour of the day (0–23) before which the AI doesn't call; it texts instead. */
   noCallsBefore?: number;
   /** States the driver won't take loads into (e.g. NJ for the NYC area). */

@@ -1,5 +1,6 @@
 "use client";
 
+import { FirstLanguagePick } from "@/components/driver/first-language";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUpRight, ChevronDown, ClipboardCheck, Link2, MapPin, Navigation, Phone } from "lucide-react";
@@ -171,6 +172,7 @@ export default function DriverHomePage() {
       )}
     <div className={cn("relative z-10 flex flex-col gap-5 px-5", hero && "-mt-7 rounded-t-[1.75rem] bg-white pt-3 shadow-[0_-8px_24px_rgb(0_0_0/0.12)]")}>
       {hero && <span aria-hidden className="mx-auto -mb-2 block h-1.5 w-10 rounded-full bg-ink-200" />}
+      <FirstLanguagePick driver={driver} />
       <ConsentCard />
       <div>
         <div className="flex items-center justify-between gap-3">

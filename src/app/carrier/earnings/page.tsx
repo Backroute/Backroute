@@ -1,5 +1,6 @@
 "use client";
 
+import { FirstRunEmpty } from "@/components/shared/empty-next-step";
 import { MoneyCharts } from "@/components/shared/money-charts";
 import { Lightbulb, Sparkles, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/shared/portal-shell";
@@ -102,6 +103,14 @@ export default function EarningsPage() {
       <PageHeader title="Earnings" />
 
       <div className="flex flex-col gap-6 px-4 py-6 sm:px-8">
+        {!loads.some((l) => l.stage === "delivered" || l.imported) && (
+          <FirstRunEmpty
+            title="Nothing earned yet"
+            body="Each load shows here the day it delivers: what it paid, less fuel, tolls and empty miles. Bring in last year's loads to see your lanes and brokers from day one."
+            action="Bring your history"
+            href="/carrier/settings?tab=general#set-history"
+          />
+        )}
         {/* Bento: the week's number is the big tile, everything that explains it sits around it in smaller ones. */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <MoneySource
